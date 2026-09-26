@@ -10,13 +10,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NT, Num, Pill } from '@/components/pulse/widgets';
 import { showRir } from '@/components/rir';
 import { useUser } from '@/lib/auth';
+import { ExercisePicker } from '@/components/ExercisePicker';
 import { useLocalized } from '@/lib/i18n';
 import {
   daysAgo, discardWorkout, finishWorkout, fmtSet, getActiveWorkout, lastTimeFor, loadHistory, logSet, repRange,
   saveActiveWorkout, suggestNext, unlogSet, type ActiveWorkout, type SessionData,
 } from '@/lib/training';
-import { EXERCISES, getExercise, MUSCLE_NAMES } from '@/three/catalog';
-import { MOTIONS } from '@/three/motions';
+import { getExercise } from '@/three/catalog';
 import { brand, fonts, night, space } from '@/theme';
 
 interface Draft { weight: string; reps: string }
@@ -229,32 +229,6 @@ export default function WorkoutLog() {
   );
 }
 
-function ExercisePicker({ onPick, onClose }: { onPick: (id: string) => void; onClose: () => void }) {
-  const { t } = useTranslation();
-  const { L } = useLocalized();
-  const [q, setQ] = useState('');
-  const list = EXERCISES.filter((e) => !q || L(e.name).toLowerCase().includes(q.toLowerCase()) || e.name.en.toLowerCase().includes(q.toLowerCase()));
-  return (
-    <View style={styles.sheetWrap}>
-      <SafeAreaView edges={['bottom']} style={styles.sheet}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: space.sm }}>
-          <TextInput value={q} onChangeText={setQ} placeholder={t('workout.search')} placeholderTextColor={night.faint}
-            style={[styles.search, { fontFamily: fonts.regular }]} />
-          <Pressable onPress={onClose} hitSlop={8}><Ionicons name="close" size={24} color={night.text} /></Pressable>
-        </View>
-        <ScrollView>
-          {list.map((e) => (
-            <Pressable key={e.id} onPress={() => onPick(e.id)} style={styles.pickRow}>
-              <NT style={{ flex: 1 }} numberOfLines={1}>{L(e.name)}</NT>
-              <NT size={11} faint>{MOTIONS[e.motion].primary.map((m) => L(MUSCLE_NAMES[m])).join('، ')}</NT>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.md, paddingVertical: space.sm },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: night.card },
@@ -272,8 +246,4 @@ const styles = StyleSheet.create({
   addSet: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 6 },
   addEx: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: night.line, paddingVertical: 14 },
   rest: { position: 'absolute', left: space.lg, right: space.lg, bottom: 28, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: brand.amber, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12 },
-  sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { maxHeight: '75%', backgroundColor: night.bg2, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: space.lg },
-  search: { flex: 1, height: 44, borderRadius: 12, backgroundColor: night.card, color: night.text, paddingHorizontal: 14, textAlign: 'auto' },
-  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: night.line },
 });

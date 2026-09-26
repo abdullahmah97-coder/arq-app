@@ -1,75 +1,89 @@
+// حساب مستخدم آخر: متابعة، صداقة، ورتبته وبرامجه ونصائحه
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import { gymName } from '@/components/GymPicker';
-import { Avatar, Button, Card, Loading, Row, Screen, Stat, T } from '@/components/ui';
+import { ProfileView } from '@/components/social/ProfileView';
+import { Button, Loading, Row, Screen } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { acceptRequest, relationTo, removeFriendship, sendRequest, type Relation } from '@/lib/friends';
 import { useLocalized } from '@/lib/i18n';
-import { errorKey, publicUrl, supabase } from '@/lib/supabase';
-import type { Gym, Profile } from '@/lib/types';
-import { colors, space } from '@/theme';
+import { follow, isFollowing, unfollow, type PublicProfile } from '@/lib/social';
+import { errorKey, supabase } from '@/lib/supabase';
+import type { Gym } from '@/lib/types';
+import { space } from '@/theme';
 
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const { userId } = useUser();
-  const [p, setP] = useState<Profile | null>(null);
+  const [p, setP] = useState<PublicProfile | null>(null);
   const [gym, setGym] = useState<Gym | null>(null);
   const [rel, setRel] = useState<{ relation: Relation; id?: string }>({ relation: 'none' });
-  const [busy, setBusy] = useState(false);
+  const [following, setFollowing] = useState(false);
+  const [busy, setBusy] = useState<'follow' | 'friend' | null>(null);
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
-    setP(data as Profile);
+    setP(data as PublicProfile);
     if (data?.gym_id) {
       const { data: g } = await supabase.from('gyms').select('*').eq('id', data.gym_id).single();
       setGym(g as Gym);
     }
-    setRel(await relationTo(userId, id));
+    const [r, f] = await Promise.all([relationTo(userId, id), isFollowing(userId, id)]);
+    setRel(r); setFollowing(f);
   }, [id, userId]);
 
   useEffect(() => { load(); }, [load]);
 
   if (!p) return <Loading />;
+  const self = p.id === userId;
+
+  const toggleFollow = async () => {
+    setBusy('follow');
+    // تحديث متفائل للعداد
+    setFollowing(!following);
+    setP({ ...p, followers_count: p.followers_count + (following ? -1 : 1) });
+    const { error } = following ? await unfollow(userId, p.id) : await follow(userId, p.id);
+    setBusy(null);
+    if (error) { Alert.alert(t(errorKey(error))); load(); }
+  };
 
   const run = async (fn: () => PromiseLike<{ error: any }>) => {
-    setBusy(true);
+    setBusy('friend');
     const { error } = await fn();
-    setBusy(false);
+    setBusy(null);
     if (error) Alert.alert(t(errorKey(error)));
     load();
   };
 
+  const friendBtn = (() => {
+    switch (rel.relation) {
+      case 'none': return <Button variant="secondary" icon="person-add-outline" title={t('profile.addFriend')} loading={busy === 'friend'} onPress={() => run(() => sendRequest(userId, id))} />;
+      case 'outgoing': return <Button variant="ghost" title={t('profile.pending')} loading={busy === 'friend'} onPress={() => run(() => removeFriendship(rel.id!))} />;
+      case 'incoming': return <Button variant="secondary" title={t('friends.accept')} loading={busy === 'friend'} onPress={() => run(() => acceptRequest(rel.id!))} />;
+      case 'friends': return <Button variant="ghost" title={t('profile.isFriend')} onPress={() => Alert.alert(t('friends.removeConfirm'), '', [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('friends.remove'), style: 'destructive', onPress: () => run(() => removeFriendship(rel.id!)) },
+      ])} />;
+      default: return null;
+    }
+  })();
+
   return (
     <Screen edges={['bottom']}>
       <Stack.Screen options={{ title: `@${p.username}` }} />
-      <View style={{ alignItems: 'center', gap: space.sm }}>
-        <Avatar size={96} uri={publicUrl('avatars', p.avatar_url)} name={p.full_name ?? p.username} />
-        <T size="xl" bold>{p.full_name || p.username}</T>
-        <T muted>@{p.username}{gym ? ` · 📍 ${gymName(gym, lng)}` : ''}</T>
-        {p.bio ? <T center>{p.bio}</T> : null}
-      </View>
-
-      <Row gap={space.md}>
-        <Stat icon="star" label={t('home.points')} value={p.points} />
-        <Stat icon="flame" color={colors.fire} label={t('home.streak')} value={p.streak} />
-        <Stat icon="ribbon" color={colors.gold} label={t('profile.bestStreak')} value={p.best_streak} />
-      </Row>
-
-      <Card>
-        {rel.relation === 'none' && <Button title={t('profile.addFriend')} icon="person-add" loading={busy} onPress={() => run(() => sendRequest(userId, id))} />}
-        {rel.relation === 'outgoing' && <Button title={`${t('profile.pending')} · ${t('common.cancel')}`} variant="ghost" loading={busy} onPress={() => run(() => removeFriendship(rel.id!))} />}
-        {rel.relation === 'incoming' && <Button title={t('friends.accept')} loading={busy} onPress={() => run(() => acceptRequest(rel.id!))} />}
-        {rel.relation === 'friends' && (
-          <Button title={t('profile.isFriend')} variant="secondary" onPress={() => Alert.alert(t('friends.removeConfirm'), '', [
-            { text: t('common.cancel'), style: 'cancel' },
-            { text: t('friends.remove'), style: 'destructive', onPress: () => run(() => removeFriendship(rel.id!)) },
-          ])} />
-        )}
-      </Card>
+      <ProfileView p={p} me={userId} gymLabel={gym ? gymName(gym, lng) : null} actions={self ? null : (
+        <Row gap={space.md}>
+          <View style={{ flex: 1 }}>
+            <Button title={following ? t('social.followingBtn') : t('social.follow')} icon={following ? 'checkmark' : 'add'}
+              variant={following ? 'secondary' : 'primary'} loading={busy === 'follow'} onPress={toggleFollow} />
+          </View>
+          <View style={{ flex: 1 }}>{friendBtn}</View>
+        </Row>
+      )} />
     </Screen>
   );
 }

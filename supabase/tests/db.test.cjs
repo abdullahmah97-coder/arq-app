@@ -40,7 +40,8 @@ grant usage on schema public, auth, storage to authenticated;
   await db.exec(fs.readFileSync(`${ROOT}/seed.sql`, 'utf8'));
   await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                  revoke update on public.profiles from authenticated;
-                 grant update (username, full_name, avatar_url, bio, gym_id, locale, onboarded) on public.profiles to authenticated;`);
+                 grant update (username, full_name, avatar_url, bio, gym_id, locale, onboarded) on public.profiles to authenticated;
+                 revoke insert, update on public.program_adopts from authenticated;`);
   console.log('ok   migration + seed applied');
 
   await q(`insert into auth.users (id, raw_user_meta_data) values
@@ -200,6 +201,50 @@ grant usage on schema public, auth, storage to authenticated;
   check('others cannot read sets', (await as(B, 'select * from workout_sets')).length === 0 && (await as(B, 'select * from workout_sessions')).length === 0);
   await expectErr('cannot add sets to another user session', () => as(B, `insert into workout_sets (session_id, user_id, exercise_id, set_index, reps, weight_kg) values ($1, $2, 'row_bb', 3, 10, 60)`, [ses.id, B]), /row-level security/);
   await expectErr('absurd weight rejected', () => as(A, `insert into workout_sets (session_id, user_id, exercise_id, set_index, reps, weight_kg) values ($1, $2, 'row_bb', 3, 10, 5000)`, [ses.id, A]), /check constraint/);
+
+  // follows + ranks + publishing (programs & tips)
+  await as(A, `insert into follows (follower, followee) values ($1, $2)`, [A, B]);
+  await as(C, `insert into follows (follower, followee) values ($1, $2)`, [C, B]);
+  let cnt = (await q('select followers_count, following_count from profiles where id = $1', [B]))[0];
+  check('follower count maintained by trigger', cnt.followers_count === 2 && cnt.following_count === 0, JSON.stringify(cnt));
+  check('following count', (await q('select following_count from profiles where id = $1', [A]))[0].following_count === 1);
+  await expectErr('cannot follow self', () => as(A, `insert into follows (follower, followee) values ($1, $1)`, [A]), /check constraint/);
+  await expectErr('cannot follow on behalf of others', () => as(A, `insert into follows (follower, followee) values ($1, $2)`, [C, A]), /row-level security/);
+  await expectErr('cannot fake follower count', () => as(B, `update profiles set followers_count = 10000 where id = $1`, [B]), /permission denied/);
+  await expectErr('cannot self-grant coach', () => as(B, `update profiles set is_coach = true where id = $1`, [B]), /permission denied/);
+  await as(C, `delete from follows where follower = $1`, [C]);
+  check('unfollow decrements', (await q('select followers_count from profiles where id = $1', [B]))[0].followers_count === 1);
+  check('rank levels', JSON.stringify((await q(`select array[rank_level(0), rank_level(149), rank_level(150), rank_level(500), rank_level(1200), rank_level(2500)] r`))[0].r) === '[0,0,1,2,3,4]');
+
+  const DAYS = JSON.stringify([{ title: 'Upper', exercises: [{ exercise_id: 'bench_bb', sets: 3, reps: '8-10', rest_sec: 120, rir: '1-2' }] }]);
+  await q('update profiles set points = 100 where id = $1', [A]);
+  await expectErr('beginner cannot post tips', () => as(A, `insert into tips (author, body) values ($1, 'اشرب مويه')`, [A]), /row-level security/);
+  await q('update profiles set points = 600 where id = $1', [A]);
+  await as(A, `insert into tips (author, body, tag) values ($1, 'نم ٨ ساعات قبل يوم الأرجل', 'recovery')`, [A]);
+  check('advanced can post tips', (await as(B, 'select * from tips')).length === 1);
+  await expectErr('advanced cannot publish programs yet', () => as(A, `insert into user_programs (author, title, days) values ($1, 'برنامجي', $2::jsonb)`, [A, DAYS]), /row-level security/);
+  await q('update profiles set points = 1300 where id = $1', [A]);
+  const up = (await as(A, `insert into user_programs (author, title, level, days) values ($1, 'علوي سفلي', 'beginner', $2::jsonb) returning id`, [A, DAYS]))[0];
+  check('pro publishes a program visible to all', (await as(B, 'select * from user_programs')).length === 1);
+  await expectErr('cannot publish as someone else', () => as(B, `insert into user_programs (author, title, days) values ($1, 'x x x', $2::jsonb)`, [A, DAYS]), /row-level security/);
+  await expectErr('empty days rejected', () => as(A, `insert into user_programs (author, title, days) values ($1, 'فاضي', '[]'::jsonb)`, [A]), /check constraint/);
+  await q('update profiles set is_coach = true where id = $1', [B]);
+  await as(B, `insert into tips (author, body) values ($1, 'verified coach tip')`, [B]);
+  check('verified coach can post regardless of points', (await as(A, 'select * from tips where author = $1', [B])).length === 1);
+  await expectErr('others cannot delete my program', () => as(B, `delete from user_programs where id = $1 returning id`, [up.id]).then(r => { if (!r.length) throw new Error('row-level security: nothing deleted'); }), /row-level security/);
+
+  const pA2 = (await q('select points from profiles where id=$1', [A]))[0].points;
+  const a1 = (await as(B, 'select adopt_program($1) p', [up.id]))[0].p;
+  const a2 = (await as(B, 'select adopt_program($1) p', [up.id]))[0].p;
+  const a3 = (await as(A, 'select adopt_program($1) p', [up.id]))[0].p;
+  const pA3 = (await q('select points from profiles where id=$1', [A]))[0].points;
+  check('author +10 once per adopter, not for self', a1 === 10 && a2 === 0 && a3 === 0 && pA3 - pA2 === 10, `${a1},${a2},${a3} ${pA2}->${pA3}`);
+  await expectErr('adopts only via RPC', () => as(C, `insert into program_adopts (program_id, user_id) values ($1, $2)`, [up.id, C]), /permission denied|row-level security/);
+  check('adopt count', (await as(C, 'select count(*)::int n from program_adopts where program_id = $1', [up.id]))[0].n === 2);
+  const tip = (await as(B, 'select id from tips where author = $1', [A]))[0];
+  await as(B, `insert into tip_likes (tip_id, user_id) values ($1, $2)`, [tip.id, B]);
+  await expectErr('cannot like as someone else', () => as(B, `insert into tip_likes (tip_id, user_id) values ($1, $2)`, [tip.id, A]), /row-level security/);
+  check('can_publish reflects rank', (await as(A, `select can_publish('program') p`))[0].p === true && (await as(C, `select can_publish('tip') p`))[0].p === false);
 
   // nearby
   const nb = await as(A, 'select * from nearby_gyms(24.69, 46.685, 5)');

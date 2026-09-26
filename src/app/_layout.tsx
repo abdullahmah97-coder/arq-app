@@ -70,6 +70,11 @@ function RootNavigator() {
         <Stack.Screen name="workout/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="workout/history" options={{ title: t('workout.history') }} />
         <Stack.Screen name="programs" options={{ title: t('programs.title') }} />
+        <Stack.Screen name="program/[id]" options={{ title: t('social.program') }} />
+        <Stack.Screen name="program/new" options={{ title: t('social.newProgram'), presentation: 'modal' }} />
+        <Stack.Screen name="tip/new" options={{ title: t('social.newTip'), presentation: 'modal' }} />
+        <Stack.Screen name="ranks" options={{ title: t('social.ranksTitle') }} />
+        <Stack.Screen name="follows/[id]" options={{ title: '' }} />
       </Stack.Protected>
     </Stack>
   );

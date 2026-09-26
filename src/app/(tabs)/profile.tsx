@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ProfileView } from '@/components/social/ProfileView';
 import { useTranslation } from 'react-i18next';
 import { Alert, I18nManager, Pressable, View } from 'react-native';
 import { checkForAppUpdate, isBeta, versionLabel } from '@/lib/appInfo';
 import { LanguageToggle } from '@/components/LanguageToggle';
-import { Avatar, Button, Card, Row, Screen, Stat, T } from '@/components/ui';
+import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
-import { errorKey, publicUrl, supabase } from '@/lib/supabase';
+import { errorKey, supabase } from '@/lib/supabase';
 import { deleteMyAccount } from '@/lib/account';
-import { BrandGradient, SaduPattern } from '@/brand/Brand';
-import { brand, colors, radius, space, THEMES, type ThemeId } from '@/theme';
+import { colors, space, THEMES, type ThemeId } from '@/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/lib/appTheme';
 import { useLocalized } from '@/lib/i18n';
@@ -29,25 +30,13 @@ function MenuItem({ icon, label, onPress }: { icon: IconName; label: string; onP
 
 export default function ProfileTab() {
   const { t } = useTranslation();
-  const { userId, profile, health } = useUser();
+  const { userId, profile, health, refreshProfile } = useUser();
+  const [reloadKey, setReloadKey] = useState(0);
+  useFocusEffect(useCallback(() => { refreshProfile(); setReloadKey((k) => k + 1); }, [refreshProfile]));
 
   return (
     <Screen>
-      <BrandGradient name="ember" style={{ borderRadius: radius.lg, overflow: 'hidden', padding: space.xl, alignItems: 'center', gap: space.sm }}>
-        <SaduPattern variant="arrows" opacity={0.14} />
-        <View style={{ borderWidth: 3, borderColor: brand.amber, borderRadius: 60, padding: 3 }}>
-          <Avatar size={92} uri={publicUrl('avatars', profile.avatar_url)} name={profile.full_name ?? profile.username} />
-        </View>
-        <T size="xl" bold color={brand.cream}>{profile.full_name || profile.username}</T>
-        <T color={brand.sand}>@{profile.username}</T>
-        {profile.bio ? <T center color={brand.cream}>{profile.bio}</T> : null}
-      </BrandGradient>
-
-      <Row gap={space.md}>
-        <Stat icon="star" label={t('home.points')} value={profile.points} />
-        <Stat icon="flame" color={colors.fire} label={t('home.streak')} value={profile.streak} />
-        <Stat icon="ribbon" color={colors.gold} label={t('profile.bestStreak')} value={profile.best_streak} />
-      </Row>
+      <ProfileView p={profile} me={userId} reloadKey={reloadKey} />
 
       {health?.weight_kg ? (
         <Card style={{ gap: space.xs }}>
@@ -61,6 +50,7 @@ export default function ProfileTab() {
 
       <Card style={{ paddingVertical: space.xs }}>
         {isBeta ? <MenuItem icon="chatbubble-ellipses-outline" label={t('beta.feedback')} onPress={() => router.push('/feedback')} /> : null}
+        <MenuItem icon="ribbon-outline" label={t('social.ranksTitle')} onPress={() => router.push('/ranks')} />
         <MenuItem icon="barbell-outline" label={t('workout.history')} onPress={() => router.push('/workout/history')} />
         <MenuItem icon="pulse-outline" label={t('health.title')} onPress={() => router.push('/health')} />
         <MenuItem icon="watch-outline" label={t('health.devices')} onPress={() => router.push('/devices')} />

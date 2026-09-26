@@ -21,6 +21,10 @@ export interface Profile {
   last_checkin_on: string | null;
   onboarded: boolean;
   created_at: string;
+  followers_count: number;
+  following_count: number;
+  /** مدرب موثّق (يُمنح من الإدارة) */
+  is_coach: boolean;
 }
 
 export interface HealthProfile {
