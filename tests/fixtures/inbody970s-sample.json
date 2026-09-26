@@ -1,0 +1,13 @@
+{
+  "device_model": "InBody970S", "test_date": "2021-03-31", "gender": "female", "age": 51, "height_cm": 156.9,
+  "weight_kg": 59.1, "smm_kg": 19.8, "body_fat_mass_kg": 21.5, "pbf_pct": 36.3, "bmi": 24.0, "ffm_kg": 37.6,
+  "total_body_water_l": 27.7, "protein_kg": 7.3, "minerals_kg": 2.65, "bmr_kcal": 1183, "ecw_ratio": 0.398,
+  "visceral_fat_level": null, "visceral_fat_area_cm2": 125.8, "inbody_score": null, "waist_hip_ratio": 0.97, "phase_angle": 4.3,
+  "target_weight_kg": 52.9, "weight_control_kg": -6.2, "fat_control_kg": -9.3, "muscle_control_kg": 3.1,
+  "segmental_lean": {
+    "right_arm": {"kg": 2.00, "pct": 99.8}, "left_arm": {"kg": 1.92, "pct": 95.7}, "trunk": {"kg": 17.7, "pct": 97.4},
+    "right_leg": {"kg": 5.24, "pct": 82.8}, "left_leg": {"kg": 5.16, "pct": 81.5}
+  },
+  "segmental_fat": null,
+  "ranges": { "weight": [45.0, 60.8], "smm": null, "body_fat_mass": [10.6, 16.9], "pbf": [18.0, 28.0], "bmi": [18.5, 25.0] }
+}

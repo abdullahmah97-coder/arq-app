@@ -39,3 +39,12 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# secrets
+.env
+
+# مفاتيح النشر (لا ترفعها أبداً)
+secrets/
+*.p8
+*.p12
+*.mobileprovision

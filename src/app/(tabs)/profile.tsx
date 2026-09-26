@@ -1,0 +1,133 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { Alert, I18nManager, Pressable, View } from 'react-native';
+import { checkForAppUpdate, isBeta, versionLabel } from '@/lib/appInfo';
+import { LanguageToggle } from '@/components/LanguageToggle';
+import { Avatar, Button, Card, Row, Screen, Stat, T } from '@/components/ui';
+import { useUser } from '@/lib/auth';
+import { errorKey, publicUrl, supabase } from '@/lib/supabase';
+import { deleteMyAccount } from '@/lib/account';
+import { BrandGradient, SaduPattern } from '@/brand/Brand';
+import { brand, colors, radius, space, THEMES, type ThemeId } from '@/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useAppTheme } from '@/lib/appTheme';
+import { useLocalized } from '@/lib/i18n';
+import type { IconName } from '@/components/ui';
+
+function MenuItem({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+      <Row style={{ paddingVertical: space.md }} gap={space.md}>
+        <Ionicons name={icon} size={22} color={colors.primary} />
+        <T style={{ flex: 1 }}>{label}</T>
+        <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.muted} />
+      </Row>
+    </Pressable>
+  );
+}
+
+export default function ProfileTab() {
+  const { t } = useTranslation();
+  const { userId, profile, health } = useUser();
+
+  return (
+    <Screen>
+      <BrandGradient name="ember" style={{ borderRadius: radius.lg, overflow: 'hidden', padding: space.xl, alignItems: 'center', gap: space.sm }}>
+        <SaduPattern variant="arrows" opacity={0.14} />
+        <View style={{ borderWidth: 3, borderColor: brand.amber, borderRadius: 60, padding: 3 }}>
+          <Avatar size={92} uri={publicUrl('avatars', profile.avatar_url)} name={profile.full_name ?? profile.username} />
+        </View>
+        <T size="xl" bold color={brand.cream}>{profile.full_name || profile.username}</T>
+        <T color={brand.sand}>@{profile.username}</T>
+        {profile.bio ? <T center color={brand.cream}>{profile.bio}</T> : null}
+      </BrandGradient>
+
+      <Row gap={space.md}>
+        <Stat icon="star" label={t('home.points')} value={profile.points} />
+        <Stat icon="flame" color={colors.fire} label={t('home.streak')} value={profile.streak} />
+        <Stat icon="ribbon" color={colors.gold} label={t('profile.bestStreak')} value={profile.best_streak} />
+      </Row>
+
+      {health?.weight_kg ? (
+        <Card style={{ gap: space.xs }}>
+          <T size="sm" muted>{t('profile.healthInfo')}</T>
+          <T bold>
+            {health.weight_kg} {t('common.kg')} · {health.height_cm} {t('common.cm')}
+            {health.goal ? ` · ${t(`onboarding.goal_${health.goal}`)}` : ''}
+          </T>
+        </Card>
+      ) : null}
+
+      <Card style={{ paddingVertical: space.xs }}>
+        {isBeta ? <MenuItem icon="chatbubble-ellipses-outline" label={t('beta.feedback')} onPress={() => router.push('/feedback')} /> : null}
+        <MenuItem icon="barbell-outline" label={t('workout.history')} onPress={() => router.push('/workout/history')} />
+        <MenuItem icon="pulse-outline" label={t('health.title')} onPress={() => router.push('/health')} />
+        <MenuItem icon="watch-outline" label={t('health.devices')} onPress={() => router.push('/devices')} />
+        <MenuItem icon="analytics-outline" label={t('profile.inbody')} onPress={() => router.push('/inbody')} />
+        <MenuItem icon="trending-down-outline" label={t('profile.progress')} onPress={() => router.push('/progress')} />
+        <MenuItem icon="people-outline" label={t('profile.friends')} onPress={() => router.push('/friends')} />
+        <MenuItem icon="create-outline" label={t('profile.edit')} onPress={() => router.push('/profile-edit')} />
+        <MenuItem icon="book-outline" label={t('profile.learn')} onPress={() => router.push('/learn/body-composition')} />
+      </Card>
+
+      <Card style={{ gap: space.md }}>
+        <T bold>{t('profile.theme')}</T>
+        <ThemePicker />
+      </Card>
+
+      <Card style={{ gap: space.md }}>
+        <T bold>{t('profile.language')}</T>
+        <LanguageToggle userId={userId} />
+      </Card>
+
+      <T size="xs" muted center>🔒 {t('profile.privacy')}</T>
+      <Button title={t('auth.signOut')} variant="ghost" icon="log-out-outline" onPress={() => supabase.auth.signOut()} />
+      <Pressable onPress={() => Alert.alert(t('profile.deleteAccount'), t('profile.deleteConfirm'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('profile.deleteYes'), style: 'destructive', onPress: () => deleteMyAccount(userId).catch((e) => Alert.alert(t(errorKey(e)))) },
+      ])}>
+        <T size="sm" center color={colors.danger}>{t('profile.deleteAccount')}</T>
+      </Pressable>
+      <Pressable onPress={async () => {
+        const r = await checkForAppUpdate();
+        if (r === 'none') Alert.alert(t('beta.upToDate'));
+        else if (r === 'unavailable') Alert.alert(t('beta.updateUnavailable'));
+      }}>
+        <T size="xs" muted center>{versionLabel()} · {t('beta.checkUpdate')}</T>
+      </Pressable>
+    </Screen>
+  );
+}
+
+/** اختيار لون التطبيق: ثيمات من درجات ألوان دليل الهوية */
+function ThemePicker() {
+  const { theme, setTheme } = useAppTheme();
+  const { lng } = useLocalized();
+  return (
+    <View style={{ flexDirection: 'row', gap: space.sm }}>
+      {(Object.keys(THEMES) as ThemeId[]).map((id) => {
+        const th = THEMES[id];
+        const active = theme === id;
+        return (
+          <Pressable key={id} accessibilityRole="radio" accessibilityState={{ selected: active }} accessibilityLabel={th.name[lng]}
+            onPress={() => {
+              if (active) return;
+              setTheme(id);
+              // الواجهة يُعاد تركيبها بالألوان الجديدة؛ نرجع لصفحة الحساب
+              setTimeout(() => router.navigate('/(tabs)/profile'), 60);
+            }}
+            style={{ flex: 1, alignItems: 'center', gap: 6 }}>
+            <View style={{ padding: 3, borderRadius: 16, borderWidth: 2, borderColor: active ? colors.primary : 'transparent', width: '100%' }}>
+              <LinearGradient colors={th.swatch} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={{ height: 58, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+                {active ? <Ionicons name="checkmark-circle" size={22} color={id === 'sand' ? th.swatch[2] : '#F8EDDA'} /> : null}
+              </LinearGradient>
+            </View>
+            <T size="xs" semibold={active}>{th.name[lng]}</T>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}

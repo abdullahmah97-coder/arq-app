@@ -1,25 +1,97 @@
 {
   "expo": {
-    "name": "gym-social",
-    "slug": "gym-social",
+    "name": "ARQ أرك",
+    "slug": "arq",
+    "scheme": "arq",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#F8EDDA",
+    "extra": {
+      "supportsRTL": true
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "sa.arq.app",
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true,
+        "NSMotionUsageDescription": "لحساب خطواتك اليومية. To count your daily steps."
+      }
     },
     "android": {
+      "package": "sa.arq.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#F1551D",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_DISTANCE",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_HEART_RATE_VARIABILITY",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.ACTIVITY_RECOGNITION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "نستخدم موقعك للتأكد أنك داخل النادي عند تسجيل الحضور. We use your location to confirm you are at the gym when you check in."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "لرفع صور التقدم والمنشورات. To upload progress photos and posts.",
+          "cameraPermission": "لتصوير الجسم والمنشورات. To take body and post photos."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 140,
+          "backgroundColor": "#F8EDDA"
+        }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "نقرأ خطواتك ونومك ونبضك من Apple Health لحساب جاهزيتك وتعديل تمرينك. We read steps, sleep and heart data from Apple Health to score your recovery and adapt your workout.",
+          "NSHealthUpdateUsageDescription": "لتسجيل تمارينك في Apple Health. To save your workouts to Apple Health.",
+          "background": false
+        }
+      ],
+      "react-native-health-connect",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "لحساب خطواتك اليومية. To count your daily steps."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
     }
   }
 }

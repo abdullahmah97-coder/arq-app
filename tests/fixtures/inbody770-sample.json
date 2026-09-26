@@ -1,0 +1,16 @@
+{
+  "device_model": "InBody770", "test_date": "2017-03-08", "gender": "female", "age": 41, "height_cm": 163,
+  "weight_kg": 66.4, "smm_kg": 26.7, "body_fat_mass_kg": 18.1, "pbf_pct": 27.2, "bmi": 25.0, "ffm_kg": 48.3,
+  "total_body_water_l": 35.5, "protein_kg": 9.5, "minerals_kg": 3.28, "bmr_kcal": 1413, "ecw_ratio": 0.380,
+  "visceral_fat_level": null, "visceral_fat_area_cm2": 71.2, "inbody_score": 81, "waist_hip_ratio": 0.83, "phase_angle": 6.0,
+  "target_weight_kg": 62.7, "weight_control_kg": -3.7, "fat_control_kg": -3.7, "muscle_control_kg": 0.0,
+  "segmental_lean": {
+    "right_arm": {"kg": 2.56, "pct": 116.6}, "left_arm": {"kg": 2.35, "pct": 107.4}, "trunk": {"kg": 20.9, "pct": 105.5},
+    "right_leg": {"kg": 7.79, "pct": 112.5}, "left_leg": {"kg": 7.59, "pct": 109.6}
+  },
+  "segmental_fat": {
+    "right_arm": {"kg": 1.1, "pct": 110.9}, "left_arm": {"kg": 1.2, "pct": 122.7}, "trunk": {"kg": 9.0, "pct": 167.0},
+    "right_leg": {"kg": 2.9, "pct": 119.5}, "left_leg": {"kg": 2.9, "pct": 118.0}
+  },
+  "ranges": { "weight": [48.5, 65.7], "smm": [null, null], "body_fat_mass": [11.4, 18.3], "pbf": [18.0, 28.0], "bmi": [18.5, 25.0] }
+}

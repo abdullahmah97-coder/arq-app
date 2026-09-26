@@ -1,0 +1,13 @@
+# كل ما يُرفع لفرع beta على GitHub يوصل للمختبرين كتحديث فوري (بدون بناء جديد)
+name: Beta OTA update
+
+on:
+  push:
+    branches: ['beta']
+
+jobs:
+  publish_update:
+    type: update
+    environment: preview
+    params:
+      channel: beta
