@@ -12,6 +12,8 @@ export interface PlanExercise {
   reps: string; // مثل "8-10" أو "30 ث"
   rest_sec: number;
   notes?: I18nText;
+  /** عدّات متبقية في الخزان (Reps In Reserve) مثل "1-2" */
+  rir?: string;
 }
 
 export interface PlanDay {
@@ -61,6 +63,8 @@ export interface WeeklyPlan {
   photo_notes?: I18nText;
   /** هل بُنيت الخطة على تقرير InBody */
   based_on_inbody?: boolean;
+  /** البرنامج الجاهز المعتمد (إن وجد) */
+  program?: { id: string; name: I18nText; credit?: string };
 }
 
 export interface PlanInput {

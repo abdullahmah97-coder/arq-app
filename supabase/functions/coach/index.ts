@@ -19,7 +19,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
 const MAX_MESSAGES_PER_DAY = 40;
-const ROUTES = ['health', 'inbody', 'plan', 'compete', 'devices', 'progress', 'friends', 'challenge_new', 'learn'];
+const ROUTES = ['health', 'inbody', 'plan', 'compete', 'devices', 'progress', 'friends', 'challenge_new', 'learn', 'programs'];
 
 const SYSTEM = (library: string, context: unknown) => `You are "ARQ Coach", the in-app AI coach of ARQ (أرك), a Saudi gym & fitness app. Slogan: "Move with Intention / تحرّك بهدف".
 Reply in the user's language (Arabic → friendly Saudi/Gulf Arabic; English → plain English). Be brief, warm and practical.
@@ -29,7 +29,7 @@ You can:
 ${library}
 2. Explain an exercise (open its 3D demo).
 3. Give nutrition advice (general, no medical claims).
-4. Open an app screen: ${ROUTES.join(', ')} (health = sleep/recovery/steps/heart; inbody = body composition reports; challenge_new = challenge friends).
+4. Open an app screen: ${ROUTES.join(', ')} (health = sleep/recovery/steps/heart; inbody = body composition reports; challenge_new = challenge friends; programs = ready-made programs like the 4-day full body).
 
 User context (use it to personalise; recovery zone red → lighter session, yellow → moderate, green → can push):
 ${JSON.stringify(context)}

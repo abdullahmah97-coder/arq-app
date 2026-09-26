@@ -513,7 +513,8 @@
     "route_friends": "Open friends",
     "route_challenge_new": "Create a challenge",
     "route_learn": "Body composition info",
-    "tab": "AI Coach"
+    "tab": "AI Coach",
+    "route_programs": "Open ready programs"
   },
   "workout": {
     "title": "Workout",
@@ -554,5 +555,24 @@
     "best": "Best",
     "progress": "Best set over time",
     "lastToday": "Last time (today):"
+  },
+  "programs": {
+    "title": "Ready programs",
+    "intro": "Proven training programs you can adopt as your weekly plan in one tap — every exercise has a 3D demo, and gets logged and compared with last time.",
+    "days": "{{n}} days",
+    "for_male": "For men",
+    "for_female": "For women",
+    "active": "Your current program",
+    "source": "Source",
+    "rest": "Rest {{a}}–{{b}} min",
+    "schedule": "Pick your training days",
+    "picked": "{{n}} of {{total}} days picked",
+    "adopt": "Adopt program",
+    "reapply": "Re-apply program",
+    "keepsMeals": "Your meal plan and daily targets stay as they are.",
+    "needPlan": "Create your plan first (so we keep your meals and targets), then adopt the program.",
+    "pickDays": "Pick {{n}} training days",
+    "adopted": "Done! The program is now your weekly plan 💪",
+    "browse": "Ready programs"
   }
 }

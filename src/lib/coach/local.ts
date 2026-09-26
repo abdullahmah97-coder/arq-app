@@ -30,6 +30,7 @@ const NO_EQUIP = new Set(['split_squat', 'glute_bridge', 'plank', 'walking_lunge
 const DUMBBELL_KINDS = new Set(['dumbbells', 'goblet', 'hammerDumbbells', 'dumbbellR', 'mat', 'bench', 'benchBehind', 'benchSideRow', 'inclineBench', 'seatBack']);
 
 const ROUTES: [RegExp, CoachRoute][] = [
+  [/برنامج|برامج|فل ?بدي|full ?body program|programs?/i, 'programs'],
   [/نوم|نمت|جاهزي|نبض|hrv|خطوات|خطواتي|ساعت?ي? .*بيانات|sleep|recovery|readiness|steps|strain/i, 'health'],
   [/in ?body|انبدي|إنبدي|تكوين الجسم|body composition/i, 'inbody'],
   [/اربط.*(ساعة|جوال)|ساعة|ساعتي|watch|apple health|health connect/i, 'devices'],

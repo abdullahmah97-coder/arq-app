@@ -10,6 +10,7 @@ import { todayIndex } from '@/lib/dates';
 import { adaptWorkout, useHealth } from '@/lib/health';
 import { findExercise } from '@/three/catalog';
 import { startWorkout } from '@/lib/training';
+import { showRir } from '@/components/rir';
 import { useLocalized } from '@/lib/i18n';
 import { latestAppliedAnalysis } from '@/lib/inbody';
 import { generatePlan, savePlan } from '@/lib/plan';
@@ -105,6 +106,17 @@ export default function PlanScreen() {
       </Row>
 
       <T muted>{L(p.summary)}</T>
+      {p.program?.credit ? <T size="xs" muted>{t('programs.source')}: {p.program.credit}</T> : null}
+      <Pressable onPress={() => router.push('/programs')}>
+        <Row style={{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: space.md }}>
+          <Ionicons name="albums-outline" size={20} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <T semibold>{t('programs.browse')}</T>
+            <T size="xs" muted numberOfLines={1}>{p.program ? L(p.program.name) : t('programs.intro')}</T>
+          </View>
+          <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.muted} />
+        </Row>
+      </Pressable>
 
       {p.based_on_inbody ? (
         <Pressable onPress={() => router.push('/inbody')}>
@@ -173,7 +185,7 @@ export default function PlanScreen() {
             title: L(workout.focus), source: 'plan', plan_id: plan.id, plan_day: day === todayIndex() ? day : null,
             exercises: workout.exercises.flatMap((e) => {
               const g = findExercise(e.exercise_id ?? e.name.en);
-              return g ? [{ exercise_id: g.id, sets: e.sets, reps: e.reps, rest_sec: e.rest_sec }] : [];
+              return g ? [{ exercise_id: g.id, sets: e.sets, reps: e.reps, rest_sec: e.rest_sec, rir: e.rir }] : [];
             }),
           }).catch((e) => Alert.alert(t(errorKey(e))))} />
       ) : null}
@@ -212,7 +224,7 @@ function Macro({ label, value, unit, color }: { label: string; value: string; un
 
 function WorkoutDay({ d, canComplete, onComplete, busy, onStart }: { d: PlanDay; canComplete: boolean; onComplete: () => void; busy: boolean; onStart: () => void }) {
   const { t } = useTranslation();
-  const { L } = useLocalized();
+  const { L, lng } = useLocalized();
   return (
     <View style={{ gap: space.md }}>
       <T size="lg" bold style={{ color: colors.primary }}>{L(d.focus)}</T>
@@ -224,7 +236,14 @@ function WorkoutDay({ d, canComplete, onComplete, busy, onStart }: { d: PlanDay;
             <T bold style={{ flex: 1 }}>{i + 1}. {L(e.name)}</T>
             <T bold style={{ color: colors.primary }}>{t('plan.sets', { sets: e.sets, reps: e.reps })}</T>
           </Row>
-          <T size="sm" muted>{t('plan.rest', { sec: e.rest_sec })}</T>
+          <Row gap={6}>
+            <T size="sm" muted>{t('plan.rest', { sec: e.rest_sec })}</T>
+            {e.rir ? (
+              <Pressable onPress={() => showRir(lng)} hitSlop={6} style={{ backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                <T size="xs" semibold>RIR {e.rir} ⓘ</T>
+              </Pressable>
+            ) : null}
+          </Row>
           {e.notes ? <T size="sm" muted>💡 {L(e.notes)}</T> : null}
           {guide ? (
             <Row gap={6} style={{ alignSelf: 'flex-start', backgroundColor: brand.deepGreen, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginTop: 2 }}>

@@ -24,7 +24,7 @@ import { brand, fonts, night, space } from '@/theme';
 const KEY = 'arq.coach.history';
 const ROUTE_PATH: Record<CoachRoute, string> = {
   health: '/health', inbody: '/inbody', plan: '/(tabs)/plan', compete: '/(tabs)/compete', devices: '/devices',
-  progress: '/progress', friends: '/friends', challenge_new: '/challenge/new', learn: '/learn/body-composition',
+  progress: '/progress', friends: '/friends', challenge_new: '/challenge/new', learn: '/learn/body-composition', programs: '/programs',
 };
 
 /** نص بسيط يدعم **عريض** وأسطر جديدة */

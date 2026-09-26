@@ -1,4 +1,8 @@
 // اختبار المقارنة مع آخر جلسة مماثلة
+import { applyProgram, PROGRAMS } from '../src/content/programs';
+import { generateRulesPlan } from '../src/lib/plan/rules';
+import { isWeeklyPlan } from '../src/lib/plan/validate';
+import { getExercise } from '../src/three/catalog';
 import { compareSession, e1rm, findLastSimilar, similarity, suggestNext, summarize, type SessionData } from '../src/lib/training/stats';
 
 let fail = 0;
@@ -33,6 +37,20 @@ ok(JSON.stringify(suggestNext('row_bb', back2.sets, '8-10')) === JSON.stringify(
 ok(suggestNext('row_bb', back1.sets, '8-12')!.weight === 60 && !suggestNext('row_bb', back1.sets, '8-12')!.increase, 'suggest same weight');
 ok(suggestNext('back_squat', [{ exercise_id: 'back_squat', set_index: 1, reps: 12, weight_kg: 80 }, { exercise_id: 'back_squat', set_index: 2, reps: 12, weight_kg: 80 }], '8-12')!.weight === 85, 'lower body +5 kg');
 ok(suggestNext('plank', [], '30') === null, 'no history → null');
+
+// البرامج الجاهزة (فل بدي ٤ أيام)
+for (const pr of PROGRAMS) {
+  ok(pr.days.length === pr.daysPerWeek && pr.schedule.length === pr.daysPerWeek, `${pr.id}: days/schedule`);
+  ok(pr.days.every((d) => d.exercises.every((e) => !!getExercise(e.exercise_id))), `${pr.id}: every exercise has a 3D demo`);
+  const base = generateRulesPlan({ gender: 'male', goal: 'gain', level: 'intermediate', days_per_week: 3, weight_kg: 80, height_cm: 178, age: 28 });
+  const plan = applyProgram(pr, base);
+  ok(isWeeklyPlan(plan), `${pr.id}: produces a valid weekly plan`);
+  ok(plan.days.filter((d) => !d.rest).length === 4 && plan.days[0].exercises.length === 7 && plan.days[0].exercises[0].rir === '1-2', `${pr.id}: 4 training days, day 1 = 7 exercises with RIR`);
+  ok(plan.meals === base.meals && plan.targets === base.targets, `${pr.id}: keeps meals & targets`);
+  ok(plan.days[0].exercises[0].rest_sec === 150 && plan.days[0].exercises[3].rest_sec === 90, `${pr.id}: rest 2–3 min → 150 s, 1–2 min → 90 s`);
+}
+const total = PROGRAMS[0].days.reduce((a, d) => a + d.exercises.length, 0);
+ok(total === 25, `program has 25 exercise slots (${total})`);
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL TRAINING TESTS PASSED');
 if (fail) process.exit(1);

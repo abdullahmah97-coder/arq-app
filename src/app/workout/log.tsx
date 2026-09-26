@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NT, Num, Pill } from '@/components/pulse/widgets';
+import { showRir } from '@/components/rir';
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
 import {
@@ -24,7 +25,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).
 
 export default function WorkoutLog() {
   const { t } = useTranslation();
-  const { L } = useLocalized();
+  const { L, lng } = useLocalized();
   const { userId, refreshProfile } = useUser();
   const [w, setW] = useState<ActiveWorkout | null>(null);
   const [history, setHistory] = useState<SessionData[]>([]);
@@ -143,7 +144,14 @@ export default function WorkoutLog() {
                       <Ionicons name="cube-outline" size={20} color={brand.amber} />
                     </Pressable>
                   </View>
-                  <NT size={12} faint>{t('workout.target', { sets: e.sets, reps: e.reps })}</NT>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <NT size={12} faint>{t('workout.target', { sets: e.sets, reps: e.reps })}</NT>
+                    {e.rir ? (
+                      <Pressable onPress={() => showRir(lng)} hitSlop={6} style={{ backgroundColor: night.cardStrong, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                        <NT size={11} semibold color={brand.amber}>RIR {e.rir} ⓘ</NT>
+                      </Pressable>
+                    ) : null}
+                  </View>
 
                   {/* آخر مرة */}
                   {inf?.last ? (

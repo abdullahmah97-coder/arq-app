@@ -69,6 +69,7 @@ function RootNavigator() {
         <Stack.Screen name="workout/log" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="workout/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="workout/history" options={{ title: t('workout.history') }} />
+        <Stack.Screen name="programs" options={{ title: t('programs.title') }} />
       </Stack.Protected>
     </Stack>
   );

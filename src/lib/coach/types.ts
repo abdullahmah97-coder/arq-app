@@ -1,6 +1,6 @@
 // صيغة ردود مدرب ARQ الذكي (نفسها من الذكاء الاصطناعي أو من المحرك المحلي)
 
-export type CoachRoute = 'health' | 'inbody' | 'plan' | 'compete' | 'devices' | 'progress' | 'friends' | 'challenge_new' | 'learn';
+export type CoachRoute = 'health' | 'inbody' | 'plan' | 'compete' | 'devices' | 'progress' | 'friends' | 'challenge_new' | 'learn' | 'programs';
 
 export interface CoachWorkoutItem {
   exercise_id: string;

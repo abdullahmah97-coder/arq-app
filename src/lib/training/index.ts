@@ -6,7 +6,7 @@ import type { SessionData, SetEntry } from './stats';
 
 export * from './stats';
 
-export interface PlannedExercise { exercise_id: string; sets: number; reps: string; rest_sec: number }
+export interface PlannedExercise { exercise_id: string; sets: number; reps: string; rest_sec: number; rir?: string }
 
 export interface ActiveWorkout {
   session_id: string;
