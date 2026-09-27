@@ -847,7 +847,7 @@
     "rejectNeedsNote": "Write the reason so the brand knows what to fix",
     "verifyCoach": "Verify as coach ✓",
     "unverifyCoach": "Remove coach verification",
-    "offers": "Gym offers",
+    "offers": "Offers",
     "offersHint": "Add gym offers and membership prices. You can also assign a manager per gym to post their own offers (via SQL for now).",
     "inactive": "Paused"
   },
