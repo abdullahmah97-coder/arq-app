@@ -1,4 +1,5 @@
 # كل ما يُرفع لفرع beta على GitHub يوصل للمختبرين كتحديث فوري (بدون بناء جديد)
+# APP_VARIANT لازم يطابق بروفايل beta في eas.json، وإلا تختلف بصمة النسخة (runtime) وما يوصل التحديث للجوال
 name: Beta OTA update
 
 on:
@@ -9,5 +10,7 @@ jobs:
   publish_update:
     type: update
     environment: preview
+    env:
+      APP_VARIANT: beta
     params:
       channel: beta

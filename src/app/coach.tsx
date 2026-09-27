@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Logo, SaduPattern } from '@/brand/Brand';
+import { goBackOrHome } from '@/components/HeaderBack';
 import { NT, Num } from '@/components/pulse/widgets';
 import { useUser } from '@/lib/auth';
 import { askCoach, starterChips, type CoachContext, type CoachMessage, type CoachReply, type CoachRoute, type CoachWorkout } from '@/lib/coach';
@@ -107,10 +108,14 @@ export default function Coach() {
       <StatusBar style={night.statusBar} />
       <LinearGradient colors={[night.bg2, night.bg]} style={StyleSheet.absoluteFill} end={{ x: 0, y: 0.45 }} />
       <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
+        {/* مقبض السحب: اسحب لتحت للإغلاق */}
+        <View style={styles.grabber} />
         {/* الترويسة */}
         <View style={styles.header}>
-          <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} hitSlop={10} style={styles.iconBtn}>
-            <Ionicons name="close" size={22} color={night.text} />
+          <Pressable onPress={goBackOrHome} hitSlop={12} style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
+            accessibilityRole="button" accessibilityLabel={t('common.close')}>
+            <Ionicons name="close" size={20} color={night.text} />
+            <NT size={13} semibold>{t('common.close')}</NT>
           </Pressable>
           <View style={{ alignItems: 'center' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -237,6 +242,8 @@ function WorkoutCard({ w, onAdd, onStart, hasPlan }: { w: CoachWorkout; onAdd: (
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.md, paddingVertical: space.sm },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: night.card },
+  closeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 40, paddingHorizontal: 12, borderRadius: 20, backgroundColor: night.cardStrong, borderWidth: 1, borderColor: night.line },
+  grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: night.line, marginTop: 6 },
   hello: { alignItems: 'center', gap: space.md, paddingTop: space.xl, paddingHorizontal: space.lg },
   orb: { width: 84, height: 84, borderRadius: 22, backgroundColor: brand.orange, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '45deg' }], overflow: 'hidden', marginBottom: space.md },
   bubble: { maxWidth: '88%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },

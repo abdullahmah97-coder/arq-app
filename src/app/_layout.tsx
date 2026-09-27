@@ -6,12 +6,19 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { HeaderBack } from '@/components/HeaderBack';
 import { Loading } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { HealthProvider } from '@/lib/health';
 import { restoreLocale } from '@/lib/i18n';
 import { colors, fontAssets, fonts, type ThemeId } from '@/theme';
 import { restoreTheme, saveTheme, ThemeCtx } from '@/lib/appTheme';
+
+/** الصفحات اللي تفتح كنافذة من تحت: زر إغلاق بدل سهم الرجوع */
+const MODAL_ROUTES = new Set([
+  'post/new', 'challenge/new', 'feedback', 'program/new', 'tip/new',
+  'clubs/chain-edit', 'clubs/review', 'clubs/offer', 'store/join', 'store/product',
+]);
 
 const navTheme = () => ({
   ...DefaultTheme,
@@ -29,14 +36,17 @@ function RootNavigator() {
 
   return (
     <Stack
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerStyle: { backgroundColor: colors.bg },
         headerTintColor: colors.text,
         headerTitleStyle: { fontFamily: fonts.title },
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.bg },
         headerBackButtonDisplayMode: 'minimal',
-      }}
+        // زر رجوع خاص يشتغل دائماً (بدل الأصلي)، وزر إغلاق للنوافذ
+        headerLeft: () => <HeaderBack close={MODAL_ROUTES.has(route.name)} />,
+        gestureEnabled: true,
+      })}
     >
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -65,7 +75,8 @@ function RootNavigator() {
         <Stack.Screen name="devices" options={{ title: t('health.devices') }} />
         <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
         <Stack.Screen name="feedback" options={{ title: t('beta.feedback'), presentation: 'modal' }} />
-        <Stack.Screen name="coach" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+        {/* نافذة من تحت: تنسحب لتحت للإغلاق، وفيها زر إغلاق واضح */}
+        <Stack.Screen name="coach" options={{ headerShown: false, presentation: 'modal', gestureEnabled: true }} />
         <Stack.Screen name="workout/log" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="workout/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="workout/history" options={{ title: t('workout.history') }} />

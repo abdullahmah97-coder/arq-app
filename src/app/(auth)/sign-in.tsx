@@ -31,7 +31,7 @@ export default function SignIn() {
           <SaduPattern variant="peaks" color={brand.cream} opacity={0.25} />
           <SafeAreaView edges={['top']} style={{ paddingHorizontal: space.lg }}>
             <View style={{ alignItems: 'flex-end', paddingTop: space.sm }}>
-              <LanguageToggle />
+              <LanguageToggle compact />
             </View>
             <View style={{ alignItems: 'center', gap: space.lg, marginTop: space.xl }}>
               <Logo variant="mark" height={96} color={brand.cream} />

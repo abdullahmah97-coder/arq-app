@@ -1,4 +1,5 @@
-# بناء نسخة تجريبية جديدة ورفعها للمتجرين (للتغييرات الأصلية Native) — عند الرفع لفرع release-beta
+# بناء نسخة آيفون تجريبية جديدة ورفعها لـ TestFlight (للتغييرات الأصلية Native) — عند الرفع لفرع release-beta
+# أندرويد يُضاف لاحقاً بعد إعداد حساب Google Play (مفتاح الخدمة في secrets/)
 name: Beta build & submit
 
 on:
@@ -11,20 +12,9 @@ jobs:
     params:
       platform: ios
       profile: beta
-  build_android:
-    type: build
-    params:
-      platform: android
-      profile: beta
   submit_ios:
     type: submit
     needs: [build_ios]
     params:
       build_id: ${{ needs.build_ios.outputs.build_id }}
-      profile: beta
-  submit_android:
-    type: submit
-    needs: [build_android]
-    params:
-      build_id: ${{ needs.build_android.outputs.build_id }}
       profile: beta

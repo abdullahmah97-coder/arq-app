@@ -3,8 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+// قاعدة بيانات ARQ الفعلية — احتياط إذا ما وصلت المتغيرات للبناء أو التحديث الفوري
+// (مفتاح anon عام بطبيعته ومحمي بصلاحيات RLS)
+const PROD_URL = 'https://hfplqbnbuskiaeblxpfo.supabase.co';
+const PROD_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcGxxYm5idXNraWFlYmx4cGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1MDQxOTUsImV4cCI6MjEwNjA4MDE5NX0.ptXrGAqJz-ii3AU0HEnrx5bTnQNLLS2wm5tH3p10drI';
+const url = process.env.EXPO_PUBLIC_SUPABASE_URL || PROD_URL;
+const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || PROD_ANON_KEY;
 
 if (!url || !anonKey) {
   console.warn('Missing EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY — copy .env.example to .env');
