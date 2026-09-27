@@ -317,7 +317,7 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
       case 'goblet': {
         const db = makeDumbbell(M, 0.3); group.add(db);
         updaters.push(() => {
-          midHands(_a); db.position.copy(_a); db.position.y -= 0.13;
+          midHands(_a); db.position.copy(_a); db.position.y -= 0.17; db.position.addScaledVector(new THREE.Vector3(0, 0, 1), 0.03);
           db.rotation.set(0, 0, Math.PI / 2);
         });
         break;

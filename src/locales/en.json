@@ -542,7 +542,9 @@
     "female": "Female",
     "notFound": "Exercise not found",
     "dragHint": "Drag to rotate · tap a muscle to highlight it",
-    "allMuscles": "All muscles"
+    "allMuscles": "All muscles",
+    "styleAthlete": "Athlete",
+    "styleMuscles": "Muscles"
   },
   "beta": {
     "badge": "Beta",

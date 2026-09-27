@@ -34,7 +34,14 @@ export interface Human {
   setHighlight(primary: Muscle[], secondary: Muscle[]): void;
   /** قبضة الأصابع: 0 مفتوح … 1 مقفل */
   setGrip(amount: number): void;
+  /** athlete = لاعب بملابس ARQ، anatomy = جسم رمادي والعضلات الشغالة بالأحمر (عرض تشريحي) */
+  setStyle(style: HumanStyle): void;
 }
+
+export type HumanStyle = 'athlete' | 'anatomy';
+const CLAY = new THREE.Color('#BCC3C7'); // (THREE.Color يحوّل للخطي تلقائياً)
+const ANAT_P = new THREE.Color('#D8261C');
+const ANAT_S = new THREE.Color('#F08A2E');
 
 const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
@@ -82,6 +89,8 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
     g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     skins.push({ mesh: m, base, colors, cloth: /Cloth/i.test(m.name) });
   });
+  const extras: THREE.Object3D[] = [];
+  model.traverse((o) => { if ((o as THREE.Mesh).isMesh && /Logo/i.test(o.name)) extras.push(o); });
 
   const bone = (n: string) => {
     const b = findBone(model, n);
@@ -214,7 +223,12 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
   const layers = skins.map((l) => ({ ...l, regions: paintRegions(l.mesh), adj: adjacency(l.mesh.geometry) }));
   const P = new THREE.Color(HUMAN_COLORS.primary).convertSRGBToLinear();
   const Sc = new THREE.Color(HUMAN_COLORS.secondary).convertSRGBToLinear();
+  let style: HumanStyle = 'athlete';
+  let lastP: Muscle[] = []; let lastS: Muscle[] = [];
   const setHighlight = (primary: Muscle[], secondary: Muscle[]) => {
+    lastP = primary; lastS = secondary;
+    const anat = style === 'anatomy';
+    const PC = anat ? ANAT_P : P; const SC = anat ? ANAT_S : Sc;
     for (const l of layers) {
       const { muscle, weight } = l.regions;
       const n = muscle.length;
@@ -222,20 +236,27 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
       let kp = new Float32Array(n), ks = new Float32Array(n);
       for (let i = 0; i < n; i++) {
         const m = muscle[i];
-        const k = Math.min(0.85, (l.cloth ? 0.55 : 0.45) + weight[i] * 0.35);
+        const k = anat ? Math.min(0.95, 0.7 + weight[i] * 0.3) : Math.min(0.85, (l.cloth ? 0.55 : 0.45) + weight[i] * 0.35);
         if (m && primary.includes(m)) kp[i] = k; else if (m && secondary.includes(m)) ks[i] = k;
       }
       for (let it = 0; it < 3; it++) { kp = smoothField(kp, l.adj); ks = smoothField(ks, l.adj); }
       for (let i = 0; i < n; i++) {
         const j = i * 3;
-        let r = l.base[j], g = l.base[j + 1], b = l.base[j + 2];
+        let r = anat ? CLAY.r : l.base[j], g = anat ? CLAY.g : l.base[j + 1], b = anat ? CLAY.b : l.base[j + 2];
         const a = Math.min(1, kp[i] * 1.25), c = Math.min(1, ks[i] * 1.25) * (1 - a);
-        r += (Sc.r - r) * c; g += (Sc.g - g) * c; b += (Sc.b - b) * c;
-        r += (P.r - r) * a; g += (P.g - g) * a; b += (P.b - b) * a;
+        r += (SC.r - r) * c; g += (SC.g - g) * c; b += (SC.b - b) * c;
+        r += (PC.r - r) * a; g += (PC.g - g) * a; b += (PC.b - b) * a;
         l.colors[j] = r; l.colors[j + 1] = g; l.colors[j + 2] = b;
       }
       (l.mesh.geometry.attributes.color as THREE.BufferAttribute).needsUpdate = true;
+      const mat = l.mesh.material as THREE.MeshStandardMaterial;
+      mat.roughness = anat ? 0.5 : 0.6;
     }
+  };
+  const setStyle = (next: HumanStyle) => {
+    style = next;
+    for (const e of extras) e.visible = next !== 'anatomy';
+    setHighlight(lastP, lastS);
   };
   setHighlight([], []);
 
@@ -267,7 +288,7 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
     }
   };
 
-  return { object, propRig, sync, setHighlight, setGrip };
+  return { object, propRig, sync, setHighlight, setGrip, setStyle };
 }
 
 // ---------------------------------------------------------------------------

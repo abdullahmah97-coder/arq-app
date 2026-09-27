@@ -542,7 +542,9 @@
     "female": "امرأة",
     "notFound": "التمرين غير موجود",
     "dragHint": "اسحب لتدوير المجسّم · اضغط على العضلة لإبرازها",
-    "allMuscles": "كل العضلات"
+    "allMuscles": "كل العضلات",
+    "styleAthlete": "لاعب",
+    "styleMuscles": "عضلات"
   },
   "beta": {
     "badge": "تجريبي",

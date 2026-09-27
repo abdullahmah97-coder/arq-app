@@ -2,12 +2,15 @@
 import '@/polyfills/process';
 import { Ionicons } from '@expo/vector-icons';
 import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as THREE from 'three';
 import { createHuman } from '@/three/human';
 import { motionDuration, MOTIONS, sampleMotion } from '@/three/motions';
 import { bakeStaticProps, createFloor, createProps } from '@/three/equipment';
 import { motionBounds, placeCamera } from '@/three/framing';
+import type { HumanStyle } from '@/three/human';
+import { createStudio, enableShadows } from '@/three/studio';
 import { applyPose, createRig, type Muscle } from '@/three/rig';
 import { brand } from '@/theme';
 import { ExerciseFigure2D } from './ExerciseFigure2D';
@@ -48,11 +51,11 @@ interface Props {
 }
 
 type SceneProps = Props & {
-  playing: boolean; yaw: { current: number }; speed: number;
+  playing: boolean; yaw: { current: number }; speed: number; bodyStyle: HumanStyle;
   onFrame: () => void; onFail: (where: string, e: unknown) => void;
 };
 
-function Scene({ motion, gender, focus, playing, yaw, speed, onFrame, onFail }: SceneProps) {
+function Scene({ motion, gender, focus, playing, yaw, speed, bodyStyle, onFrame, onFail }: SceneProps) {
   const { useLoader, useFrame, GLTFLoader } = loadEngine()!;
   const gltf = useLoader(GLTFLoader, MODELS[gender] as unknown as string);
   const m = MOTIONS[motion];
@@ -76,11 +79,20 @@ function Scene({ motion, gender, focus, playing, yaw, speed, onFrame, onFail }: 
       props.update();
     }));
     const center = bounds.getCenter(new THREE.Vector3());
+    // الاستوديو: خلفية متدرجة + إضاءة ثلاثية + ظل حقيقي على الأرض
+    try {
+      world.add(createStudio(bounds, { shadows: true }).group);
+      enableShadows(human.object);
+      enableShadows(props.group);
+    } catch (e) { logEvent('3d_studio_error', errorDetail(e), { once: true }); }
     return { driver, human, props, world, bounds, center };
   }, [gltf, m]);
   const cam = useRef({ dist: 0 });
   const perf = useRef({ n: 0, t0: 0, sent: false });
 
+  useEffect(() => {
+    try { rig.human.setStyle(bodyStyle); } catch (e) { onFail('style', e); }
+  }, [rig, bodyStyle, onFail]);
   useEffect(() => {
     try {
       if (focus) rig.human.setHighlight([focus], []);
@@ -129,8 +141,11 @@ class Guard extends Component<{ fallback: ReactNode; onError: (e: unknown) => vo
 const READY_FRAMES = 30;
 
 export function ExerciseViewer({ motion, gender, focus, height = 420 }: Props) {
+  const { t } = useTranslation();
   const [playing, setPlaying] = useState(true);
   const [slow, setSlow] = useState(false);
+  // شكل الجسم: لاعب بملابس ARQ أو عرض تشريحي (جسم رمادي والعضلات الشغالة بالأحمر)
+  const [bodyStyle, setBodyStyle] = useState<HumanStyle>('athlete');
   // 3D (النموذج الواقعي) أو 2D (رسم بدون كرت الرسومات). نبدأ بالتحقق: هل طيّح 3D التطبيق قبل؟
   const [mode, setMode] = useState<'checking' | Mode3D>('checking');
   const failed = useRef(false);
@@ -206,6 +221,7 @@ export function ExerciseViewer({ motion, gender, focus, height = 420 }: Props) {
       ) : mode === '2d' || !E ? flat : (
         <Guard key={gender} fallback={flat} onError={(e) => fail('render', e)}>
           <E.Canvas camera={{ fov: 30, near: 0.1, far: 50, position: [0, 1.3, 3.9] }} gl={{ antialias: true }}
+            shadows={{ enabled: true, type: THREE.PCFShadowMap }}
             onCreated={({ gl }) => {
               try {
                 const c = gl.getContext();
@@ -213,11 +229,8 @@ export function ExerciseViewer({ motion, gender, focus, height = 420 }: Props) {
               } catch (e) { logEvent('3d_gl_error', errorDetail(e), { once: true }); }
             }}>
             <color attach="background" args={[brand.cream]} />
-            <hemisphereLight args={['#fff7ea', '#b89a74', 1.3]} />
-            <directionalLight position={[2, 4, 3]} intensity={2.2} />
-            <directionalLight position={[-3, 2, -3]} intensity={0.8} color={brand.amber} />
             <Suspense fallback={null}>
-              <Scene motion={motion} gender={gender} focus={focus} playing={playing} yaw={yaw} speed={speed} onFrame={onFrame} onFail={fail} />
+              <Scene motion={motion} gender={gender} focus={focus} playing={playing} yaw={yaw} speed={speed} bodyStyle={bodyStyle} onFrame={onFrame} onFail={fail} />
             </Suspense>
           </E.Canvas>
         </Guard>
@@ -233,6 +246,17 @@ export function ExerciseViewer({ motion, gender, focus, height = 420 }: Props) {
           <Ionicons name="sync" size={18} color={brand.cream} />
         </Pressable>
       </View>
+      {mode === '3d' ? (
+        <View style={styles.styleToggle}>
+          {(['athlete', 'anatomy'] as const).map((st) => (
+            <Pressable key={st} onPress={() => setBodyStyle(st)} style={[styles.styleOpt, bodyStyle === st && styles.styleOptOn]}
+              accessibilityRole="button" accessibilityState={{ selected: bodyStyle === st }}>
+              <Ionicons name={st === 'athlete' ? 'person' : 'body'} size={13} color={bodyStyle === st ? brand.cream : brand.green} />
+              <Text style={[styles.styleTxt, bodyStyle === st && { color: brand.cream }]}>{t(st === 'athlete' ? 'exercise.styleAthlete' : 'exercise.styleMuscles')}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       {mode === '2d' ? (
         <Pressable onPress={retry3D} style={styles.try3d} accessibilityLabel="3D">
           <Ionicons name="cube-outline" size={14} color={brand.cream} />
@@ -255,6 +279,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   try3d: { position: 'absolute', bottom: 12, end: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 15, backgroundColor: 'rgba(10,51,45,0.85)' },
   try3dText: { color: brand.cream, fontSize: 12, fontWeight: '700' },
+  styleToggle: { position: 'absolute', bottom: 12, start: 12, flexDirection: 'row', padding: 3, gap: 2, borderRadius: 16, backgroundColor: 'rgba(255,250,240,0.9)' },
+  styleOpt: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 28, borderRadius: 14 },
+  styleOptOn: { backgroundColor: 'rgba(10,51,45,0.9)' },
+  styleTxt: { color: brand.green, fontSize: 12, fontWeight: '700' },
   controls: { position: 'absolute', top: 12, start: 12, gap: 8 },
   btn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(10,51,45,0.85)', alignItems: 'center', justifyContent: 'center' },
   hint: { position: 'absolute', top: 12, end: 12, opacity: 0.6 },
