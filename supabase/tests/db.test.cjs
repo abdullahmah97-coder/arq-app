@@ -145,7 +145,8 @@ grant usage on schema public, auth, storage to authenticated;
   await expectErr('outsider cannot view standings', () => as(C, 'select * from challenge_standings($1)', [ch.id]), /forbidden/);
 
   // settle (make it ended)
-  await q(`update challenges set starts_on = app_today() - 8, ends_on = app_today() - 1 where id = $1`, [ch.id]);
+  // ينتهي قبل يومين: تسجيل B (قبل ساعة) يبقى خارج الفترة حتى لو شغّلنا الاختبار بعد منتصف الليل بتوقيت الرياض
+  await q(`update challenges set starts_on = app_today() - 8, ends_on = app_today() - 2 where id = $1`, [ch.id]);
   await q(`update check_ins set checked_in_at = now() - interval '2 days' where user_id = $1 and points_awarded > 0`, [A]);
   const before = (await q('select points from profiles where id=$1', [A]))[0].points;
   await as(A, 'select settle_challenge($1)', [ch.id]);
