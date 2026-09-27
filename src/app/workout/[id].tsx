@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FullSafeView } from '@/components/FullSafeView';
 import { SaduPattern } from '@/brand/Brand';
 import { NT, Num } from '@/components/pulse/widgets';
 import { useLocalized } from '@/lib/i18n';
@@ -51,7 +51,7 @@ export default function WorkoutSummary() {
     <View style={{ flex: 1, backgroundColor: night.bg }}>
       <StatusBar style={night.statusBar} />
       <LinearGradient colors={[night.bg2, night.bg]} style={StyleSheet.absoluteFill} end={{ x: 0, y: 0.5 }} />
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+      <FullSafeView edges={['top']} style={{ flex: 1 }}>
         <View style={styles.header}>
           <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} hitSlop={10} style={styles.iconBtn}>
             <Ionicons name={lng === 'ar' ? 'chevron-forward' : 'chevron-back'} size={22} color={night.text} />
@@ -142,7 +142,7 @@ export default function WorkoutSummary() {
             </Pressable>
           </ScrollView>
         )}
-      </SafeAreaView>
+      </FullSafeView>
     </View>
   );
 }

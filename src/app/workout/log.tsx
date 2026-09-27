@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FullSafeView } from '@/components/FullSafeView';
 import { NT, Num, Pill } from '@/components/pulse/widgets';
 import { showRir } from '@/components/rir';
 import { useUser } from '@/lib/auth';
@@ -119,7 +119,7 @@ export default function WorkoutLog() {
     <View style={{ flex: 1, backgroundColor: night.bg }}>
       <StatusBar style={night.statusBar} />
       <LinearGradient colors={[night.bg2, night.bg]} style={StyleSheet.absoluteFill} end={{ x: 0, y: 0.4 }} />
-      <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
+      <FullSafeView edges={['top', 'bottom']} style={{ flex: 1 }}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} hitSlop={10} style={styles.iconBtn}><Ionicons name="chevron-down" size={22} color={night.text} /></Pressable>
           <View style={{ alignItems: 'center', flex: 1 }}>
@@ -247,7 +247,7 @@ export default function WorkoutLog() {
             <Pressable onPress={() => setRest(null)} hitSlop={8}><NT size={13} bold color={brand.deepGreen}>{t('workout.skip')}</NT></Pressable>
           </View>
         ) : null}
-      </SafeAreaView>
+      </FullSafeView>
 
       <Modal visible={picker} animationType="slide" transparent onRequestClose={() => setPicker(false)}>
         <ExercisePicker onPick={addExercise} onClose={() => setPicker(false)} />

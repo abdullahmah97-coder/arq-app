@@ -9,7 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { HeaderBack } from '@/components/HeaderBack';
 import { Loading } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { installGlobalErrorLogger } from '@/lib/events';
+import { flushLastFatal, installGlobalErrorLogger } from '@/lib/events';
 import { HealthProvider } from '@/lib/health';
 import { restoreLocale } from '@/lib/i18n';
 import { colors, fontAssets, fonts, type ThemeId } from '@/theme';
@@ -118,6 +118,8 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({ NotoKufiArabic_300Light, NotoKufiArabic_400Regular, NotoKufiArabic_600SemiBold, NotoKufiArabic_700Bold, ...fontAssets });
   useEffect(() => {
     Promise.all([restoreLocale(), restoreTheme().then(setThemeId)]).finally(() => setReady(true));
+    // لو انقفل التطبيق بخطأ في التشغيل السابق نرسل تفاصيله الحين
+    flushLastFatal();
   }, []);
   const themeCtx = useMemo(() => ({
     theme: themeId,

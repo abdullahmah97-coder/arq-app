@@ -1,16 +1,18 @@
 // عارض التمرين ثلاثي الأبعاد: شخصية ARQ (رجل/امرأة) تؤدي الحركة مع إضاءة العضلات العاملة
 import { Ionicons } from '@expo/vector-icons';
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createHuman } from '@/three/human';
 import { MOTIONS, sampleMotion } from '@/three/motions';
 import { applyPose, createFloor, createProps, createRig, type Muscle } from '@/three/rig';
 import { brand } from '@/theme';
-import { Canvas, useFrame, useLoader, useThree } from './r3f';
+import { ExerciseFigure2D } from './ExerciseFigure2D';
+import { Canvas, useFrame, useLoader } from './r3f';
+import { initial3DMode, mark3DDone, mark3DFailed, mark3DStart, reset3D, type Mode3D } from './safe3d';
 import './textDecoderPolyfill';
-import { errorDetail, logEvent } from '@/lib/events';
+import { errorDetail, logEvent, setFatalGuard } from '@/lib/events';
 
 export type Gender = 'male' | 'female';
 
@@ -27,7 +29,10 @@ interface Props {
   height?: number;
 }
 
-type SceneProps = Props & { playing: boolean; yaw: { current: number }; speed: number; onReady?: () => void };
+type SceneProps = Props & {
+  playing: boolean; yaw: { current: number }; speed: number;
+  onFrame: () => void; onFail: (where: string, e: unknown) => void;
+};
 
 /** كاميرا تدور حول المجسّم */
 function orbit(camera: THREE.Camera, m: (typeof MOTIONS)[string], yaw: number) {
@@ -37,38 +42,11 @@ function orbit(camera: THREE.Camera, m: (typeof MOTIONS)[string], yaw: number) {
   camera.lookAt(0, y, 0);
 }
 
-/** مجسّم بسيط (بدون ملفات تحميل) — احتياط إذا النموذج الواقعي ما اشتغل على الجهاز */
-function SimpleScene({ motion, focus, playing, yaw, speed }: SceneProps) {
-  const m = MOTIONS[motion];
-  useEffect(() => { logEvent('3d_simple_ok', { motion }, { once: true }); }, [motion]);
-  const { camera } = useThree();
-  const t = useRef(0);
-  const rig = useMemo(() => {
-    const driver = createRig();
-    const props = createProps(driver, m.props);
-    const world = new THREE.Group();
-    world.add(driver.object, props.group, createFloor());
-    return { driver, props, world };
-  }, [m]);
-  useEffect(() => {
-    if (focus) rig.driver.setHighlight([focus], []);
-    else rig.driver.setHighlight(m.primary, m.secondary);
-  }, [rig, focus, m]);
-  useFrame((_, dt) => {
-    if (playing) t.current += Math.min(dt, 0.05) * speed;
-    applyPose(rig.driver, sampleMotion(m, t.current), { ground: m.ground });
-    rig.driver.object.updateMatrixWorld(true);
-    rig.props.update();
-    orbit(camera, m, yaw.current);
-  });
-  return <primitive object={rig.world} />;
-}
-
-function Scene({ motion, gender, focus, playing, yaw, speed, onReady }: SceneProps) {
+function Scene({ motion, gender, focus, playing, yaw, speed, onFrame, onFail }: SceneProps) {
   const gltf = useLoader(GLTFLoader, MODELS[gender] as unknown as string);
   const m = MOTIONS[motion];
-  const { camera } = useThree();
   const t = useRef(0);
+  const dead = useRef(false);
 
   const rig = useMemo(() => {
     const driver = createRig();
@@ -81,20 +59,29 @@ function Scene({ motion, gender, focus, playing, yaw, speed, onReady }: ScenePro
   }, [gltf, m]);
 
   useEffect(() => {
-    if (focus) rig.human.setHighlight([focus], []);
-    else rig.human.setHighlight(m.primary, m.secondary);
-  }, [rig, focus, m]);
-  useEffect(() => { onReady?.(); }, [rig, onReady]);
+    try {
+      if (focus) rig.human.setHighlight([focus], []);
+      else rig.human.setHighlight(m.primary, m.secondary);
+    } catch (e) { onFail('highlight', e); }
+  }, [rig, focus, m, onFail]);
 
-
-  useFrame((_, dt) => {
-    if (playing) t.current += Math.min(dt, 0.05) * speed;
-    applyPose(rig.driver, sampleMotion(m, t.current), { ground: m.ground });
-    rig.human.sync(!!m.ground);
-    rig.props.update();
-    // الكاميرا تدور حول المجسّم (المجسّم والأدوات محسوبة بإحداثيات العالم فلا ندوّرها)
-    orbit(camera, m, yaw.current);
-  });
+  // نرسم بأنفسنا (أولوية 1) داخل try/catch: أي خطأ في الرسم يحوّلنا للعرض ثنائي الأبعاد بدل ما ينقفل التطبيق
+  useFrame(({ gl, scene, camera }, dt) => {
+    if (dead.current) return;
+    try {
+      if (playing) t.current += Math.min(dt, 0.05) * speed;
+      applyPose(rig.driver, sampleMotion(m, t.current), { ground: m.ground });
+      rig.human.sync(!!m.ground);
+      rig.props.update();
+      // الكاميرا تدور حول المجسّم (المجسّم والأدوات محسوبة بإحداثيات العالم فلا ندوّرها)
+      orbit(camera, m, yaw.current);
+      gl.render(scene, camera);
+      onFrame();
+    } catch (e) {
+      dead.current = true;
+      onFail('frame', e);
+    }
+  }, 1);
 
   return <primitive object={rig.world} />;
 }
@@ -107,25 +94,62 @@ class Guard extends Component<{ fallback: ReactNode; onError: (e: unknown) => vo
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
+const READY_FRAMES = 30;
+
 export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
   const [playing, setPlaying] = useState(true);
   const [slow, setSlow] = useState(false);
-  // النموذج الواقعي أولاً؛ لو فشل أو تأخر كثير نعرض المجسّم البسيط
-  const [simple, setSimple] = useState(false);
-  const ready = useRef(false);
+  // 3D (النموذج الواقعي) أو 2D (رسم بدون كرت الرسومات). نبدأ بالتحقق: هل طيّح 3D التطبيق قبل؟
+  const [mode, setMode] = useState<'checking' | Mode3D>('checking');
+  const failed = useRef(false);
+  const frames = useRef(0);
   const started = useRef(Date.now());
-  const onReady = useMemo(() => () => {
-    ready.current = true;
-    logEvent('3d_human_ok', { motion, gender, ms: Date.now() - started.current }, { once: true });
-  }, [motion, gender]);
+
   useEffect(() => {
-    ready.current = false;
-    started.current = Date.now();
+    let alive = true;
+    initial3DMode().then(async (m) => {
+      if (m === '3d') await mark3DStart({ motion, gender });
+      if (alive) { started.current = Date.now(); setMode(m); }
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fail = useCallback((where: string, e: unknown) => {
+    if (failed.current) return;
+    failed.current = true;
+    const d = { where, motion, gender, frames: frames.current, ...errorDetail(e) };
+    logEvent('3d_error', d);
+    mark3DFailed(d);
+    setMode('2d');
+  }, [motion, gender]);
+
+  const onFrame = useCallback(() => {
+    frames.current += 1;
+    if (frames.current === READY_FRAMES) {
+      mark3DDone();
+      logEvent('3d_human_ok', { motion, gender, ms: Date.now() - started.current }, { once: true });
+    }
+  }, [motion, gender]);
+
+  // أثناء عرض 3D: أي خطأ قاتل نحوله للعرض 2D بدل إغلاق التطبيق، ولو ما اشتغل خلال ١٢ ثانية كذلك
+  useEffect(() => {
+    if (mode !== '3d') return;
+    const off = setFatalGuard((e) => { fail('fatal', e); return true; });
     const id = setTimeout(() => {
-      if (!ready.current) { logEvent('3d_timeout', { motion, gender }); setSimple(true); }
-    }, 9000);
-    return () => clearTimeout(id);
-  }, [gender, motion]);
+      if (frames.current < READY_FRAMES) fail('timeout', new Error(`only ${frames.current} frames in 12s`));
+    }, 12000);
+    return () => { off(); clearTimeout(id); mark3DDone(); };
+  }, [mode, fail]);
+
+  const retry3D = async () => {
+    await reset3D();
+    failed.current = false; frames.current = 0;
+    await mark3DStart({ motion, gender, retry: true });
+    started.current = Date.now();
+    setMode('3d');
+  };
+
   const yaw = useRef(0);
   const start = useRef(0);
   const pan = useMemo(() => PanResponder.create({
@@ -134,42 +158,35 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
     onPanResponderMove: (_, g) => { yaw.current = start.current + g.dx * 0.6; },
   }), []);
 
+  const speed = slow ? 0.45 : 1;
+  const flat = (
+    <ExerciseFigure2D motion={motion} focus={focus} playing={playing} speed={speed} yaw={yaw}
+      onError={(e) => logEvent('2d_error', { motion, ...errorDetail(e) }, { once: true })} />
+  );
+
   return (
     <View style={[styles.wrap, { height }]} {...pan.panHandlers}>
-      {(() => {
-        const sp = { motion, gender, focus, playing, yaw, speed: slow ? 0.45 : 1 };
-        const canvas = (child: ReactNode) => (
+      {mode === 'checking' ? (
+        <View style={styles.center}><ActivityIndicator color={brand.orange} /></View>
+      ) : mode === '2d' ? flat : (
+        <Guard key={gender} fallback={flat} onError={(e) => fail('render', e)}>
           <Canvas camera={{ fov: 30, near: 0.1, far: 50, position: [0, 1.3, 3.9] }} gl={{ antialias: true }}
             onCreated={({ gl }) => {
               try {
                 const c = gl.getContext();
-                logEvent('3d_gl', { webgl2: gl.capabilities.isWebGL2, version: String(c.getParameter(c.VERSION)), renderer: String(c.getParameter(c.RENDERER)) }, { once: true });
+                logEvent('3d_gl', { webgl2: gl.capabilities.isWebGL2, version: String(c.getParameter(c.VERSION)) }, { once: true });
               } catch (e) { logEvent('3d_gl_error', errorDetail(e), { once: true }); }
             }}>
             <color attach="background" args={[brand.cream]} />
             <hemisphereLight args={['#fff7ea', '#b89a74', 1.3]} />
             <directionalLight position={[2, 4, 3]} intensity={2.2} />
             <directionalLight position={[-3, 2, -3]} intensity={0.8} color={brand.amber} />
-            {child}
+            <Suspense fallback={null}>
+              <Scene motion={motion} gender={gender} focus={focus} playing={playing} yaw={yaw} speed={speed} onFrame={onFrame} onFail={fail} />
+            </Suspense>
           </Canvas>
-        );
-        const fallback = canvas(<SimpleScene {...sp} />);
-        // لو حتى المجسّم البسيط ما اشتغل (الرسم ثلاثي الأبعاد غير متاح) نعرض رسالة بدل ما تنهار الصفحة
-        const unavailable = (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <Ionicons name="cube-outline" size={34} color={brand.green} />
-          </View>
-        );
-        return (
-          <Guard fallback={unavailable} onError={(e) => logEvent('3d_simple_error', { motion, ...errorDetail(e) })}>
-            {simple ? fallback : (
-              <Guard key={gender} fallback={fallback} onError={(e) => { logEvent('3d_human_error', { motion, gender, ...errorDetail(e) }); setSimple(true); }}>
-                {canvas(<Suspense fallback={null}><Scene {...sp} onReady={onReady} /></Suspense>)}
-              </Guard>
-            )}
-          </Guard>
-        );
-      })()}
+        </Guard>
+      )}
       <View style={styles.controls} pointerEvents="box-none">
         <Pressable onPress={() => setPlaying((p) => !p)} style={styles.btn} accessibilityLabel={playing ? 'Pause' : 'Play'}>
           <Ionicons name={playing ? 'pause' : 'play'} size={18} color={brand.cream} />
@@ -181,6 +198,12 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
           <Ionicons name="sync" size={18} color={brand.cream} />
         </Pressable>
       </View>
+      {mode === '2d' ? (
+        <Pressable onPress={retry3D} style={styles.try3d} accessibilityLabel="3D">
+          <Ionicons name="cube-outline" size={14} color={brand.cream} />
+          <Text style={styles.try3dText}>3D</Text>
+        </Pressable>
+      ) : null}
       <View style={styles.hint} pointerEvents="none">
         <Ionicons name="hand-left-outline" size={14} color={brand.green} />
       </View>
@@ -194,6 +217,9 @@ export function ViewerLoading({ height = 380 }: { height?: number }) {
 
 const styles = StyleSheet.create({
   wrap: { borderRadius: 20, overflow: 'hidden', backgroundColor: brand.cream },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  try3d: { position: 'absolute', bottom: 12, end: 12, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 15, backgroundColor: 'rgba(10,51,45,0.85)' },
+  try3dText: { color: brand.cream, fontSize: 12, fontWeight: '700' },
   controls: { position: 'absolute', top: 12, start: 12, gap: 8 },
   btn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(10,51,45,0.85)', alignItems: 'center', justifyContent: 'center' },
   hint: { position: 'absolute', top: 12, end: 12, opacity: 0.6 },
