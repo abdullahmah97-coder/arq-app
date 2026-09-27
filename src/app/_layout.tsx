@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { HeaderBack } from '@/components/HeaderBack';
 import { Loading } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { installGlobalErrorLogger } from '@/lib/events';
 import { HealthProvider } from '@/lib/health';
 import { restoreLocale } from '@/lib/i18n';
 import { colors, fontAssets, fonts, type ThemeId } from '@/theme';
@@ -17,7 +18,7 @@ import { restoreTheme, saveTheme, ThemeCtx } from '@/lib/appTheme';
 /** الصفحات اللي تفتح كنافذة من تحت: زر إغلاق بدل سهم الرجوع */
 const MODAL_ROUTES = new Set([
   'post/new', 'challenge/new', 'feedback', 'program/new', 'tip/new',
-  'clubs/chain-edit', 'clubs/review', 'clubs/offer', 'store/join', 'store/product', 'food/add',
+  'clubs/chain-edit', 'clubs/review', 'clubs/offer', 'store/join', 'store/product', 'food/add', 'exercise/[id]',
 ]);
 
 const navTheme = () => ({
@@ -73,7 +74,8 @@ function RootNavigator() {
         <Stack.Screen name="learn/inbody" options={{ title: t('inbody.learn') }} />
         <Stack.Screen name="health" options={{ headerShown: false }} />
         <Stack.Screen name="devices" options={{ title: t('health.devices') }} />
-        <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
+        {/* صفحة التمرين تفتح كنافذة من تحت: ترجع منها دائماً (حتى لو فتحتها من داخل تمرين شغّال) */}
+        <Stack.Screen name="exercise/[id]" options={{ title: '', presentation: 'modal', gestureEnabled: true }} />
         <Stack.Screen name="feedback" options={{ title: t('beta.feedback'), presentation: 'modal' }} />
         {/* نافذة من تحت: تنسحب لتحت للإغلاق، وفيها زر إغلاق واضح */}
         <Stack.Screen name="coach" options={{ headerShown: false, presentation: 'modal', gestureEnabled: true }} />
@@ -107,6 +109,8 @@ function RootNavigator() {
     </Stack>
   );
 }
+
+installGlobalErrorLogger();
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);

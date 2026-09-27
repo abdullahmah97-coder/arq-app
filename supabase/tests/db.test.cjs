@@ -423,6 +423,13 @@ grant usage on schema public, auth, storage to authenticated;
   await expectErr('food: cannot log for someone else', () => as(B, `insert into food_logs (user_id, slot, name, kcal) values ($1, 'lunch', 'x', 10)`, [A]), /row-level security/);
   await expectErr('food: calories must be sane', () => as(A, `insert into food_logs (slot, name, kcal) values ('lunch', 'x', 99999)`), /check constraint/);
   check('food: delete own entry', (await as(A, `delete from food_logs where food_id = 'foul' returning id`)).length === 1);
+
+  // app events (beta diagnostics): write own, only the owner reads
+  await as(A, `insert into app_events (kind, detail) values ('3d_timeout', '{"motion":"bench_bb"}')`);
+  await expectErr('events: cannot write as someone else', () => as(A, `insert into app_events (user_id, kind) values ($1, 'x')`, [B]), /row-level security/);
+  check('events: normal users cannot read', (await as(A, 'select * from app_events')).length === 0);
+  const isAdminB = (await q('select count(*)::int n from app_admins where user_id = $1', [B]))[0].n === 1;
+  check('events: owner reads them', !isAdminB || (await as(B, 'select * from app_events')).length === 1);
   { let hidden = false; try { hidden = (await as(A, 'select * from gym_area_scans')).length === 0; } catch (e) { hidden = /permission denied/.test(e.message); }
     check('scan log is private', hidden); }
 

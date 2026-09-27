@@ -1,6 +1,6 @@
 -- ARQ — إعداد قاعدة البيانات كاملة (مرة وحدة)
 -- الصق هذا الملف كله في Supabase > SQL Editor > New query ثم Run.
--- مولّد تلقائياً من supabase/migrations (15 ملف) — لا تعدّله يدوياً: npm run db:bundle
+-- مولّد تلقائياً من supabase/migrations (16 ملف) — لا تعدّله يدوياً: npm run db:bundle
 
 -- ===================== 20260926000000_init.sql =====================
 -- =====================================================================
@@ -1961,3 +1961,25 @@ language sql stable security invoker set search_path = public as $$
 $$;
 revoke all on function public.food_day_totals(date) from public, anon;
 grant execute on function public.food_day_totals(date) to authenticated;
+
+
+-- ===================== 20260927100000_app_events.sql =====================
+-- =====================================================================
+-- سجل أحداث وأخطاء التطبيق (للنسخة التجريبية): يساعدنا نعرف سبب أي مشكلة بدون ما نطلب من المختبر شرح تقني
+--   * كل مستخدم يكتب أحداثه فقط، والمالك وحده يقرأها
+-- =====================================================================
+create table public.app_events (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid default auth.uid() references public.profiles(id) on delete cascade,
+  kind        text not null check (char_length(kind) between 1 and 60),
+  detail      jsonb not null default '{}'::jsonb check (pg_column_size(detail) <= 8000),
+  app         jsonb not null default '{}'::jsonb check (pg_column_size(app) <= 2000),
+  created_at  timestamptz not null default now()
+);
+create index on public.app_events (created_at desc);
+create index on public.app_events (kind, created_at desc);
+
+alter table public.app_events enable row level security;
+create policy events_insert_own on public.app_events for insert to authenticated with check (user_id = auth.uid());
+create policy events_owner_read on public.app_events for select to authenticated using (is_admin());
+revoke update, delete on public.app_events from anon, authenticated;

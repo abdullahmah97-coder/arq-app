@@ -10,6 +10,7 @@ import { applyPose, createFloor, createProps, createRig, type Muscle } from '@/t
 import { brand } from '@/theme';
 import { Canvas, useFrame, useLoader, useThree } from './r3f';
 import './textDecoderPolyfill';
+import { errorDetail, logEvent } from '@/lib/events';
 
 export type Gender = 'male' | 'female';
 
@@ -39,6 +40,7 @@ function orbit(camera: THREE.Camera, m: (typeof MOTIONS)[string], yaw: number) {
 /** مجسّم بسيط (بدون ملفات تحميل) — احتياط إذا النموذج الواقعي ما اشتغل على الجهاز */
 function SimpleScene({ motion, focus, playing, yaw, speed }: SceneProps) {
   const m = MOTIONS[motion];
+  useEffect(() => { logEvent('3d_simple_ok', { motion }, { once: true }); }, [motion]);
   const { camera } = useThree();
   const t = useRef(0);
   const rig = useMemo(() => {
@@ -98,10 +100,10 @@ function Scene({ motion, gender, focus, playing, yaw, speed, onReady }: ScenePro
 }
 
 /** يلتقط أي خطأ في المشهد ثلاثي الأبعاد ويعرض البديل بدل شاشة فاضية */
-class Guard extends Component<{ fallback: ReactNode; onError: () => void; children: ReactNode }, { failed: boolean }> {
+class Guard extends Component<{ fallback: ReactNode; onError: (e: unknown) => void; children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch() { this.props.onError(); }
+  componentDidCatch(e: unknown) { this.props.onError(e); }
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
@@ -111,12 +113,19 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
   // النموذج الواقعي أولاً؛ لو فشل أو تأخر كثير نعرض المجسّم البسيط
   const [simple, setSimple] = useState(false);
   const ready = useRef(false);
-  const onReady = useMemo(() => () => { ready.current = true; }, []);
+  const started = useRef(Date.now());
+  const onReady = useMemo(() => () => {
+    ready.current = true;
+    logEvent('3d_human_ok', { motion, gender, ms: Date.now() - started.current }, { once: true });
+  }, [motion, gender]);
   useEffect(() => {
     ready.current = false;
-    const id = setTimeout(() => { if (!ready.current) setSimple(true); }, 9000);
+    started.current = Date.now();
+    const id = setTimeout(() => {
+      if (!ready.current) { logEvent('3d_timeout', { motion, gender }); setSimple(true); }
+    }, 9000);
     return () => clearTimeout(id);
-  }, [gender]);
+  }, [gender, motion]);
   const yaw = useRef(0);
   const start = useRef(0);
   const pan = useMemo(() => PanResponder.create({
@@ -130,7 +139,13 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
       {(() => {
         const sp = { motion, gender, focus, playing, yaw, speed: slow ? 0.45 : 1 };
         const canvas = (child: ReactNode) => (
-          <Canvas camera={{ fov: 30, near: 0.1, far: 50, position: [0, 1.3, 3.9] }} gl={{ antialias: true }}>
+          <Canvas camera={{ fov: 30, near: 0.1, far: 50, position: [0, 1.3, 3.9] }} gl={{ antialias: true }}
+            onCreated={({ gl }) => {
+              try {
+                const c = gl.getContext();
+                logEvent('3d_gl', { webgl2: gl.capabilities.isWebGL2, version: String(c.getParameter(c.VERSION)), renderer: String(c.getParameter(c.RENDERER)) }, { once: true });
+              } catch (e) { logEvent('3d_gl_error', errorDetail(e), { once: true }); }
+            }}>
             <color attach="background" args={[brand.cream]} />
             <hemisphereLight args={['#fff7ea', '#b89a74', 1.3]} />
             <directionalLight position={[2, 4, 3]} intensity={2.2} />
@@ -146,9 +161,9 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
           </View>
         );
         return (
-          <Guard fallback={unavailable} onError={() => {}}>
+          <Guard fallback={unavailable} onError={(e) => logEvent('3d_simple_error', { motion, ...errorDetail(e) })}>
             {simple ? fallback : (
-              <Guard key={gender} fallback={fallback} onError={() => setSimple(true)}>
+              <Guard key={gender} fallback={fallback} onError={(e) => { logEvent('3d_human_error', { motion, gender, ...errorDetail(e) }); setSimple(true); }}>
                 {canvas(<Suspense fallback={null}><Scene {...sp} onReady={onReady} /></Suspense>)}
               </Guard>
             )}
