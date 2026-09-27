@@ -47,13 +47,22 @@ call npm ci --no-audit --no-fund
 if errorlevel 1 goto :fail
 
 echo.
-echo [4/6] Expo account: log in, or create a free account at https://expo.dev/signup first.
+echo [4/6] Expo account...
+call npx -y eas-cli@latest whoami >nul 2>nul
+if not errorlevel 1 (
+  echo      Already logged in to Expo.
+  goto :init
+)
+echo      A browser window will open - sign in to Expo with GitHub, then come back here.
 call npx -y eas-cli@latest login
 if errorlevel 1 goto :fail
+:init
+findstr /C:"projectId" app.json >nul 2>nul
+if not errorlevel 1 goto :keys
 echo      If asked to create a project for this app, answer Y.
 call npx -y eas-cli@latest init
 if errorlevel 1 goto :fail
-
+:keys
 echo.
 echo [5/6] Supabase keys...
 findstr /C:"EXPO_PUBLIC_SUPABASE_URL" eas.json >nul 2>nul
