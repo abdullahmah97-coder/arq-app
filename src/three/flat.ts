@@ -2,7 +2,7 @@
 // كل جزء في المجسّم شكل محدّب (كرة/كبسولة/صندوق) فحدوده على الشاشة = الغلاف المحدّب لنقاطه بعد الإسقاط.
 // نرسم الأبعد أولاً، ونضيف طبقة "مضيئة" من النقاط المواجهة للضوء عشان يبان المجسّم مجسّم.
 import * as THREE from 'three';
-import { MOTIONS, sampleMotion, type Motion } from './motions';
+import { MOTIONS, poseOpts, sampleMotion, type Motion } from './motions';
 import { createFloor, createProps } from './equipment';
 import { motionBounds, placeCamera } from './framing';
 import { applyPose, createRig, type Muscle, type Rig } from './rig';
@@ -70,8 +70,9 @@ export interface FlatScene {
   frame(t: number, yaw: number, w: number, h: number): FlatFrame;
 }
 
-export function createFlatScene(motionId: keyof typeof MOTIONS): FlatScene {
+export function createFlatScene(motionId: keyof typeof MOTIONS, muscles?: { primary: Muscle[]; secondary: Muscle[] }): FlatScene {
   const motion = MOTIONS[motionId];
+  const hl = muscles ?? motion;
   const rig = createRig();
   const props = createProps(rig, motion.props);
   const world = new THREE.Group();
@@ -97,7 +98,7 @@ export function createFlatScene(motionId: keyof typeof MOTIONS): FlatScene {
 
   const setHighlight = (focus: Muscle | null) => {
     if (focus) rig.setHighlight([focus], []);
-    else rig.setHighlight(motion.primary, motion.secondary);
+    else rig.setHighlight(hl.primary, hl.secondary);
   };
   setHighlight(null);
 
@@ -108,7 +109,7 @@ export function createFlatScene(motionId: keyof typeof MOTIONS): FlatScene {
   };
 
   const frame = (t: number, yaw: number, w: number, h: number): FlatFrame => {
-    applyPose(rig, sampleMotion(motion, t), { ground: motion.ground });
+    applyPose(rig, sampleMotion(motion, t), poseOpts(motion));
     props.update();
     world.updateMatrixWorld(true);
 

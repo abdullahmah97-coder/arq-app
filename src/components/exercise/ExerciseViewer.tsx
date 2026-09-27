@@ -6,14 +6,14 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as THREE from 'three';
 import { createHuman } from '@/three/human';
-import { motionDuration, MOTIONS, sampleMotion } from '@/three/motions';
+import { floorFor, motionDuration, MOTIONS, poseOpts, sampleMotion } from '@/three/motions';
 import { bakeStaticProps, createFloor, createProps } from '@/three/equipment';
 import { motionBounds, placeCamera } from '@/three/framing';
 import type { HumanStyle } from '@/three/human';
 import { createStudio, enableShadows } from '@/three/studio';
 import { applyPose, createRig, type Muscle } from '@/three/rig';
 import { brand } from '@/theme';
-import { ExerciseFigure2D } from './ExerciseFigure2D';
+import { ExerciseFigure2D, SPIN } from './ExerciseFigure2D';
 import { initial3DMode, mark3DDone, mark3DFailed, mark3DStart, reset3D, type Mode3D } from './safe3d';
 import './textDecoderPolyfill';
 import { errorDetail, logEvent, setFatalGuard } from '@/lib/events';
@@ -47,6 +47,8 @@ interface Props {
   gender: Gender;
   /** تمييز عضلة محددة (عند الضغط على اسمها) بدل عضلات التمرين */
   focus?: Muscle | null;
+  /** عضلات التمرين لو تختلف عن الحركة (تمارين المكتبة اللي تعرض خريطة العضلات) */
+  muscles?: { primary: Muscle[]; secondary: Muscle[] };
   height?: number;
 }
 
@@ -55,7 +57,7 @@ type SceneProps = Props & {
   onFrame: () => void; onFail: (where: string, e: unknown) => void;
 };
 
-function Scene({ motion, gender, focus, playing, yaw, speed, bodyStyle, onFrame, onFail }: SceneProps) {
+function Scene({ motion, gender, focus, muscles, playing, yaw, speed, bodyStyle, onFrame, onFail }: SceneProps) {
   const { useLoader, useFrame, GLTFLoader } = loadEngine()!;
   const gltf = useLoader(GLTFLoader, MODELS[gender] as unknown as string);
   const m = MOTIONS[motion];
@@ -70,12 +72,12 @@ function Scene({ motion, gender, focus, playing, yaw, speed, bodyStyle, onFrame,
     const world = new THREE.Group();
     world.add(human.object, props.group, floor);
     // حدود اللاعب والجهاز خلال الحركة كلها: الكاميرا تقرّب عليها تلقائياً
-    const bounds = motionBounds(driver, props, m, () => human.sync(!!m.ground));
+    const bounds = motionBounds(driver, props, m, () => human.sync(!!m.ground, floorFor(m)));
     // دمج أجزاء الأجهزة الثابتة (أسرع بالرسم)
     const dur = motionDuration(m);
     bakeStaticProps(props.group, [0, 0.21, 0.43, 0.62, 0.81].map((f) => () => {
-      applyPose(driver, sampleMotion(m, f * dur), { ground: m.ground });
-      human.sync(!!m.ground);
+      applyPose(driver, sampleMotion(m, f * dur), poseOpts(m));
+      human.sync(!!m.ground, floorFor(m));
       props.update();
     }));
     const center = bounds.getCenter(new THREE.Vector3());
@@ -95,21 +97,25 @@ function Scene({ motion, gender, focus, playing, yaw, speed, bodyStyle, onFrame,
   }, [rig, bodyStyle, onFail]);
   useEffect(() => {
     try {
+      const hl = muscles ?? m;
       if (focus) rig.human.setHighlight([focus], []);
-      else rig.human.setHighlight(m.primary, m.secondary);
+      else rig.human.setHighlight(hl.primary, hl.secondary);
     } catch (e) { onFail('highlight', e); }
-  }, [rig, focus, m, onFail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rig, focus, m, onFail, muscles?.primary.join(), muscles?.secondary.join()]);
 
   // نرسم بأنفسنا (أولوية 1) داخل try/catch: أي خطأ في الرسم يحوّلنا للعرض ثنائي الأبعاد بدل ما ينقفل التطبيق
   useFrame(({ gl, scene, camera }, dt) => {
     if (dead.current) return;
     try {
       if (playing) t.current += Math.min(dt, 0.05) * speed;
-      applyPose(rig.driver, sampleMotion(m, t.current), { ground: m.ground });
-      rig.human.sync(!!m.ground);
+      applyPose(rig.driver, sampleMotion(m, t.current), poseOpts(m));
+      rig.human.sync(!!m.ground, floorFor(m));
       rig.props.update();
       // الكاميرا تدور حول اللاعب وتقرّب لأقصى حد يظهر فيه هو والجهاز
-      placeCamera(camera as THREE.PerspectiveCamera, rig.bounds, rig.center, (m.view?.yaw ?? 35) + yaw.current, cam.current);
+      // خريطة العضلات: دوران بطيء عشان تبان العضلات من قدام ومن ورا
+      const spin = motion === 'muscle_map' ? t.current * SPIN : 0;
+      placeCamera(camera as THREE.PerspectiveCamera, rig.bounds, rig.center, (m.view?.yaw ?? 35) + yaw.current + spin, cam.current);
       gl.render(scene, camera);
       onFrame();
       // قياس سلاسة الحركة مرة وحدة (عدد الإطارات بالثانية ودقة الرسم)
@@ -140,12 +146,12 @@ class Guard extends Component<{ fallback: ReactNode; onError: (e: unknown) => vo
 
 const READY_FRAMES = 30;
 
-export function ExerciseViewer({ motion, gender, focus, height = 420 }: Props) {
+export function ExerciseViewer({ motion, gender, focus, muscles, height = 420 }: Props) {
   const { t } = useTranslation();
   const [playing, setPlaying] = useState(true);
   const [slow, setSlow] = useState(false);
   // شكل الجسم: لاعب بملابس ARQ أو عرض تشريحي (جسم رمادي والعضلات الشغالة بالأحمر)
-  const [bodyStyle, setBodyStyle] = useState<HumanStyle>('athlete');
+  const [bodyStyle, setBodyStyle] = useState<HumanStyle>(motion === 'muscle_map' ? 'anatomy' : 'athlete');
   // 3D (النموذج الواقعي) أو 2D (رسم بدون كرت الرسومات). نبدأ بالتحقق: هل طيّح 3D التطبيق قبل؟
   const [mode, setMode] = useState<'checking' | Mode3D>('checking');
   const failed = useRef(false);
@@ -210,7 +216,7 @@ export function ExerciseViewer({ motion, gender, focus, height = 420 }: Props) {
   const speed = slow ? 0.45 : 1;
   const E = mode === '3d' ? loadEngine() : null;
   const flat = (
-    <ExerciseFigure2D motion={motion} focus={focus} playing={playing} speed={speed} yaw={yaw}
+    <ExerciseFigure2D motion={motion} focus={focus} muscles={muscles} playing={playing} speed={speed} yaw={yaw}
       onError={(e) => logEvent('2d_error', { motion, ...errorDetail(e) }, { once: true })} />
   );
 
@@ -230,7 +236,7 @@ export function ExerciseViewer({ motion, gender, focus, height = 420 }: Props) {
             }}>
             <color attach="background" args={[brand.cream]} />
             <Suspense fallback={null}>
-              <Scene motion={motion} gender={gender} focus={focus} playing={playing} yaw={yaw} speed={speed} bodyStyle={bodyStyle} onFrame={onFrame} onFail={fail} />
+              <Scene motion={motion} gender={gender} focus={focus} muscles={muscles} playing={playing} yaw={yaw} speed={speed} bodyStyle={bodyStyle} onFrame={onFrame} onFail={fail} />
             </Suspense>
           </E.Canvas>
         </Guard>

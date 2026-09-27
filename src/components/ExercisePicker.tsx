@@ -6,8 +6,7 @@ import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NT } from '@/components/pulse/widgets';
 import { useLocalized } from '@/lib/i18n';
-import { EXERCISES, MUSCLE_NAMES } from '@/three/catalog';
-import { MOTIONS } from '@/three/motions';
+import { EXERCISES, exerciseMuscles, MUSCLE_NAMES } from '@/three/catalog';
 import { fonts, night, space } from '@/theme';
 
 export function ExercisePicker({ onPick, onClose }: { onPick: (id: string) => void; onClose: () => void }) {
@@ -27,7 +26,7 @@ export function ExercisePicker({ onPick, onClose }: { onPick: (id: string) => vo
           {list.map((e) => (
             <Pressable key={e.id} onPress={() => onPick(e.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: night.line }}>
               <NT style={{ flex: 1 }} numberOfLines={1}>{L(e.name)}</NT>
-              <NT size={11} faint>{MOTIONS[e.motion].primary.map((m) => L(MUSCLE_NAMES[m])).join('، ')}</NT>
+              <NT size={11} faint>{exerciseMuscles(e).primary.map((m) => L(MUSCLE_NAMES[m])).join('، ')}</NT>
             </Pressable>
           ))}
         </ScrollView>

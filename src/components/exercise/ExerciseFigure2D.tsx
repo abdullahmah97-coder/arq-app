@@ -10,6 +10,8 @@ import { brand } from '@/theme';
 interface Props {
   motion: keyof typeof MOTIONS;
   focus?: Muscle | null;
+  /** عضلات التمرين (لو تختلف عن الحركة، مثل تمارين خريطة العضلات) */
+  muscles?: { primary: Muscle[]; secondary: Muscle[] };
   playing: boolean;
   speed: number;
   yaw: { current: number };
@@ -17,15 +19,18 @@ interface Props {
 }
 
 const FRAME_MS = 1000 / 24;
+/** سرعة دوران خريطة العضلات (درجة/ثانية) */
+export const SPIN = 30;
 
-export function ExerciseFigure2D({ motion, focus, playing, speed, yaw, onError }: Props) {
+export function ExerciseFigure2D({ motion, focus, muscles, playing, speed, yaw, onError }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [frame, setFrame] = useState<FlatFrame | null>(null);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
   const scene = useMemo(() => {
-    try { return createFlatScene(motion); } catch (e) { onErrorRef.current?.(e); return null; }
-  }, [motion]);
+    try { return createFlatScene(motion, muscles); } catch (e) { onErrorRef.current?.(e); return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [motion, muscles?.primary.join(), muscles?.secondary.join()]);
   const live = useRef({ playing, speed, focus });
   live.current = { playing, speed, focus };
 
@@ -45,7 +50,8 @@ export function ExerciseFigure2D({ motion, focus, playing, speed, yaw, onError }
       if (!p && drawnPaused && lastYaw === yaw.current && lastFocus === f) return;
       if (p) t += dt * s;
       try {
-        setFrame(scene.frame(t, yaw.current, size.w, size.h));
+        // خريطة العضلات: دوران بطيء عشان تبان العضلات من قدام ومن ورا
+        setFrame(scene.frame(t, yaw.current + (motion === 'muscle_map' ? t * SPIN : 0), size.w, size.h));
         lastYaw = yaw.current; lastFocus = f; drawnPaused = !p;
       } catch (e) {
         stopped = true;
@@ -54,7 +60,7 @@ export function ExerciseFigure2D({ motion, focus, playing, speed, yaw, onError }
     };
     raf = requestAnimationFrame(tick);
     return () => { stopped = true; cancelAnimationFrame(raf); };
-  }, [scene, size.w, size.h, yaw]);
+  }, [scene, size.w, size.h, yaw, motion]);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;

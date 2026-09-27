@@ -1,6 +1,6 @@
 // تأطير الكاميرا تلقائياً: نحسب حدود اللاعب والجهاز خلال الحركة كاملة ثم نقرّب الكاميرا لأقصى حد يظهر فيه كل شيء
 import * as THREE from 'three';
-import { motionDuration, sampleMotion, type Motion } from './motions';
+import { motionDuration, poseOpts, sampleMotion, type Motion } from './motions';
 import { applyPose, type PropsRuntime, type Rig } from './rig';
 
 const PITCH = THREE.MathUtils.degToRad(10);
@@ -12,7 +12,7 @@ export function motionBounds(rig: Rig, props: PropsRuntime, m: Motion, sync?: ()
   const dur = Math.max(0.1, motionDuration(m));
   const N = 20;
   for (let i = 0; i < N; i++) {
-    applyPose(rig, sampleMotion(m, (i / N) * dur), { ground: m.ground });
+    applyPose(rig, sampleMotion(m, (i / N) * dur), poseOpts(m));
     sync?.();
     props.update();
     rig.object.updateMatrixWorld(true);

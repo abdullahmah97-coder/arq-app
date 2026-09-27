@@ -1,6 +1,5 @@
 // مدرب ARQ: يسأل الذكاء الاصطناعي (Edge Function "coach")، ولو ما توفر يرد المدرب المحلي
-import { EXERCISES } from '../../three/catalog';
-import { MOTIONS } from '../../three/motions';
+import { EXERCISES, exerciseEquipment, exerciseMuscles } from '../../three/catalog';
 import { supabase } from '../supabase';
 import { localCoach } from './local';
 import type { CoachContext, CoachMessage, CoachReply } from './types';
@@ -9,11 +8,7 @@ export * from './types';
 export { starterChips } from './local';
 
 /** مكتبة التمارين كنص مختصر يُرسل للنموذج (المعرف | الاسم | العضلات | الأدوات) */
-const LIBRARY = EXERCISES.map((e) => {
-  const m = MOTIONS[e.motion];
-  const equip = m.props.map((p) => p.kind).join(',') || 'bodyweight';
-  return `${e.id} | ${e.name.en} | ${m.primary.join(',')} | ${equip}`;
-}).join('\n');
+const LIBRARY = EXERCISES.map((e) => `${e.id} | ${e.name.en} | ${exerciseMuscles(e).primary.join(',')} | ${exerciseEquipment(e)}`).join('\n');
 
 export async function askCoach(history: CoachMessage[], ctx: CoachContext): Promise<CoachReply> {
   const last = history[history.length - 1];

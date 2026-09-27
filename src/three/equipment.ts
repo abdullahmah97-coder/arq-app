@@ -550,8 +550,150 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         updaters.push(() => { midHands(_a); w.position.set(_a.x, 0.108, _a.z); w.rotation.set(0, Math.PI / 2, 0); axle.position.set(_a.x, 0.108, _a.z); });
         break;
       }
+      case 'declineBench': {
+        // بنش مائل للأسفل (الرأس أوطى من الحوض) مع مسند للرجلين
+        const g = new THREE.Group(); g.position.set(...pos);
+        const pad = rbox(0.3, 0.08, 1.15, M.pad, [0, 0.62, 0], 0.03); pad.rotation.x = D(-18); g.add(pad);
+        g.add(tubeAB([0, 0.5, 0.35], [0, 0.03, 0.4], 0.028, M.steel));
+        g.add(tubeAB([0, 0.28, -0.4], [0, 0.03, -0.45], 0.028, M.steel));
+        g.add(tubeAB([0, 0.03, 0.55], [0, 0.03, -0.6], 0.028, M.steelDark));
+        for (const z of [0.55, -0.6]) g.add(tubeAB([-0.22, 0.025, z], [0.22, 0.025, z], 0.025, M.steelDark));
+        // مسند الرجلين أمام أسفل الساق (فوق الكاحل)
+        const roll = disc(0.055, 0.34, M.pad, 16); roll.position.set(0, 0.84, 0.86); g.add(roll);
+        g.add(tubeAB([0, 0.84, 0.86], [0, 0.5, 0.42], 0.022, M.steel));
+        group.add(g); break;
+      }
+      case 'preacherBench': {
+        // مقعد بريتشر: مسند مائل للذراعين أمام الصدر
+        const g = new THREE.Group(); g.position.set(...pos);
+        g.add(rbox(0.36, 0.07, 0.34, M.pad, [0, 0.5, -0.05], 0.03));
+        g.add(tubeAB([0, 0.46, -0.05], [0, 0.03, -0.05], 0.03, M.steel));
+        // المسند تحت العضد مباشرة (مائل 45°) والكوع عند طرفه
+        const armPad = rbox(0.46, 0.07, 0.25, M.pad, [0, 0.89, 0.12], 0.03); armPad.rotation.x = D(45); g.add(armPad);
+        g.add(tubeAB([0, 0.84, 0.17], [0, 0.03, 0.3], 0.03, M.steel));
+        g.add(rbox(0.5, 0.04, 0.8, M.steelDark, [0, 0.02, 0.15], 0.012));
+        group.add(g); break;
+      }
+      case 'hyperBench': {
+        // جهاز تمديد الظهر 45°: مسند للحوض ومسند للكاحل
+        const g = new THREE.Group(); g.position.set(...pos);
+        // مسند الحوض أمام أعلى الفخذ، ومسند الكاحل خلف أسفل الساق، ولوح للقدمين
+        const hipPad = rbox(0.36, 0.08, 0.34, M.pad, [0, 0.82, 0.32], 0.03); hipPad.rotation.x = D(-45); g.add(hipPad);
+        g.add(tubeAB([0, 0.03, -0.45], [0, 0.75, 0.27], 0.032, M.steel));
+        g.add(tubeAB([0, 0.75, 0.27], [0, 0.03, 0.45], 0.03, M.steel));
+        for (const x of [-0.1, 0.1]) { const r = disc(0.05, 0.12, M.pad, 14); r.position.set(x, 0.46, -0.39); g.add(r); }
+        g.add(tubeAB([0, 0.24, -0.34], [0, 0.46, -0.39], 0.022, M.steel));
+        g.add(tubeAB([0, 0.03, -0.3], [0, 0.23, -0.3], 0.026, M.steel));
+        g.add(tubeAB([0, 0.03, -0.65], [0, 0.03, 0.55], 0.03, M.steelDark));
+        const plate = rbox(0.46, 0.03, 0.3, M.steelDark, [0, 0.235, -0.29], 0.01); plate.rotation.x = D(-10); g.add(plate);
+        group.add(g); break;
+      }
+      case 'plyoBox': {
+        group.add(rbox(0.6, 0.5, 0.5, M.pad, [pos[0], 0.25, pos[2]], 0.035)); break;
+      }
+      case 'smithBar': {
+        // سميث مشين: البار على الظهر يتحرك على قضبان ثابتة (pos[2] = موضع القضبان للأمام/الخلف)
+        const zb = pos[2] || -0.12;
+        for (const x of [-0.72, 0.72]) {
+          group.add(tubeAB([x, 0.03, zb], [x, 2.25, zb], 0.028, M.steel));
+          group.add(tubeAB([x - 0.08, 0.03, zb], [x + 0.08, 0.03, zb], 0.03, M.steelDark));
+        }
+        group.add(tubeAB([-0.72, 2.25, zb], [0.72, 2.25, zb], 0.03, M.steel));
+        group.add(rbox(1.7, 0.04, 0.7, M.steelDark, [0, 0.02, zb + 0.07], 0.012));
+        const bar = makeBarbell(M, 1.6, 0.2); group.add(bar);
+        const sleeves = [tube(0.03, M.steelDark), tube(0.03, M.steelDark)]; group.add(...sleeves);
+        updaters.push(() => {
+          rig.barOnBack.getWorldPosition(_a);
+          bar.position.set(0, _a.y, zb);
+          bar.rotation.set(0, 0, 0);
+          setTube(sleeves[0], new THREE.Vector3(-0.72, _a.y - 0.06, zb), new THREE.Vector3(-0.72, _a.y + 0.06, zb));
+          setTube(sleeves[1], new THREE.Vector3(0.72, _a.y - 0.06, zb), new THREE.Vector3(0.72, _a.y + 0.06, zb));
+        });
+        break;
+      }
+      case 'lowBar': {
+        // بار منخفض للسحب المقلوب: البار على ارتفاع قبضة اللاعب بين قائمين
+        const b = tube(0.018, M.chrome); b.rotation.z = Math.PI / 2; b.scale.set(1, 1.3, 1); group.add(b);
+        for (const x of [-0.65, 0.65]) {
+          const up = tube(0.032, M.steel); group.add(up);
+          group.add(tubeAB([x, 0.03, pos[2] - 0.3], [x, 0.03, pos[2] + 0.3], 0.03, M.steelDark));
+          updaters.push(() => { midHands(_a); setTube(up, new THREE.Vector3(x, 0.03, _a.z), new THREE.Vector3(x, _a.y + 0.08, _a.z)); });
+        }
+        updaters.push(() => { midHands(_a); b.position.copy(_a); });
+        break;
+      }
+      case 'band': {
+        // مطاط مقاومة بين اليدين
+        const bandM = new THREE.MeshStandardMaterial({ color: '#F1551D', roughness: 0.7 });
+        const t1 = tube(0.012, bandM, 8); group.add(t1);
+        updaters.push(() => { grip(rig.L, _a); grip(rig.R, _b); setTube(t1, _a, _b); });
+        break;
+      }
+      case 'cableAnkle': {
+        // كيبل من البكرة السفلية إلى سوار الكاحل
+        const S = pos[0] >= 0 ? rig.L : rig.R;
+        const strap = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.018, 8, 16), M.pad); group.add(strap);
+        cable(new THREE.Vector3(pos[0], pos[1] || 0.12, pos[2] || 0.7), () => S.ankle.getWorldPosition(new THREE.Vector3()), { handle: false, offset: 0.45 });
+        updaters.push(() => { S.ankle.getWorldPosition(_a); strap.position.copy(_a); strap.rotation.set(Math.PI / 2, 0, 0); });
+        break;
+      }
+      case 'cableSide': {
+        // كيبل من الجنب على ارتفاع الصدر (بالوف برس / وود تشوب)
+        cable(new THREE.Vector3(pos[0] || 0.9, pos[1] || 1.2, pos[2] || 0), () => midHands(new THREE.Vector3()), { side: (pos[0] || 0.9) > 0 ? 1 : -1, offset: 0.12 });
+        break;
+      }
+      case 'hipAdduction': {
+        const g = seatUnit(M, { backH: 0.7, tilt: 14 }); g.position.set(...pos); group.add(g);
+        group.add(weightStack(M, [pos[0], 0, pos[2] - 0.6], 1.6));
+        for (const S of [rig.L, rig.R]) {
+          const padM = rbox(0.07, 0.22, 0.26, M.pad, [0, 0, 0], 0.03); group.add(padM);
+          const arm = tube(0.025, M.steel); group.add(arm);
+          const piv = new THREE.Vector3(pos[0], 0.3, pos[2] + 0.1);
+          updaters.push(() => {
+            S.knee.getWorldPosition(_a);
+            const out = Math.sign(_a.x - pos[0]) || 1;
+            padM.position.set(_a.x - out * 0.09, _a.y, _a.z - 0.05);
+            _b.set(padM.position.x, 0.3, padM.position.z);
+            setTube(arm, piv, _b);
+          });
+        }
+        break;
+      }
+      case 'kettlebell': {
+        // كيتل بل بين اليدين
+        const kb = new THREE.Group(); group.add(kb);
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.1, 18, 12), M.plate); body.position.y = -0.13; kb.add(body);
+        const h = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.014, 8, 16, Math.PI), M.plate); h.position.y = -0.04; kb.add(h);
+        updaters.push(() => { midHands(_a); kb.position.copy(_a); });
+        break;
+      }
+      case 'medBall': {
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 14), new THREE.MeshStandardMaterial({ color: '#2B3A35', roughness: 0.8 }));
+        group.add(ball);
+        updaters.push(() => { midHands(_a); ball.position.copy(_a); ball.position.addScaledVector(new THREE.Vector3(0, 0, 1), 0.06); });
+        break;
+      }
+      case 'cableFlyLow': {
+        cable(new THREE.Vector3(1.0, 0.25, -0.2), () => grip(rig.L, new THREE.Vector3()), { side: 1, offset: 0.12 });
+        cable(new THREE.Vector3(-1.0, 0.25, -0.2), () => grip(rig.R, new THREE.Vector3()), { side: -1, offset: 0.12 });
+        break;
+      }
+      case 'rackPins': {
+        // قفص باور رَك مختصر: قوائم أمامية وخلفية ومساند (بنز) على ارتفاع الركبة
+        for (const x of [-0.72, 0.72]) {
+          for (const z of [-0.35, 0.35]) group.add(tubeAB([x, 0.03, z], [x, 2.1, z], 0.028, M.steel));
+          group.add(tubeAB([x, 0.03, -0.45], [x, 0.03, 0.45], 0.03, M.steelDark));
+          group.add(tubeAB([x, pos[1] || 0.5, -0.45], [x, pos[1] || 0.5, 0.45], 0.02, M.chrome));
+          group.add(tubeAB([x, 2.1, -0.35], [x, 2.1, 0.35], 0.028, M.steel));
+        }
+        break;
+      }
       case 'mat': {
         group.add(rbox(0.7, 0.018, 1.9, M.pad, [pos[0], 0.009, pos[2]], 0.008)); break;
+      }
+      case 'matSide': {
+        // مات بالعرض (للتمارين على الجنب مثل البلانك الجانبي)
+        group.add(rbox(1.9, 0.018, 0.7, M.pad, [pos[0], 0.009, pos[2]], 0.008)); break;
       }
     }
   }

@@ -35,12 +35,16 @@ export interface Pose {
   spine?: number;   // ثني أسفل الظهر للأمام
   chest?: number;   // ثني أعلى الظهر
   neck?: number;
+  twist?: number;   // لف الجذع (موجب = الكتف الأيسر للأمام) — يتوزع على أسفل وأعلى الظهر
+  lean?: number;    // ميل الجذع للجنب (موجب = لليسار)
   lShoulder?: Joint3; rShoulder?: Joint3;
   lElbow?: number; rElbow?: number;
   lWrist?: number; rWrist?: number;
   lHip?: Joint3; rHip?: Joint3;
   lKnee?: number; rKnee?: number;
   lAnkle?: number; rAnkle?: number; // موجب = رفع الكعب (وقوف على الأصابع)
+  /** فتح الركبة للخارج حول المحور العمودي للحوض (مهم بالسكوات العميق: الركبة فوق أصابع القدم) */
+  lHipOut?: number; rHipOut?: number;
 }
 
 const J0: Joint3 = [0, 0, 0];
@@ -58,25 +62,28 @@ export function lerpPose(a: Pose, b: Pose, t: number): Pose {
       pitch: n(ra.pitch, rb.pitch), yaw: n(ra.yaw, rb.yaw), roll: n(ra.roll, rb.roll),
     },
     spine: n(a.spine, b.spine), chest: n(a.chest, b.chest), neck: n(a.neck, b.neck),
+    twist: n(a.twist, b.twist), lean: n(a.lean, b.lean),
     lShoulder: j(a.lShoulder, b.lShoulder), rShoulder: j(a.rShoulder, b.rShoulder),
     lElbow: n(a.lElbow, b.lElbow), rElbow: n(a.rElbow, b.rElbow),
     lWrist: n(a.lWrist, b.lWrist), rWrist: n(a.rWrist, b.rWrist),
     lHip: j(a.lHip, b.lHip), rHip: j(a.rHip, b.rHip),
     lKnee: n(a.lKnee, b.lKnee), rKnee: n(a.rKnee, b.rKnee),
     lAnkle: n(a.lAnkle, b.lAnkle), rAnkle: n(a.rAnkle, b.rAnkle),
+    lHipOut: n(a.lHipOut, b.lHipOut), rHipOut: n(a.rHipOut, b.rHipOut),
   };
 }
 
 /** وضعية متماثلة: نفس القيم لليمين واليسار */
 export function sym(p: {
-  root?: Pose['root']; spine?: number; chest?: number; neck?: number;
-  shoulder?: Joint3; elbow?: number; wrist?: number; hip?: Joint3; knee?: number; ankle?: number;
+  root?: Pose['root']; spine?: number; chest?: number; neck?: number; twist?: number; lean?: number;
+  shoulder?: Joint3; elbow?: number; wrist?: number; hip?: Joint3; knee?: number; ankle?: number; hipOut?: number;
 }): Pose {
   const out: Pose = {
-    root: p.root, spine: p.spine, chest: p.chest, neck: p.neck,
+    root: p.root, spine: p.spine, chest: p.chest, neck: p.neck, twist: p.twist, lean: p.lean,
     lShoulder: p.shoulder, rShoulder: p.shoulder, lElbow: p.elbow, rElbow: p.elbow,
     lWrist: p.wrist, rWrist: p.wrist,
     lHip: p.hip, rHip: p.hip, lKnee: p.knee, rKnee: p.knee, lAnkle: p.ankle, rAnkle: p.ankle,
+    lHipOut: p.hipOut, rHipOut: p.hipOut,
   };
   // لا نرجع مفاتيح فارغة حتى لا تمسح قيم وضعية أخرى عند الدمج
   for (const k of Object.keys(out) as (keyof Pose)[]) if (out[k] === undefined) delete out[k];
@@ -216,28 +223,49 @@ export function createRig(): Rig {
 // ---------------------------------------------------------------------------
 const _v = new THREE.Vector3();
 
-export function applyPose(rig: Rig, p: Pose, opts: { ground?: boolean; flatFeet?: boolean } = {}) {
+const _qOut = new THREE.Quaternion();
+const _Y = new THREE.Vector3(0, 1, 0);
+export type FloorFn = (x: number, z: number) => number;
+/** تثبيت القدمين بمكانهما (بين الوضعيات ما تنزلق القدم): المرجع = منتصف القدم في الوضعية الأولى */
+export interface Plant { side: 'both' | 'L' | 'R'; key0: Pose; anchor?: { x: number; z: number } }
+export interface PoseOpts { ground?: boolean; flatFeet?: boolean; floor?: FloorFn; plant?: Plant }
+
+function midfoot(rig: Rig, side: Plant['side'], out: THREE.Vector3) {
+  const pts = side === 'L' ? [rig.L.toe, rig.L.heel] : side === 'R' ? [rig.R.toe, rig.R.heel] : [rig.L.toe, rig.L.heel, rig.R.toe, rig.R.heel];
+  out.set(0, 0, 0);
+  for (const o of pts) out.add(o.getWorldPosition(_v));
+  return out.multiplyScalar(1 / pts.length);
+}
+const _mf = new THREE.Vector3();
+
+export function applyPose(rig: Rig, p: Pose, opts: PoseOpts = {}) {
+  if (opts.plant && !opts.plant.anchor) {
+    applyPose(rig, opts.plant.key0, { ground: opts.ground, flatFeet: opts.flatFeet });
+    midfoot(rig, opts.plant.side, _mf);
+    opts.plant.anchor = { x: _mf.x, z: _mf.z };
+  }
   const r = p.root ?? {};
   rig.root.position.set(r.x ?? 0, r.y ?? 0.97, r.z ?? 0);
   rig.root.rotation.set(D(r.pitch ?? 0), D(r.yaw ?? 0), D(r.roll ?? 0));
-  rig.spine.rotation.x = D(p.spine ?? 0);
-  rig.chest.rotation.x = D(p.chest ?? 0);
+  rig.spine.rotation.set(D(p.spine ?? 0), D((p.twist ?? 0) * 0.45), D((p.lean ?? 0) * 0.55));
+  rig.chest.rotation.set(D(p.chest ?? 0), D((p.twist ?? 0) * 0.55), D((p.lean ?? 0) * 0.45));
   rig.neck.rotation.x = D(p.neck ?? 0);
 
-  const side = (S: Side, s: 1 | -1, sh?: Joint3, el?: number, wr?: number, hp?: Joint3, kn?: number, an?: number) => {
+  const side = (S: Side, s: 1 | -1, sh?: Joint3, el?: number, wr?: number, hp?: Joint3, kn?: number, an?: number, out?: number) => {
     const a = sh ?? J0;
     S.shoulder.rotation.set(D(-a[0]), D(a[2] * s), D(a[1] * s));
     S.elbow.rotation.x = D(-(el ?? 0));
     S.wrist.rotation.x = D(-(wr ?? 0));
     const h = hp ?? J0;
     S.hip.rotation.set(D(-h[0]), D(h[2] * s), D(h[1] * s));
+    if (out) S.hip.quaternion.premultiply(_qOut.setFromAxisAngle(_Y, D(out * s)));
     S.knee.rotation.x = D(kn ?? 0);
     // القدم: بشكل افتراضي مسطحة بالنسبة للأرض (تعويض ميل الساق والحوض)
     const chain = -(h[0]) + (kn ?? 0) + (r.pitch ?? 0);
     S.ankle.rotation.x = opts.flatFeet === false ? D(an ?? 0) : D(-chain + (an ?? 0));
   };
-  side(rig.L, 1, p.lShoulder, p.lElbow, p.lWrist, p.lHip, p.lKnee, p.lAnkle);
-  side(rig.R, -1, p.rShoulder, p.rElbow, p.rWrist, p.rHip, p.rKnee, p.rAnkle);
+  side(rig.L, 1, p.lShoulder, p.lElbow, p.lWrist, p.lHip, p.lKnee, p.lAnkle, p.lHipOut);
+  side(rig.R, -1, p.rShoulder, p.rElbow, p.rWrist, p.rHip, p.rKnee, p.rAnkle, p.rHipOut);
 
   if (opts.ground) {
     rig.object.updateMatrixWorld(true);
@@ -246,6 +274,22 @@ export function applyPose(rig: Rig, p: Pose, opts: { ground?: boolean; flatFeet?
       min = Math.min(min, o.getWorldPosition(_v).y);
     }
     rig.root.position.y -= min;
+  }
+  else if (opts.floor) {
+    // حماية: القدم ما تدخل الأرض أو الصندوق أثناء الانتقال بين الوضعيات (يرفع الجسم فقط، ما ينزّله)
+    rig.object.updateMatrixWorld(true);
+    let pen = 0;
+    for (const o of [rig.L.toe, rig.L.heel, rig.R.toe, rig.R.heel]) {
+      o.getWorldPosition(_v);
+      pen = Math.max(pen, opts.floor(_v.x, _v.z) - _v.y);
+    }
+    if (pen > 0) rig.root.position.y += pen;
+  }
+  if (opts.plant?.anchor) {
+    rig.object.updateMatrixWorld(true);
+    midfoot(rig, opts.plant.side, _mf);
+    rig.root.position.x += opts.plant.anchor.x - _mf.x;
+    rig.root.position.z += opts.plant.anchor.z - _mf.z;
   }
   rig.object.updateMatrixWorld(true);
 }
@@ -257,8 +301,10 @@ export type PropKind =
   | 'barbell' | 'barbellBack' | 'ezbar' | 'dumbbells' | 'dumbbellR' | 'goblet' | 'hammerDumbbells'
   | 'bench' | 'inclineBench' | 'seat' | 'seatBack' | 'pullupBar' | 'dipBars' | 'cableLow' | 'cableHigh'
   | 'cableFly' | 'pecDeck' | 'legExtension' | 'legCurlLying' | 'legCurlSeated' | 'legPress' | 'hackSquat'
-  | 'abWheel' | 'mat' | 'step' | 'benchBehind' | 'benchSideRow' | 'latBar' | 'backPad'
-  | 'benchPress' | 'chestPress' | 'shoulderPress' | 'hipAbduction' | 'latMachine' | 'rowStation';
+  | 'abWheel' | 'mat' | 'matSide' | 'step' | 'benchBehind' | 'benchSideRow' | 'latBar' | 'backPad'
+  | 'benchPress' | 'chestPress' | 'shoulderPress' | 'hipAbduction' | 'latMachine' | 'rowStation'
+  | 'declineBench' | 'preacherBench' | 'hyperBench' | 'plyoBox' | 'smithBar' | 'lowBar' | 'band'
+  | 'cableAnkle' | 'cableSide' | 'hipAdduction' | 'kettlebell' | 'medBall' | 'cableFlyLow' | 'rackPins';
 
 export interface PropSpec { kind: PropKind; pos?: [number, number, number]; }
 

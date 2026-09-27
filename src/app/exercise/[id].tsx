@@ -10,8 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
 import { e1rm, fmtSet, loadHistory, summarize, type SessionData } from '@/lib/training';
 import { ANATOMY } from '@/three/anatomy';
-import { getExercise, MUSCLE_NAMES } from '@/three/catalog';
-import { MOTIONS } from '@/three/motions';
+import { exerciseMuscles, getExercise, MUSCLE_NAMES } from '@/three/catalog';
 import type { Muscle } from '@/three/rig';
 import { brand, colors, space } from '@/theme';
 
@@ -32,7 +31,7 @@ export default function ExerciseScreen() {
   const best = mine.reduce<typeof mine[number]['top']>((b, m) => (m.top && (!b || e1rm(m.top.weight_kg, m.top.reps) > e1rm(b.weight_kg, b.reps)) ? m.top : b), null);
 
   if (!ex) return <Screen><Empty text={t('exercise.notFound')} /></Screen>;
-  const m = MOTIONS[ex.motion];
+  const m = exerciseMuscles(ex);
   const muscles: [Muscle, 'primary' | 'secondary'][] = [
     ...m.primary.map((x) => [x, 'primary'] as [Muscle, 'primary']),
     ...m.secondary.map((x) => [x, 'secondary'] as [Muscle, 'secondary']),
@@ -44,9 +43,9 @@ export default function ExerciseScreen() {
       <Stack.Screen options={{ title: L(ex.name) }} />
 
       <Suspense fallback={<ViewerLoading />}>
-        <ExerciseViewer motion={ex.motion} gender={gender} focus={focus} />
+        <ExerciseViewer motion={ex.motion} gender={gender} focus={focus} muscles={ex.library ? m : undefined} />
       </Suspense>
-      <T size="xs" muted center>{t('exercise.dragHint')}</T>
+      <T size="xs" muted center>{t(ex.library ? 'exercise.mapHint' : 'exercise.dragHint')}</T>
       <Segmented value={gender} onChange={setGender}
         options={[{ value: 'male', label: t('exercise.male') }, { value: 'female', label: t('exercise.female') }]} />
 

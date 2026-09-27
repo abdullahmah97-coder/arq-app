@@ -3,7 +3,7 @@
 // بعد معايرة الفرق بين محاور الهيكلين في وضعية T.
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { applyPose, sym, type Muscle, type Rig } from './rig';
+import { applyPose, sym, type FloorFn, type Muscle, type Rig } from './rig';
 
 export const HUMAN_COLORS = {
   skin: '#EFD3B0',
@@ -30,7 +30,7 @@ export interface Human {
   object: THREE.Group;
   /** كائن بنفس شكل Rig لكن نقاطه على جسم النموذج الحقيقي (تستخدمه الأدوات) */
   propRig: Rig;
-  sync(ground: boolean): void;
+  sync(ground: boolean, floor?: FloorFn): void;
   setHighlight(primary: Muscle[], secondary: Muscle[]): void;
   /** قبضة الأصابع: 0 مفتوح … 1 مقفل */
   setGrip(amount: number): void;
@@ -261,7 +261,7 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
   setHighlight([], []);
 
   // ------------------------------------------------------------------ التحريك
-  const sync = (ground: boolean) => {
+  const sync = (ground: boolean, floor?: FloorFn) => {
     object.position.set(0, 0, 0);
     driver.object.updateMatrixWorld(true);
     object.updateMatrixWorld(true);
@@ -285,6 +285,10 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
       for (const o of [propRig.L.toe, propRig.L.heel, propRig.R.toe, propRig.R.heel]) min = Math.min(min, o.getWorldPosition(_v).y);
       object.position.y = -min;
       object.updateMatrixWorld(true);
+    } else if (floor) {
+      let pen = 0;
+      for (const o of [propRig.L.toe, propRig.L.heel, propRig.R.toe, propRig.R.heel]) { o.getWorldPosition(_v); pen = Math.max(pen, floor(_v.x, _v.z) - _v.y); }
+      if (pen > 0) { object.position.y = pen; object.updateMatrixWorld(true); }
     }
   };
 

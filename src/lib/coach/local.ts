@@ -1,10 +1,11 @@
 // المدرب المحلي: يفهم الطلبات الشائعة بالعربي والإنجليزي ويبني تمريناً من مكتبة التمارين ثلاثية الأبعاد.
 // يُستخدم عندما لا يتوفر الذكاء الاصطناعي (بدون إنترنت، أو قبل إعداد المفتاح)، وهو قابل للاختبار.
-import { EXERCISES, findExercise } from '../../three/catalog';
+import { EXERCISES, findExercise, musclesOf } from '../../three/catalog';
 import { MOTIONS } from '../../three/motions';
 
 /** حركة التمرين (بعض التمارين تشارك حركة تمرين ثاني، مثل الطعن الخلفي) */
 const motionOf = (id: string) => MOTIONS[(EXERCISES.find((e) => e.id === id)?.motion ?? id) as keyof typeof MOTIONS];
+const primaryOf = (id: string) => musclesOf(id).primary;
 import type { Muscle } from '../../three/rig';
 import type { CoachContext, CoachReply, CoachRoute, CoachWorkout } from './types';
 
@@ -31,7 +32,8 @@ const GROUP_NAME: Record<Group, [string, string]> = {
 // أدوات منزلية: بدون أدوات = حصيرة فقط؛ بالدمبل = دمبلات (والكرسي/الكنبة بدل البنش)
 const NO_EQUIP = new Set(['split_squat', 'glute_bridge', 'plank', 'walking_lunge', 'bulgarian_split_squat', 'calf_raise',
   'push_up', 'knee_push_up', 'air_squat', 'reverse_lunge', 'donkey_kick', 'superman', 'crunch', 'lying_leg_raise', 'mountain_climber', 'dead_bug',
-  'jumping_jack', 'high_knees', 'burpee', 'wall_sit']);
+  'jumping_jack', 'high_knees', 'burpee', 'wall_sit',
+  'diamond_push_up', 'wide_push_up', 'single_leg_bridge', 'side_plank', 'bicycle_crunch', 'reverse_crunch', 'sit_up', 'v_up', 'flutter_kicks', 'jump_squat']);
 const DUMBBELL_KINDS = new Set(['dumbbells', 'goblet', 'hammerDumbbells', 'dumbbellR', 'mat', 'bench', 'benchBehind', 'benchSideRow', 'inclineBench', 'seatBack']);
 
 const ROUTES: [RegExp, CoachRoute][] = [
@@ -80,9 +82,10 @@ function pick(groups: Group[], count: number, equip: 'gym' | 'dumbbells' | 'none
     return true;
   };
   // لكل مجموعة: تمارين عضلتها الأساسية ضمن المطلوب، والمركّبة (أكثر من عضلة أساسية) أولاً
+  // تمارين المكتبة (بدون حركة 3D) ما تنختار تلقائياً، والتمارين الإضافية تجي بعد الأساسية
   const perGroup = groups.map((g) => EXERCISES
-    .filter((e) => ok(e.id) && MOTIONS[e.motion].primary.some((m) => GROUP_MUSCLES[g].includes(m)))
-    .sort((a, b) => MOTIONS[b.motion].primary.length - MOTIONS[a.motion].primary.length));
+    .filter((e) => !e.library && ok(e.id) && primaryOf(e.id).some((m) => GROUP_MUSCLES[g].includes(m)))
+    .sort((a, b) => (Number(!!a.extra) - Number(!!b.extra)) || (primaryOf(b.id).length - primaryOf(a.id).length)));
   const out: string[] = [];
   for (let round = 0; out.length < count && round < 8; round++) {
     for (let gi = 0; gi < perGroup.length && out.length < count; gi++) {
@@ -95,7 +98,7 @@ function pick(groups: Group[], count: number, equip: 'gym' | 'dumbbells' | 'none
   }
   // لو المطلوب قليل (مثلاً بدون أدوات) نكمّل من أي مجموعة متاحة
   if (out.length < Math.min(3, count)) {
-    for (const e of EXERCISES) if (out.length < 3 && ok(e.id) && !out.includes(e.id)) out.push(e.id);
+    for (const e of EXERCISES) if (out.length < 3 && !e.library && ok(e.id) && !out.includes(e.id)) out.push(e.id);
   }
   return out;
 }
@@ -105,9 +108,9 @@ export function buildWorkout(ctx: CoachContext, groups: Group[], minutes: number
   const ids = pick(groups, count, equip, seed);
   const red = ctx.zone === 'red';
   const exercises = ids.map((id, i) => {
-    const compound = motionOf(id).primary.length > 1 || i === 0;
+    const compound = primaryOf(id).length > 1 || i === 0;
     const r = repsFor(ctx, compound);
-    const isHold = id === 'plank';
+    const isHold = id === 'plank' || id === 'side_plank';
     return {
       exercise_id: id,
       sets: red ? 2 : ctx.level === 'beginner' ? 3 : i < 2 ? 4 : 3,
@@ -116,7 +119,7 @@ export function buildWorkout(ctx: CoachContext, groups: Group[], minutes: number
     };
   });
   // الاسم من العضلات اللي فعلاً في التمرين (مو من الطلب فقط)
-  const covered = groups.filter((g) => ids.some((id) => motionOf(id).primary.some((m) => GROUP_MUSCLES[g].includes(m))));
+  const covered = groups.filter((g) => ids.some((id) => primaryOf(id).some((m) => GROUP_MUSCLES[g].includes(m))));
   const names = covered.length >= 3 ? [L(ctx, 'كامل الجسم', 'Full body')] : (covered.length ? covered : groups).map((g) => GROUP_NAME[g][ctx.lang === 'en' ? 1 : 0]);
   const where = equip === 'none' ? L(ctx, ' بالبيت', ' at home') : equip === 'dumbbells' ? L(ctx, ' بالدمبل', ' with dumbbells') : '';
   return {

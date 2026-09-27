@@ -2,8 +2,7 @@
 // برنامج «فل بدي ٤ أيام» مبني على جدول زوّدنا به صاحب التطبيق، ومكيّف على مكتبة تمارين ARQ ثلاثية الأبعاد.
 import type { I18nText } from '../lib/types';
 import type { PlanDay, PlanExercise, WeeklyPlan } from '../lib/plan/types';
-import { getExercise, MUSCLE_NAMES } from '../three/catalog';
-import { MOTIONS } from '../three/motions';
+import { exerciseMuscles, getExercise, MUSCLE_NAMES } from '../three/catalog';
 
 const t = (ar: string, en: string): I18nText => ({ ar, en });
 
@@ -42,8 +41,7 @@ const REST_CIRCUIT: [number, number] = [0.5, 1];
 function x(id: string, sets: number, reps: string, rest: [number, number], rir: string): ProgramExercise {
   const g = getExercise(id);
   if (!g) throw new Error(`unknown exercise ${id}`);
-  const m = MOTIONS[g.motion];
-  return { exercise_id: id, original: g.name.en, target: MUSCLE_NAMES[m.primary[0]], sets, reps, rest, rir };
+  return { exercise_id: id, original: g.name.en, target: MUSCLE_NAMES[exerciseMuscles(g).primary[0]], sets, reps, rest, rir };
 }
 const day = (ar: string, en: string, exercises: ProgramExercise[]) => ({ title: t(ar, en), exercises });
 

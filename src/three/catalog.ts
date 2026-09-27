@@ -14,6 +14,15 @@ export interface ExerciseGuide {
   mistakes: I18nText[];
   breathing: I18nText;
   tip?: I18nText;
+  /** تمرين إضافي (له حركة 3D) — المدرب المحلي ما يختاره كأول تمرين للمجموعة */
+  extra?: boolean;
+  /** من المكتبة الإضافية: شرح + خريطة عضلات فقط (بدون حركة 3D خاصة) */
+  library?: boolean;
+  /** العضلات (لتمارين المكتبة؛ غيرها تؤخذ من الحركة) */
+  primary?: Muscle[];
+  secondary?: Muscle[];
+  /** الأدوات (نص إنجليزي مختصر للمدرب الذكي) */
+  equipment?: string;
 }
 
 export const MUSCLE_NAMES: Record<Muscle, I18nText> = {
@@ -962,9 +971,921 @@ export const EXERCISES: ExerciseGuide[] = [
     breathing: t('أخرج النفس مع القفزة.', 'Exhale on the jump.'),
     tip: t('بدّل القفزة بالوقوف لتسهيلها.', 'Step instead of jump to make it easier.'),
   },
+  // ================================================================== تمارين جديدة بحركة 3D (مصدرها قاعدة التمارين المفتوحة، الشرح مكتوب لأرك)
+  // ------------------------------------------------------------------ صدر
+  {
+    id: 'decline_bench_bb', motion: 'decline_bench_bb', extra: true, name: t('بنش مائل للأسفل بالبار', 'Decline Barbell Bench Press'),
+    aliases: ['Decline Bench Press', 'Decline Barbell Bench Press', 'Decline Press'],
+    steps: [
+      t('ثبّت رجليك تحت المسند واستلقِ على البنش المائل للأسفل.', 'Hook your legs under the pads and lie back on the decline bench.'),
+      t('امسك البار أعرض من الكتفين بقليل وارفعه فوق أسفل صدرك.', 'Grip slightly wider than your shoulders and unrack the bar over your lower chest.'),
+      t('نزّل البار ببطء حتى يلمس أسفل الصدر، والكوعين بزاوية ٤٥ تقريباً عن الجسم.', 'Lower slowly to your lower chest with elbows about 45° from your body.'),
+      t('ادفع البار لفوق حتى تستقيم يدينك بدون ما تقفل الكوع بقوة.', 'Press back up until your arms are straight without slamming the elbows.'),
+    ],
+    mistakes: [t('ارتداد البار من الصدر.', 'Bouncing the bar off your chest.'), t('فتح الكوعين للجنب بزاوية ٩٠.', 'Flaring the elbows out to 90°.')],
+    breathing: EXHALE_UP,
+    tip: t('خل معك مساعد (سبوتر)، لأن فك البار من هالوضعية أصعب.', 'Use a spotter — unracking from this angle is awkward.'),
+  },
+  {
+    id: 'incline_push_up', motion: 'incline_push_up', extra: true, name: t('ضغط مائل (اليدين على صندوق)', 'Incline Push-Up'),
+    aliases: ['Incline Push Up', 'Incline Pushups', 'Hands Elevated Push Up'],
+    steps: [
+      t('حط يدينك على حافة صندوق أو بنش بعرض الكتفين.', 'Place your hands on the edge of a box or bench, shoulder-width apart.'),
+      t('ارجع برجليك لورا حتى يصير جسمك خط مستقيم من الراس للكعب.', 'Walk your feet back until your body is a straight line from head to heels.'),
+      t('نزّل صدرك للحافة والكوعين مائلة لورا.', 'Lower your chest to the edge with your elbows angled back.'),
+      t('ادفع الصندوق بعيد عنك وارجع لوضع البداية.', 'Push the box away and return to the start.'),
+    ],
+    mistakes: [t('نزول الحوض.', 'Sagging hips.'), t('النزول نص المسافة.', 'Half reps.')],
+    breathing: EXHALE_UP,
+    tip: t('كل ما كان السطح أعلى صار أسهل — خطوة ممتازة قبل الضغط العادي.', 'The higher the surface, the easier it gets — a great step before regular push-ups.'),
+  },
+  {
+    id: 'decline_push_up', motion: 'decline_push_up', extra: true, name: t('ضغط والرجلين مرفوعة', 'Decline Push-Up'),
+    aliases: ['Decline Push Up', 'Feet Elevated Push Up', 'Push-Ups With Feet Elevated'],
+    steps: [
+      t('حط أصابع رجلك على صندوق أو بنش، ويدينك على الأرض أعرض من الكتفين بقليل.', 'Put your toes on a box or bench and your hands on the floor slightly wider than your shoulders.'),
+      t('شد البطن والأرداف حتى يصير جسمك مستقيم.', 'Brace your abs and glutes so your body stays straight.'),
+      t('انزل حتى يقرب صدرك من الأرض.', 'Lower until your chest nearly touches the floor.'),
+      t('ادفع لفوق بقوة بدون ما يطيح الحوض.', 'Press up powerfully without letting your hips drop.'),
+    ],
+    mistakes: [t('تقويس أسفل الظهر.', 'Arching the lower back.'), t('الراس يسبق الجسم للأرض.', 'Leading with your head.')],
+    breathing: EXHALE_UP,
+    tip: t('يشغّل أعلى الصدر والأكتاف أكثر من الضغط العادي.', 'Works the upper chest and shoulders more than a regular push-up.'),
+  },
+  {
+    id: 'diamond_push_up', motion: 'diamond_push_up', extra: true, name: t('ضغط دايموند', 'Diamond Push-Up'),
+    aliases: ['Diamond Push Up', 'Close Grip Push Up', 'Triangle Push Up', 'Push-Ups - Close Triceps Position'],
+    steps: [
+      t('حط يدينك تحت صدرك، والإبهامين والسبابتين يتلاقون بشكل مثلث.', 'Place your hands under your chest with thumbs and index fingers touching in a diamond.'),
+      t('افرد رجلك لورا وشد جسمك.', 'Extend your legs back and brace your whole body.'),
+      t('انزل والكوعين قريبة من جسمك باتجاه الخلف.', 'Lower with your elbows tucked back along your sides.'),
+      t('ادفع حتى تستقيم يدينك.', 'Press until your arms are straight.'),
+    ],
+    mistakes: [t('فتح الكوعين للجنب.', 'Elbows flaring out.'), t('نزول الحوض.', 'Sagging hips.')],
+    breathing: EXHALE_UP,
+    tip: t('لو صعب عليك، ابدأ على الركب.', 'If it is too hard, start on your knees.'),
+  },
+  {
+    id: 'wide_push_up', motion: 'wide_push_up', extra: true, name: t('ضغط واسع', 'Wide Push-Up'), aliases: ['Wide Push Up', 'Wide Grip Push Up', 'Push-Up Wide'],
+    steps: [
+      t('حط يدينك على الأرض أعرض من كتفينك بشبر تقريباً.', 'Place your hands about a hand-span wider than your shoulders.'),
+      t('خل جسمك مستقيم والبطن مشدود.', 'Keep your body straight and your core tight.'),
+      t('انزل حتى يقرب صدرك من الأرض.', 'Lower until your chest is close to the floor.'),
+      t('ادفع لفوق وأنت تحس بالصدر يشتغل.', 'Push back up, feeling your chest do the work.'),
+    ],
+    mistakes: [t('فتح اليدين زيادة (يضغط على الكتف).', 'Hands so wide it strains your shoulders.'), t('نزول ناقص.', 'Partial reps.')],
+    breathing: EXHALE_UP,
+  },
+  {
+    id: 'low_cable_crossover', motion: 'low_cable_crossover', extra: true, name: t('تفتيح كيبل من تحت لفوق', 'Low Cable Crossover'),
+    aliases: ['Low Cable Crossover', 'Low To High Cable Fly', 'Low Cable Fly'],
+    steps: [
+      t('اضبط البكرتين على أوطى ارتفاع وامسك مقبض بكل يد.', 'Set both pulleys at the lowest position and hold a handle in each hand.'),
+      t('اوقف بالنص بخطوة للأمام، واليدين تحت جنب الحوض والكوع مثني شوي.', 'Stand in the middle with a split stance, hands low by your hips and elbows slightly bent.'),
+      t('ارفع يدينك بقوس لفوق حتى يتلاقون قدام أعلى الصدر.', 'Sweep your hands up in an arc until they meet in front of your upper chest.'),
+      t('ارجع ببطء لتحت وأنت تحس بالتمدد.', 'Lower slowly, feeling the stretch.'),
+    ],
+    mistakes: [t('ثني الكوع زيادة فتصير حركة سحب.', 'Bending the elbows so much it turns into a curl.'), t('رفع الأكتاف للأذن.', 'Shrugging your shoulders.')],
+    breathing: t('أخرج النفس وأنت ترفع يدينك، وخذ نفس وأنت تنزل.', 'Exhale as you bring your hands up, inhale as you lower.'),
+  },
+  // ------------------------------------------------------------------ ظهر
+  {
+    id: 'inverted_row', motion: 'inverted_row', extra: true, name: t('سحب مقلوب (بوزن الجسم)', 'Inverted Row'),
+    aliases: ['Inverted Row', 'Bodyweight Row', 'Australian Pull Up'],
+    steps: [
+      t('اضبط البار على ارتفاع الخصر تقريباً وانسدح تحته.', 'Set a bar at about waist height and lie underneath it.'),
+      t('امسك البار أعرض من الكتفين بقليل، والكعبين على الأرض والجسم مستقيم.', 'Grip slightly wider than your shoulders with heels on the floor and body straight.'),
+      t('اسحب صدرك للبار وضم لوحي الكتف.', 'Pull your chest to the bar, squeezing your shoulder blades together.'),
+      t('انزل ببطء حتى تستقيم يدينك.', 'Lower slowly until your arms are straight.'),
+    ],
+    mistakes: [t('نزول الحوض وقت السحب.', 'Hips sagging during the pull.'), t('مد الرقبة للبار بدل الصدر.', 'Reaching with your chin instead of your chest.')],
+    breathing: EXHALE_PULL,
+    tip: t('قرّب رجلك (جسمك يصير أعمودي أكثر) عشان يصير أسهل.', 'Walk your feet in (body more upright) to make it easier.'),
+  },
+  {
+    id: 'row_db_bent', motion: 'row_db_bent', extra: true, name: t('تجديف دمبل منحني', 'Bent-Over Dumbbell Row'),
+    aliases: ['Bent Over Dumbbell Row', 'Bent Over Two-Dumbbell Row', 'Two Arm Dumbbell Row'],
+    steps: [
+      t('امسك دمبل بكل يد والكفين مقابل بعض.', 'Hold a dumbbell in each hand, palms facing each other.'),
+      t('اثنِ ركبك شوي وانحني من الحوض حتى يصير ظهرك مائل ومستقيم.', 'Soften your knees and hinge at the hips until your back is inclined and flat.'),
+      t('اسحب الدمبلين لجنب البطن والكوعين قريبة من الجسم.', 'Row the dumbbells to your sides with elbows close to your body.'),
+      t('نزّل ببطء بدون ما يتقوس ظهرك.', 'Lower slowly without rounding your back.'),
+    ],
+    mistakes: [t('تقويس الظهر.', 'Rounding your back.'), t('الوقوف وقت السحب والاعتماد على الزخم.', 'Standing up and using momentum.')],
+    breathing: EXHALE_PULL,
+  },
+  {
+    id: 'rack_pull', motion: 'rack_pull', extra: true, name: t('رك بول (سحب من الحامل)', 'Rack Pull'), aliases: ['Rack Pull', 'Rack Pulls', 'Rack Deadlift'],
+    steps: [
+      t('حط البار على مساند الحامل فوق الركبة بقليل.', 'Set the bar on the rack pins just above your knees.'),
+      t('امسك البار بعرض الكتفين وانحني من الحوض وظهرك مستقيم.', 'Grip shoulder-width and hinge at the hips with a flat back.'),
+      t('ادفع الحوض للأمام وقف مستقيم وأنت ضام لوحي الكتف.', 'Drive your hips forward and stand tall, squeezing your shoulder blades.'),
+      t('رجّع البار للمساند بتحكم.', 'Lower the bar back to the pins under control.'),
+    ],
+    mistakes: [t('الميلان لورا في الأعلى.', 'Leaning back at the top.'), t('تقويس الظهر.', 'Rounding your back.')],
+    breathing: t('خذ نفس وشد البطن قبل السحب، وأخرجه لما توقف.', 'Breathe in and brace before pulling; exhale once you are standing.'),
+  },
+  {
+    id: 'hyperextension', motion: 'hyperextension', extra: true, name: t('تمديد الظهر على جهاز ٤٥°', 'Back Extension (45°)'),
+    aliases: ['Hyperextension', 'Hyperextensions', 'Back Extension', '45 Degree Back Extension', 'Hyperextensions (Back Extensions)'],
+    steps: [
+      t('اضبط المسند تحت الحوض مباشرة وثبّت كاحلك تحت المسند الخلفي.', 'Set the pad just below your hips and lock your ankles under the rear pad.'),
+      t('ضم يدينك على صدرك وخل جسمك مستقيم.', 'Cross your arms over your chest and keep your body straight.'),
+      t('انزل من الحوض ببطء وظهرك مستقيم.', 'Hinge down slowly from the hips with a flat back.'),
+      t('ارجع لفوق بعصر الأرداف حتى يصير جسمك خط مستقيم.', 'Rise by squeezing your glutes until your body is one straight line.'),
+    ],
+    mistakes: [t('الرفع أعلى من الخط المستقيم (تقويس).', 'Overarching past a straight line.'), t('الحركة السريعة.', 'Swinging up fast.')],
+    breathing: t('خذ نفس وأنت تنزل، وأخرجه وأنت ترتفع.', 'Inhale as you lower, exhale as you rise.'),
+  },
+  // ------------------------------------------------------------------ أكتاف
+  {
+    id: 'band_pull_apart', motion: 'band_pull_apart', extra: true, name: t('فتح المطاط', 'Band Pull-Apart'), aliases: ['Band Pull Apart', 'Band Pull-Aparts'],
+    steps: [
+      t('امسك مطاط المقاومة قدامك على مستوى الكتف.', 'Hold a resistance band in front of you at shoulder height.'),
+      t('خل يدينك ممدودة والكوع مثني شوي.', 'Keep your arms extended with a slight bend in the elbows.'),
+      t('افتح يدينك للجنب حتى يلمس المطاط صدرك.', 'Pull the band apart until it touches your chest.'),
+      t('ارجع ببطء لوضع البداية.', 'Return slowly to the start.'),
+    ],
+    mistakes: [t('رفع الأكتاف للأذن.', 'Shrugging toward your ears.'), t('تقويس أسفل الظهر.', 'Arching your lower back.')],
+    breathing: EXHALE_PULL,
+    tip: t('تمرين ممتاز للإحماء وتحسين وقفة الكتف.', 'A great warm-up and posture exercise.'),
+  },
+  {
+    id: 'push_press', motion: 'push_press', extra: true, name: t('بوش برس', 'Push Press'), aliases: ['Push Press', 'Barbell Push Press'],
+    steps: [
+      t('ابدأ والبار على مقدمة الكتف، والقبضة أعرض من الكتف بقليل.', 'Start with the bar on your front shoulders, grip just wider than your shoulders.'),
+      t('انزل بركبك نزلة قصيرة وسريعة وجذعك مستقيم.', 'Dip your knees briefly and quickly, keeping your torso upright.'),
+      t('ادفع برجلك بقوة واستغل الدفعة لرفع البار فوق راسك.', 'Drive hard through your legs and use that drive to press the bar overhead.'),
+      t('ثبّت البار فوق ثم رجّعه لكتفك بتحكم.', 'Lock it out overhead, then lower it back to your shoulders under control.'),
+    ],
+    mistakes: [t('النزول عميق مثل السكوات.', 'Dipping too deep, like a squat.'), t('تقويس الظهر في الأعلى.', 'Arching your back at lockout.')],
+    breathing: t('خذ نفس وشد البطن قبل النزلة، وأخرجه مع الدفع.', 'Breathe in and brace before the dip; exhale as you drive up.'),
+  },
+  // ------------------------------------------------------------------ ذراعين
+  {
+    id: 'preacher_curl', motion: 'preacher_curl', extra: true, name: t('بريتشر كيرل', 'Preacher Curl'), aliases: ['Preacher Curl', 'EZ Bar Preacher Curl', 'Scott Curl'],
+    steps: [
+      t('اجلس وحط ظهر العضد كامل على مسند البريتشر.', 'Sit and rest the backs of your upper arms fully on the preacher pad.'),
+      t('امسك البار بقبضة من تحت بعرض الكتفين.', 'Grip the bar underhand, shoulder-width.'),
+      t('ارفع البار بثني الكوع فقط حتى تحس بعصرة الباي.', 'Curl by bending only at the elbows until your biceps are fully squeezed.'),
+      t('نزّل ببطء حتى تستقيم يدك تقريباً.', 'Lower slowly until your arms are almost straight.'),
+    ],
+    mistakes: [t('رفع العضد عن المسند.', 'Lifting your upper arms off the pad.'), t('النزول السريع في الأسفل (يضغط على الكوع).', 'Dropping fast at the bottom (stresses the elbow).')],
+    breathing: t('أخرج النفس وأنت ترفع، وخذ نفس وأنت تنزل.', 'Exhale as you curl up, inhale as you lower.'),
+  },
+  {
+    id: 'wrist_curl', motion: 'wrist_curl', extra: true, name: t('ثني الرسغ (للساعد)', 'Wrist Curl'),
+    aliases: ['Wrist Curl', 'Seated Dumbbell Wrist Curl', 'Seated Dumbbell Palms-Up Wrist Curl'],
+    steps: [
+      t('اجلس وحط ساعدك على فخذك والكف لفوق، والرسغ برا الركبة.', 'Sit with your forearms on your thighs, palms up and wrists just past your knees.'),
+      t('خل الدمبل ينزل لأطراف أصابعك ببطء.', 'Let the dumbbells roll down toward your fingertips slowly.'),
+      t('ارفع الدمبل بثني الرسغ فقط لأعلى نقطة.', 'Curl the weight up by flexing only your wrists.'),
+      t('نزّل بتحكم وكرر.', 'Lower under control and repeat.'),
+    ],
+    mistakes: [t('رفع الساعد عن الفخذ.', 'Lifting your forearms off your thighs.'), t('وزن ثقيل بحركة قصيرة.', 'Going heavy with a short range.')],
+    breathing: t('تنفس بهدوء، وأخرج النفس مع الرفع.', 'Breathe easily; exhale as you curl up.'),
+  },
+  {
+    id: 'overhead_cable_triceps', motion: 'overhead_cable_triceps', extra: true, name: t('تراي كيبل فوق الراس', 'Overhead Cable Triceps Extension'),
+    aliases: ['Cable Overhead Triceps Extension', 'Overhead Rope Extension', 'Cable Rope Overhead Triceps Extension', 'Triceps Overhead Extension with Rope'],
+    steps: [
+      t('امسك الحبل وعطِ ظهرك للجهاز، مع خطوة للأمام وميلان بسيط.', 'Hold the rope, face away from the machine, step forward and lean slightly.'),
+      t('خل كوعينك جنب راسك والحبل خلف الرقبة.', 'Keep your elbows by your head with the rope behind your neck.'),
+      t('افرد يدينك لقدام وفوق حتى تستقيم.', 'Extend your arms up and forward until straight.'),
+      t('ارجع ببطء حتى تحس بتمدد التراي.', 'Return slowly until you feel the triceps stretch.'),
+    ],
+    mistakes: [t('فتح الكوعين للجنب.', 'Elbows flaring out.'), t('تحريك الكتف بدل الكوع.', 'Moving from the shoulders instead of the elbows.')],
+    breathing: EXHALE_PUSH,
+  },
+  // ------------------------------------------------------------------ أرجل
+  {
+    id: 'smith_squat', motion: 'smith_squat', extra: true, name: t('سكوات سميث', 'Smith Machine Squat'), aliases: ['Smith Machine Squat', 'Smith Squat'],
+    steps: [
+      t('حط بار السميث على أعلى ظهرك وفك الأمان.', 'Set the Smith bar on your upper back and unhook it.'),
+      t('القدمين بعرض الكتفين، تحت البار أو قدامه بقليل.', 'Feet shoulder-width, under or slightly in front of the bar.'),
+      t('انزل بالحوض لتحت ولورا حتى يصير الفخذ موازي للأرض.', 'Sit down and back until your thighs are parallel to the floor.'),
+      t('ادفع بكامل القدم لفوق ورجّع البار للأمان في الأعلى.', 'Drive up through your whole foot and re-hook the bar at the top.'),
+    ],
+    mistakes: [t('رفع الكعب.', 'Heels lifting.'), t('دخول الركب للداخل.', 'Knees caving in.')],
+    breathing: EXHALE_UP,
+    tip: t('السكة الثابتة تساعدك تركز على الفخذ، بس تعلّم السكوات الحر بعد.', 'The fixed path helps you focus on the quads, but still learn the free squat.'),
+  },
+  {
+    id: 'db_squat', motion: 'db_squat', extra: true, name: t('سكوات بالدمبل', 'Dumbbell Squat'), aliases: ['Dumbbell Squat', 'DB Squat'],
+    steps: [
+      t('امسك دمبل بكل يد جنبك والكفين للداخل.', 'Hold a dumbbell at each side, palms facing in.'),
+      t('القدمين بعرض الكتفين والصدر مرفوع.', 'Feet shoulder-width, chest up.'),
+      t('انزل كأنك تجلس، والدمبلات تنزل جنب رجلك.', 'Sit down with the dumbbells hanging beside your legs.'),
+      t('ادفع لفوق بكامل القدم.', 'Stand back up through your whole foot.'),
+    ],
+    mistakes: [t('انحناء الظهر لقدام.', 'Rounding forward.'), t('رفع الكعب.', 'Heels lifting.')],
+    breathing: EXHALE_UP,
+  },
+  {
+    id: 'box_jump', motion: 'box_jump', extra: true, name: t('القفز على الصندوق', 'Box Jump'), aliases: ['Box Jump', 'Box Jumps', 'Front Box Jump'],
+    steps: [
+      t('اوقف قدام صندوق ثابت بمسافة قصيرة والقدمين بعرض الحوض.', 'Stand a short step from a sturdy box, feet hip-width.'),
+      t('انزل نص سكوات وارجع بيدينك لورا.', 'Dip into a quarter squat and swing your arms back.'),
+      t('اقفز بقوة وارفع ركبك، وانزل بهدوء على الصندوق بكامل القدم.', 'Jump explosively, bring your knees up and land softly on the box with your whole foot.'),
+      t('اوقف مستقيم فوق، ثم انزل خطوة خطوة (لا تنط لتحت).', 'Stand tall on top, then step down one foot at a time (don’t jump down).'),
+    ],
+    mistakes: [t('الهبوط والركب داخلة لبعض.', 'Landing with your knees caving in.'), t('صندوق أعلى من مستواك.', 'Using a box that is too high for you.')],
+    breathing: t('أخرج النفس مع القفزة.', 'Exhale as you jump.'),
+  },
+  {
+    id: 'jump_squat', motion: 'jump_squat', extra: true, name: t('سكوات بالقفز', 'Jump Squat'), aliases: ['Jump Squat', 'Squat Jump', 'Freehand Jump Squat'],
+    steps: [
+      t('اوقف والقدمين بعرض الكتفين.', 'Stand with your feet shoulder-width apart.'),
+      t('انزل سكوات حتى يقرب الفخذ من الموازي.', 'Squat down to near parallel.'),
+      t('اقفز لفوق بأقوى ما تقدر وافرد جسمك.', 'Explode upward and fully extend your body.'),
+      t('انزل بهدوء على مقدمة القدم وادخل مباشرة في السكوات اللي بعده.', 'Land softly on the balls of your feet and flow into the next squat.'),
+    ],
+    mistakes: [t('الهبوط والركب مقفلة.', 'Landing with locked knees.'), t('دخول الركب للداخل.', 'Knees caving in.')],
+    breathing: t('خذ نفس وأنت تنزل، وأخرجه مع القفزة.', 'Inhale on the way down, exhale as you jump.'),
+  },
+  {
+    id: 'hip_adduction', motion: 'hip_adduction', extra: true, name: t('جهاز الضم (الفخذ الداخلي)', 'Hip Adduction Machine'),
+    aliases: ['Hip Adduction', 'Adductor Machine', 'Thigh Adductor'],
+    steps: [
+      t('اجلس وظهرك على المسند، والمساند على داخل ركبك.', 'Sit with your back on the pad and the pads against your inner knees.'),
+      t('ابدأ ورجلك مفتوحة لمسافة مريحة.', 'Start with your legs open to a comfortable width.'),
+      t('ضم رجلك لبعض بتحكم حتى يتقابل المسندين.', 'Squeeze your legs together under control until the pads meet.'),
+      t('ارجع ببطء بدون ما يضرب الوزن.', 'Return slowly without letting the stack slam.'),
+    ],
+    mistakes: [t('الفتح أكثر من المريح.', 'Opening wider than is comfortable.'), t('الاعتماد على الزخم.', 'Using momentum.')],
+    breathing: t('أخرج النفس وأنت تضم، وخذ نفس وأنت تفتح.', 'Exhale as you squeeze, inhale as you open.'),
+  },
+  {
+    id: 'single_leg_bridge', motion: 'single_leg_bridge', extra: true, name: t('جسر برجل وحدة', 'Single-Leg Glute Bridge'),
+    aliases: ['Single Leg Glute Bridge', 'Single Leg Bridge', 'One Leg Glute Bridge'],
+    steps: [
+      t('انسدح على ظهرك، رجل مثنية والقدم على الأرض والثانية ممدودة.', 'Lie on your back with one knee bent and foot flat, the other leg extended.'),
+      t('ادفع بكعب الرجل الثابتة وارفع الحوض.', 'Drive through the planted heel and lift your hips.'),
+      t('ارفع حتى يصير الكتف والحوض والركبة خط واحد، واعصر الأرداف.', 'Rise until shoulders, hips and knee form one line; squeeze your glute.'),
+      t('نزّل ببطء وكمّل العدد، ثم بدّل الرجل.', 'Lower slowly, finish your reps, then switch legs.'),
+    ],
+    mistakes: [t('ميلان الحوض لجهة.', 'Letting your hips tilt to one side.'), t('الرفع بتقويس الظهر بدل الأرداف.', 'Arching your back instead of using your glutes.')],
+    breathing: t('أخرج النفس وأنت ترفع الحوض.', 'Exhale as you lift your hips.'),
+  },
+  {
+    id: 'cable_kickback', motion: 'cable_kickback', extra: true, name: t('ركلة خلفية بالكيبل', 'Cable Glute Kickback'),
+    aliases: ['Cable Kickback', 'Cable Glute Kickback', 'One-Legged Cable Kickback'],
+    steps: [
+      t('ركّب سوار الكاحل على البكرة السفلية واربطه برجلك.', 'Attach an ankle strap to the low pulley and fasten it around your ankle.'),
+      t('امسك الجهاز وميّل للأمام شوي وظهرك مستقيم.', 'Hold the frame and lean forward slightly with a flat back.'),
+      t('ادفع رجلك لورا بالكعب حتى تحس بعصرة الأرداف.', 'Kick your leg back, leading with the heel, until your glute squeezes.'),
+      t('ارجع ببطء بدون ما ينزل الوزن كامل.', 'Return slowly without letting the weight rest.'),
+    ],
+    mistakes: [t('تقويس الظهر عشان ترفع أعلى.', 'Arching your back to kick higher.'), t('التأرجح.', 'Swinging.')],
+    breathing: t('أخرج النفس مع الدفع لورا.', 'Exhale as you kick back.'),
+  },
+  {
+    id: 'pull_through', motion: 'pull_through', extra: true, name: t('سحب الكيبل بين الرجلين', 'Cable Pull-Through'), aliases: ['Pull Through', 'Cable Pull Through'],
+    steps: [
+      t('عطِ ظهرك للبكرة السفلية وامسك الحبل من بين رجلك.', 'Face away from a low pulley and hold the rope between your legs.'),
+      t('امشِ خطوتين لقدام والقدمين أعرض من الكتف.', 'Walk forward two steps and set your feet wider than your shoulders.'),
+      t('انحني من الحوض وخل الحبل يرجع بين رجلك وظهرك مستقيم.', 'Hinge at the hips, letting the rope travel back between your legs with a flat back.'),
+      t('ادفع الحوض لقدام وقف مستقيم وأنت تعصر الأرداف.', 'Drive your hips forward to stand tall, squeezing your glutes.'),
+    ],
+    mistakes: [t('السحب باليدين.', 'Pulling with your arms.'), t('ثني الركب مثل السكوات بدل الانحناء.', 'Squatting instead of hinging.')],
+    breathing: t('خذ نفس وأنت تنحني، وأخرجه وأنت تدفع الحوض.', 'Inhale as you hinge, exhale as you drive your hips through.'),
+  },
+  // ------------------------------------------------------------------ بطن
+  {
+    id: 'russian_twist', motion: 'russian_twist', extra: true, name: t('روسيان تويست', 'Russian Twist'), aliases: ['Russian Twist', 'Medicine Ball Russian Twist'],
+    steps: [
+      t('اجلس والركب مثنية، وميّل جذعك لورا وظهرك مستقيم.', 'Sit with knees bent and lean back with a straight spine.'),
+      t('امسك الكرة قدام بطنك.', 'Hold the ball in front of your stomach.'),
+      t('لف جذعك لجهة وقرّب الكرة من جنب الحوض، ثم للجهة الثانية.', 'Rotate your torso to bring the ball beside one hip, then the other.'),
+      t('خل اللفة من الجذع مو من اليدين بس.', 'Turn from your torso, not just your arms.'),
+    ],
+    mistakes: [t('تقويس الظهر.', 'Rounding your back.'), t('تحريك اليدين بدون لف الجذع.', 'Moving only your arms.')],
+    breathing: t('أخرج النفس مع كل لفة.', 'Exhale with each twist.'),
+    tip: t('ارفع رجلك عن الأرض عشان يصير أصعب.', 'Lift your feet off the floor to make it harder.'),
+  },
+  {
+    id: 'side_plank', motion: 'side_plank', extra: true, name: t('بلانك جانبي', 'Side Plank'), aliases: ['Side Plank', 'Side Bridge'],
+    steps: [
+      t('انسدح على جنبك واسند على ساعدك، والكوع تحت الكتف.', 'Lie on your side propped on your forearm, elbow under your shoulder.'),
+      t('حط رجل فوق الثانية.', 'Stack your feet.'),
+      t('ارفع الحوض حتى يصير جسمك خط مستقيم من الراس للقدم.', 'Lift your hips until your body is straight from head to feet.'),
+      t('اثبت المدة المطلوبة، ثم بدّل الجهة.', 'Hold for the target time, then switch sides.'),
+    ],
+    mistakes: [t('نزول الحوض.', 'Hips sagging.'), t('ميلان الجسم لقدام أو لورا.', 'Rolling forward or back.')],
+    breathing: BRACE,
+  },
+  {
+    id: 'bicycle_crunch', motion: 'bicycle_crunch', extra: true, name: t('كرنش الدراجة', 'Bicycle Crunch'), aliases: ['Bicycle Crunch', 'Bicycle Crunches', 'Air Bike'],
+    steps: [
+      t('انسدح على ظهرك ويدينك خفيفة جنب راسك.', 'Lie on your back with your hands lightly beside your head.'),
+      t('ارفع كتفينك عن الأرض وارفع رجلك.', 'Lift your shoulders off the floor and raise your legs.'),
+      t('قرّب الكوع من الركبة المعاكسة وافرد الرجل الثانية.', 'Bring one elbow toward the opposite knee while extending the other leg.'),
+      t('بدّل الجهة بحركة متواصلة مثل الدراجة.', 'Switch sides in a smooth pedaling motion.'),
+    ],
+    mistakes: [t('سحب الرقبة باليدين.', 'Pulling on your neck.'), t('السرعة الزايدة.', 'Rushing the reps.')],
+    breathing: t('أخرج النفس مع كل لفة.', 'Exhale on each twist.'),
+  },
+  {
+    id: 'reverse_crunch', motion: 'reverse_crunch', extra: true, name: t('كرنش عكسي', 'Reverse Crunch'), aliases: ['Reverse Crunch', 'Reverse Crunches'],
+    steps: [
+      t('انسدح على ظهرك ويدينك جنبك على الأرض.', 'Lie on your back with your arms by your sides.'),
+      t('ارفع رجلك والركب مثنية ٩٠ درجة.', 'Lift your legs with your knees bent at 90°.'),
+      t('لف الحوض لفوق وقرّب ركبك من صدرك.', 'Curl your pelvis up, bringing your knees toward your chest.'),
+      t('نزّل ببطء بدون ما تطيح رجلك على الأرض.', 'Lower slowly without dropping your feet.'),
+    ],
+    mistakes: [t('التأرجح بالزخم.', 'Swinging with momentum.'), t('الدفع القوي باليدين على الأرض.', 'Pushing hard with your hands.')],
+    breathing: t('أخرج النفس وأنت ترفع الحوض.', 'Exhale as you curl up.'),
+  },
+  {
+    id: 'sit_up', motion: 'sit_up', extra: true, name: t('سيت أب', 'Sit-Up'), aliases: ['Sit Up', 'Sit-Ups', 'Situp'],
+    steps: [
+      t('انسدح والركب مثنية والقدم على الأرض.', 'Lie back with your knees bent and feet flat.'),
+      t('حط يدينك جنب راسك أو على صدرك.', 'Place your hands beside your head or across your chest.'),
+      t('ارفع جذعك كامل حتى تجلس.', 'Curl your torso all the way up to sitting.'),
+      t('انزل ببطء فقرة فقرة.', 'Lower back down slowly, one vertebra at a time.'),
+    ],
+    mistakes: [t('سحب الرقبة.', 'Yanking on your neck.'), t('ارتفاع القدمين عن الأرض.', 'Feet lifting off the floor.')],
+    breathing: t('أخرج النفس وأنت تطلع.', 'Exhale as you sit up.'),
+  },
+  {
+    id: 'v_up', motion: 'v_up', extra: true, name: t('في أب', 'V-Up'), aliases: ['V Up', 'V-Ups', 'Jackknife Sit-Up', 'Jackknife'],
+    steps: [
+      t('انسدح ممدود ويدينك فوق راسك.', 'Lie flat with your arms extended overhead.'),
+      t('ارفع رجلك وجذعك بنفس الوقت.', 'Lift your legs and torso at the same time.'),
+      t('حاول تلمس أصابع رجلك بيدينك وجسمك بشكل V.', 'Reach your hands toward your toes, forming a V.'),
+      t('نزّل ببطء بتحكم.', 'Lower slowly under control.'),
+    ],
+    mistakes: [t('ثني الركب كثير.', 'Bending your knees a lot.'), t('الطيحة بقوة على الأرض.', 'Crashing back down.')],
+    breathing: t('أخرج النفس وأنت ترتفع.', 'Exhale as you rise.'),
+  },
+  {
+    id: 'hanging_leg_raise', motion: 'hanging_leg_raise', extra: true, name: t('رفع الرجلين معلّق', 'Hanging Leg Raise'),
+    aliases: ['Hanging Leg Raise', 'Hanging Leg Raises'],
+    steps: [
+      t('تعلّق على البار بقبضة بعرض الكتفين.', 'Hang from a bar with a shoulder-width grip.'),
+      t('شد البطن ووقّف التأرجح.', 'Brace your core and stop any swinging.'),
+      t('ارفع رجلك ممدودة حتى تصير موازية للأرض أو أعلى.', 'Raise your straight legs to parallel or higher.'),
+      t('نزّل ببطء بدون تأرجح.', 'Lower slowly without swinging.'),
+    ],
+    mistakes: [t('التأرجح.', 'Swinging.'), t('تقويس الظهر بدل لف الحوض.', 'Arching your back instead of tilting your pelvis.')],
+    breathing: t('أخرج النفس وأنت ترفع رجلك.', 'Exhale as you raise your legs.'),
+    tip: t('لو صعب، ابدأ والركب مثنية.', 'If it’s too hard, start with bent knees.'),
+  },
+  {
+    id: 'pallof_press', motion: 'pallof_press', extra: true, name: t('بالوف برس', 'Pallof Press'), aliases: ['Pallof Press', 'Cable Anti Rotation Press'],
+    steps: [
+      t('اوقف بجنب الجهاز والكيبل على مستوى الصدر، وامسك المقبض بيدينك قدام صدرك.', 'Stand side-on to a chest-height cable and hold the handle at your chest with both hands.'),
+      t('ابعد عن الجهاز حتى يصير فيه شد، وركبك مثنية شوي.', 'Step away until there is tension, knees slightly bent.'),
+      t('ادفع يدينك لقدام وقاوم إن الكيبل يلفك.', 'Press your hands straight out and resist the cable twisting you.'),
+      t('اثبت ثانيتين وارجع لصدرك.', 'Hold for two seconds, then bring it back to your chest.'),
+    ],
+    mistakes: [t('لف الجسم مع الكيبل.', 'Rotating with the cable.'), t('قفل الركب.', 'Locking your knees.')],
+    breathing: BRACE,
+  },
+  {
+    id: 'woodchop', motion: 'woodchop', extra: true, name: t('ود تشوب بالكيبل', 'Cable Woodchop'),
+    aliases: ['Woodchop', 'Wood Chop', 'Cable Woodchop', 'Standing Cable Wood Chop'],
+    steps: [
+      t('اضبط البكرة عالية واوقف بجنب الجهاز، وامسك المقبض بيدينك.', 'Set the pulley high, stand side-on and hold the handle with both hands.'),
+      t('خل يدينك ممدودة ورجلك أعرض من الكتف.', 'Keep your arms extended and feet wider than your shoulders.'),
+      t('اسحب المقبض بقوس من فوق لتحت عبر جسمك وأنت تلف الجذع.', 'Pull the handle down across your body in an arc, rotating your torso.'),
+      t('ارجع ببطء لفوق بتحكم.', 'Return up slowly under control.'),
+    ],
+    mistakes: [t('السحب باليدين بس.', 'Pulling only with your arms.'), t('تقويس الظهر.', 'Rounding your back.')],
+    breathing: t('أخرج النفس وأنت تسحب لتحت.', 'Exhale as you chop down.'),
+  },
+  {
+    id: 'side_bend_db', motion: 'side_bend_db', extra: true, name: t('ميلان جانبي بالدمبل', 'Dumbbell Side Bend'), aliases: ['Dumbbell Side Bend', 'Side Bend'],
+    steps: [
+      t('اوقف مستقيم وامسك دمبل بيد وحدة جنبك.', 'Stand tall holding a dumbbell in one hand at your side.'),
+      t('ميّل جذعك لجهة الدمبل ببطء.', 'Slowly bend your torso toward the dumbbell.'),
+      t('ارجع وميّل للجهة الثانية شوي بعضلات الجنب.', 'Come back up and slightly past center using your side abs.'),
+      t('كمّل العدد، ثم بدّل اليد.', 'Finish your reps, then switch hands.'),
+    ],
+    mistakes: [t('الميلان لقدام أو لورا.', 'Leaning forward or back.'), t('وزن ثقيل بحركة سريعة.', 'Heavy weight with fast reps.')],
+    breathing: t('خذ نفس وأنت تميل، وأخرجه وأنت ترجع.', 'Inhale as you bend, exhale as you come back.'),
+  },
+  {
+    id: 'flutter_kicks', motion: 'flutter_kicks', extra: true, name: t('فلتر كيك', 'Flutter Kicks'), aliases: ['Flutter Kicks', 'Flutter Kick'],
+    steps: [
+      t('انسدح على ظهرك ويدينك جنبك أو تحت الحوض.', 'Lie on your back with your hands by your sides or under your hips.'),
+      t('ارفع رجلك ممدودة شوي عن الأرض.', 'Lift your straight legs a little off the floor.'),
+      t('حرّك الرجلين لفوق وتحت بالتناوب بحركات قصيرة.', 'Alternate kicking your legs up and down in small movements.'),
+      t('خل أسفل ظهرك لاصق بالأرض طول الوقت.', 'Keep your lower back pressed into the floor the whole time.'),
+    ],
+    mistakes: [t('تقويس أسفل الظهر.', 'Arching your lower back.'), t('رفع الرجلين عالي زيادة.', 'Lifting your legs too high.')],
+    breathing: t('تنفس بإيقاع منتظم ولا تحبس نفسك.', 'Breathe steadily; don’t hold your breath.'),
+  },
+  // ================================================================== مكتبة إضافية: شرح + خريطة العضلات (بدون حركة 3D خاصة)
+  // ------------------------------------------------------------------ صدر
+  {
+    id: 'smith_bench_press', motion: 'muscle_map', library: true, name: t('بنش سميث', 'Smith Machine Bench Press'), aliases: ['Smith Machine Bench Press', 'Smith Bench Press'],
+    primary: ['chest'], secondary: ['triceps', 'shoulders'], equipment: 'smith machine, bench',
+    steps: [
+      t('استلقِ على البنش تحت بار السميث، والبار فوق منتصف صدرك.', 'Lie on the bench under the Smith bar, lined up over your mid-chest.'),
+      t('فك الأمان ونزّل البار ببطء حتى يلمس صدرك والكوعين مائلة لتحت.', 'Unhook it and lower slowly to your chest with elbows angled down.'),
+      t('ادفع لفوق، ورجّع البار للأمان بعد آخر عدة.', 'Press up, then re-hook the bar after your last rep.'),
+    ],
+    mistakes: [t('رفع الحوض عن البنش.', 'Lifting your hips off the bench.')],
+    breathing: EXHALE_UP,
+  },
+  {
+    id: 'decline_db_press', motion: 'muscle_map', library: true, name: t('بنش دمبل مائل للأسفل', 'Decline Dumbbell Bench Press'), aliases: ['Decline Dumbbell Bench Press', 'Decline Dumbbell Press'],
+    primary: ['chest'], secondary: ['triceps', 'shoulders'], equipment: 'dumbbells, decline bench',
+    steps: [
+      t('ثبّت رجلك واستلقِ على البنش المائل للأسفل والدمبلات على صدرك.', 'Hook your legs and lie back on the decline bench with the dumbbells at your chest.'),
+      t('ادفع الدمبلات لفوق حتى يتقاربون فوق أسفل الصدر.', 'Press the dumbbells up until they meet over your lower chest.'),
+      t('نزّل ببطء لجنب الصدر.', 'Lower slowly to the sides of your chest.'),
+    ],
+    mistakes: [t('النزول السريع بدون تحكم.', 'Dropping the weights too fast.')],
+    breathing: EXHALE_UP,
+  },
+  {
+    id: 'cable_chest_press', motion: 'muscle_map', library: true, name: t('ضغط صدر بالكيبل واقف', 'Standing Cable Chest Press'), aliases: ['Cable Chest Press', 'Standing Cable Chest Press'],
+    primary: ['chest'], secondary: ['triceps', 'shoulders'], equipment: 'cable',
+    steps: [
+      t('اضبط البكرتين على مستوى الصدر، وامسك مقبض بكل يد وظهرك للجهاز.', 'Set both pulleys at chest height and hold a handle in each hand, facing away.'),
+      t('خذ خطوة لقدام بوقفة ثابتة والبطن مشدود.', 'Step forward into a staggered stance with your core braced.'),
+      t('ادفع يدينك لقدام حتى تتقابل، ثم ارجع ببطء.', 'Press your hands forward until they meet, then return slowly.'),
+    ],
+    mistakes: [t('الميلان بالجسم بدل الدفع باليدين.', 'Leaning your body instead of pressing.')],
+    breathing: EXHALE_PUSH,
+  },
+  {
+    id: 'plyo_push_up', motion: 'muscle_map', library: true, name: t('ضغط انفجاري', 'Plyometric Push-Up'), aliases: ['Plyo Push-up', 'Plyometric Push Up', 'Clap Push Up'],
+    primary: ['chest'], secondary: ['triceps', 'shoulders'], equipment: 'bodyweight',
+    steps: [
+      t('ابدأ بوضعية الضغط والجسم مستقيم.', 'Start in a push-up position with a straight body.'),
+      t('انزل، ثم ادفع بقوة حتى ترتفع يدينك عن الأرض.', 'Lower, then push explosively so your hands leave the floor.'),
+      t('انزل بهدوء والكوع مثني شوي، وكرر.', 'Land softly with slightly bent elbows and repeat.'),
+    ],
+    mistakes: [t('الهبوط والكوع مقفل.', 'Landing with locked elbows.')],
+    breathing: t('أخرج النفس مع الدفعة.', 'Exhale as you push off.'),
+    tip: t('أتقن الضغط العادي أول.', 'Master regular push-ups first.'),
+  },
+  // ------------------------------------------------------------------ ظهر
+  {
+    id: 'barbell_shrug', motion: 'muscle_map', library: true, name: t('شرق بالبار (ترابيس)', 'Barbell Shrug'), aliases: ['Barbell Shrug', 'Shrug', 'Shrugs'],
+    primary: ['upperBack'], secondary: ['forearms'], equipment: 'barbell',
+    steps: [
+      t('امسك البار قدام فخذك بعرض الكتفين.', 'Hold the bar in front of your thighs at shoulder width.'),
+      t('ارفع كتفينك لأذنك بشكل مستقيم لفوق.', 'Lift your shoulders straight up toward your ears.'),
+      t('اثبت ثانية ثم نزّل ببطء.', 'Pause for a second, then lower slowly.'),
+    ],
+    mistakes: [t('لف الكتف بشكل دائري.', 'Rolling your shoulders in circles.'), t('ثني الكوع.', 'Bending your elbows.')],
+    breathing: EXHALE_PULL,
+  },
+  {
+    id: 'db_shrug', motion: 'muscle_map', library: true, name: t('شرق بالدمبل', 'Dumbbell Shrug'), aliases: ['Dumbbell Shrug', 'DB Shrug'],
+    primary: ['upperBack'], secondary: ['forearms'], equipment: 'dumbbells',
+    steps: [
+      t('امسك دمبل بكل يد جنبك والكفين للداخل.', 'Hold a dumbbell at each side, palms facing in.'),
+      t('ارفع كتفينك لفوق باتجاه الأذن.', 'Raise your shoulders up toward your ears.'),
+      t('اعصر فوق ثانية ونزّل ببطء.', 'Squeeze for a second at the top and lower slowly.'),
+    ],
+    mistakes: [t('تحريك الراس لقدام.', 'Pushing your head forward.')],
+    breathing: EXHALE_PULL,
+  },
+  {
+    id: 'machine_row', motion: 'muscle_map', library: true, name: t('تجديف جهاز', 'Machine Row'), aliases: ['Machine Row', 'Seated Machine Row', 'Leverage Iso Row', 'Chest Supported Row'],
+    primary: ['upperBack', 'lats'], secondary: ['biceps', 'rearDelts'], equipment: 'machine',
+    steps: [
+      t('اجلس وصدرك على المسند وامسك المقابض.', 'Sit with your chest on the pad and grab the handles.'),
+      t('اسحب المقابض لجنبك وضم لوحي الكتف.', 'Pull the handles to your sides, squeezing your shoulder blades.'),
+      t('ارجع ببطء حتى تستقيم يدك.', 'Return slowly until your arms are straight.'),
+    ],
+    mistakes: [t('إبعاد الصدر عن المسند.', 'Leaning off the chest pad.')],
+    breathing: EXHALE_PULL,
+  },
+  {
+    id: 'assisted_pullup', motion: 'muscle_map', library: true, name: t('عقلة بالمساعدة', 'Assisted Pull-Up'), aliases: ['Assisted Pull Up', 'Band Assisted Pull-Up', 'Machine Assisted Pull Up'],
+    primary: ['lats'], secondary: ['biceps', 'upperBack'], equipment: 'band or assist machine',
+    steps: [
+      t('اربط مطاط بالبار وحط ركبتك أو قدمك فيه، أو استخدم جهاز المساعدة.', 'Loop a band over the bar and put a knee or foot in it, or use the assist machine.'),
+      t('امسك البار أعرض من الكتفين واسحب حتى يعدّي ذقنك البار.', 'Grip wider than your shoulders and pull until your chin clears the bar.'),
+      t('انزل ببطء حتى تستقيم يدك.', 'Lower slowly until your arms are straight.'),
+    ],
+    mistakes: [t('التأرجح.', 'Swinging.'), t('نص الحركة.', 'Half reps.')],
+    breathing: EXHALE_PULL,
+    tip: t('قلّل المساعدة تدريجياً حتى تسوي العقلة بدونها.', 'Reduce the assistance gradually until you can do strict pull-ups.'),
+  },
+  {
+    id: 'renegade_row', motion: 'muscle_map', library: true, name: t('تجديف رينيقيد', 'Renegade Row'), aliases: ['Renegade Row', 'Alternating Renegade Row', 'Plank Row'],
+    primary: ['upperBack', 'abs'], secondary: ['lats', 'shoulders'], equipment: 'dumbbells or kettlebells',
+    steps: [
+      t('ابدأ بوضعية الضغط ويدينك ماسكة الدمبلات على الأرض.', 'Start in a push-up position gripping dumbbells on the floor.'),
+      t('اسحب دمبل لجنب البطن وخل الحوض ثابت.', 'Row one dumbbell to your side while keeping your hips square.'),
+      t('رجّعه للأرض وبدّل اليد.', 'Put it back down and switch sides.'),
+    ],
+    mistakes: [t('لف الحوض مع السحب.', 'Twisting your hips as you row.')],
+    breathing: EXHALE_PULL,
+  },
+  // ------------------------------------------------------------------ أكتاف
+  {
+    id: 'standing_db_press', motion: 'muscle_map', library: true, name: t('ضغط كتف بالدمبل واقف', 'Standing Dumbbell Shoulder Press'), aliases: ['Standing Dumbbell Press', 'Standing Dumbbell Shoulder Press'],
+    primary: ['shoulders'], secondary: ['triceps', 'abs'], equipment: 'dumbbells',
+    steps: [
+      t('اوقف والدمبلات على مستوى كتفك والكفين لقدام.', 'Stand with the dumbbells at shoulder height, palms forward.'),
+      t('شد البطن وادفع الدمبلات فوق راسك حتى تستقيم يدك.', 'Brace and press the dumbbells overhead until your arms are straight.'),
+      t('نزّل ببطء لمستوى الكتف.', 'Lower slowly back to shoulder height.'),
+    ],
+    mistakes: [t('تقويس أسفل الظهر لورا.', 'Arching your lower back.')],
+    breathing: EXHALE_PUSH,
+  },
+  {
+    id: 'cable_rear_delt_fly', motion: 'muscle_map', library: true, name: t('تفتيح خلفي بالكيبل', 'Cable Rear Delt Fly'), aliases: ['Cable Rear Delt Fly', 'Cable Reverse Fly'],
+    primary: ['rearDelts'], secondary: ['upperBack'], equipment: 'cable',
+    steps: [
+      t('اضبط البكرتين على مستوى الكتف وامسك الكيبلين بشكل متقاطع.', 'Set both pulleys at shoulder height and grab the cables crossed over.'),
+      t('افتح يدينك للجنب ولورا والكوع مثني شوي.', 'Open your arms out and back with a slight bend in the elbows.'),
+      t('ارجع ببطء لقدام.', 'Return slowly to the front.'),
+    ],
+    mistakes: [t('رفع الأكتاف للأذن.', 'Shrugging.'), t('وزن ثقيل مع ثني الكوع.', 'Going heavy and bending your elbows.')],
+    breathing: EXHALE_PULL,
+  },
+  {
+    id: 'external_rotation', motion: 'muscle_map', library: true, name: t('تدوير الكتف للخارج', 'Cable External Rotation'), aliases: ['External Rotation', 'External Rotation with Cable', 'External Rotation with Band'],
+    primary: ['rearDelts'], secondary: ['shoulders'], equipment: 'cable or band',
+    steps: [
+      t('اوقف بجنب الكيبل والكوع لاصق بجنبك بزاوية ٩٠.', 'Stand side-on to the cable with your elbow at your side bent to 90°.'),
+      t('لف ساعدك للخارج بعيد عن بطنك والكوع ثابت.', 'Rotate your forearm outward, away from your stomach, keeping the elbow fixed.'),
+      t('ارجع ببطء.', 'Return slowly.'),
+    ],
+    mistakes: [t('إبعاد الكوع عن الجسم.', 'Letting your elbow drift away from your side.')],
+    breathing: t('تنفس بهدوء.', 'Breathe steadily.'),
+    tip: t('وزن خفيف — هدفه حماية مفصل الكتف.', 'Go light — it’s for shoulder health.'),
+  },
+  {
+    id: 'battle_ropes', motion: 'muscle_map', library: true, name: t('حبال المعركة', 'Battle Ropes'), aliases: ['Battle Ropes', 'Battling Ropes'],
+    primary: ['shoulders'], secondary: ['abs', 'forearms', 'quads'], equipment: 'battle ropes',
+    steps: [
+      t('امسك طرف كل حبل بيد واوقف بنص سكوات.', 'Hold one rope end in each hand in a half squat.'),
+      t('حرّك يدينك لفوق وتحت بسرعة بالتناوب عشان تسوي موجات.', 'Whip your arms up and down quickly, alternating to make waves.'),
+      t('خل البطن مشدود والظهر مستقيم طول الوقت.', 'Keep your core tight and your back straight throughout.'),
+    ],
+    mistakes: [t('الوقوف والرجل مفرودة.', 'Standing with straight legs.')],
+    breathing: t('تنفس بإيقاع سريع ومنتظم.', 'Breathe quickly and rhythmically.'),
+  },
+  // ------------------------------------------------------------------ ذراعين
+  {
+    id: 'spider_curl', motion: 'muscle_map', library: true, name: t('سبايدر كيرل', 'Spider Curl'), aliases: ['Spider Curl', 'Spider Curls'],
+    primary: ['biceps'], secondary: ['forearms'], equipment: 'EZ bar or dumbbells, incline bench',
+    steps: [
+      t('انسدح على بطنك على بنش مائل ويدك متدلية لتحت.', 'Lie chest-down on an incline bench with your arms hanging straight down.'),
+      t('ارفع الوزن بثني الكوع فقط حتى تعصر الباي.', 'Curl by bending only your elbows until your biceps squeeze.'),
+      t('نزّل ببطء.', 'Lower slowly.'),
+    ],
+    mistakes: [t('تحريك العضد لقدام.', 'Swinging your upper arms forward.')],
+    breathing: t('أخرج النفس وأنت ترفع، وخذ نفس وأنت تنزل.', 'Exhale as you curl up, inhale as you lower.'),
+  },
+  {
+    id: 'zottman_curl', motion: 'muscle_map', library: true, name: t('زوتمان كيرل', 'Zottman Curl'), aliases: ['Zottman Curl'],
+    primary: ['biceps', 'forearms'], secondary: [], equipment: 'dumbbells',
+    steps: [
+      t('ارفع الدمبلات والكفين لفوق مثل الكيرل العادي.', 'Curl the dumbbells up with your palms facing up.'),
+      t('في الأعلى لف الكفين لتحت.', 'At the top, rotate your palms to face down.'),
+      t('نزّل ببطء والكفين لتحت، ثم لفّهم لفوق وكرر.', 'Lower slowly palms-down, then turn them back up and repeat.'),
+    ],
+    mistakes: [t('النزول السريع.', 'Lowering too fast.')],
+    breathing: t('أخرج النفس وأنت ترفع، وخذ نفس وأنت تنزل.', 'Exhale as you curl up, inhale as you lower.'),
+  },
+  {
+    id: 'reverse_curl', motion: 'muscle_map', library: true, name: t('كيرل عكسي (قبضة من فوق)', 'Reverse Barbell Curl'), aliases: ['Reverse Barbell Curl', 'Reverse Curl', 'Reverse EZ Bar Curl'],
+    primary: ['forearms', 'biceps'], secondary: [], equipment: 'barbell or EZ bar',
+    steps: [
+      t('امسك البار بقبضة من فوق بعرض الكتفين.', 'Hold the bar with an overhand grip at shoulder width.'),
+      t('ارفع البار بثني الكوع والعضد ثابت جنبك.', 'Curl the bar up with your upper arms fixed at your sides.'),
+      t('نزّل ببطء.', 'Lower slowly.'),
+    ],
+    mistakes: [t('ثني الرسغ لتحت.', 'Letting your wrists bend down.')],
+    breathing: t('أخرج النفس وأنت ترفع، وخذ نفس وأنت تنزل.', 'Exhale as you curl up, inhale as you lower.'),
+  },
+  {
+    id: 'cable_hammer_curl', motion: 'muscle_map', library: true, name: t('هامر كيرل بالحبل', 'Cable Rope Hammer Curl'), aliases: ['Cable Hammer Curl', 'Rope Hammer Curl', 'Cable Hammer Curls - Rope Attachment'],
+    primary: ['biceps', 'forearms'], secondary: [], equipment: 'cable, rope',
+    steps: [
+      t('ركّب الحبل على البكرة السفلية وامسكه والكفين مقابل بعض.', 'Attach a rope to the low pulley and hold it with palms facing each other.'),
+      t('ارفع الحبل لصدرك والكوع ثابت جنبك.', 'Curl the rope toward your chest, elbows fixed at your sides.'),
+      t('نزّل ببطء حتى تستقيم يدك.', 'Lower slowly until your arms are straight.'),
+    ],
+    mistakes: [t('تحريك الكوع لقدام.', 'Letting your elbows drift forward.')],
+    breathing: t('أخرج النفس وأنت ترفع، وخذ نفس وأنت تنزل.', 'Exhale as you curl up, inhale as you lower.'),
+  },
+  {
+    id: 'reverse_pushdown', motion: 'muscle_map', library: true, name: t('تراي كيبل بقبضة عكسية', 'Reverse-Grip Triceps Pushdown'), aliases: ['Reverse Grip Triceps Pushdown', 'Reverse Grip Pushdown'],
+    primary: ['triceps'], secondary: ['forearms'], equipment: 'cable, straight bar',
+    steps: [
+      t('امسك البار من تحت (الكفين لفوق) والكوع لاصق بجنبك.', 'Grip the bar underhand (palms up) with elbows pinned to your sides.'),
+      t('ادفع البار لتحت حتى تستقيم يدك.', 'Push the bar down until your arms are straight.'),
+      t('ارجع ببطء لمستوى الصدر.', 'Return slowly to chest height.'),
+    ],
+    mistakes: [t('فتح الكوع عن الجسم.', 'Elbows drifting away from your body.')],
+    breathing: EXHALE_PUSH,
+  },
+  {
+    id: 'single_arm_cable_triceps', motion: 'muscle_map', library: true, name: t('تراي كيبل بيد وحدة', 'One-Arm Cable Triceps Extension'), aliases: ['Cable One Arm Tricep Extension', 'Single Arm Cable Pushdown', 'One Arm Pushdown'],
+    primary: ['triceps'], secondary: [], equipment: 'cable, handle',
+    steps: [
+      t('امسك المقبض بيد وحدة والكوع لاصق بجنبك.', 'Hold the handle in one hand with your elbow at your side.'),
+      t('افرد يدك لتحت حتى تستقيم واعصر التراي.', 'Extend your arm down until straight and squeeze your triceps.'),
+      t('ارجع ببطء وكمّل العدد، ثم بدّل اليد.', 'Return slowly, finish your reps, then switch arms.'),
+    ],
+    mistakes: [t('لف الجسم مع الحركة.', 'Twisting your body with the movement.')],
+    breathing: EXHALE_PUSH,
+  },
+  {
+    id: 'dip_machine', motion: 'muscle_map', library: true, name: t('جهاز الديبس', 'Dip Machine'), aliases: ['Dip Machine', 'Seated Dip Machine', 'Machine Dips'],
+    primary: ['triceps'], secondary: ['chest', 'shoulders'], equipment: 'machine',
+    steps: [
+      t('اجلس وامسك المقابض جنبك والكوع لورا.', 'Sit and grab the handles at your sides with elbows pointing back.'),
+      t('ادفع المقابض لتحت حتى تستقيم يدك.', 'Press the handles down until your arms are straight.'),
+      t('ارجع ببطء لين يصير الكوع ٩٠ درجة تقريباً.', 'Return slowly until your elbows reach about 90°.'),
+    ],
+    mistakes: [t('رفع الأكتاف للأذن.', 'Shrugging your shoulders up.')],
+    breathing: EXHALE_PUSH,
+  },
+  {
+    id: 'close_grip_db_press', motion: 'muscle_map', library: true, name: t('ضغط دمبل قبضة ضيقة', 'Close-Grip Dumbbell Press'), aliases: ['Close-Grip Dumbbell Press', 'Dumbbell Crush Press'],
+    primary: ['triceps'], secondary: ['chest'], equipment: 'dumbbells, bench',
+    steps: [
+      t('استلقِ وامسك الدمبلين فوق صدرك والكفين مقابل بعض ولاصقين.', 'Lie back holding the dumbbells over your chest, palms facing and touching.'),
+      t('نزّل الدمبلات لصدرك والكوع قريب من جسمك.', 'Lower them to your chest with elbows close to your body.'),
+      t('ادفع لفوق وهم لاصقين ببعض.', 'Press back up while keeping them pressed together.'),
+    ],
+    mistakes: [t('فتح الكوع للجنب.', 'Flaring your elbows.')],
+    breathing: EXHALE_UP,
+  },
+  {
+    id: 'reverse_wrist_curl', motion: 'muscle_map', library: true, name: t('ثني الرسغ العكسي', 'Reverse Wrist Curl'), aliases: ['Reverse Wrist Curl', 'Palms-Down Wrist Curl', 'Seated Dumbbell Palms-Down Wrist Curl'],
+    primary: ['forearms'], secondary: [], equipment: 'dumbbells or barbell',
+    steps: [
+      t('اجلس وساعدك على فخذك والكف لتحت.', 'Sit with your forearms on your thighs, palms facing down.'),
+      t('ارفع ظهر الكف لفوق بثني الرسغ فقط.', 'Lift the back of your hands up by extending only your wrists.'),
+      t('نزّل ببطء.', 'Lower slowly.'),
+    ],
+    mistakes: [t('وزن ثقيل — الحركة تحتاج وزن خفيف.', 'Going heavy — this one needs a light weight.')],
+    breathing: t('تنفس بهدوء.', 'Breathe steadily.'),
+  },
+  {
+    id: 'wrist_roller', motion: 'muscle_map', library: true, name: t('لفافة الرسغ', 'Wrist Roller'), aliases: ['Wrist Roller'],
+    primary: ['forearms'], secondary: ['shoulders'], equipment: 'wrist roller',
+    steps: [
+      t('امسك العصا قدامك ويدينك ممدودة على مستوى الكتف.', 'Hold the roller in front of you with arms straight at shoulder height.'),
+      t('لف العصا بالرسغين بالتناوب حتى يطلع الوزن لفوق.', 'Roll it with alternating wrist turns until the weight reaches the top.'),
+      t('نزّل الوزن ببطء بعكس اللف.', 'Lower the weight slowly by rolling the other way.'),
+    ],
+    mistakes: [t('نزول اليدين وتعب الكتف قبل الساعد.', 'Letting your arms drop so your shoulders give out first.')],
+    breathing: t('تنفس بهدوء ولا تحبس نفسك.', 'Breathe steadily; don’t hold your breath.'),
+  },
+  {
+    id: 'plate_pinch', motion: 'muscle_map', library: true, name: t('مسك الأقراص (قوة القبضة)', 'Plate Pinch'), aliases: ['Plate Pinch'],
+    primary: ['forearms'], secondary: [], equipment: 'weight plates',
+    steps: [
+      t('حط قرصين ملساء وجهاً لوجه وامسكهم بأصابعك من الجوانب.', 'Put two smooth plates together and pinch them with your fingers.'),
+      t('ارفعهم واوقف مستقيم.', 'Lift them and stand tall.'),
+      t('اثبت أطول وقت تقدر، ثم بدّل اليد.', 'Hold as long as you can, then switch hands.'),
+    ],
+    mistakes: [t('ميلان الجسم لجهة.', 'Leaning to one side.')],
+    breathing: t('تنفس بهدوء.', 'Breathe steadily.'),
+  },
+  // ------------------------------------------------------------------ أرجل
+  {
+    id: 'trap_bar_deadlift', motion: 'muscle_map', library: true, name: t('ديدلفت بالبار السداسي', 'Trap Bar Deadlift'), aliases: ['Trap Bar Deadlift', 'Hex Bar Deadlift'],
+    primary: ['quads', 'glutes'], secondary: ['hamstrings', 'lowerBack', 'upperBack'], equipment: 'trap bar',
+    steps: [
+      t('اوقف داخل البار السداسي وامسك المقابض جنبك.', 'Stand inside the trap bar and grab the handles at your sides.'),
+      t('انزل بالحوض وصدرك مرفوع وظهرك مستقيم.', 'Sit your hips down with chest up and back flat.'),
+      t('ادفع الأرض برجلك وقف مستقيم، ثم نزّل بنفس الطريقة.', 'Push the floor away to stand tall, then lower the same way.'),
+    ],
+    mistakes: [t('تقويس الظهر.', 'Rounding your back.'), t('الوقوف بالظهر قبل الرجل.', 'Letting your hips shoot up first.')],
+    breathing: t('خذ نفس وشد البطن قبل الرفع، وأخرجه لما توقف.', 'Breathe in and brace before lifting; exhale once you are standing.'),
+  },
+  {
+    id: 'lateral_lunge', motion: 'muscle_map', library: true, name: t('طعن جانبي', 'Lateral Lunge'), aliases: ['Lateral Lunge', 'Side Lunge', 'Barbell Side Split Squat'],
+    primary: ['quads', 'glutes'], secondary: ['hamstrings'], equipment: 'bodyweight or dumbbell',
+    steps: [
+      t('اوقف والقدمين مضمومة.', 'Stand with your feet together.'),
+      t('خذ خطوة واسعة للجنب وانزل على هالرجل والرجل الثانية ممدودة.', 'Take a wide step to the side and sit into that leg, keeping the other leg straight.'),
+      t('ادفع بالرجل المثنية وارجع لوضع البداية، ثم بدّل.', 'Push off the bent leg back to the start, then switch sides.'),
+    ],
+    mistakes: [t('الركبة تدخل للداخل.', 'Knee caving inward.'), t('رفع الكعب.', 'Heel lifting off the floor.')],
+    breathing: EXHALE_UP,
+  },
+  {
+    id: 'glute_ham_raise', motion: 'muscle_map', library: true, name: t('نوردك / رفعة الفخذ الخلفي', 'Glute-Ham Raise (Nordic Curl)'), aliases: ['Glute Ham Raise', 'Nordic Curl', 'Nordic Hamstring Curl', 'Natural Glute Ham Raise'],
+    primary: ['hamstrings'], secondary: ['glutes', 'calves'], equipment: 'GHD or partner',
+    steps: [
+      t('اجلس على ركبك وثبّت كاحلك (جهاز أو شخص يمسكها).', 'Kneel and lock your ankles in place (on a machine or held by a partner).'),
+      t('خل جسمك مستقيم من الركبة للراس، وانزل لقدام ببطء قد ما تقدر.', 'Keep a straight line from knees to head and lower forward as slowly as you can.'),
+      t('ادفع بيدينك من الأرض واسحب بالفخذ الخلفي لترجع.', 'Push off the floor with your hands and pull back up with your hamstrings.'),
+    ],
+    mistakes: [t('ثني الحوض بدل ما يبقى الجسم مستقيم.', 'Bending at the hips instead of staying straight.')],
+    breathing: t('أخرج النفس وأنت ترجع لفوق.', 'Exhale as you pull back up.'),
+    tip: t('تمرين صعب — ابدأ بعدات قليلة.', 'It’s tough — start with a few reps.'),
+  },
+  {
+    id: 'standing_leg_curl', motion: 'muscle_map', library: true, name: t('ثني الساق واقف', 'Standing Leg Curl'), aliases: ['Standing Leg Curl', 'Standing Hamstring Curl'],
+    primary: ['hamstrings'], secondary: ['calves'], equipment: 'machine',
+    steps: [
+      t('اوقف في الجهاز والمسند خلف أسفل ساقك.', 'Stand in the machine with the pad behind your lower leg.'),
+      t('اثنِ الركبة وارفع الكعب باتجاه الأرداف.', 'Bend your knee and bring your heel toward your glutes.'),
+      t('نزّل ببطء وكمّل العدد، ثم بدّل الرجل.', 'Lower slowly, finish your reps, then switch legs.'),
+    ],
+    mistakes: [t('ميلان الحوض أو الجسم.', 'Twisting your hips or body.')],
+    breathing: EXHALE_PULL,
+  },
+  {
+    id: 'box_squat', motion: 'muscle_map', library: true, name: t('سكوات على صندوق', 'Box Squat'), aliases: ['Box Squat', 'Squat To Box'],
+    primary: ['quads', 'glutes'], secondary: ['hamstrings', 'lowerBack'], equipment: 'barbell, box',
+    steps: [
+      t('حط صندوق خلفك على ارتفاع الركبة تقريباً والبار على ظهرك.', 'Place a box behind you at about knee height with the bar on your back.'),
+      t('ارجع بالحوض وانزل حتى تجلس على الصندوق بخفة.', 'Sit your hips back and down until you lightly touch the box.'),
+      t('ادفع من الصندوق وقف مستقيم بدون ارتداد.', 'Drive up off the box to stand tall without bouncing.'),
+    ],
+    mistakes: [t('الطيحة على الصندوق بقوة.', 'Dropping hard onto the box.')],
+    breathing: EXHALE_UP,
+  },
+  {
+    id: 'leg_press_calf_raise', motion: 'muscle_map', library: true, name: t('سمانة على جهاز الليق برس', 'Leg Press Calf Raise'), aliases: ['Calf Press', 'Leg Press Calf Raise', 'Calf Press On The Leg Press Machine'],
+    primary: ['calves'], secondary: [], equipment: 'leg press',
+    steps: [
+      t('اجلس في الليق برس وحط مقدمة القدم على طرف المنصة.', 'Sit in the leg press with the balls of your feet on the platform edge.'),
+      t('ادفع المنصة بأصابع رجلك لأعلى نقطة.', 'Push the platform away with your toes as far as you can.'),
+      t('ارجع ببطء حتى تحس بتمدد السمانة.', 'Return slowly until you feel the calf stretch.'),
+    ],
+    mistakes: [t('ثني الركبة.', 'Bending your knees.')],
+    breathing: EXHALE_PUSH,
+  },
+  {
+    id: 'monster_walk', motion: 'muscle_map', library: true, name: t('مشي بالمطاط (مونستر ووك)', 'Monster Walk'), aliases: ['Monster Walk', 'Band Walk', 'Lateral Band Walk'],
+    primary: ['glutes'], secondary: ['quads'], equipment: 'mini band',
+    steps: [
+      t('حط المطاط حول ركبك أو كاحلك وانزل نص سكوات.', 'Place a mini band around your knees or ankles and sink into a half squat.'),
+      t('امشِ خطوات صغيرة للجنب أو بشكل مائل لقدام.', 'Take small steps sideways or diagonally forward.'),
+      t('خل المطاط مشدود طول الوقت.', 'Keep tension on the band the whole time.'),
+    ],
+    mistakes: [t('دخول الركب للداخل.', 'Letting your knees cave in.')],
+    breathing: t('تنفس بإيقاع منتظم.', 'Breathe steadily.'),
+  },
+  // ------------------------------------------------------------------ بطن
+  {
+    id: 'ab_crunch_machine', motion: 'muscle_map', library: true, name: t('جهاز البطن', 'Ab Crunch Machine'), aliases: ['Ab Crunch Machine', 'Machine Crunch'],
+    primary: ['abs'], secondary: [], equipment: 'machine',
+    steps: [
+      t('اجلس في الجهاز وامسك المقابض وثبّت رجلك.', 'Sit in the machine, grab the handles and secure your feet.'),
+      t('لف جذعك لقدام بعضلات البطن.', 'Curl your torso forward using your abs.'),
+      t('ارجع ببطء بدون ما يضرب الوزن.', 'Return slowly without letting the stack slam.'),
+    ],
+    mistakes: [t('السحب باليدين بدل البطن.', 'Pulling with your arms instead of your abs.')],
+    breathing: t('أخرج النفس وأنت تنزل.', 'Exhale as you crunch down.'),
+  },
+  {
+    id: 'decline_crunch', motion: 'muscle_map', library: true, name: t('كرنش على بنش مائل', 'Decline Crunch'), aliases: ['Decline Crunch', 'Decline Sit Up'],
+    primary: ['abs'], secondary: [], equipment: 'decline bench',
+    steps: [
+      t('ثبّت رجلك في البنش المائل وانسدح لورا.', 'Hook your feet in the decline bench and lie back.'),
+      t('ارفع كتفينك وجذعك باتجاه ركبك.', 'Curl your shoulders and torso toward your knees.'),
+      t('نزّل ببطء بدون ما تطيح.', 'Lower slowly without dropping back.'),
+    ],
+    mistakes: [t('سحب الرقبة باليدين.', 'Pulling on your neck.')],
+    breathing: t('أخرج النفس وأنت تطلع.', 'Exhale as you curl up.'),
+  },
+  {
+    id: 'oblique_crunch', motion: 'muscle_map', library: true, name: t('كرنش جانبي', 'Oblique Crunch'), aliases: ['Oblique Crunch', 'Oblique Crunches', 'Cross-Body Crunch'],
+    primary: ['abs'], secondary: [], equipment: 'bodyweight',
+    steps: [
+      t('انسدح على ظهرك والركب مثنية ويدينك جنب راسك.', 'Lie on your back with knees bent and hands beside your head.'),
+      t('ارفع كتفك وقرّبه من الركبة المعاكسة.', 'Lift one shoulder toward the opposite knee.'),
+      t('ارجع ببطء وبدّل الجهة.', 'Lower slowly and switch sides.'),
+    ],
+    mistakes: [t('سحب الرقبة.', 'Pulling on your neck.')],
+    breathing: t('أخرج النفس مع كل رفعة.', 'Exhale on each crunch.'),
+  },
+  {
+    id: 'heel_touchers', motion: 'muscle_map', library: true, name: t('لمس الكعب', 'Alternate Heel Touchers'), aliases: ['Heel Touchers', 'Alternate Heel Touchers', 'Heel Taps'],
+    primary: ['abs'], secondary: [], equipment: 'bodyweight',
+    steps: [
+      t('انسدح والركب مثنية، وارفع كتفينك شوي عن الأرض.', 'Lie with knees bent and lift your shoulders slightly off the floor.'),
+      t('ميّل لجهة ولمس الكعب بيدك.', 'Crunch to one side and tap your heel with your hand.'),
+      t('بدّل الجهة بدون ما تنزل كتفك.', 'Switch sides without lowering your shoulders.'),
+    ],
+    mistakes: [t('تنزيل الراس بين كل عدة.', 'Dropping your head between reps.')],
+    breathing: t('أخرج النفس مع كل لمسة.', 'Exhale on each tap.'),
+  },
+  {
+    id: 'med_ball_slam', motion: 'muscle_map', library: true, name: t('ضرب الكرة الطبية', 'Medicine Ball Slam'), aliases: ['Medicine Ball Slam', 'Ball Slam', 'Overhead Slam'],
+    primary: ['abs', 'lats'], secondary: ['shoulders', 'glutes'], equipment: 'slam ball',
+    steps: [
+      t('ارفع الكرة فوق راسك وانت على أطراف أصابعك.', 'Raise the ball overhead as you rise onto your toes.'),
+      t('اضرب الكرة على الأرض بكل قوتك وانت تنحني.', 'Slam it into the floor as hard as you can while hinging down.'),
+      t('امسكها من الأرض بظهر مستقيم وكرر.', 'Pick it up with a flat back and repeat.'),
+    ],
+    mistakes: [t('تقويس الظهر وقت الالتقاط.', 'Rounding your back to pick the ball up.')],
+    breathing: t('أخرج النفس بقوة مع الضربة.', 'Exhale hard as you slam.'),
+  },
+  {
+    id: 'knee_tucks', motion: 'muscle_map', library: true, name: t('ضم الركب جالس', 'Seated Knee Tucks'), aliases: ['Seated Knee Tucks', 'Seated Leg Tucks', 'Leg Pull-In'],
+    primary: ['abs'], secondary: [], equipment: 'bodyweight or bench',
+    steps: [
+      t('اجلس وميّل لورا واسند بيدينك، ورجلك مرفوعة وممدودة.', 'Sit, lean back on your hands and lift your legs straight.'),
+      t('قرّب ركبك من صدرك وأنت تقرّب جذعك لها.', 'Pull your knees toward your chest as you bring your torso to meet them.'),
+      t('افرد رجلك من جديد بدون ما تلمس الأرض.', 'Extend your legs again without touching the floor.'),
+    ],
+    mistakes: [t('الاعتماد على الزخم.', 'Using momentum.')],
+    breathing: t('أخرج النفس وأنت تضم.', 'Exhale as you tuck.'),
+  },
+  // ------------------------------------------------------------------ كارديو ولياقة
+  {
+    id: 'jump_rope', motion: 'muscle_map', library: true, name: t('نط الحبل', 'Jump Rope'), aliases: ['Jump Rope', 'Rope Jumping', 'Skipping'],
+    primary: ['calves'], secondary: ['quads', 'shoulders'], equipment: 'jump rope',
+    steps: [
+      t('امسك الحبل والكوع قريب من جسمك.', 'Hold the rope with elbows close to your body.'),
+      t('لف الحبل بالرسغ مو بالكتف.', 'Turn the rope with your wrists, not your shoulders.'),
+      t('نط نطات صغيرة على مقدمة القدم.', 'Make small hops on the balls of your feet.'),
+    ],
+    mistakes: [t('النط عالي زيادة.', 'Jumping too high.')],
+    breathing: t('تنفس بإيقاع منتظم.', 'Breathe steadily.'),
+  },
+  {
+    id: 'rowing_machine', motion: 'muscle_map', library: true, name: t('جهاز التجديف', 'Rowing Machine'), aliases: ['Rowing Machine', 'Rower', 'Rowing, Stationary', 'Rowing Stationary'],
+    primary: ['upperBack', 'quads'], secondary: ['lats', 'glutes', 'hamstrings', 'biceps'], equipment: 'rower',
+    steps: [
+      t('ادفع برجلك أول وظهرك مستقيم.', 'Push with your legs first, keeping your back straight.'),
+      t('بعدها ميّل لورا شوي واسحب المقبض لأسفل صدرك.', 'Then lean back slightly and pull the handle to your lower chest.'),
+      t('ارجع بالعكس: اليدين ثم الجذع ثم الركب.', 'Return in reverse: arms, then torso, then knees.'),
+    ],
+    mistakes: [t('السحب باليدين قبل الرجل.', 'Pulling with your arms before your legs.')],
+    breathing: t('أخرج النفس مع السحبة، وخذ نفس وأنت ترجع.', 'Exhale on the drive, inhale on the recovery.'),
+  },
+  {
+    id: 'treadmill_run', motion: 'muscle_map', library: true, name: t('الجري على السير', 'Treadmill Running'), aliases: ['Treadmill', 'Running, Treadmill', 'Running Treadmill', 'Treadmill Run'],
+    primary: ['quads', 'hamstrings'], secondary: ['calves', 'glutes'], equipment: 'treadmill',
+    steps: [
+      t('ابدأ بمشي خفيف ٣–٥ دقائق للإحماء.', 'Start with 3–5 minutes of easy walking to warm up.'),
+      t('زد السرعة لسرعة تقدر تتكلم فيها بصعوبة بسيطة.', 'Raise the speed to a pace where talking is slightly hard.'),
+      t('خل خطوتك قصيرة ونزول القدم تحت جسمك.', 'Keep a short stride with your feet landing under your body.'),
+    ],
+    mistakes: [t('مسك الجهاز طول الوقت.', 'Holding onto the rails the whole time.')],
+    breathing: t('تنفس بإيقاع مريح.', 'Breathe at a comfortable rhythm.'),
+  },
+  {
+    id: 'stationary_bike', motion: 'muscle_map', library: true, name: t('الدراجة الثابتة', 'Stationary Bike'), aliases: ['Stationary Bike', 'Bicycling, Stationary', 'Exercise Bike', 'Spin Bike'],
+    primary: ['quads'], secondary: ['hamstrings', 'glutes', 'calves'], equipment: 'bike',
+    steps: [
+      t('اضبط المقعد بحيث تكون الركبة مثنية شوي في أسفل الدورة.', 'Set the seat so your knee is slightly bent at the bottom of the pedal stroke.'),
+      t('ابدأ بمقاومة خفيفة للإحماء.', 'Start with light resistance to warm up.'),
+      t('زد المقاومة أو السرعة حسب هدفك وخل ظهرك مستقيم.', 'Increase resistance or speed to suit your goal, keeping your back straight.'),
+    ],
+    mistakes: [t('مقعد واطي زيادة.', 'Seat set too low.')],
+    breathing: t('تنفس بإيقاع مريح.', 'Breathe at a comfortable rhythm.'),
+  },
+  {
+    id: 'stair_climber', motion: 'muscle_map', library: true, name: t('جهاز الدرج', 'Stair Climber'), aliases: ['Stair Climber', 'Stairmaster', 'Step Mill'],
+    primary: ['glutes', 'quads'], secondary: ['calves', 'hamstrings'], equipment: 'stair climber',
+    steps: [
+      t('اوقف مستقيم وامسك الجهاز بخفة للتوازن فقط.', 'Stand tall and hold the rails lightly, just for balance.'),
+      t('اطلع بكامل القدم على كل درجة.', 'Step with your whole foot on each stair.'),
+      t('حافظ على سرعة ثابتة تقدر تكمّل عليها.', 'Keep a steady pace you can sustain.'),
+    ],
+    mistakes: [t('الاتكاء بالجسم على الجهاز.', 'Leaning your body weight on the rails.')],
+    breathing: t('تنفس بإيقاع مريح.', 'Breathe at a comfortable rhythm.'),
+  },
+  {
+    id: 'power_clean', motion: 'muscle_map', library: true, name: t('باور كلين', 'Power Clean'), aliases: ['Power Clean', 'Clean'],
+    primary: ['glutes', 'hamstrings', 'quads'], secondary: ['upperBack', 'shoulders', 'calves'], equipment: 'barbell',
+    steps: [
+      t('ابدأ مثل الديدلفت والبار قريب من ساقك.', 'Set up like a deadlift with the bar close to your shins.'),
+      t('ارفع البار لفوق الركبة ثم افرد الحوض والرجل بقوة وارفع كتفك.', 'Lift past the knees, then explode through your hips and legs and shrug.'),
+      t('ادخل تحت البار واستقبله على مقدمة الكتف والكوع لقدام.', 'Drop under the bar and catch it on your front shoulders with elbows high.'),
+    ],
+    mistakes: [t('السحب باليدين بدري.', 'Pulling early with your arms.'), t('البار يبتعد عن الجسم.', 'Letting the bar drift away from your body.')],
+    breathing: t('خذ نفس وشد البطن قبل كل عدة.', 'Breathe in and brace before each rep.'),
+    tip: t('حركة فنية — تعلّمها بوزن خفيف أو مع مدرب.', 'It’s a technical lift — learn it light or with a coach.'),
+  },
 ];
 
 const BY_ID = new Map(EXERCISES.map((e) => [e.id, e]));
+
+/** العضلات الأساسية والمساعدة للتمرين (من الدليل أو من حركته) */
+export function exerciseMuscles(e: ExerciseGuide): { primary: Muscle[]; secondary: Muscle[] } {
+  if (e.primary) return { primary: e.primary, secondary: e.secondary ?? [] };
+  const m = MOTIONS[e.motion];
+  return { primary: m.primary, secondary: m.secondary };
+}
+
+/** العضلات لأي معرف تمرين (أو معرف حركة قديم) */
+export function musclesOf(id: string): { primary: Muscle[]; secondary: Muscle[] } {
+  const e = BY_ID.get(id);
+  if (e) return exerciseMuscles(e);
+  const m = MOTIONS[id as keyof typeof MOTIONS];
+  return m ? { primary: m.primary, secondary: m.secondary } : { primary: [], secondary: [] };
+}
+
+/** الأدوات كنص مختصر */
+export function exerciseEquipment(e: ExerciseGuide): string {
+  if (e.equipment) return e.equipment;
+  return MOTIONS[e.motion].props.map((p) => p.kind).join(',') || 'bodyweight';
+}
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const BY_NAME = new Map<string, ExerciseGuide>();
 for (const e of EXERCISES) {
@@ -974,6 +1895,36 @@ for (const e of EXERCISES) {
 
 // كلمات مفتاحية لربط أي اسم تمرين (من الذكاء الاصطناعي) بأقرب حركة
 const KEYWORDS: [RegExp, string][] = [
+  // التمارين الجديدة (الأدق أولاً)
+  [/decline.*(dumbbell|db).*(press|bench)/, 'decline_db_press'], [/decline.*(bench|press)/, 'decline_bench_bb'], [/smith.*bench/, 'smith_bench_press'],
+  [/incline.*push|hands elevated/, 'incline_push_up'], [/decline.*push|feet elevated/, 'decline_push_up'],
+  [/diamond|triangle push|close.*(grip|triceps).*push/, 'diamond_push_up'], [/wide.*push|push.*wide/, 'wide_push_up'], [/plyo.*push|clap push/, 'plyo_push_up'],
+  [/low.*(crossover|cable fl)|low to high/, 'low_cable_crossover'], [/cable chest press/, 'cable_chest_press'],
+  [/inverted row|australian|bodyweight row/, 'inverted_row'], [/renegade|plank row/, 'renegade_row'],
+  [/bent.?over.*(dumbbell|two)|(dumbbell|db).*bent.?over.*row|two.?arm.*dumbbell row/, 'row_db_bent'], [/machine row|iso row|chest supported row/, 'machine_row'],
+  [/rack pull/, 'rack_pull'], [/trap bar|hex bar/, 'trap_bar_deadlift'], [/hyperextension|back extension|45 degree/, 'hyperextension'],
+  [/assisted pull/, 'assisted_pullup'], [/dumbbell shrug|db shrug/, 'db_shrug'], [/shrug/, 'barbell_shrug'],
+  [/pull ?apart/, 'band_pull_apart'], [/push press/, 'push_press'], [/standing.*dumbbell.*press/, 'standing_db_press'],
+  [/rear delt fl|cable reverse fl/, 'cable_rear_delt_fly'], [/external rotation/, 'external_rotation'], [/battl.*rope/, 'battle_ropes'],
+  [/reverse.*wrist|palms down.*wrist/, 'reverse_wrist_curl'], [/wrist curl/, 'wrist_curl'],
+  [/preacher|scott curl/, 'preacher_curl'], [/spider curl/, 'spider_curl'], [/zottman/, 'zottman_curl'], [/reverse.*curl/, 'reverse_curl'],
+  [/(cable|rope).*hammer|hammer.*(cable|rope)/, 'cable_hammer_curl'],
+  [/wrist roller/, 'wrist_roller'], [/plate pinch/, 'plate_pinch'],
+  [/overhead.*(cable|rope)|(cable|rope).*overhead/, 'overhead_cable_triceps'], [/reverse.*pushdown/, 'reverse_pushdown'],
+  [/(one|single).?arm.*(cable|pushdown).*tri|(one|single).?arm pushdown/, 'single_arm_cable_triceps'], [/dip machine|machine dip/, 'dip_machine'],
+  [/close.?grip.*dumbbell|crush press/, 'close_grip_db_press'],
+  [/smith.*squat/, 'smith_squat'], [/dumbbell squat|db squat/, 'db_squat'], [/box squat|squat to box/, 'box_squat'],
+  [/box jump/, 'box_jump'], [/jump squat|squat jump/, 'jump_squat'], [/adduct/, 'hip_adduction'],
+  [/lateral lunge|side lunge|side split squat/, 'lateral_lunge'], [/nordic|glute ham/, 'glute_ham_raise'], [/standing.*leg curl|standing hamstring/, 'standing_leg_curl'],
+  [/calf press|leg press calf/, 'leg_press_calf_raise'], [/monster walk|band walk/, 'monster_walk'],
+  [/single.?leg.*(bridge|glute bridge)|one.?leg.*bridge/, 'single_leg_bridge'], [/^(?!.*tricep).*cable.*kick ?back|one.?legged cable/, 'cable_kickback'], [/pull ?through/, 'pull_through'],
+  [/russian twist/, 'russian_twist'], [/side plank|side bridge/, 'side_plank'], [/bicycle|air bike/, 'bicycle_crunch'], [/reverse crunch/, 'reverse_crunch'],
+  [/ab crunch machine|machine crunch/, 'ab_crunch_machine'], [/decline crunch|decline sit/, 'decline_crunch'], [/oblique crunch|cross body crunch/, 'oblique_crunch'],
+  [/heel (touch|tap)/, 'heel_touchers'], [/slam/, 'med_ball_slam'], [/knee tuck|leg tuck|leg pull in/, 'knee_tucks'],
+  [/sit ?ups?\b/, 'sit_up'], [/\bv ?ups?\b|jack ?knife/, 'v_up'], [/hanging leg raise/, 'hanging_leg_raise'],
+  [/pallof|anti rotation/, 'pallof_press'], [/wood ?chop|cable lift/, 'woodchop'], [/side bend/, 'side_bend_db'], [/flutter/, 'flutter_kicks'],
+  [/jump rope|rope jump|skipping/, 'jump_rope'], [/rowing machine|\brower\b|ergometer|rowing stationary/, 'rowing_machine'], [/treadmill|running|\bjog/, 'treadmill_run'],
+  [/\bbike\b|bicycling|cycling|spin bike/, 'stationary_bike'], [/stair|step mill/, 'stair_climber'], [/power clean|\bclean\b/, 'power_clean'],
   // المكتبة الموسّعة (الأدق أولاً)
   [/front squat/, 'front_squat'], [/sumo.*(deadlift|dl)/, 'sumo_deadlift'], [/sumo|plie/, 'sumo_squat'], [/step.?up/, 'step_up'],
   [/reverse lunge/, 'reverse_lunge'], [/good ?morning/, 'good_morning'], [/donkey|glute kick ?back|quadruped kick/, 'donkey_kick'],
