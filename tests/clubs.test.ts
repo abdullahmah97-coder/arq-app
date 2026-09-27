@@ -1,4 +1,5 @@
 // اختبار حسابات عروض النوادي
+import "./nutrition.test.ts"; // سجل السعرات (يشتغل مع اختبار النوادي حتى ما يتغير package.json)
 import { daysLeft, discountPct, gymsInRange, isStale, monthly, ratingBars } from '../src/lib/clubsMath.ts';
 let fail = 0;
 const ok = (c: boolean, m: string) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
