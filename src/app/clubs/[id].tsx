@@ -26,8 +26,11 @@ export default function ClubPage() {
   const [manage, setManage] = useState(false);
 
   useFocusEffect(useCallback(() => {
-    loadClubs().then((cs) => setClub(cs.find((c) => c.id === id) ?? null)).catch(() => setClub(null));
-    loadOffers(String(id)).then(setOffers).catch(() => {});
+    loadClubs().then((cs) => {
+      const c = cs.find((x) => x.id === id) ?? null;
+      setClub(c);
+      loadOffers({ gymId: String(id), chainId: c?.chain_id }).then(setOffers).catch(() => {});
+    }).catch(() => setClub(null));
     loadReviews(String(id)).then(setReviews).catch(() => {});
     canManageGym(String(id)).then(setManage).catch(() => {});
   }, [id]));
@@ -48,6 +51,11 @@ export default function ClubPage() {
         <ClubLogo c={club} size={72} />
         <T size="xl" bold color={brand.cream} center>{gymName(club, lng)}</T>
         <T size="sm" color={brand.sand}>{[club.chain, t(`clubs.aud_${club.audience}`), club.district || club.city].filter(Boolean).join(' · ')}</T>
+        {club.chain_id ? (
+          <Pressable onPress={() => router.push({ pathname: '/clubs/chain/[id]', params: { id: club.chain_id! } })}>
+            <T size="xs" semibold color={brand.amber}>{t('clubs.seeChain')} ›</T>
+          </Pressable>
+        ) : null}
         <Row gap={space.sm} style={{ marginTop: space.sm }}>
           <HeroBtn icon="navigate" label={t('clubs.directions')} onPress={() => Linking.openURL(mapsUrl)} />
           <HeroBtn icon="people" label={t('clubs.whoIsHere')} onPress={() => router.push({ pathname: '/gym/[id]', params: { id: club.id } })} />
@@ -82,11 +90,11 @@ export default function ClubPage() {
       </Row>
       {active.length ? active.map((o) => (
         <View key={o.id} style={{ gap: 6 }}>
-          <OfferCard o={o} club={club} />
+          <OfferCard o={o} rating={club} />
           <Row gap={space.md} style={{ paddingHorizontal: 4 }}>
             {o.details ? <T size="xs" muted style={{ flex: 1 }}>{o.details}</T> : <View style={{ flex: 1 }} />}
             {o.promo_code ? <T size="xs" semibold color={colors.primary}>{t('clubs.code')}: {o.promo_code}</T> : null}
-            {o.url ? <Pressable onPress={() => Linking.openURL(o.url!)}><T size="xs" semibold color={colors.primary}>{t('clubs.subscribe')} ↗</T></Pressable> : null}
+            {o.url || o.source_url ? <Pressable onPress={() => Linking.openURL((o.url || o.source_url)!)}><T size="xs" semibold color={colors.primary}>{o.url ? t('clubs.subscribe') : t('clubs.source')} ↗</T></Pressable> : null}
             {manage ? <Pressable onPress={() => router.push({ pathname: '/clubs/offer', params: { gym: club.id, id: o.id } })}><Ionicons name="create-outline" size={16} color={colors.muted} /></Pressable> : null}
           </Row>
         </View>

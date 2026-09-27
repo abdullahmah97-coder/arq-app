@@ -6,7 +6,7 @@ import { Alert, Pressable, Switch, View } from 'react-native';
 import { ClubLogo } from '@/components/clubs/parts';
 import { gymName } from '@/components/GymPicker';
 import { Button, Empty, Input, Row, Screen, T } from '@/components/ui';
-import { canManageGym, deleteOffer, loadClubs, saveOffer, type Club } from '@/lib/clubs';
+import { canManageChain, canManageGym, deleteOffer, loadChains, loadClubs, saveOffer, type Chain, type Club } from '@/lib/clubs';
 import { useLocalized } from '@/lib/i18n';
 import { errorKey, supabase } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
@@ -16,11 +16,14 @@ const toNum = (s: string) => { const v = Number(s.replace(/[٠-٩]/g, (d) => Str
 const plusDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 
 export default function OfferForm() {
-  const { gym, id } = useLocalSearchParams<{ gym?: string; id?: string }>();
+  const { gym, chain, id } = useLocalSearchParams<{ gym?: string; chain?: string; id?: string }>();
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const [gymId, setGymId] = useState<string | null>(gym ?? null);
+  const [chainId, setChainId] = useState<string | null>(chain ?? null);
   const [clubs, setClubs] = useState<Club[]>([]);
+  const [chains, setChains] = useState<Chain[]>([]);
+  const [source, setSource] = useState('');
   const [q, setQ] = useState('');
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [title, setTitle] = useState('');
@@ -34,30 +37,41 @@ export default function OfferForm() {
   const [active, setActive] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { loadClubs().then(setClubs).catch(() => {}); }, []);
-  useEffect(() => { if (gymId) canManageGym(gymId).then(setAllowed); }, [gymId]);
+  useEffect(() => { loadClubs().then(setClubs).catch(() => {}); loadChains().then(setChains).catch(() => {}); }, []);
+  useEffect(() => {
+    if (gymId) canManageGym(gymId).then(setAllowed);
+    else if (chainId) canManageChain(chainId).then(setAllowed);
+  }, [gymId, chainId]);
   useEffect(() => {
     if (!id) return;
     supabase.from('gym_offers').select('*').eq('id', id).single().then(({ data: o }) => {
       if (!o) return;
       setTitle(o.title); setDetails(o.details ?? ''); setPrice(String(+o.price_sar)); setOldPrice(o.old_price_sar ? String(+o.old_price_sar) : '');
       setMonths(o.months); setEndsOn(o.ends_on ?? ''); setUrl(o.url ?? ''); setCode(o.promo_code ?? ''); setActive(o.active);
+      setSource(o.source_url ?? ''); if (o.chain_id) setChainId(o.chain_id); if (o.gym_id) setGymId(o.gym_id);
     });
   }, [id]);
 
   const club = clubs.find((c) => c.id === gymId);
+  const ch = chains.find((c) => c.id === chainId);
 
-  if (!gymId) {
-    const list = clubs.filter((c) => !q || `${c.name} ${c.name_en ?? ''} ${c.chain ?? ''}`.toLowerCase().includes(q.toLowerCase()));
+  if (!gymId && !chainId) {
+    const match = (x: string) => !q || x.toLowerCase().includes(q.toLowerCase());
+    const cl = chains.filter((c) => match(`${c.name} ${c.name_en ?? ''}`));
+    const br = clubs.filter((c) => match(`${c.name} ${c.name_en ?? ''} ${c.chain ?? ''}`));
+    const row = (key: string, logo: { name: string; logo_path?: string | null }, title: string, sub: string, onPress: () => void) => (
+      <Pressable key={key} onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border }}>
+        <ClubLogo c={logo} size={36} /><T semibold style={{ flex: 1 }}>{title}</T><T size="xs" muted>{sub}</T>
+      </Pressable>
+    );
     return (
       <Screen edges={['bottom']}>
         <Stack.Screen options={{ title: t('clubs.pickClub') }} />
         <Input value={q} onChangeText={setQ} placeholder={t('clubs.searchClub')} />
-        {list.map((c) => (
-          <Pressable key={c.id} onPress={() => setGymId(c.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border }}>
-            <ClubLogo c={c} size={36} /><T semibold style={{ flex: 1 }}>{gymName(c, lng)}</T><T size="xs" muted>{c.city}</T>
-          </Pressable>
-        ))}
+        {cl.length ? <T size="sm" bold>{t('clubs.chainWide')}</T> : null}
+        {cl.map((c) => row(c.id, { name: c.name_en || c.name, logo_path: c.logo_path }, c.name, t('clubs.allBranches'), () => setChainId(c.id)))}
+        {br.length ? <T size="sm" bold>{t('clubs.oneBranch')}</T> : null}
+        {br.map((c) => row(c.id, c, gymName(c, lng), c.city ?? '', () => setGymId(c.id)))}
       </Screen>
     );
   }
@@ -71,7 +85,7 @@ export default function OfferForm() {
     if (endsOn && !/^\d{4}-\d{2}-\d{2}$/.test(endsOn)) return Alert.alert(t('clubs.err_date'));
     setBusy(true);
     try {
-      await saveOffer({ gym_id: gymId, title, details, price_sar: p, old_price_sar: op, months, ends_on: endsOn || null, url: url || null, promo_code: code || null, active }, id);
+      await saveOffer({ gym_id: gymId, chain_id: gymId ? null : chainId, source_url: source || null, title, details, price_sar: p, old_price_sar: op, months, ends_on: endsOn || null, url: url || null, promo_code: code || null, active }, id);
       router.back();
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
   };
@@ -79,7 +93,16 @@ export default function OfferForm() {
   return (
     <Screen edges={['bottom']}>
       <Stack.Screen options={{ title: id ? t('clubs.editOffer') : t('clubs.addOffer') }} />
-      {club ? <Row><ClubLogo c={club} size={36} /><T bold style={{ flex: 1 }}>{gymName(club, lng)}</T>{!gym ? <Pressable onPress={() => setGymId(null)}><T size="sm" color={colors.primary}>{t('clubs.change')}</T></Pressable> : null}</Row> : null}
+      {club || ch ? (
+        <Row>
+          <ClubLogo c={club ?? { name: ch!.name_en || ch!.name, logo_path: ch!.logo_path }} size={36} />
+          <View style={{ flex: 1 }}>
+            <T bold>{club ? gymName(club, lng) : ch!.name}</T>
+            <T size="xs" muted>{club ? t('clubs.oneBranch') : t('clubs.allBranches')}</T>
+          </View>
+          {!gym && !chain ? <Pressable onPress={() => { setGymId(null); setChainId(null); }}><T size="sm" color={colors.primary}>{t('clubs.change')}</T></Pressable> : null}
+        </Row>
+      ) : null}
       <Input label={t('clubs.offerTitle')} value={title} onChangeText={setTitle} maxLength={80} placeholder={t('clubs.offerTitlePh')} />
       <View style={{ gap: 6 }}>
         <T size="sm" semibold>{t('clubs.duration')}</T>
@@ -104,6 +127,7 @@ export default function OfferForm() {
         </Row>
       </View>
       <Input label={t('clubs.subscribeUrl')} value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="gym.sa/offers" />
+      <Input label={t('clubs.sourceUrl')} value={source} onChangeText={setSource} autoCapitalize="none" keyboardType="url" placeholder="gym.sa/offers" hint={t('clubs.sourceHint')} />
       <Input label={t('clubs.promo')} value={code} onChangeText={setCode} autoCapitalize="characters" maxLength={30} placeholder="ARQ10" />
       <Row style={{ justifyContent: 'space-between' }}><T semibold>{t('clubs.activeOffer')}</T><Switch value={active} onValueChange={setActive} trackColor={{ true: brand.orange }} /></Row>
       <Button title={t('clubs.saveOffer')} icon="checkmark" loading={busy} onPress={save} />

@@ -361,6 +361,27 @@ grant usage on schema public, auth, storage to authenticated;
   check('owner can remove abusive review', (await as(B, `delete from gym_reviews where gym_id = $1 and user_id = $2 returning rating`, [gym.id, C])).length === 1);
   check('user cannot delete others review', (await as(C, `delete from gym_reviews where user_id = $1 returning rating`, [A])).length === 0);
 
+  // gym chains + chain-level offers (seeded from research) + managers
+  const chains = await as(A, 'select * from chains_directory()');
+  check('seeded chains visible', chains.length >= 15 && chains.some(c => c.slug === 'puregym' && Number(c.offers) >= 10), `${chains.length} chains`);
+  const pgc = chains.find(c => c.slug === 'puregym');
+  check('chain best monthly price', Number(pgc.best_monthly) === 96, String(pgc.best_monthly));
+  const bm = chains.find(c => c.slug === 'body-masters');
+  check('dated offers counted until they end', Number(bm.offers) === (new Date().toISOString().slice(0, 10) <= '2026-09-30' ? 6 : 0));
+  await q(`update gyms set chain_id = $1 where id = $2`, [pgc.id, gym.id]);
+  const gd = (await as(A, 'select * from gyms_directory() where id = $1', [gym.id]))[0];
+  check('branch directory includes chain offers + name', Number(gd.best_monthly) === 96 && gd.chain === 'PureGym KSA' && gd.chain_id === pgc.id, JSON.stringify([gd.best_monthly, gd.chain]));
+  const cd = (await as(A, 'select * from chains_directory(24.69, 46.685)')).find(c => c.slug === 'puregym');
+  check('chain: branches, aggregated rating, nearest branch', Number(cd.branches) === 1 && Number(cd.reviews) >= 1 && cd.nearest_m < 1000, JSON.stringify([cd.branches, cd.rating, cd.reviews, Math.round(cd.nearest_m)]));
+  await expectErr('users cannot add chain offers', () => as(A, `insert into gym_offers (chain_id, title, price_sar) values ($1, 'عرض مزيف', 1)`, [pgc.id]), /row-level security/);
+  await expectErr('users cannot edit chains', () => as(A, `update gym_chains set name = 'x' where id = $1 returning id`, [pgc.id]).then(r => { if (!r.length) throw new Error('row-level security: no rows'); }), /row-level security/);
+  await as(B, `insert into chain_managers (chain_id, user_id) values ($1, $2)`, [bm.id, A]);
+  const cof = (await as(A, `insert into gym_offers (chain_id, title, price_sar, months, source_url) values ($1, 'عرض من السلسلة', 999, 6, 'https://example.com/o') returning confidence, seen_on`, [bm.id]))[0];
+  check('chain manager posts offer (partner, dated today)', cof.confidence === 'partner' && cof.seen_on != null);
+  check('chain manager can upload logo path', (await as(A, `update gym_chains set logo_path = $2 where id = $1 returning id`, [bm.id, `${A}/logo.png`])).length === 1);
+  await expectErr('offer needs a gym or chain', () => as(B, `insert into gym_offers (title, price_sar) values ('بدون هدف', 10)`), /gym_offers_target|row-level security/);
+  await expectErr('source must be https', () => as(B, `insert into gym_offers (chain_id, title, price_sar, source_url) values ($1, 'رابط غلط', 10, 'http://x.com')`, [bm.id]), /check constraint/);
+
   // nearby
   const nb = await as(A, 'select * from nearby_gyms(24.69, 46.685, 5)');
   check('nearby gyms', nb.length >= 1 && nb[0].name === gym.name);

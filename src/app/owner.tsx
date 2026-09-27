@@ -58,13 +58,16 @@ export default function Owner() {
 
       {tab === 'offers' ? (
         <>
-          <Button icon="add" title={t('clubs.addOffer')} onPress={() => router.push('/clubs/offer')} />
+          <Row gap={space.sm}>
+            <View style={{ flex: 1 }}><Button icon="add" title={t('clubs.addOffer')} onPress={() => router.push('/clubs/offer')} /></View>
+            <View style={{ flex: 1 }}><Button variant="secondary" icon="image-outline" title={t('owner.chainsLogos')} onPress={() => router.push({ pathname: '/clubs', params: { tab: 'chains' } })} /></View>
+          </Row>
           <T size="xs" muted>{t('owner.offersHint')}</T>
           {offers.length ? offers.map((o) => (
-            <Pressable key={o.id} onPress={() => router.push({ pathname: '/clubs/offer', params: { gym: o.gym_id, id: o.id } })}
+            <Pressable key={o.id} onPress={() => router.push({ pathname: '/clubs/offer', params: o.chain_id ? { chain: o.chain_id, id: o.id } : { gym: o.gym_id!, id: o.id } })}
               style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: space.md, opacity: o.active ? 1 : 0.55 }}>
               <View style={{ flex: 1, gap: 2 }}>
-                <T semibold numberOfLines={1}>{o.gyms?.chain || o.gyms?.name} · {o.title}</T>
+                <T semibold numberOfLines={1}>{o.gym_chains?.name || o.gyms?.chain || o.gyms?.name} · {o.title}</T>
                 <T size="xs" muted>{+o.price_sar} {t('clubs.sar')}{o.ends_on ? ` · ${t('clubs.until', { d: o.ends_on })}` : ''}{o.active ? '' : ` · ${t('owner.inactive')}`}</T>
               </View>
               <Ionicons name="create-outline" size={18} color={colors.muted} />

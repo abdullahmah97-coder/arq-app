@@ -14,3 +14,10 @@ export function ratingBars(reviews: { rating: number }[]) {
   const total = Math.max(1, reviews.length);
   return c.map((n, i) => ({ stars: 5 - i, n, pct: n / total }));
 }
+
+/** هل السعر قديم؟ (أكثر من ١٢٠ يوم من آخر تحقق، أو بدون تاريخ ومصدره غير رسمي) */
+export function isStale(o: { seen_on: string | null; confidence: string }, now = new Date()) {
+  if (o.confidence === 'uncertain') return true;
+  if (!o.seen_on) return o.confidence === 'article';
+  return (now.getTime() - new Date(`${o.seen_on}T00:00:00`).getTime()) / 86400000 > 120;
+}

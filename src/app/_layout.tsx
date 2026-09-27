@@ -79,6 +79,8 @@ function RootNavigator() {
         <Stack.Screen name="owner" options={{ title: t('owner.title') }} />
         <Stack.Screen name="clubs/index" options={{ title: t('clubs.title') }} />
         <Stack.Screen name="clubs/[id]" options={{ title: '' }} />
+        <Stack.Screen name="clubs/chain/[id]" options={{ title: '' }} />
+        <Stack.Screen name="clubs/chain-edit" options={{ title: t('clubs.editChain'), presentation: 'modal' }} />
         <Stack.Screen name="clubs/review" options={{ title: t('clubs.rate'), presentation: 'modal' }} />
         <Stack.Screen name="clubs/offer" options={{ title: t('clubs.addOffer'), presentation: 'modal' }} />
         <Stack.Screen name="chat/[id]" options={{ title: '' }} />
