@@ -258,7 +258,7 @@ export type PropKind =
   | 'bench' | 'inclineBench' | 'seat' | 'seatBack' | 'pullupBar' | 'dipBars' | 'cableLow' | 'cableHigh'
   | 'cableFly' | 'pecDeck' | 'legExtension' | 'legCurlLying' | 'legCurlSeated' | 'legPress' | 'hackSquat'
   | 'abWheel' | 'mat' | 'step' | 'benchBehind' | 'benchSideRow' | 'latBar' | 'backPad'
-  | 'benchPress' | 'chestPress' | 'shoulderPress' | 'hipAbduction' | 'latMachine';
+  | 'benchPress' | 'chestPress' | 'shoulderPress' | 'hipAbduction' | 'latMachine' | 'rowStation';
 
 export interface PropSpec { kind: PropKind; pos?: [number, number, number]; }
 

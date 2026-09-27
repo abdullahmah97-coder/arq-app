@@ -257,9 +257,9 @@ export const MOTIONS: Record<string, Motion> = {
   },
   row_cable_seated: {
     keys: [
-      { root: { y: 0.2, z: -0.2 }, spine: 18, ...sym({ hip: [85, 10, 0], knee: 30, shoulder: [85, 10, 0], elbow: 4 }) },
-      { root: { y: 0.2, z: -0.2 }, spine: 0, chest: -8, ...sym({ hip: [85, 10, 0], knee: 30, shoulder: [-20, 12, 0], elbow: 100 }) },
-    ], tempo: [1.2, 1.8], hold: [0.1, 0.4], props: [{ kind: 'cableLow', pos: [0, 0.3, 1.05] }, { kind: 'mat', pos: [0, 0, 0.2] }],
+      { root: { y: 0.55, z: -0.2 }, spine: 18, ...sym({ hip: [82, 10, 0], knee: 34, ankle: -10, shoulder: [80, 10, 0], elbow: 4 }) },
+      { root: { y: 0.55, z: -0.2 }, spine: 0, chest: -8, ...sym({ hip: [82, 10, 0], knee: 34, ankle: -10, shoulder: [-20, 12, 0], elbow: 100 }) },
+    ], tempo: [1.2, 1.8], hold: [0.1, 0.4], props: [{ kind: 'rowStation', pos: [0, 0, 0] }],
     primary: ['upperBack', 'lats'], secondary: ['biceps', 'rearDelts'], view: { yaw: 75, y: 0.6 },
   },
   row_db_one_arm: {
@@ -493,7 +493,7 @@ export const MOTIONS: Record<string, Motion> = {
   },
   cable_curl: {
     keys: [sym({ shoulder: [8, 14, 0], elbow: 6, hip: [0, 5, 0] }), sym({ shoulder: [16, 14, 0], elbow: 135, hip: [0, 5, 0] })],
-    tempo: [1.1, 1.8], hold: [0.1, 0.3], ground: true, props: [{ kind: 'ezbar' }, { kind: 'cableLow', pos: [0, 0.1, 0.55] }],
+    tempo: [1.1, 1.8], hold: [0.1, 0.3], ground: true, props: [{ kind: 'cableLow', pos: [0, 0.1, 0.55] }],
     primary: ['biceps'], secondary: ['forearms'], view: { yaw: 60, y: 1.0 },
   },
   incline_db_curl: {

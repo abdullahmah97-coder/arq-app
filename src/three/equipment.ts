@@ -7,8 +7,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { PropSpec, PropsRuntime, Rig } from './rig';
 
 export const EQUIP_COLORS = {
-  steel: '#9AA6A1',
-  steelDark: '#5F6D68',
+  steel: '#AEB8B4',
+  steelDark: '#6E7B76',
   chrome: '#DDE2E0',
   pad: '#22302B',
   plate: '#1B2120',
@@ -28,12 +28,12 @@ function mats() {
   const std = (color: string, o: Partial<THREE.MeshStandardMaterialParameters> = {}) =>
     new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.1, ...o });
   return {
-    steel: std(EQUIP_COLORS.steel, { metalness: 0.45, roughness: 0.38 }),
-    steelDark: std(EQUIP_COLORS.steelDark, { metalness: 0.35, roughness: 0.45 }),
-    chrome: std(EQUIP_COLORS.chrome, { metalness: 0.7, roughness: 0.25 }),
+    steel: std(EQUIP_COLORS.steel, { metalness: 0.12, roughness: 0.42 }),
+    steelDark: std(EQUIP_COLORS.steelDark, { metalness: 0.1, roughness: 0.5 }),
+    chrome: std(EQUIP_COLORS.chrome, { metalness: 0.35, roughness: 0.22 }),
     pad: std(EQUIP_COLORS.pad, { roughness: 0.75, metalness: 0 }),
     plate: std(EQUIP_COLORS.plate, { roughness: 0.5, metalness: 0.15 }),
-    cable: new THREE.LineBasicMaterial({ color: EQUIP_COLORS.cable }),
+    cable: std(EQUIP_COLORS.cable, { roughness: 0.6 }),
   };
 }
 type Mats = ReturnType<typeof mats>;
@@ -225,20 +225,28 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
   };
 
   /** كيبل متحرك من بكرة ثابتة إلى اليد + محطة الكيبل + مقبض */
-  const cable = (anchor: THREE.Vector3, target: () => THREE.Vector3, o: { side?: 1 | -1; offset?: number; handle?: boolean } = {}) => {
-    group.add(cableStation(M, anchor, o.side ?? 1, o.offset ?? 0.5));
-    const geo = new THREE.BufferGeometry().setFromPoints([anchor.clone(), anchor.clone()]);
-    const line = new THREE.Line(geo, M.cable);
-    group.add(line);
-    const handle = o.handle === false ? null : new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 8, 16), M.steelDark);
+  const cable = (anchor: THREE.Vector3, target: () => THREE.Vector3, o: { side?: 1 | -1; offset?: number; handle?: boolean; station?: boolean; bar?: boolean } = {}) => {
+    if (o.station !== false) group.add(cableStation(M, anchor, o.side ?? 1, o.offset ?? 0.5));
+    const wire = tube(0.0065, M.cable, 6);
+    group.add(wire);
+    const handle = o.handle === false || o.bar ? null : new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.013, 8, 16), M.steelDark);
     if (handle) group.add(handle);
+    // بار قصير بين اليدين (للبوش داون والكيرل بالكيبل)
+    const bar = o.bar ? tube(0.015, M.chrome) : null;
+    const grips = o.bar ? [tube(0.02, M.pad), tube(0.02, M.pad)] : [];
+    if (bar) group.add(bar, ...grips);
     updaters.push(() => {
       const p = target();
-      const arr = geo.attributes.position.array as Float32Array;
-      arr[3] = p.x; arr[4] = p.y; arr[5] = p.z;
-      geo.attributes.position.needsUpdate = true;
-      geo.computeBoundingSphere();
+      setTube(wire, anchor, p);
       if (handle) { handle.position.copy(p); handle.lookAt(anchor); }
+      if (bar) {
+        grip(rig.L, _a); grip(rig.R, _b);
+        _c.copy(_b).sub(_a).normalize();
+        const e1 = _a.clone().addScaledVector(_c, -0.07); const e2 = _b.clone().addScaledVector(_c, 0.07);
+        setTube(bar, e1, e2);
+        setTube(grips[0], _a.clone().addScaledVector(_c, -0.06), _a.clone().addScaledVector(_c, 0.06));
+        setTube(grips[1], _b.clone().addScaledVector(_c, -0.06), _b.clone().addScaledVector(_c, 0.06));
+      }
     });
   };
 
@@ -398,11 +406,34 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         }
         group.add(g); break;
       }
-      case 'cableLow': cable(new THREE.Vector3(pos[0], pos[1] || 0.15, pos[2] || 1.0), () => midHands(new THREE.Vector3()), { side: pos[0] > 0.2 ? 1 : 1, offset: pos[0] > 0.2 ? 0.3 : 0.5 }); break;
-      case 'cableHigh': cable(new THREE.Vector3(pos[0], pos[1] || 2.1, pos[2] || 0.45), () => midHands(new THREE.Vector3())); break;
+      case 'cableLow': cable(new THREE.Vector3(pos[0], pos[1] || 0.15, pos[2] || 1.0), () => midHands(new THREE.Vector3()), { side: 1, offset: pos[0] > 0.2 ? 0.3 : 0.5, bar: Math.abs(pos[0]) < 0.2 }); break;
+      case 'cableHigh': cable(new THREE.Vector3(pos[0], pos[1] || 2.1, pos[2] || 0.45), () => midHands(new THREE.Vector3()), { bar: true }); break;
       case 'cableFly': {
         cable(new THREE.Vector3(1.0, 1.9, -0.3), () => grip(rig.L, new THREE.Vector3()), { side: 1, offset: 0.12 });
         cable(new THREE.Vector3(-1.0, 1.9, -0.3), () => grip(rig.R, new THREE.Vector3()), { side: -1, offset: 0.12 });
+        break;
+      }
+      case 'rowStation': {
+        // جهاز السحب الأرضي: مقعد طويل منخفض + مسند قدمين + برج أوزان أمام القدمين
+        const z0 = pos[2];
+        group.add(rbox(0.34, 0.08, 0.9, M.pad, [0, 0.42, z0 - 0.35], 0.03));
+        group.add(tubeAB([0, 0.36, z0 - 0.75], [0, 0.36, z0 + 0.15], 0.03, M.steel));
+        for (const z of [z0 - 0.7, z0 + 0.05]) group.add(tubeAB([0, 0.36, z], [0, 0.03, z], 0.03, M.steel));
+        group.add(rbox(0.16, 0.06, 2.1, M.steelDark, [0, 0.03, z0 + 0.1], 0.015));
+        const plate = rbox(0.46, 0.34, 0.05, M.steel, [0, 0.3, z0 + 0.62], 0.02); plate.rotation.x = D(-28); group.add(plate);
+        for (const x of [-0.12, 0.12]) group.add(rbox(0.1, 0.03, 0.16, M.pad, [x, 0.25, z0 + 0.57], 0.012));
+        group.add(tubeAB([0, 0.2, z0 + 0.66], [0, 0.03, z0 + 0.62], 0.028, M.steel));
+        const anc = new THREE.Vector3(0, 0.36, z0 + 1.0);
+        group.add(weightStack(M, [0, 0, z0 + 1.2], 1.75));
+        const pul = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.015, 8, 18), M.steelDark); pul.position.copy(anc); pul.rotation.y = Math.PI / 2; group.add(pul);
+        group.add(tubeAB([0, 0.36, z0 + 1.0], [0, 0.36, z0 + 1.2], 0.03, M.steel));
+        // مقبض V يتبع اليدين
+        const vh = new THREE.Group(); group.add(vh);
+        vh.add(tubeAB([-0.07, 0, 0], [0.07, 0, 0], 0.016, M.pad));
+        vh.add(tubeAB([-0.07, 0, 0], [0, 0, 0.12], 0.012, M.steelDark));
+        vh.add(tubeAB([0.07, 0, 0], [0, 0, 0.12], 0.012, M.steelDark));
+        updaters.push(() => { midHands(_a); vh.position.copy(_a); vh.lookAt(anc.x, _a.y, anc.z); });
+        cable(anc, () => midHands(new THREE.Vector3()).add(new THREE.Vector3(0, 0, 0.12)), { station: false, handle: false });
         break;
       }
       case 'pecDeck': {
