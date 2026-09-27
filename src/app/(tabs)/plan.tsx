@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, I18nManager, Pressable, ScrollView, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
+import { AteButton, CalorieCard } from '@/components/nutrition/CalorieCard';
 import { Button, Card, Empty, H, Row, Screen, SectionTitle, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { todayIndex } from '@/lib/dates';
@@ -13,8 +14,9 @@ import { startWorkout } from '@/lib/training';
 import { showRir } from '@/components/rir';
 import { useLocalized } from '@/lib/i18n';
 import { latestAppliedAnalysis } from '@/lib/inbody';
+import { deleteFood, estimateCarbsFat, loadFoodDay, logFood, type FoodEntry } from '@/lib/nutrition';
 import { generatePlan, savePlan } from '@/lib/plan';
-import type { PlanDay, PlanMealDay } from '@/lib/plan/types';
+import type { PlanDay, PlanMeal, PlanMealDay, PlanTargets } from '@/lib/plan/types';
 import { errorKey, supabase } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 
@@ -27,6 +29,20 @@ export default function PlanScreen() {
   const [day, setDay] = useState(todayIndex());
   const [busy, setBusy] = useState(false);
   const weekdays = t('weekdaysShort', { returnObjects: true }) as string[];
+  const [food, setFood] = useState<FoodEntry[]>([]);
+
+  // سجل أكل اليوم: يتحدث كل ما رجعت للصفحة (بعد إضافة أكل)
+  const loadFood = useCallback(() => { loadFoodDay(userId).then(setFood).catch(() => {}); }, [userId]);
+  useFocusEffect(loadFood);
+  const removeFood = async (e: FoodEntry) => {
+    try { await deleteFood(e.id); loadFood(); } catch (err) { Alert.alert(t(errorKey(err))); }
+  };
+  const ateMeal = async (m: PlanMeal, targets: PlanTargets) => {
+    try {
+      await logFood(userId, { slot: m.slot, name: L(m.name), source: 'plan', kcal: m.kcal, protein_g: m.protein_g, ...estimateCarbsFat(m.kcal, m.protein_g, targets) });
+      loadFood();
+    } catch (err) { Alert.alert(t(errorKey(err))); }
+  };
 
   const regenerate = async () => {
     if (!health?.height_cm || !health.birth_year || !health.gender || !health.goal || !health.level || !health.days_per_week) {
@@ -81,6 +97,7 @@ export default function PlanScreen() {
         <H>{t('plan.title')}</H>
         <Empty text={t('home.noPlan')} icon="calendar-outline" />
         <Button title={t('home.makePlan')} onPress={regenerate} loading={busy} />
+        <CalorieCard entries={food} targets={null} onDelete={removeFood} />
       </Screen>
     );
   }
@@ -189,7 +206,13 @@ export default function PlanScreen() {
             }),
           }).catch((e) => Alert.alert(t(errorKey(e))))} />
       ) : null}
-      {tab === 'meals' && meals ? <MealsDay d={meals} /> : null}
+      {tab === 'meals' && day === todayIndex() ? (
+        <CalorieCard entries={food} targets={{ calories: p.targets.calories, protein_g: p.targets.protein_g, carbs_g: p.targets.carbs_g, fat_g: p.targets.fat_g }} onDelete={removeFood} />
+      ) : null}
+      {tab === 'meals' && meals ? (
+        <MealsDay d={meals} today={day === todayIndex()} logged={new Set(food.filter((f) => f.source === 'plan').map((f) => f.name))}
+          onAte={(m) => ateMeal(m, p.targets)} />
+      ) : null}
 
       {p.photo_notes ? (
         <Card style={{ gap: space.sm }}>
@@ -266,7 +289,7 @@ function WorkoutDay({ d, canComplete, onComplete, busy, onStart }: { d: PlanDay;
   );
 }
 
-function MealsDay({ d }: { d: PlanMealDay }) {
+function MealsDay({ d, today, logged, onAte }: { d: PlanMealDay; today: boolean; logged: Set<string>; onAte: (m: PlanMeal) => void }) {
   const { t } = useTranslation();
   const { L, lng } = useLocalized();
   const unit = (a: string) => (lng === 'ar' ? a.replace(/\s?ml\b/, ' مل').replace(/\s?g\b/, ' جم') : a);
@@ -282,6 +305,7 @@ function MealsDay({ d }: { d: PlanMealDay }) {
             <T size="xs" muted>{m.kcal} {t('common.kcal')} · {m.protein_g}{t('common.g')}</T>
           </Row>
           <T bold>{L(m.name)}</T>
+          {today ? <AteButton logged={logged.has(L(m.name))} onPress={() => onAte(m)} /> : null}
           {m.portions.map((p, k) => (
             <Row key={k} style={{ justifyContent: 'space-between' }}>
               <T size="sm" muted style={{ flex: 1 }}>• {L(p.name)}</T>

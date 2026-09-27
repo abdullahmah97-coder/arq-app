@@ -412,6 +412,17 @@ grant usage on schema public, auth, storage to authenticated;
   const ciMap = (await as(A, 'select * from check_in($1, $2, $3, 10)', [mg.id, mg.lat + 0.001, mg.lng]))[0];
   check('check-in at a map gym (within 200m) works', !!ciMap.id, `dist=${ciMap.distance_m}`);
   await as(A, 'select * from check_out($1)', [ciMap.id]);
+
+  // food log (calories)
+  await as(A, `insert into food_logs (slot, name, food_id, servings, kcal, protein_g, carbs_g, fat_g) values
+    ('breakfast', 'فول مدمس', 'foul', 1, 260, 13, 35, 8), ('lunch', 'كبسة دجاج', 'kabsa_chicken', 1.5, 1125, 60, 127.5, 39)`);
+  await as(B, `insert into food_logs (slot, name, kcal, source) values ('snack', 'تمر', 85, 'custom')`);
+  const ft = (await as(A, 'select * from food_day_totals()'))[0];
+  check('food: day totals are my own only', Number(ft.kcal) === 1385 && Number(ft.items) === 2 && Number(ft.protein_g) === 73, JSON.stringify(ft));
+  check('food: others cannot read my log', (await as(B, 'select * from food_logs')).length === 1);
+  await expectErr('food: cannot log for someone else', () => as(B, `insert into food_logs (user_id, slot, name, kcal) values ($1, 'lunch', 'x', 10)`, [A]), /row-level security/);
+  await expectErr('food: calories must be sane', () => as(A, `insert into food_logs (slot, name, kcal) values ('lunch', 'x', 99999)`), /check constraint/);
+  check('food: delete own entry', (await as(A, `delete from food_logs where food_id = 'foul' returning id`)).length === 1);
   { let hidden = false; try { hidden = (await as(A, 'select * from gym_area_scans')).length === 0; } catch (e) { hidden = /permission denied/.test(e.message); }
     check('scan log is private', hidden); }
 

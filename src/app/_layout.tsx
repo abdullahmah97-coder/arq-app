@@ -17,7 +17,7 @@ import { restoreTheme, saveTheme, ThemeCtx } from '@/lib/appTheme';
 /** الصفحات اللي تفتح كنافذة من تحت: زر إغلاق بدل سهم الرجوع */
 const MODAL_ROUTES = new Set([
   'post/new', 'challenge/new', 'feedback', 'program/new', 'tip/new',
-  'clubs/chain-edit', 'clubs/review', 'clubs/offer', 'store/join', 'store/product',
+  'clubs/chain-edit', 'clubs/review', 'clubs/offer', 'store/join', 'store/product', 'food/add',
 ]);
 
 const navTheme = () => ({
@@ -102,6 +102,7 @@ function RootNavigator() {
         <Stack.Screen name="store/manage" options={{ title: t('store.myStore') }} />
         <Stack.Screen name="store/product" options={{ title: t('store.product'), presentation: 'modal' }} />
         <Stack.Screen name="follows/[id]" options={{ title: '' }} />
+        <Stack.Screen name="food/add" options={{ title: t('food.addFood'), presentation: 'modal' }} />
       </Stack.Protected>
     </Stack>
   );
