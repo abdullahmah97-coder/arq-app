@@ -1,3 +1,5 @@
+// أول شيء: تعويض دوال Node اللي تحتاجها بعض المكتبات (لازم قبل أي استيراد ثاني)
+import '@/polyfills/process';
 import {
   NotoKufiArabic_300Light, NotoKufiArabic_400Regular, NotoKufiArabic_600SemiBold, NotoKufiArabic_700Bold, useFonts,
 } from '@expo-google-fonts/noto-kufi-arabic';

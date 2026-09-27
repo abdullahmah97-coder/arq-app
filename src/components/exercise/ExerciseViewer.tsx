@@ -1,20 +1,36 @@
 // عارض التمرين ثلاثي الأبعاد: شخصية ARQ (رجل/امرأة) تؤدي الحركة مع إضاءة العضلات العاملة
+import '@/polyfills/process';
 import { Ionicons } from '@expo/vector-icons';
 import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createHuman } from '@/three/human';
 import { MOTIONS, sampleMotion } from '@/three/motions';
 import { applyPose, createFloor, createProps, createRig, type Muscle } from '@/three/rig';
 import { brand } from '@/theme';
 import { ExerciseFigure2D } from './ExerciseFigure2D';
-import { Canvas, useFrame, useLoader } from './r3f';
 import { initial3DMode, mark3DDone, mark3DFailed, mark3DStart, reset3D, type Mode3D } from './safe3d';
 import './textDecoderPolyfill';
 import { errorDetail, logEvent, setFatalGuard } from '@/lib/events';
 
 export type Gender = 'male' | 'female';
+
+// مكتبات الرسم ثلاثي الأبعاد نحمّلها وقت الحاجة داخل try/catch: لو فشل تحميلها نعرض 2D بدل ما ينقفل التطبيق
+type Engine = typeof import('./r3f') & { GLTFLoader: typeof import('three/examples/jsm/loaders/GLTFLoader.js').GLTFLoader };
+let engine: Engine | null | undefined;
+function loadEngine(): Engine | null {
+  if (engine === undefined) {
+    try {
+      const r3f = require('./r3f') as typeof import('./r3f');
+      const { GLTFLoader } = require('three/examples/jsm/loaders/GLTFLoader.js') as typeof import('three/examples/jsm/loaders/GLTFLoader.js');
+      engine = { ...r3f, GLTFLoader };
+    } catch (e) {
+      engine = null;
+      logEvent('3d_import_error', errorDetail(e), { once: true });
+    }
+  }
+  return engine;
+}
 
 const MODELS: Record<Gender, number> = {
   male: require('../../../assets/models/athlete_male.glb'),
@@ -43,6 +59,7 @@ function orbit(camera: THREE.Camera, m: (typeof MOTIONS)[string], yaw: number) {
 }
 
 function Scene({ motion, gender, focus, playing, yaw, speed, onFrame, onFail }: SceneProps) {
+  const { useLoader, useFrame, GLTFLoader } = loadEngine()!;
   const gltf = useLoader(GLTFLoader, MODELS[gender] as unknown as string);
   const m = MOTIONS[motion];
   const t = useRef(0);
@@ -108,6 +125,7 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
   useEffect(() => {
     let alive = true;
     initial3DMode().then(async (m) => {
+      if (m === '3d' && !loadEngine()) { mark3DFailed({ where: 'import', motion }); m = '2d'; }
       if (m === '3d') await mark3DStart({ motion, gender });
       if (alive) { started.current = Date.now(); setMode(m); }
     });
@@ -143,6 +161,7 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
   }, [mode, fail]);
 
   const retry3D = async () => {
+    if (!loadEngine()) return;
     await reset3D();
     failed.current = false; frames.current = 0;
     await mark3DStart({ motion, gender, retry: true });
@@ -159,6 +178,7 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
   }), []);
 
   const speed = slow ? 0.45 : 1;
+  const E = mode === '3d' ? loadEngine() : null;
   const flat = (
     <ExerciseFigure2D motion={motion} focus={focus} playing={playing} speed={speed} yaw={yaw}
       onError={(e) => logEvent('2d_error', { motion, ...errorDetail(e) }, { once: true })} />
@@ -168,9 +188,9 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
     <View style={[styles.wrap, { height }]} {...pan.panHandlers}>
       {mode === 'checking' ? (
         <View style={styles.center}><ActivityIndicator color={brand.orange} /></View>
-      ) : mode === '2d' ? flat : (
+      ) : mode === '2d' || !E ? flat : (
         <Guard key={gender} fallback={flat} onError={(e) => fail('render', e)}>
-          <Canvas camera={{ fov: 30, near: 0.1, far: 50, position: [0, 1.3, 3.9] }} gl={{ antialias: true }}
+          <E.Canvas camera={{ fov: 30, near: 0.1, far: 50, position: [0, 1.3, 3.9] }} gl={{ antialias: true }}
             onCreated={({ gl }) => {
               try {
                 const c = gl.getContext();
@@ -184,7 +204,7 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
             <Suspense fallback={null}>
               <Scene motion={motion} gender={gender} focus={focus} playing={playing} yaw={yaw} speed={speed} onFrame={onFrame} onFail={fail} />
             </Suspense>
-          </Canvas>
+          </E.Canvas>
         </Guard>
       )}
       <View style={styles.controls} pointerEvents="box-none">
