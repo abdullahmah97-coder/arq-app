@@ -48,3 +48,11 @@ secrets/
 *.p8
 *.p12
 *.mobileprovision
+
+# من المستودع الأصلي على GitHub
+*.i
+*.ii
+*.gpu
+*.ptx
+*.cubin
+*.fatbin
