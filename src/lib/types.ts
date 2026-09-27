@@ -25,7 +25,11 @@ export interface Profile {
   following_count: number;
   /** مدرب موثّق (يُمنح من الإدارة) */
   is_coach: boolean;
+  /** مين يشوفني في النادي: gym (الموجودين معي + الأصدقاء) | friends | hidden */
+  presence_visibility: PresenceVisibility;
 }
+
+export type PresenceVisibility = 'gym' | 'friends' | 'hidden';
 
 export interface HealthProfile {
   user_id: string;

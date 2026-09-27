@@ -74,6 +74,16 @@ function RootNavigator() {
         <Stack.Screen name="program/new" options={{ title: t('social.newProgram'), presentation: 'modal' }} />
         <Stack.Screen name="tip/new" options={{ title: t('social.newTip'), presentation: 'modal' }} />
         <Stack.Screen name="ranks" options={{ title: t('social.ranksTitle') }} />
+        <Stack.Screen name="gym/[id]" options={{ title: t('presence.title') }} />
+        <Stack.Screen name="messages" options={{ title: t('chat.title') }} />
+        <Stack.Screen name="owner" options={{ title: t('owner.title') }} />
+        <Stack.Screen name="chat/[id]" options={{ title: '' }} />
+        <Stack.Screen name="checkin/[id]" options={{ title: t('presence.comments') }} />
+        <Stack.Screen name="store/index" options={{ title: t('store.title') }} />
+        <Stack.Screen name="store/[id]" options={{ title: '' }} />
+        <Stack.Screen name="store/join" options={{ title: t('store.addYours'), presentation: 'modal' }} />
+        <Stack.Screen name="store/manage" options={{ title: t('store.myStore') }} />
+        <Stack.Screen name="store/product" options={{ title: t('store.product'), presentation: 'modal' }} />
         <Stack.Screen name="follows/[id]" options={{ title: '' }} />
       </Stack.Protected>
     </Stack>

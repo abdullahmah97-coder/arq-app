@@ -233,15 +233,18 @@ export default function Home() {
 
           <CheckInCard onChange={loadRank} />
 
-          {/* متجر ARQ — قريباً */}
-          <View style={styles.store}>
+          {/* متجر الشركاء: أضف متجرك + استبدال النقاط (قريباً) */}
+          <Pressable style={styles.store} onPress={() => router.push('/store')} accessibilityRole="button" accessibilityLabel={t('store.title')}>
             <Image source={IMG.bottle} style={styles.storeImg} contentFit="cover" />
             <View style={{ flex: 1, gap: 4, padding: space.md }}>
-              <Pill color={brand.cream} bg={brand.orange}>{t('store.soon')}</Pill>
-              <NT size={16} bold color={brand.deepGreen}>{t('store.title')}</NT>
-              <NT size={12} color={brand.green}>{t('store.subtitle')}</NT>
+              <NT size={16} bold color={brand.deepGreen}>{t('store.homeTitle')}</NT>
+              <NT size={12} color={brand.green}>{t('store.homeBody')}</NT>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <Pill color={brand.cream} bg={brand.orange}>{t('store.soon')}</Pill>
+                <NT size={11} color={brand.green} numberOfLines={1} style={{ flexShrink: 1 }}>{t('store.redeemShort')}</NT>
+              </View>
             </View>
-          </View>
+          </Pressable>
 
           <NCard onPress={() => setShowRules((x) => !x)}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

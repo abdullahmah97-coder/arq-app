@@ -10,7 +10,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SaduPattern } from '@/brand/Brand';
 import { NT, Num } from '@/components/pulse/widgets';
 import { useLocalized } from '@/lib/i18n';
-import { compareSession, daysAgo, fmtSet, loadHistory, loadSession, type SessionCompare, type SessionData } from '@/lib/training';
+import { FriendsBest } from '@/components/workout/FriendsBest';
+import { compareSession, daysAgo, fmtSet, loadFriendsBest, loadHistory, loadSession, summarize, type FriendBest, type SessionCompare, type SessionData } from '@/lib/training';
 import { getExercise } from '@/three/catalog';
 import { brand, night, pulse, space } from '@/theme';
 
@@ -20,12 +21,16 @@ export default function WorkoutSummary() {
   const { L, lng } = useLocalized();
   const [session, setSession] = useState<SessionData | null>(null);
   const [cmp, setCmp] = useState<SessionCompare | null>(null);
+  const [friends, setFriends] = useState<Record<string, FriendBest[]>>({});
 
   useEffect(() => {
     (async () => {
       const [s, h] = await Promise.all([loadSession(String(id)), loadHistory(120)]);
       setSession(s);
-      if (s) setCmp(compareSession(s, h));
+      if (s) {
+        setCmp(compareSession(s, h));
+        loadFriendsBest([...new Set(s.sets.map((x) => x.exercise_id))]).then(setFriends).catch(() => {});
+      }
     })();
   }, [id]);
 
@@ -104,6 +109,32 @@ export default function WorkoutSummary() {
               })}
             </View>
             <NT size={11} faint style={{ lineHeight: 18 }}>{t('workout.legend')}</NT>
+
+            {/* أفضل رقم بين الأصدقاء */}
+            {cmp.rows.some((r) => friends[r.exercise_id]?.some((f) => !f.is_me)) ? (
+              <View style={{ gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="trophy" size={16} color={brand.amber} />
+                  <NT size={16} bold>{t('workout.friendsBoard')}</NT>
+                </View>
+                <NT size={12} muted>{t('workout.friendsBoardHint')}</NT>
+                {cmp.rows.filter((r) => friends[r.exercise_id]?.some((f) => !f.is_me)).map((r) => {
+                  const g = getExercise(r.exercise_id);
+                  const top = summarize(r.exercise_id, session.sets).top;
+                  return (
+                    <View key={r.exercise_id} style={[styles.stat, { gap: 8 }]}>
+                      <NT size={14} bold>{g ? L(g.name) : r.exercise_id}</NT>
+                      <FriendsBest rows={friends[r.exercise_id]} mine={top} />
+                    </View>
+                  );
+                })}
+              </View>
+            ) : (
+              <Pressable onPress={() => router.push('/friends')} style={[styles.stat, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+                <Ionicons name="people-outline" size={18} color={brand.amber} />
+                <NT size={12} muted style={{ flex: 1 }}>{t('workout.friendsBoardEmpty')}</NT>
+              </Pressable>
+            )}
 
             <Pressable onPress={() => router.push('/workout/history')} style={styles.link}>
               <Ionicons name="list-outline" size={18} color={brand.deepGreen} />

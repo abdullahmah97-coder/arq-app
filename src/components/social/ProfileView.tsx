@@ -4,14 +4,15 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, I18nManager, Pressable, View } from 'react-native';
+import { ActivityIndicator, Alert, I18nManager, Pressable, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { Num } from '@/components/pulse/widgets';
 import { Avatar, Card, Empty, Row, Segmented, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import { canPublish, rankProgress, RANKS } from '@/lib/ranks';
 import { deleteTip, likeTip, loadPrograms, loadTips, profileCounts, type PublicProfile, type Tip, type UserProgram } from '@/lib/social';
-import { publicUrl, supabase } from '@/lib/supabase';
+import { pickImage } from '@/lib/images';
+import { errorKey, publicUrl, supabase, uploadImage } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 import { ProgramCard, TipCard } from './cards';
 import { CoachCheck, RankBadge } from './RankBadge';
@@ -19,8 +20,8 @@ import { CoachCheck, RankBadge } from './RankBadge';
 type Tab = 'programs' | 'tips' | 'posts';
 type PostTile = { id: string; image_path: string | null; caption: string | null };
 
-export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0 }: {
-  p: PublicProfile; me: string; gymLabel?: string | null; actions?: ReactNode; reloadKey?: number;
+export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfileChanged }: {
+  p: PublicProfile; me: string; gymLabel?: string | null; actions?: ReactNode; reloadKey?: number; onProfileChanged?: () => void;
 }) {
   const { t } = useTranslation();
   const { L, lng } = useLocalized();
@@ -45,6 +46,27 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0 }: {
   useEffect(() => { load(); }, [load, reloadKey]);
 
   const prog = rankProgress(p.points);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
+  // تغيير صورة الحساب مباشرة من الصفحة (لحسابي فقط)
+  const changeAvatar = () => Alert.alert(t('profile.changePhoto'), '', [
+    { text: t('social.fromLibrary'), onPress: () => pickAndUpload('library') },
+    { text: t('social.fromCamera'), onPress: () => pickAndUpload('camera') },
+    { text: t('common.cancel'), style: 'cancel' },
+  ]);
+  const pickAndUpload = async (src: 'library' | 'camera') => {
+    const img = await pickImage(src, [1, 1]);
+    if (!img) return;
+    setLocalAvatar(img.uri); setAvatarBusy(true);
+    try {
+      const path = await uploadImage('avatars', me, img.uri, img.mimeType);
+      const { error } = await supabase.from('profiles').update({ avatar_url: path }).eq('id', me);
+      if (error) throw error;
+      onProfileChanged?.();
+    } catch (e) {
+      setLocalAvatar(null); Alert.alert(t(errorKey(e)));
+    } finally { setAvatarBusy(false); }
+  };
   const like = async (x: Tip) => {
     setTips((ts) => ts?.map((y) => (y.id === x.id ? { ...y, liked: !y.liked, likes: y.likes + (y.liked ? -1 : 1) } : y)) ?? null);
     const { error } = await likeTip(x, me);
@@ -60,9 +82,15 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0 }: {
       {/* الهيدر */}
       <BrandGradient name="ember" style={{ borderRadius: radius.lg, overflow: 'hidden', padding: space.xl, alignItems: 'center', gap: space.sm }}>
         <SaduPattern variant="arrows" opacity={0.12} />
-        <View style={{ borderWidth: 3, borderColor: prog.cur.level === 4 ? brand.amber : prog.cur.color, borderRadius: 60, padding: 3 }}>
-          <Avatar size={92} uri={publicUrl('avatars', p.avatar_url)} name={p.full_name ?? p.username} />
-        </View>
+        <Pressable disabled={!self || avatarBusy} onPress={changeAvatar} accessibilityRole={self ? 'button' : undefined} accessibilityLabel={self ? t('profile.changePhoto') : undefined}
+          style={{ borderWidth: 3, borderColor: prog.cur.level === 4 ? brand.amber : prog.cur.color, borderRadius: 60, padding: 3 }}>
+          <Avatar size={92} uri={localAvatar ?? publicUrl('avatars', p.avatar_url)} name={p.full_name ?? p.username} />
+          {self ? (
+            <View style={{ position: 'absolute', bottom: 0, end: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: brand.orange, borderWidth: 2, borderColor: brand.cream, alignItems: 'center', justifyContent: 'center' }}>
+              {avatarBusy ? <ActivityIndicator size="small" color={brand.cream} /> : <Ionicons name="camera" size={15} color={brand.cream} />}
+            </View>
+          ) : null}
+        </Pressable>
         <Row gap={6}>
           <T size="xl" bold color={brand.cream}>{p.full_name || p.username}</T>
           {p.is_coach ? <CoachCheck size={20} /> : null}

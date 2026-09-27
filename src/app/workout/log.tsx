@@ -12,12 +12,13 @@ import { showRir } from '@/components/rir';
 import { useUser } from '@/lib/auth';
 import { ExercisePicker } from '@/components/ExercisePicker';
 import { useLocalized } from '@/lib/i18n';
+import { FriendsBest } from '@/components/workout/FriendsBest';
 import {
-  daysAgo, discardWorkout, finishWorkout, fmtSet, getActiveWorkout, lastTimeFor, loadHistory, logSet, repRange,
+  daysAgo, liftScore, loadFriendsBest, type FriendBest, discardWorkout, finishWorkout, fmtSet, getActiveWorkout, lastTimeFor, loadHistory, logSet, repRange,
   saveActiveWorkout, suggestNext, unlogSet, type ActiveWorkout, type SessionData,
 } from '@/lib/training';
 import { getExercise } from '@/three/catalog';
-import { brand, fonts, night, space } from '@/theme';
+import { brand, fonts, night, pulse, space } from '@/theme';
 
 interface Draft { weight: string; reps: string }
 
@@ -35,11 +36,14 @@ export default function WorkoutLog() {
   const [rest, setRest] = useState<{ until: number; total: number } | null>(null);
   const [picker, setPicker] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [friends, setFriends] = useState<Record<string, FriendBest[]>>({});
 
   useFocusEffect(useCallback(() => {
     getActiveWorkout().then((a) => { if (!a) router.back(); else setW(a); });
     loadHistory(80).then(setHistory);
   }, []));
+  const exKey = w?.exercises.map((e) => e.exercise_id).join(',') ?? '';
+  useEffect(() => { if (exKey) loadFriendsBest(exKey.split(',')).then(setFriends).catch(() => {}); }, [exKey]);
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
   useEffect(() => { if (rest && now >= rest.until) setRest(null); }, [now, rest]);
 
@@ -169,6 +173,11 @@ export default function WorkoutLog() {
                     </Pill>
                   ) : null}
 
+                  {friends[e.exercise_id] ? (
+                    <FriendsBest compact rows={friends[e.exercise_id]}
+                      mine={w.done.filter((x) => x.exercise_id === e.exercise_id).reduce<{ weight_kg: number; reps: number } | null>((b, x) => (!b || liftScore(x.weight_kg, x.reps) > liftScore(b.weight_kg, b.reps) ? x : b), null)} />
+                  ) : null}
+
                   {/* المجموعات */}
                   <View style={styles.setHead}>
                     <NT size={10} faint style={{ width: 26 }}>#</NT>
@@ -185,7 +194,10 @@ export default function WorkoutLog() {
                     return (
                       <View key={i} style={[styles.setRow, done && styles.setDone]}>
                         <Num size={15} color={done ? brand.amber : night.muted} style={{ width: 26 }}>{i}</Num>
-                        <NT size={12} faint style={{ flex: 1 }}>{prev ? fmtSet(prev) : '—'}</NT>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <NT size={12} faint>{prev ? fmtSet(prev) : '—'}</NT>
+                          {done && prev ? <SetDelta now={w.done.find((s) => s.exercise_id === e.exercise_id && s.set_index === i)!} prev={prev} /> : null}
+                        </View>
                         <TextInput value={d.weight} onChangeText={(v) => set({ weight: v })} keyboardType="decimal-pad" editable={!done}
                           placeholder="0" placeholderTextColor={night.faint} style={[styles.input, { fontFamily: fonts.display }]} selectTextOnFocus />
                         <TextInput value={d.reps} onChangeText={(v) => set({ reps: v })} keyboardType="number-pad" editable={!done}
@@ -196,6 +208,21 @@ export default function WorkoutLog() {
                       </View>
                     );
                   })}
+                  {inf?.last && w.done.some((x) => x.exercise_id === e.exercise_id) ? (() => {
+                    const vNow = w.done.filter((x) => x.exercise_id === e.exercise_id).reduce((a, x) => a + x.weight_kg * x.reps, 0);
+                    const vPrev = inf.last.sets.reduce((a, x) => a + x.weight_kg * x.reps, 0);
+                    if (!vPrev) return null;
+                    const pct = vNow / vPrev;
+                    return (
+                      <View style={{ gap: 4, marginTop: 4 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <NT size={11} faint>{t('workout.volVsLast')}</NT>
+                          <NT size={11} semibold color={pct >= 1 ? pulse.green : night.muted}>{`\u2066${Math.round(vNow).toLocaleString('en-US')} / ${Math.round(vPrev).toLocaleString('en-US')} kg\u2069`}{pct >= 1 ? ' ✓' : ''}</NT>
+                        </View>
+                        <View style={styles.progress}><View style={[styles.progressFill, { width: `${Math.min(100, pct * 100)}%`, backgroundColor: pct >= 1 ? pulse.green : brand.amber }]} /></View>
+                      </View>
+                    );
+                  })() : null}
                   <Pressable onPress={() => setExtra((x) => ({ ...x, [e.exercise_id]: (x[e.exercise_id] ?? 0) + 1 }))} style={styles.addSet}>
                     <Ionicons name="add" size={16} color={brand.amber} /><NT size={12} semibold color={brand.amber}>{t('workout.addSet')}</NT>
                   </Pressable>
@@ -225,6 +252,20 @@ export default function WorkoutLog() {
       <Modal visible={picker} animationType="slide" transparent onRequestClose={() => setPicker(false)}>
         <ExercisePicker onPick={addExercise} onClose={() => setPicker(false)} />
       </Modal>
+    </View>
+  );
+}
+
+/** سهم مقارنة المجموعة مع نفس المجموعة آخر مرة */
+function SetDelta({ now, prev }: { now: { weight_kg: number; reps: number }; prev: { weight_kg: number; reps: number } }) {
+  const d = liftScore(now.weight_kg, now.reps) - liftScore(prev.weight_kg, prev.reps);
+  if (Math.abs(d) < 1e-6) return <NT size={11} faint>=</NT>;
+  const up = d > 0;
+  const txt = now.weight_kg !== prev.weight_kg ? `${up ? '+' : ''}${+(now.weight_kg - prev.weight_kg).toFixed(1)}kg` : `${up ? '+' : ''}${now.reps - prev.reps}`;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: up ? 'rgba(76,175,125,0.16)' : 'rgba(241,85,29,0.16)', borderRadius: 6, paddingHorizontal: 4 }}>
+      <Ionicons name={up ? 'caret-up' : 'caret-down'} size={10} color={up ? pulse.green : brand.orange} />
+      <NT size={10} semibold color={up ? pulse.green : brand.orange}>{`\u2066${txt}\u2069`}</NT>
     </View>
   );
 }

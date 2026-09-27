@@ -40,8 +40,9 @@ grant usage on schema public, auth, storage to authenticated;
   await db.exec(fs.readFileSync(`${ROOT}/seed.sql`, 'utf8'));
   await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                  revoke update on public.profiles from authenticated;
-                 grant update (username, full_name, avatar_url, bio, gym_id, locale, onboarded) on public.profiles to authenticated;
-                 revoke insert, update on public.program_adopts from authenticated;`);
+                 grant update (username, full_name, avatar_url, bio, gym_id, locale, onboarded, presence_visibility) on public.profiles to authenticated;
+                 revoke insert, update on public.program_adopts from authenticated;
+                 revoke insert, update, delete on public.app_admins from authenticated;`);
   console.log('ok   migration + seed applied');
 
   await q(`insert into auth.users (id, raw_user_meta_data) values
@@ -245,6 +246,96 @@ grant usage on schema public, auth, storage to authenticated;
   await as(B, `insert into tip_likes (tip_id, user_id) values ($1, $2)`, [tip.id, B]);
   await expectErr('cannot like as someone else', () => as(B, `insert into tip_likes (tip_id, user_id) values ($1, $2)`, [tip.id, A]), /row-level security/);
   check('can_publish reflects rank', (await as(A, `select can_publish('program') p`))[0].p === true && (await as(C, `select can_publish('tip') p`))[0].p === false);
+
+  // gym presence (Swarm-like) with privacy
+  await q(`update check_ins set checked_out_at = coalesce(checked_out_at, now()) - interval '2 days', checked_in_at = checked_in_at - interval '2 days'`);
+  const ciB2 = (await q(`insert into check_ins (user_id, gym_id, checked_in_at) values ($1, $2, now() - interval '20 minutes') returning id`, [B, gym.id]))[0];
+  const ciC2 = (await q(`insert into check_ins (user_id, gym_id, checked_in_at) values ($1, $2, now() - interval '5 minutes') returning id`, [C, gym.id]))[0];
+  const seen = async (uid) => (await as(uid, 'select username from gym_presence($1)', [gym.id])).map(r => r.username).sort().join(',');
+  const cSees = await seen(C);
+  check('stranger present at gym sees B and self', cSees === 'sara,user_33333333', cSees);
+  const aSees = await seen(A);
+  check('friend not at gym sees only friend', aSees === 'sara', aSees);
+  check('anonymous present count', (await as(A, 'select gym_present_count($1) n', [gym.id]))[0].n === 2);
+  await as(C, `insert into checkin_likes (check_in_id, user_id) values ($1, $2)`, [ciB2.id, C]);
+  const cm = (await as(C, `insert into checkin_comments (check_in_id, user_id, body) values ($1, $2, 'كفو 🔥') returning id`, [ciB2.id, C]))[0];
+  const row = (await as(B, 'select * from gym_presence($1) where is_me', [gym.id]))[0];
+  check('like + comment counted on my check-in', Number(row.likes) === 1 && Number(row.comments) === 1, JSON.stringify([row.likes, row.comments]));
+  await as(B, 'delete from checkin_comments where id = $1', [cm.id]);
+  check('owner can delete comments on own check-in', (await q('select count(*)::int n from checkin_comments'))[0].n === 0);
+  await as(B, `update profiles set presence_visibility = 'friends' where id = $1`, [B]);
+  check('friends-only hides from gym strangers', !(await seen(C)).includes('sara') && (await seen(A)) === 'sara');
+  await expectErr('stranger cannot react when hidden from them', () => as(C, `insert into checkin_comments (check_in_id, user_id, body) values ($1, $2, 'hi')`, [ciB2.id, C]), /row-level security/);
+  await as(B, `update profiles set presence_visibility = 'hidden' where id = $1`, [B]);
+  check('hidden mode hides even from friends', (await seen(A)) === '' && (await as(A, 'select gym_present_count($1) n', [gym.id]))[0].n === 2);
+  await expectErr('invalid visibility rejected', () => as(B, `update profiles set presence_visibility = 'world' where id = $1`, [B]), /check constraint/);
+  await as(B, `update profiles set presence_visibility = 'gym' where id = $1`, [B]);
+
+  // best lift among friends (A and B are friends, C is not)
+  const sB = (await as(B, `insert into workout_sessions (user_id, title) values ($1, 'ظهر') returning id`, [B]))[0];
+  await as(B, `insert into workout_sets (session_id, user_id, exercise_id, set_index, reps, weight_kg) values ($1, $2, 'row_bb', 1, 8, 80), ($1, $2, 'row_bb', 2, 12, 60)`, [sB.id, B]);
+  const sC = (await as(C, `insert into workout_sessions (user_id, title) values ($1, 'ظهر') returning id`, [C]))[0];
+  await as(C, `insert into workout_sets (session_id, user_id, exercise_id, set_index, reps, weight_kg) values ($1, $2, 'row_bb', 1, 10, 140)`, [sC.id, C]);
+  const fb = await as(A, `select * from friends_best(array['row_bb','curl_db'])`);
+  const rb = fb.filter(r => r.exercise_id === 'row_bb');
+  check('friends best: friend first, me included, stranger excluded', rb.length === 2 && rb[0].username === 'sara' && Number(rb[0].weight_kg) === 80 && rb[0].reps === 8 && rb[1].is_me && !rb.some(r => r.username.startsWith('user_3')), JSON.stringify(rb.map(r => [r.username, +r.weight_kg, r.reps, r.place])));
+  check('friends best: stranger sees only own', (await as(C, `select * from friends_best(array['row_bb'])`)).every(r => r.is_me));
+
+  // add-your-store brands
+  const br = (await as(A, `insert into brands (owner, name, status, website) values ($1, 'Desert Wear', 'approved', 'https://desert.example') returning id, status`, [A]))[0];
+  check('new brand forced to pending', br.status === 'pending');
+  await as(A, `insert into brand_products (brand_id, name, price_sar, url) values ($1, 'تيشيرت تدريب', 129, 'https://desert.example/tee'), ($1, 'مسودة', 10, null)`, [br.id]);
+  check('pending brand invisible to others', (await as(B, 'select * from brands')).length === 0 && (await as(B, 'select * from brand_products')).length === 0);
+  check('owner sees own pending brand + products', (await as(A, 'select * from brand_products')).length === 2);
+  await expectErr('owner cannot self-approve', () => as(A, `update brands set status = 'approved' where id = $1`, [br.id]), /status_locked/);
+  await expectErr('one brand per account', () => as(A, `insert into brands (owner, name) values ($1, 'Second')`, [A]), /duplicate key/);
+  await expectErr('website must be https', () => as(B, `insert into brands (owner, name, website) values ($1, 'Bad', 'javascript:alert(1)')`, [B]), /check constraint/);
+  await q(`update brands set status = 'approved' where id = $1`, [br.id]);  // admin
+  await as(A, `update brand_products set active = false where name = 'مسودة'`);
+  check('approved brand visible with active products only', (await as(B, 'select * from brands')).length === 1 && (await as(B, 'select name from brand_products')).map(r => r.name).join() === 'تيشيرت تدريب');
+  await expectErr('others cannot add products to my brand', () => as(B, `insert into brand_products (brand_id, name) values ($1, 'fake')`, [br.id]), /row-level security/);
+  check('owner can edit brand details', (await as(A, `update brands set tagline = 'ملابس رياضية من الرياض' where id = $1 returning id`, [br.id])).length === 1);
+
+  // direct messages: mutual follow only
+  await expectErr('no chat without mutual follow', () => as(A, `insert into messages (sender, recipient, body) values ($1, $2, 'هلا')`, [A, B]), /row-level security/);
+  await as(B, `insert into follows (follower, followee) values ($1, $2)`, [B, A]);
+  const msg = (await as(A, `insert into messages (sender, recipient, body) values ($1, $2, 'هلا سارة، نتمرن بكرة؟') returning id`, [A, B]))[0];
+  const ib = await as(B, 'select * from inbox()');
+  check('inbox shows conversation with unread', ib.length === 1 && ib[0].username === 'ahmed' && Number(ib[0].unread) === 1 && ib[0].can_message === true, JSON.stringify(ib.map(r => [r.username, Number(r.unread)])));
+  check('outsider cannot read messages', (await as(C, 'select * from messages')).length === 0);
+  await expectErr('cannot send as someone else', () => as(C, `insert into messages (sender, recipient, body) values ($1, $2, 'x')`, [A, B]), /row-level security/);
+  check('recipient marks read', (await as(B, 'update messages set read_at = now() where id = $1 returning id', [msg.id])).length === 1);
+  await expectErr('recipient cannot edit text', () => as(B, `update messages set body = 'تعديل' where id = $1`, [msg.id]), /read_only_message/);
+  check('sender cannot mark read', (await as(A, 'update messages set read_at = now() where id = $1 returning id', [msg.id])).length === 0);
+  check('mutual followers list', (await as(A, 'select username from mutual_followers()')).map(r => r.username).join() === 'sara');
+  await as(A, `delete from follows where follower = $1 and followee = $2`, [A, B]);
+  await expectErr('unfollow stops new messages', () => as(B, `insert into messages (sender, recipient, body) values ($1, $2, 'رد')`, [B, A]), /row-level security/);
+  const ib2 = await as(A, 'select * from inbox()');
+  check('old chat kept but locked', ib2.length === 1 && ib2[0].can_message === false);
+  await as(A, `insert into follows (follower, followee) values ($1, $2)`, [A, B]);
+
+  // owner panel: reports + brand review + coach verification (B is the owner)
+  await expectErr('nobody can make themselves owner', () => as(C, `insert into app_admins (user_id) values ($1)`, [C]), /permission denied|row-level security/);
+  await q(`insert into app_admins (user_id) values ($1)`, [B]);
+  check('is_admin only for owner', (await as(B, 'select is_admin() a'))[0].a === true && (await as(A, 'select is_admin() a'))[0].a === false);
+  const rep2 = (await as(C, `insert into beta_feedback (user_id, category, message, screenshot_path) values ($1, 'bug', 'زر الحفظ ما يشتغل في تعديل الملف', $2) returning id`, [C, `${C}/shot.jpg`]))[0];
+  await expectErr('cannot attach someone else screenshot path', () => as(C, `insert into beta_feedback (user_id, message, screenshot_path) values ($1, 'hello there', $2)`, [C, `${A}/x.jpg`]), /row-level security/);
+  await expectErr('reporter cannot pre-fill owner note', () => as(C, `insert into beta_feedback (user_id, message, admin_note) values ($1, 'hello there', 'x')`, [C]), /row-level security/);
+  check('owner sees all reports', (await as(B, 'select * from beta_feedback')).length >= 2);
+  check('non-owner sees only own reports', (await as(A, 'select * from beta_feedback')).every(r => r.user_id === A));
+  check('owner triages report', (await as(B, `update beta_feedback set status = 'fixed', admin_note = 'اتصلح في 1.0.1' where id = $1 returning status`, [rep2.id]))[0].status === 'fixed');
+  await expectErr('owner cannot rewrite report text', () => as(B, `update beta_feedback set message = 'changed text' where id = $1`, [rep2.id]), /report_locked/);
+  check('reporter cannot change status', (await as(C, `update beta_feedback set status = 'wontfix' where id = $1 returning id`, [rep2.id])).length === 0);
+  const pbr = (await as(C, `insert into brands (owner, name, instagram) values ($1, 'Najd Fit', 'najdfit') returning id`, [C]))[0];
+  check('owner sees pending brand requests', (await as(B, `select * from brands where status = 'pending'`)).length === 1);
+  check('owner approves brand', (await as(B, `update brands set status = 'approved' where id = $1 returning status`, [pbr.id]))[0].status === 'approved');
+  await expectErr('brand owner still cannot change status', () => as(C, `update brands set status = 'pending' where id = $1`, [pbr.id]), /status_locked/);
+  await as(B, 'select set_coach($1, true)', [A]);
+  check('owner verifies coach', (await q('select is_coach from profiles where id = $1', [A]))[0].is_coach === true);
+  await expectErr('non-owner cannot verify coaches', () => as(A, 'select set_coach($1, true)', [C]), /forbidden/);
+  const oc = (await as(B, 'select * from owner_counts()'))[0];
+  check('owner counts', Number(oc.new_reports) >= 0 && Number(oc.pending_brands) === 0);
+  check('owner counts hidden from others', (await as(A, 'select * from owner_counts()')).length === 0);
 
   // nearby
   const nb = await as(A, 'select * from nearby_gyms(24.69, 46.685, 5)');

@@ -108,7 +108,7 @@ export const TAB_BAR_SPACE = 116;
 // ---------------------------------------------------------------------------
 // ثيمات لون التطبيق — كلها من درجات ألوان دليل الهوية (Brand Colors + Gradient Variation)
 // ---------------------------------------------------------------------------
-export type ThemeId = 'palm' | 'oasis' | 'dune' | 'sand';
+export type ThemeId = 'palm' | 'oasis' | 'dune' | 'sand' | 'lavender';
 type Overrides = { brand?: Partial<typeof brand>; night?: Partial<typeof night>; colors?: Partial<typeof colors>; pulse?: Partial<typeof pulse> };
 export const THEMES: Record<ThemeId, { name: { ar: string; en: string }; swatch: [string, string, string] } & Overrides> = {
   palm: { name: { ar: 'النخيل', en: 'Palm' }, swatch: ['#0A332D', '#F1551D', '#FEA94F'] },
@@ -132,6 +132,14 @@ export const THEMES: Record<ThemeId, { name: { ar: string; en: string }; swatch:
       text: '#0A332D', muted: 'rgba(10,51,45,0.68)', faint: 'rgba(10,51,45,0.42)', accent: '#D2480F',
     },
     pulse: { sleep: '#2F4B3C', yellow: '#D9822B', steps: '#D9822B' },
+  },
+  // الخزامى: بنفسجي هادئ — الأساسي بنفسجي عميق، والتفاعلي خزامى
+  lavender: {
+    name: { ar: 'الخزامى', en: 'Lavender' }, swatch: ['#2E2248', '#7B5BC4', '#C9B6EE'],
+    brand: { deepGreen: '#2E2248', green: '#4A3A6E', orange: '#7B5BC4', amber: '#C9B6EE', sand: '#E9E1F5', cream: '#F7F3FC' },
+    night: { bg: '#140E22', bg2: '#2E2248', accent: '#C9B6EE' },
+    colors: { muted: '#6B6180', border: '#E0D6F0' },
+    pulse: { sleep: '#A993E0' },
   },
 };
 

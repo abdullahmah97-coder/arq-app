@@ -10,6 +10,8 @@ import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { errorKey, supabase } from '@/lib/supabase';
 import { deleteMyAccount } from '@/lib/account';
+import { unreadCount } from '@/lib/messages';
+import { ownerCounts } from '@/lib/owner';
 import { colors, space, THEMES, type ThemeId } from '@/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/lib/appTheme';
@@ -32,11 +34,15 @@ export default function ProfileTab() {
   const { t } = useTranslation();
   const { userId, profile, health, refreshProfile } = useUser();
   const [reloadKey, setReloadKey] = useState(0);
-  useFocusEffect(useCallback(() => { refreshProfile(); setReloadKey((k) => k + 1); }, [refreshProfile]));
+  const [owner, setOwner] = useState<{ reports: number; brands: number } | null>(null);
+  useFocusEffect(useCallback(() => {
+    refreshProfile(); setReloadKey((k) => k + 1);
+    ownerCounts().then(setOwner).catch(() => {});
+  }, [refreshProfile]));
 
   return (
     <Screen>
-      <ProfileView p={profile} me={userId} reloadKey={reloadKey} />
+      <ProfileView p={profile} me={userId} reloadKey={reloadKey} onProfileChanged={refreshProfile} actions={<MessagesButton userId={userId} />} />
 
       {health?.weight_kg ? (
         <Card style={{ gap: space.xs }}>
@@ -49,6 +55,7 @@ export default function ProfileTab() {
       ) : null}
 
       <Card style={{ paddingVertical: space.xs }}>
+        {owner ? <MenuItem icon="shield-checkmark-outline" label={`${t('owner.title')}${owner.reports + owner.brands ? ` · ${owner.reports + owner.brands}` : ''}`} onPress={() => router.push('/owner')} /> : null}
         {isBeta ? <MenuItem icon="chatbubble-ellipses-outline" label={t('beta.feedback')} onPress={() => router.push('/feedback')} /> : null}
         <MenuItem icon="ribbon-outline" label={t('social.ranksTitle')} onPress={() => router.push('/ranks')} />
         <MenuItem icon="barbell-outline" label={t('workout.history')} onPress={() => router.push('/workout/history')} />
@@ -119,5 +126,24 @@ function ThemePicker() {
         );
       })}
     </View>
+  );
+}
+
+/** زر الرسائل في حسابي مع عدد غير المقروء */
+function MessagesButton({ userId }: { userId: string }) {
+  const { t } = useTranslation();
+  const [n, setN] = useState(0);
+  useFocusEffect(useCallback(() => { unreadCount(userId).then(setN).catch(() => {}); }, [userId]));
+  return (
+    <Pressable onPress={() => router.push('/messages')} accessibilityRole="button" accessibilityLabel={t('chat.title')}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: space.md, opacity: pressed ? 0.8 : 1 })}>
+      <Ionicons name="chatbubbles" size={22} color={colors.primary} />
+      <View style={{ flex: 1 }}>
+        <T semibold>{t('chat.title')}</T>
+        <T size="xs" muted>{t('chat.rule')}</T>
+      </View>
+      {n > 0 ? <View style={{ minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}><T size="xs" bold color={colors.onPrimary}>{n}</T></View> : null}
+      <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.muted} />
+    </Pressable>
   );
 }

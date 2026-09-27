@@ -28,7 +28,7 @@ if (Platform.OS !== 'web') {
 }
 
 /** رابط عام لملف في حاوية عامة (avatars / posts) */
-export function publicUrl(bucket: 'avatars' | 'posts', path: string | null | undefined): string | undefined {
+export function publicUrl(bucket: 'avatars' | 'posts' | 'brands', path: string | null | undefined): string | undefined {
   if (!path) return undefined;
   if (path.startsWith('http')) return path;
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
@@ -42,7 +42,7 @@ export async function signedBodyUrl(path: string): Promise<string | undefined> {
 
 /** رفع صورة من uri محلي — يرجع المسار داخل الحاوية */
 export async function uploadImage(
-  bucket: 'avatars' | 'posts' | 'body' | 'inbody',
+  bucket: 'avatars' | 'posts' | 'body' | 'inbody' | 'brands',
   userId: string,
   uri: string,
   mimeType = 'image/jpeg',

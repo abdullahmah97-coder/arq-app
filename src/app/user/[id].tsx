@@ -1,5 +1,5 @@
 // حساب مستخدم آخر: متابعة، صداقة، ورتبته وبرامجه ونصائحه
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
@@ -9,6 +9,8 @@ import { Button, Loading, Row, Screen } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { acceptRequest, relationTo, removeFriendship, sendRequest, type Relation } from '@/lib/friends';
 import { useLocalized } from '@/lib/i18n';
+import { canMessage } from '@/lib/messages';
+import { isAdmin, setCoach } from '@/lib/owner';
 import { follow, isFollowing, unfollow, type PublicProfile } from '@/lib/social';
 import { errorKey, supabase } from '@/lib/supabase';
 import type { Gym } from '@/lib/types';
@@ -23,6 +25,9 @@ export default function UserProfile() {
   const [gym, setGym] = useState<Gym | null>(null);
   const [rel, setRel] = useState<{ relation: Relation; id?: string }>({ relation: 'none' });
   const [following, setFollowing] = useState(false);
+  const [mutual, setMutual] = useState(false);
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => { isAdmin().then(setAdmin).catch(() => {}); }, []);
   const [busy, setBusy] = useState<'follow' | 'friend' | null>(null);
 
   const load = useCallback(async () => {
@@ -32,8 +37,8 @@ export default function UserProfile() {
       const { data: g } = await supabase.from('gyms').select('*').eq('id', data.gym_id).single();
       setGym(g as Gym);
     }
-    const [r, f] = await Promise.all([relationTo(userId, id), isFollowing(userId, id)]);
-    setRel(r); setFollowing(f);
+    const [r, f, m] = await Promise.all([relationTo(userId, id), isFollowing(userId, id), canMessage(userId, id)]);
+    setRel(r); setFollowing(f); setMutual(m);
   }, [id, userId]);
 
   useEffect(() => { load(); }, [load]);
@@ -48,7 +53,7 @@ export default function UserProfile() {
     setP({ ...p, followers_count: p.followers_count + (following ? -1 : 1) });
     const { error } = following ? await unfollow(userId, p.id) : await follow(userId, p.id);
     setBusy(null);
-    if (error) { Alert.alert(t(errorKey(error))); load(); }
+    if (error) { Alert.alert(t(errorKey(error))); load(); } else canMessage(userId, p.id).then(setMutual);
   };
 
   const run = async (fn: () => PromiseLike<{ error: any }>) => {
@@ -76,6 +81,7 @@ export default function UserProfile() {
     <Screen edges={['bottom']}>
       <Stack.Screen options={{ title: `@${p.username}` }} />
       <ProfileView p={p} me={userId} gymLabel={gym ? gymName(gym, lng) : null} actions={self ? null : (
+        <View style={{ gap: space.sm }}>
         <Row gap={space.md}>
           <View style={{ flex: 1 }}>
             <Button title={following ? t('social.followingBtn') : t('social.follow')} icon={following ? 'checkmark' : 'add'}
@@ -83,6 +89,15 @@ export default function UserProfile() {
           </View>
           <View style={{ flex: 1 }}>{friendBtn}</View>
         </Row>
+        <Button variant={mutual ? 'secondary' : 'ghost'} icon={mutual ? 'chatbubble-ellipses-outline' : 'lock-closed-outline'}
+          title={mutual ? t('chat.message') : t('chat.lockedShort')}
+          onPress={() => (mutual ? router.push({ pathname: '/chat/[id]', params: { id: p.id } }) : Alert.alert(t('chat.lockedTitle'), t('chat.locked', { name: p.full_name || p.username })))} />
+        {admin ? (
+          <Button variant="ghost" small icon={p.is_coach ? 'close-circle-outline' : 'shield-checkmark-outline'}
+            title={p.is_coach ? t('owner.unverifyCoach') : t('owner.verifyCoach')}
+            onPress={async () => { try { await setCoach(p.id, !p.is_coach); load(); } catch (e) { Alert.alert(t(errorKey(e))); } }} />
+        ) : null}
+        </View>
       )} />
     </Screen>
   );

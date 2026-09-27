@@ -91,6 +91,7 @@ export default function Community() {
       <Row style={{ justifyContent: 'space-between', paddingHorizontal: space.lg, paddingVertical: space.sm }}>
         <H>{t('feed.title')}</H>
         <Row gap={space.md}>
+          <IconButton icon="chatbubbles-outline" onPress={() => router.push('/messages')} />
           <IconButton icon="person-add-outline" onPress={() => router.push('/friends')} />
           <ProfileButton />
         </Row>

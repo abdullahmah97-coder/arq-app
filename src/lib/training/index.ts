@@ -5,6 +5,7 @@ import { supabase } from '../supabase';
 import type { SessionData, SetEntry } from './stats';
 
 export * from './stats';
+export * from './analytics';
 
 export interface PlannedExercise { exercise_id: string; sets: number; reps: string; rest_sec: number; rir?: string }
 
@@ -108,4 +109,16 @@ export const fmtSet = (s: Pick<SetEntry, 'weight_kg' | 'reps'>) => `\u2066${s.we
 
 export function daysAgo(iso: string, now = Date.now()) {
   return Math.max(0, Math.round((now - Date.parse(iso)) / 86400000));
+}
+
+// ---------- أفضل رقم بين الأصدقاء ----------
+export interface FriendBest { exercise_id: string; user_id: string; username: string; full_name: string | null; avatar_url: string | null; weight_kg: number; reps: number; done_at: string; is_me: boolean; place: number }
+
+/** لكل تمرين: أعلى ٣ بين أصدقائي (وأنا منهم) + رقمي لو ما كنت ضمنهم */
+export async function loadFriendsBest(exercises: string[]): Promise<Record<string, FriendBest[]>> {
+  if (!exercises.length) return {};
+  const { data } = await supabase.rpc('friends_best', { p_exercises: exercises.slice(0, 30) });
+  const out: Record<string, FriendBest[]> = {};
+  for (const r of (data ?? []) as any[]) (out[r.exercise_id] ??= []).push({ ...r, weight_kg: Number(r.weight_kg) });
+  return out;
 }

@@ -3,6 +3,7 @@ import { applyProgram, PROGRAMS } from '../src/content/programs';
 import { generateRulesPlan } from '../src/lib/plan/rules';
 import { isWeeklyPlan } from '../src/lib/plan/validate';
 import { getExercise } from '../src/three/catalog';
+import { liftProgress, muscleSets, pctDelta, weeklySeries, weekStart } from '../src/lib/training/analytics';
 import { compareSession, e1rm, findLastSimilar, similarity, suggestNext, summarize, type SessionData } from '../src/lib/training/stats';
 
 let fail = 0;
@@ -51,6 +52,32 @@ for (const pr of PROGRAMS) {
 }
 const total = PROGRAMS[0].days.reduce((a, d) => a + d.exercises.length, 0);
 ok(total === 25, `program has 25 exercise slots (${total})`);
+
+// --- تحليلات السجل ---
+{
+  const NOW = Date.parse('2026-09-27T12:00:00Z');
+  const at = (daysAgo: number, id: string, sets: [string, number, number][]): SessionData => {
+    const st = new Date(NOW - daysAgo * 86400000);
+    return { id, started_at: st.toISOString(), finished_at: new Date(st.getTime() + 3600000).toISOString(), sets: sets.map(([exercise_id, weight_kg, reps], i) => ({ exercise_id, weight_kg, reps, set_index: i + 1 })) };
+  };
+  const H = [
+    at(0, 'a', [['row_bb', 70, 8], ['row_bb', 70, 8], ['bench_bb', 80, 6]]),
+    at(3, 'b', [['back_squat', 100, 5]]),
+    at(8, 'c', [['row_bb', 65, 8], ['bench_bb', 75, 6]]),
+    at(40, 'd', [['row_bb', 60, 8], ['bench_bb', 70, 6], ['dips', 0, 12]]),
+  ];
+  const w = weeklySeries(H, 8, NOW);
+  ok(w.length === 8 && w[7].start === weekStart(NOW), 'weekly series ends at current week');
+  ok(w.reduce((a, x) => a + x.sessions, 0) === 4 && w[7].sessions + w[6].sessions >= 2, `sessions bucketed (${w.map((x) => x.sessions).join(',')})`);
+  ok(w[7].volume + w[6].volume + w[5].volume >= 70 * 16, 'weekly volume summed');
+  const m = muscleSets(H, 28, NOW);
+  ok(m.back.now === 3 && m.back.prev === 1 && m.chest.now === 2 && m.legs.now === 1, `muscle sets now vs prev (${JSON.stringify(m.back)})`);
+  const lp = liftProgress(H, 6, NOW);
+  const row = lp.find((x) => x.exercise_id === 'row_bb')!;
+  ok(row.sessions === 3 && row.series.length === 3 && row.prevBest! < row.best && row.delta! > 0, `lift progress row (${row.delta}%)`);
+  ok(lp[0].sessions >= lp[lp.length - 1].sessions, 'lifts sorted by frequency');
+  ok(pctDelta(110, 100) === 10 && pctDelta(5, 0) === null, 'pct delta');
+}
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL TRAINING TESTS PASSED');
 if (fail) process.exit(1);
