@@ -25,13 +25,25 @@ export function Stars({ value, size = 13, color = STAR, empty }: { value: number
   );
 }
 
+/** أحرف بديلة للشعار: PureGym → PG، Fitness Time → FT، Gold's Gym Arabia → GG */
+export function initials(name: string) {
+  const skip = new Set(['KSA', 'SAUDI', 'ARABIA', 'SPORT', 'CENTER', 'CLUB']);
+  const words = name.replace(/['’`]/g, '').replace(/[^A-Za-z0-9\u0600-\u06FF\s_]/g, ' ').split(/[\s_]+/).filter((w) => w && !skip.has(w.toUpperCase()));
+  if (!words.length) return name.slice(0, 1);
+  if (words.length === 1) {
+    const caps = words[0].match(/[A-Z]/g);
+    return (caps && caps.length >= 2 ? caps.slice(0, 2).join('') : words[0].slice(0, 2)).toUpperCase();
+  }
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
 export function ClubLogo({ c, size = 44 }: { c: { name: string; name_en?: string | null; chain?: string | null; logo_path?: string | null; chain_logo?: string | null }; size?: number }) {
   const uri = publicUrl('brands', c.logo_path || c.chain_logo);
-  const label = (c.chain || c.name_en || c.name).replace(/[^A-Za-z0-9\u0600-\u06FF\s]/g, ' ').trim() || c.name;
+  const label = initials(c.chain || c.name_en || c.name);
   return (
     <View style={{ width: size, height: size, borderRadius: size * 0.28, backgroundColor: brand.deepGreen, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(254,169,79,0.35)' }}>
       {uri ? <Image source={{ uri }} style={{ width: size, height: size }} contentFit="cover" />
-        : <Text style={{ color: brand.amber, fontFamily: fonts.title, fontSize: size * 0.34 }}>{label.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}</Text>}
+        : <Text style={{ color: brand.amber, fontFamily: fonts.title, fontSize: size * (label.length > 1 ? 0.34 : 0.42) }}>{label}</Text>}
     </View>
   );
 }

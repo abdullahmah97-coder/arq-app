@@ -963,6 +963,7 @@
     "allBranches": "All branches",
     "oneBranch": "One branch",
     "sourceUrl": "Source link (optional)",
-    "sourceHint": "Offer page or ad — shown to users with the date added"
+    "sourceHint": "Offer page or ad — shown to users with the date added",
+    "reviewsTab": "Reviews"
   }
 }

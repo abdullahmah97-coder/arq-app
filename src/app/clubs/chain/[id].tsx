@@ -71,7 +71,7 @@ export default function ChainPage() {
       <Segmented<Tab> value={tab} onChange={setTab} options={[
         { value: 'offers', label: `${t('clubs.tabOffers')} (${offers.length})` },
         { value: 'branches', label: `${t('clubs.branches')} (${branches.length})` },
-        { value: 'reviews', label: `${t('clubs.reviews')} (${reviews.length})` },
+        { value: 'reviews', label: `${t('clubs.reviewsTab')} (${reviews.length})` },
       ]} />
 
       {tab === 'offers' ? (
