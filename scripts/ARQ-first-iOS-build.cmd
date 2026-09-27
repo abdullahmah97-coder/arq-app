@@ -7,7 +7,9 @@ rem  builds in the Expo cloud and sends it to TestFlight.
 rem ============================================================
 setlocal EnableExtensions
 title ARQ - first iPhone build
-set "PATH=%ProgramFiles%\nodejs;%ProgramFiles%\Git\cmd;%APPDATA%\npm;%PATH%"
+rem Node.js and Git go into your user folder (no admin prompt needed)
+set "TOOLS=%LOCALAPPDATA%\ARQ\tools"
+set "PATH=%TOOLS%\node;%TOOLS%\git\cmd;%ProgramFiles%\nodejs;%ProgramFiles%\Git\cmd;%APPDATA%\npm;%PATH%"
 
 echo.
 echo  ARQ - first iPhone build
@@ -16,20 +18,22 @@ echo  Keep this window open. It takes about 30 minutes in total.
 echo.
 
 where node >nul 2>nul
-if errorlevel 1 (
-  echo [1/6] Installing Node.js...
-  winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
-)
+if not errorlevel 1 goto :havenode
+echo [1/6] Downloading Node.js - no admin prompt needed...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $t=$env:LOCALAPPDATA+'\ARQ\tools'; New-Item -ItemType Directory -Force $t | Out-Null; $v=(Invoke-RestMethod 'https://nodejs.org/dist/index.json' | Where-Object { $_.lts } | Select-Object -First 1).version; $z=$env:TEMP+'\arq-node.zip'; Invoke-WebRequest ('https://nodejs.org/dist/'+$v+'/node-'+$v+'-win-x64.zip') -OutFile $z -UseBasicParsing; $x=$env:TEMP+'\arq-node'; Remove-Item $x -Recurse -Force -ErrorAction SilentlyContinue; Expand-Archive $z $x -Force; Remove-Item ($t+'\node') -Recurse -Force -ErrorAction SilentlyContinue; Move-Item ($x+'\node-'+$v+'-win-x64') ($t+'\node')"
+if errorlevel 1 goto :fail
+:havenode
 where git >nul 2>nul
-if errorlevel 1 (
-  echo [1/6] Installing Git...
-  winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements
-)
-set "PATH=%ProgramFiles%\nodejs;%ProgramFiles%\Git\cmd;%APPDATA%\npm;%PATH%"
+if not errorlevel 1 goto :havegit
+echo [1/6] Downloading Git - no admin prompt needed...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $t=$env:LOCALAPPDATA+'\ARQ\tools'; New-Item -ItemType Directory -Force $t | Out-Null; $r=Invoke-RestMethod 'https://api.github.com/repos/git-for-windows/git/releases/latest' -Headers @{'User-Agent'='arq-setup'}; $a=$r.assets | Where-Object { $_.name -match '^MinGit-[0-9.]+-64-bit[.]zip$' } | Select-Object -First 1; $z=$env:TEMP+'\arq-git.zip'; Invoke-WebRequest $a.browser_download_url -OutFile $z -UseBasicParsing; Remove-Item ($t+'\git') -Recurse -Force -ErrorAction SilentlyContinue; Expand-Archive $z ($t+'\git') -Force"
+if errorlevel 1 goto :fail
+:havegit
 where node >nul 2>nul
-if errorlevel 1 goto :restart
+if errorlevel 1 goto :fail
 where git >nul 2>nul
-if errorlevel 1 goto :restart
+if errorlevel 1 goto :fail
+echo      Node.js and Git are ready.
 
 set "APPDIR=%USERPROFILE%\arq-app"
 if exist "%APPDIR%\.git" (
