@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "ARQ أرك",
-    "slug": "arq",
+    "slug": "arq-app",
+    "owner": "abdullahalhudaifs-team",
     "scheme": "arq",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +10,10 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#F8EDDA",
     "extra": {
-      "supportsRTL": true
+      "supportsRTL": true,
+      "eas": {
+        "projectId": "8e7b57a5-f97e-431c-bbad-113c0f9033d3"
+      }
     },
     "ios": {
       "supportsTablet": false,

@@ -55,16 +55,23 @@ call npx -y eas-cli@latest init
 if errorlevel 1 goto :fail
 
 echo.
-echo [5/6] Supabase keys - open supabase.com, your project, Project Settings, API.
+echo [5/6] Supabase keys...
+findstr /C:"EXPO_PUBLIC_SUPABASE_URL" eas.json >nul 2>nul
+if not errorlevel 1 (
+  echo      Already saved in the app - skipping.
+  goto :build
+)
+echo      Open supabase.com, your project, Project Settings, API.
 set "SB_URL="
 set "SB_KEY="
-set /p SB_URL=     Paste the Project URL and press Enter:
-set /p SB_KEY=     Paste the anon public key and press Enter:
+set /p SB_URL=     Paste the Project URL and press Enter: 
+set /p SB_KEY=     Paste the anon public key and press Enter: 
 if "%SB_URL%"=="" goto :fail
 if "%SB_KEY%"=="" goto :fail
 node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('eas.json','utf8'));for(const p of Object.keys(j.build)){if(p==='base')continue;j.build[p].env=Object.assign({},j.build[p].env,{EXPO_PUBLIC_SUPABASE_URL:process.env.SB_URL.trim(),EXPO_PUBLIC_SUPABASE_ANON_KEY:process.env.SB_KEY.trim()});}fs.writeFileSync('eas.json',JSON.stringify(j,null,2)+'\n')"
 if errorlevel 1 goto :fail
 
+:build
 echo.
 echo [6/6] Building for iPhone and sending to TestFlight.
 echo      - When asked to log in to your Apple account, answer Y.

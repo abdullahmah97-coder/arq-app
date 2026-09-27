@@ -19,7 +19,9 @@
       "channel": "development",
       "environment": "development",
       "env": {
-        "APP_VARIANT": "development"
+        "APP_VARIANT": "development",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://hfplqbnbuskiaeblxpfo.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcGxxYm5idXNraWFlYmx4cGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1MDQxOTUsImV4cCI6MjEwNjA4MDE5NX0.ptXrGAqJz-ii3AU0HEnrx5bTnQNLLS2wm5tH3p10drI"
       }
     },
     "preview": {
@@ -28,7 +30,9 @@
       "channel": "preview",
       "environment": "preview",
       "env": {
-        "APP_VARIANT": "preview"
+        "APP_VARIANT": "preview",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://hfplqbnbuskiaeblxpfo.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcGxxYm5idXNraWFlYmx4cGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1MDQxOTUsImV4cCI6MjEwNjA4MDE5NX0.ptXrGAqJz-ii3AU0HEnrx5bTnQNLLS2wm5tH3p10drI"
       },
       "android": {
         "buildType": "apk"
@@ -41,7 +45,9 @@
       "channel": "beta",
       "environment": "preview",
       "env": {
-        "APP_VARIANT": "beta"
+        "APP_VARIANT": "beta",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://hfplqbnbuskiaeblxpfo.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcGxxYm5idXNraWFlYmx4cGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1MDQxOTUsImV4cCI6MjEwNjA4MDE5NX0.ptXrGAqJz-ii3AU0HEnrx5bTnQNLLS2wm5tH3p10drI"
       }
     },
     "production": {
@@ -51,7 +57,9 @@
       "channel": "production",
       "environment": "production",
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://hfplqbnbuskiaeblxpfo.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcGxxYm5idXNraWFlYmx4cGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1MDQxOTUsImV4cCI6MjEwNjA4MDE5NX0.ptXrGAqJz-ii3AU0HEnrx5bTnQNLLS2wm5tH3p10drI"
       }
     }
   },
