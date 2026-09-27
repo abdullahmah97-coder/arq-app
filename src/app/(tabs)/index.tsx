@@ -10,12 +10,13 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, V
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Logo, SaduPattern } from '@/brand/Brand';
 import { CheckInCard } from '@/components/CheckInCard';
+import { HomeClubOffers } from '@/components/clubs/HomeClubOffers';
 import { ChevronBar, MiniBars, Rings } from '@/components/pulse/Rings';
 import { MetricChip, NCard, NSection, NT, Num, OnDark, Pill, zoneColor } from '@/components/pulse/widgets';
 import { Avatar } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { startOfWeek, todayIndex } from '@/lib/dates';
-import { adaptWorkout, fmtDuration, useHealth } from '@/lib/health';
+import { adaptWorkout, useHealth } from '@/lib/health';
 import { useLocalized } from '@/lib/i18n';
 import { isBeta } from '@/lib/appInfo';
 import { getActiveWorkout, type ActiveWorkout } from '@/lib/training';
@@ -232,6 +233,9 @@ export default function Home() {
           </View>
 
           <CheckInCard onChange={loadRank} />
+
+          {/* عروض النوادي: الأسعار والعروض والتقييمات */}
+          <HomeClubOffers />
 
           {/* متجر الشركاء: أضف متجرك + استبدال النقاط (قريباً) */}
           <Pressable style={styles.store} onPress={() => router.push('/store')} accessibilityRole="button" accessibilityLabel={t('store.title')}>

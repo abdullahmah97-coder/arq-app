@@ -337,6 +337,30 @@ grant usage on schema public, auth, storage to authenticated;
   check('owner counts', Number(oc.new_reports) >= 0 && Number(oc.pending_brands) === 0);
   check('owner counts hidden from others', (await as(A, 'select * from owner_counts()')).length === 0);
 
+  // gym offers, ratings and reviews (B is owner/admin from the owner-panel block)
+  const g2 = (await q(`select id from gyms where name_en like '%Narjis'`))[0];
+  await expectErr('regular user cannot post gym offers', () => as(A, `insert into gym_offers (gym_id, title, price_sar, months) values ($1, 'عرض وهمي', 99, 1)`, [gym.id]), /row-level security/);
+  const off = (await as(B, `insert into gym_offers (gym_id, title, price_sar, old_price_sar, months) values ($1, 'اشتراك ٣ شهور', 450, 600, 3) returning id, created_by`, [gym.id]))[0];
+  check('owner posts offer (stamped)', off.created_by === B);
+  await as(B, `insert into gym_managers (gym_id, user_id) values ($1, $2)`, [g2.id, C]);
+  await as(C, `insert into gym_offers (gym_id, title, price_sar, months) values ($1, 'اشتراك شهري', 199, 1)`, [g2.id]);
+  await expectErr('manager only for own gym', () => as(C, `insert into gym_offers (gym_id, title, price_sar, months) values ($1, 'x x x', 10, 1)`, [gym.id]), /row-level security/);
+  await as(B, `insert into gym_offers (gym_id, title, price_sar, months, ends_on) values ($1, 'عرض منتهي', 50, 1, current_date - 1)`, [gym.id]);
+  check('expired offers hidden from users', (await as(A, 'select title from gym_offers where gym_id = $1', [gym.id])).length === 1);
+  await expectErr('old price must be higher', () => as(B, `insert into gym_offers (gym_id, title, price_sar, old_price_sar) values ($1, 'غلط غلط', 100, 90)`, [gym.id]), /check constraint/);
+  await as(A, `insert into gym_reviews (gym_id, user_id, rating, body) values ($1, $2, 5, 'أجهزة ممتازة ونظيف')`, [gym.id, A]);
+  await as(C, `insert into gym_reviews (gym_id, user_id, rating, body) values ($1, $2, 3, 'زحمة وقت الذروة')`, [gym.id, C]);
+  await expectErr('one review per user per gym', () => as(A, `insert into gym_reviews (gym_id, user_id, rating) values ($1, $2, 4)`, [gym.id, A]), /duplicate key/);
+  await expectErr('rating 1..5 only', () => as(A, `insert into gym_reviews (gym_id, user_id, rating) values ($1, $2, 6)`, [g2.id, A]), /check constraint/);
+  await expectErr('cannot review as someone else', () => as(A, `insert into gym_reviews (gym_id, user_id, rating) values ($1, $2, 1)`, [g2.id, C]), /row-level security/);
+  const dir = await as(A, 'select * from gyms_directory(24.69, 46.685)');
+  const dg = dir.find(d => d.id === gym.id);
+  check('directory: avg rating, count, best monthly price, distance', Number(dg.rating) === 4 && Number(dg.reviews) === 2 && Number(dg.best_monthly) === 150 && dg.distance_m < 1000 && dir[0].id === gym.id, JSON.stringify([dg.rating, dg.reviews, dg.best_monthly, Math.round(dg.distance_m)]));
+  const rl = await as(C, 'select * from gym_reviews_list($1)', [gym.id]);
+  check('reviews: mine first, visited badge from check-ins', rl[0].is_me && rl.find(r => r.username === 'ahmed').visited === true, JSON.stringify(rl.map(r => [r.username, r.visited])));
+  check('owner can remove abusive review', (await as(B, `delete from gym_reviews where gym_id = $1 and user_id = $2 returning rating`, [gym.id, C])).length === 1);
+  check('user cannot delete others review', (await as(C, `delete from gym_reviews where user_id = $1 returning rating`, [A])).length === 0);
+
   // nearby
   const nb = await as(A, 'select * from nearby_gyms(24.69, 46.685, 5)');
   check('nearby gyms', nb.length >= 1 && nb[0].name === gym.name);

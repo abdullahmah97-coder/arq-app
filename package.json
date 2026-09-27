@@ -57,7 +57,7 @@
     "typecheck": "tsc --noEmit",
     "test:db": "node supabase/tests/db.test.cjs",
     "test:plan": "node --experimental-strip-types --no-warnings tests/plan.test.ts",
-    "test": "npm run test:plan && npm run test:inbody && npm run test:health && npm run test:coach && npm run test:training && npm run test:ranks && npm run test:db",
+    "test": "npm run test:plan && npm run test:inbody && npm run test:health && npm run test:coach && npm run test:training && npm run test:ranks && npm run test:clubs && npm run test:db",
     "test:inbody": "node --experimental-strip-types --no-warnings tests/inbody.test.ts",
     "test:health": "node --experimental-strip-types --no-warnings tests/health.test.ts",
     "build:dev": "npx eas-cli@latest build --profile development --platform all",
@@ -69,7 +69,8 @@
     "update:production": "npx eas-cli@latest update --channel production --environment production",
     "test:coach": "npx esbuild@0.25 tests/coach.test.ts --bundle --platform=node --log-level=error --outfile=node_modules/.cache/coach.test.js && node node_modules/.cache/coach.test.js",
     "test:training": "npx esbuild@0.25 tests/training.test.ts --bundle --platform=node --log-level=error --outfile=node_modules/.cache/training.test.js && node node_modules/.cache/training.test.js",
-    "test:ranks": "node --experimental-strip-types --no-warnings tests/ranks.test.ts"
+    "test:ranks": "node --experimental-strip-types --no-warnings tests/ranks.test.ts",
+    "test:clubs": "node --experimental-strip-types --no-warnings tests/clubs.test.ts"
   },
   "private": true
 }

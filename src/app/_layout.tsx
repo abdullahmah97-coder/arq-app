@@ -77,6 +77,10 @@ function RootNavigator() {
         <Stack.Screen name="gym/[id]" options={{ title: t('presence.title') }} />
         <Stack.Screen name="messages" options={{ title: t('chat.title') }} />
         <Stack.Screen name="owner" options={{ title: t('owner.title') }} />
+        <Stack.Screen name="clubs/index" options={{ title: t('clubs.title') }} />
+        <Stack.Screen name="clubs/[id]" options={{ title: '' }} />
+        <Stack.Screen name="clubs/review" options={{ title: t('clubs.rate'), presentation: 'modal' }} />
+        <Stack.Screen name="clubs/offer" options={{ title: t('clubs.addOffer'), presentation: 'modal' }} />
         <Stack.Screen name="chat/[id]" options={{ title: '' }} />
         <Stack.Screen name="checkin/[id]" options={{ title: t('presence.comments') }} />
         <Stack.Screen name="store/index" options={{ title: t('store.title') }} />

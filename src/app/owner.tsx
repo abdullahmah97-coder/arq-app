@@ -14,6 +14,7 @@ import {
   isAdmin, loadBrandRequests, loadReports, REPORT_STATUSES, reportShotUrl, reviewBrand, STATUS_COLOR, updateReport, type Report, type ReportStatus,
 } from '@/lib/owner';
 import type { Brand } from '@/lib/brands';
+import { loadOffers, type Offer } from '@/lib/clubs';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
 
@@ -22,7 +23,8 @@ const CAT_ICON = { bug: 'bug', idea: 'bulb', design: 'color-palette', other: 'ch
 export default function Owner() {
   const { t } = useTranslation();
   const [ok, setOk] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<'reports' | 'brands'>('reports');
+  const [tab, setTab] = useState<'reports' | 'brands' | 'offers'>('reports');
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [filter, setFilter] = useState<ReportStatus | 'all'>('new');
   const [reports, setReports] = useState<Report[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -32,8 +34,8 @@ export default function Owner() {
     const admin = await isAdmin();
     setOk(admin);
     if (!admin) return;
-    const [r, b] = await Promise.all([loadReports(), loadBrandRequests()]);
-    setReports(r); setBrands(b);
+    const [r, b, o] = await Promise.all([loadReports(), loadBrandRequests(), loadOffers()]);
+    setReports(r); setBrands(b); setOffers(o);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -52,9 +54,26 @@ export default function Owner() {
         <Stat n={count('fixed')} label={t('owner.fixed')} color={STATUS_COLOR.fixed} />
         <Stat n={pending.length} label={t('owner.pendingBrands')} color={brand.orange} />
       </View>
-      <Segmented value={tab} onChange={setTab} options={[{ value: 'reports', label: `${t('owner.reports')} (${reports.length})` }, { value: 'brands', label: `${t('owner.brands')} (${pending.length})` }]} />
+      <Segmented value={tab} onChange={setTab} options={[{ value: 'reports', label: `${t('owner.reports')} (${reports.length})` }, { value: 'brands', label: `${t('owner.brands')} (${pending.length})` }, { value: 'offers', label: `${t('owner.offers')} (${offers.length})` }]} />
 
-      {tab === 'reports' ? (
+      {tab === 'offers' ? (
+        <>
+          <Button icon="add" title={t('clubs.addOffer')} onPress={() => router.push('/clubs/offer')} />
+          <T size="xs" muted>{t('owner.offersHint')}</T>
+          {offers.length ? offers.map((o) => (
+            <Pressable key={o.id} onPress={() => router.push({ pathname: '/clubs/offer', params: { gym: o.gym_id, id: o.id } })}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: space.md, opacity: o.active ? 1 : 0.55 }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <T semibold numberOfLines={1}>{o.gyms?.chain || o.gyms?.name} · {o.title}</T>
+                <T size="xs" muted>{+o.price_sar} {t('clubs.sar')}{o.ends_on ? ` · ${t('clubs.until', { d: o.ends_on })}` : ''}{o.active ? '' : ` · ${t('owner.inactive')}`}</T>
+              </View>
+              <Ionicons name="create-outline" size={18} color={colors.muted} />
+            </Pressable>
+          )) : <Empty icon="pricetags-outline" text={t('clubs.noOffers')} />}
+        </>
+      ) : null}
+
+      {tab === 'offers' ? null : tab === 'reports' ? (
         <>
           <Segmented<ReportStatus | 'all'> wrap value={filter} onChange={setFilter}
             options={[{ value: 'all', label: t('store.all') }, ...REPORT_STATUSES.map((s) => ({ value: s, label: `${t(`owner.st_${s}`)} ${count(s) || ''}`.trim() }))]} />
