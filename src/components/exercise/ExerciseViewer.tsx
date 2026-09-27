@@ -1,6 +1,6 @@
 // عارض التمرين ثلاثي الأبعاد: شخصية ARQ (رجل/امرأة) تؤدي الحركة مع إضاءة العضلات العاملة
 import { Ionicons } from '@expo/vector-icons';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, PanResponder, Pressable, StyleSheet, View } from 'react-native';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -9,6 +9,7 @@ import { MOTIONS, sampleMotion } from '@/three/motions';
 import { applyPose, createFloor, createProps, createRig, type Muscle } from '@/three/rig';
 import { brand } from '@/theme';
 import { Canvas, useFrame, useLoader, useThree } from './r3f';
+import './textDecoderPolyfill';
 
 export type Gender = 'male' | 'female';
 
@@ -25,7 +26,43 @@ interface Props {
   height?: number;
 }
 
-function Scene({ motion, gender, focus, playing, yaw, speed }: Props & { playing: boolean; yaw: { current: number }; speed: number }) {
+type SceneProps = Props & { playing: boolean; yaw: { current: number }; speed: number; onReady?: () => void };
+
+/** كاميرا تدور حول المجسّم */
+function orbit(camera: THREE.Camera, m: (typeof MOTIONS)[string], yaw: number) {
+  const a = -THREE.MathUtils.degToRad((m.view?.yaw ?? 35) + yaw);
+  const dist = m.view?.dist ?? 3.9; const y = m.view?.y ?? 0.9;
+  camera.position.set(Math.sin(a) * dist, y + 0.4, Math.cos(a) * dist);
+  camera.lookAt(0, y, 0);
+}
+
+/** مجسّم بسيط (بدون ملفات تحميل) — احتياط إذا النموذج الواقعي ما اشتغل على الجهاز */
+function SimpleScene({ motion, focus, playing, yaw, speed }: SceneProps) {
+  const m = MOTIONS[motion];
+  const { camera } = useThree();
+  const t = useRef(0);
+  const rig = useMemo(() => {
+    const driver = createRig();
+    const props = createProps(driver, m.props);
+    const world = new THREE.Group();
+    world.add(driver.object, props.group, createFloor());
+    return { driver, props, world };
+  }, [m]);
+  useEffect(() => {
+    if (focus) rig.driver.setHighlight([focus], []);
+    else rig.driver.setHighlight(m.primary, m.secondary);
+  }, [rig, focus, m]);
+  useFrame((_, dt) => {
+    if (playing) t.current += Math.min(dt, 0.05) * speed;
+    applyPose(rig.driver, sampleMotion(m, t.current), { ground: m.ground });
+    rig.driver.object.updateMatrixWorld(true);
+    rig.props.update();
+    orbit(camera, m, yaw.current);
+  });
+  return <primitive object={rig.world} />;
+}
+
+function Scene({ motion, gender, focus, playing, yaw, speed, onReady }: SceneProps) {
   const gltf = useLoader(GLTFLoader, MODELS[gender] as unknown as string);
   const m = MOTIONS[motion];
   const { camera } = useThree();
@@ -45,6 +82,7 @@ function Scene({ motion, gender, focus, playing, yaw, speed }: Props & { playing
     if (focus) rig.human.setHighlight([focus], []);
     else rig.human.setHighlight(m.primary, m.secondary);
   }, [rig, focus, m]);
+  useEffect(() => { onReady?.(); }, [rig, onReady]);
 
 
   useFrame((_, dt) => {
@@ -53,18 +91,32 @@ function Scene({ motion, gender, focus, playing, yaw, speed }: Props & { playing
     rig.human.sync(!!m.ground);
     rig.props.update();
     // الكاميرا تدور حول المجسّم (المجسّم والأدوات محسوبة بإحداثيات العالم فلا ندوّرها)
-    const a = -THREE.MathUtils.degToRad((m.view?.yaw ?? 35) + yaw.current);
-    const dist = m.view?.dist ?? 3.9; const y = m.view?.y ?? 0.9;
-    camera.position.set(Math.sin(a) * dist, y + 0.4, Math.cos(a) * dist);
-    camera.lookAt(0, y, 0);
+    orbit(camera, m, yaw.current);
   });
 
   return <primitive object={rig.world} />;
 }
 
+/** يلتقط أي خطأ في المشهد ثلاثي الأبعاد ويعرض البديل بدل شاشة فاضية */
+class Guard extends Component<{ fallback: ReactNode; onError: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { this.props.onError(); }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
+
 export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
   const [playing, setPlaying] = useState(true);
   const [slow, setSlow] = useState(false);
+  // النموذج الواقعي أولاً؛ لو فشل أو تأخر كثير نعرض المجسّم البسيط
+  const [simple, setSimple] = useState(false);
+  const ready = useRef(false);
+  const onReady = useMemo(() => () => { ready.current = true; }, []);
+  useEffect(() => {
+    ready.current = false;
+    const id = setTimeout(() => { if (!ready.current) setSimple(true); }, 9000);
+    return () => clearTimeout(id);
+  }, [gender]);
   const yaw = useRef(0);
   const start = useRef(0);
   const pan = useMemo(() => PanResponder.create({
@@ -75,15 +127,34 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
 
   return (
     <View style={[styles.wrap, { height }]} {...pan.panHandlers}>
-      <Canvas camera={{ fov: 30, near: 0.1, far: 50, position: [0, 1.3, 3.9] }} gl={{ antialias: true }}>
-        <color attach="background" args={[brand.cream]} />
-        <hemisphereLight args={['#fff7ea', '#b89a74', 1.3]} />
-        <directionalLight position={[2, 4, 3]} intensity={2.2} />
-        <directionalLight position={[-3, 2, -3]} intensity={0.8} color={brand.amber} />
-        <Suspense fallback={null}>
-          <Scene motion={motion} gender={gender} focus={focus} playing={playing} yaw={yaw} speed={slow ? 0.45 : 1} />
-        </Suspense>
-      </Canvas>
+      {(() => {
+        const sp = { motion, gender, focus, playing, yaw, speed: slow ? 0.45 : 1 };
+        const canvas = (child: ReactNode) => (
+          <Canvas camera={{ fov: 30, near: 0.1, far: 50, position: [0, 1.3, 3.9] }} gl={{ antialias: true }}>
+            <color attach="background" args={[brand.cream]} />
+            <hemisphereLight args={['#fff7ea', '#b89a74', 1.3]} />
+            <directionalLight position={[2, 4, 3]} intensity={2.2} />
+            <directionalLight position={[-3, 2, -3]} intensity={0.8} color={brand.amber} />
+            {child}
+          </Canvas>
+        );
+        const fallback = canvas(<SimpleScene {...sp} />);
+        // لو حتى المجسّم البسيط ما اشتغل (الرسم ثلاثي الأبعاد غير متاح) نعرض رسالة بدل ما تنهار الصفحة
+        const unavailable = (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <Ionicons name="cube-outline" size={34} color={brand.green} />
+          </View>
+        );
+        return (
+          <Guard fallback={unavailable} onError={() => {}}>
+            {simple ? fallback : (
+              <Guard key={gender} fallback={fallback} onError={() => setSimple(true)}>
+                {canvas(<Suspense fallback={null}><Scene {...sp} onReady={onReady} /></Suspense>)}
+              </Guard>
+            )}
+          </Guard>
+        );
+      })()}
       <View style={styles.controls} pointerEvents="box-none">
         <Pressable onPress={() => setPlaying((p) => !p)} style={styles.btn} accessibilityLabel={playing ? 'Pause' : 'Play'}>
           <Ionicons name={playing ? 'pause' : 'play'} size={18} color={brand.cream} />

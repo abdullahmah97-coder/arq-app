@@ -46,12 +46,15 @@ for (const pr of PROGRAMS) {
   const base = generateRulesPlan({ gender: 'male', goal: 'gain', level: 'intermediate', days_per_week: 3, weight_kg: 80, height_cm: 178, age: 28 });
   const plan = applyProgram(pr, base);
   ok(isWeeklyPlan(plan), `${pr.id}: produces a valid weekly plan`);
-  ok(plan.days.filter((d) => !d.rest).length === 4 && plan.days[0].exercises.length === 7 && plan.days[0].exercises[0].rir === '1-2', `${pr.id}: 4 training days, day 1 = 7 exercises with RIR`);
+  const first = plan.days.find((d) => d.day === pr.schedule[0])!;
+  ok(plan.days.filter((d) => !d.rest).length === pr.daysPerWeek && first.exercises.length === pr.days[0].exercises.length && first.exercises[0].rir === pr.days[0].exercises[0].rir,
+    `${pr.id}: ${pr.daysPerWeek} training days, first day keeps its exercises and RIR`);
   ok(plan.meals === base.meals && plan.targets === base.targets, `${pr.id}: keeps meals & targets`);
-  ok(plan.days[0].exercises[0].rest_sec === 150 && plan.days[0].exercises[3].rest_sec === 90, `${pr.id}: rest 2–3 min → 150 s, 1–2 min → 90 s`);
+  ok(first.exercises.every((e, i) => { const r = pr.days[0].exercises[i].rest; return e.rest_sec === Math.round(((r[0] + r[1]) / 2) * 60); }), `${pr.id}: rest ranges → seconds`);
 }
 const total = PROGRAMS[0].days.reduce((a, d) => a + d.exercises.length, 0);
 ok(total === 25, `program has 25 exercise slots (${total})`);
+ok(PROGRAMS.length >= 12 && new Set(PROGRAMS.map((p) => p.id)).size === PROGRAMS.length, `${PROGRAMS.length} programs with unique ids`);
 
 // --- تحليلات السجل ---
 {

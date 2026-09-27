@@ -16,7 +16,9 @@ ok(!!chest.workout && MOTIONS[chest.workout.exercises[0].exercise_id as keyof ty
 ok(chest.workout!.exercises.length >= 3 && chest.workout!.exercises.length <= 5, `count fits time (${chest.workout!.exercises.length})`);
 
 const home = localCoach('تمرين بالبيت بدون أدوات', ar);
-const HOME = new Set(['split_squat', 'glute_bridge', 'plank', 'walking_lunge', 'bulgarian_split_squat', 'calf_raise']);
+const HOME = new Set(['split_squat', 'glute_bridge', 'plank', 'walking_lunge', 'bulgarian_split_squat', 'calf_raise',
+  'push_up', 'knee_push_up', 'air_squat', 'reverse_lunge', 'donkey_kick', 'superman', 'crunch', 'lying_leg_raise', 'mountain_climber', 'dead_bug',
+  'jumping_jack', 'high_knees', 'burpee', 'wall_sit']);
 ok(!!home.workout && home.workout.exercises.every((e) => HOME.has(e.exercise_id)), 'home = no-equipment only');
 
 const legsEn = localCoach('45 min legs and glutes with dumbbells', en);

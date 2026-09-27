@@ -26,7 +26,9 @@ const GROUP_NAME: Record<Group, [string, string]> = {
 };
 
 // أدوات منزلية: بدون أدوات = حصيرة فقط؛ بالدمبل = دمبلات (والكرسي/الكنبة بدل البنش)
-const NO_EQUIP = new Set(['split_squat', 'glute_bridge', 'plank', 'walking_lunge', 'bulgarian_split_squat', 'calf_raise']);
+const NO_EQUIP = new Set(['split_squat', 'glute_bridge', 'plank', 'walking_lunge', 'bulgarian_split_squat', 'calf_raise',
+  'push_up', 'knee_push_up', 'air_squat', 'reverse_lunge', 'donkey_kick', 'superman', 'crunch', 'lying_leg_raise', 'mountain_climber', 'dead_bug',
+  'jumping_jack', 'high_knees', 'burpee', 'wall_sit']);
 const DUMBBELL_KINDS = new Set(['dumbbells', 'goblet', 'hammerDumbbells', 'dumbbellR', 'mat', 'bench', 'benchBehind', 'benchSideRow', 'inclineBench', 'seatBack']);
 
 const ROUTES: [RegExp, CoachRoute][] = [
@@ -43,6 +45,11 @@ const ROUTES: [RegExp, CoachRoute][] = [
 
 // أسماء التمارين الشائعة بالعامية
 const AR_EXERCISES: [RegExp, string][] = [
+  [/فرونت ?سكوات|سكوات (امامي|أمامي)/, 'front_squat'], [/سومو/, 'sumo_squat'], [/ستيب|صعود (ال)?صندوق/, 'step_up'], [/قود ?مورن/, 'good_morning'],
+  [/بيربي|بربي/, 'burpee'], [/كرنش|معدة|بطن/, 'crunch'], [/متسلق|ماونتن/, 'mountain_climber'], [/جمبنق|جمبينج/, 'jumping_jack'], [/سوبرمان/, 'superman'],
+  [/فيس ?بول/, 'face_pull'], [/ارنولد|أرنولد/, 'arnold_press'], [/سكل|سكال/, 'skull_crusher'], [/كيك ?باك/, 'triceps_kickback'],
+  [/تمرين ضغط|ضغط (على )?(ال)?(ارض|أرض)|بوش ?اب|ضغط عادي/, 'push_up'], [/سوينق|سوينج|كيتل/, 'kb_swing'], [/تي ?بار/, 't_bar_row'],
+  [/جلسة (ال)?(حائط|جدار)|وول ?سيت/, 'wall_sit'], [/دنكي|ركلة/, 'donkey_kick'], [/عقلة معكوسة|تشن ?اب/, 'chin_up'],
   [/ترابيس|تربيس|شراقز|شرق/, 'upright_row'], [/سكوات|قرفصاء/, 'back_squat'], [/ديدلفت|ديد لفت|رفعة ميتة|الرفعة المميتة/, 'deadlift'], [/رومان|rdl/i, 'rdl_bb'],
   [/بنش/, 'bench_bb'], [/ضغط (ال)?كتف|ضغط علوي/, 'ohp_standing'], [/عقلة|عقله/, 'pullup'], [/سحب (امامي|أمامي|علوي)|لات/, 'lat_pulldown'],
   [/تجديف/, 'row_bb'], [/بلانك|لوح/, 'plank'], [/هيب ?ثرست|دفع (ال)?حوض/, 'hip_thrust_bb'], [/جسر/, 'glute_bridge'],
