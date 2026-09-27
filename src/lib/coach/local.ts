@@ -2,6 +2,9 @@
 // يُستخدم عندما لا يتوفر الذكاء الاصطناعي (بدون إنترنت، أو قبل إعداد المفتاح)، وهو قابل للاختبار.
 import { EXERCISES, findExercise } from '../../three/catalog';
 import { MOTIONS } from '../../three/motions';
+
+/** حركة التمرين (بعض التمارين تشارك حركة تمرين ثاني، مثل الطعن الخلفي) */
+const motionOf = (id: string) => MOTIONS[(EXERCISES.find((e) => e.id === id)?.motion ?? id) as keyof typeof MOTIONS];
 import type { Muscle } from '../../three/rig';
 import type { CoachContext, CoachReply, CoachRoute, CoachWorkout } from './types';
 
@@ -73,7 +76,7 @@ function repsFor(ctx: CoachContext, compound: boolean): { reps: string; rest: nu
 function pick(groups: Group[], count: number, equip: 'gym' | 'dumbbells' | 'none', seed: number) {
   const ok = (id: string) => {
     if (equip === 'none') return NO_EQUIP.has(id);
-    if (equip === 'dumbbells') return NO_EQUIP.has(id) || MOTIONS[id as keyof typeof MOTIONS].props.every((p) => DUMBBELL_KINDS.has(p.kind));
+    if (equip === 'dumbbells') return NO_EQUIP.has(id) || motionOf(id).props.every((p) => DUMBBELL_KINDS.has(p.kind));
     return true;
   };
   // لكل مجموعة: تمارين عضلتها الأساسية ضمن المطلوب، والمركّبة (أكثر من عضلة أساسية) أولاً
@@ -102,7 +105,7 @@ export function buildWorkout(ctx: CoachContext, groups: Group[], minutes: number
   const ids = pick(groups, count, equip, seed);
   const red = ctx.zone === 'red';
   const exercises = ids.map((id, i) => {
-    const compound = MOTIONS[id as keyof typeof MOTIONS].primary.length > 1 || i === 0;
+    const compound = motionOf(id).primary.length > 1 || i === 0;
     const r = repsFor(ctx, compound);
     const isHold = id === 'plank';
     return {
@@ -113,7 +116,7 @@ export function buildWorkout(ctx: CoachContext, groups: Group[], minutes: number
     };
   });
   // الاسم من العضلات اللي فعلاً في التمرين (مو من الطلب فقط)
-  const covered = groups.filter((g) => ids.some((id) => MOTIONS[id as keyof typeof MOTIONS].primary.some((m) => GROUP_MUSCLES[g].includes(m))));
+  const covered = groups.filter((g) => ids.some((id) => motionOf(id).primary.some((m) => GROUP_MUSCLES[g].includes(m))));
   const names = covered.length >= 3 ? [L(ctx, 'كامل الجسم', 'Full body')] : (covered.length ? covered : groups).map((g) => GROUP_NAME[g][ctx.lang === 'en' ? 1 : 0]);
   const where = equip === 'none' ? L(ctx, ' بالبيت', ' at home') : equip === 'dumbbells' ? L(ctx, ' بالدمبل', ' with dumbbells') : '';
   return {

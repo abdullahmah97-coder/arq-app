@@ -1,4 +1,5 @@
 // محرك المقارنة: الحجم، القوة القصوى التقديرية (1RM)، الأرقام الشخصية، وإيجاد آخر جلسة مماثلة
+import { getExercise } from '../../three/catalog';
 import { MOTIONS } from '../../three/motions';
 import type { Muscle } from '../../three/rig';
 
@@ -46,7 +47,7 @@ export function exercisesOf(session: SessionData): string[] {
 
 export function musclesOf(ids: string[]): Set<Muscle> {
   const out = new Set<Muscle>();
-  for (const id of ids) for (const m of MOTIONS[id as keyof typeof MOTIONS]?.primary ?? []) out.add(m);
+  for (const id of ids) for (const m of MOTIONS[(getExercise(id)?.motion ?? id) as keyof typeof MOTIONS]?.primary ?? []) out.add(m);
   return out;
 }
 

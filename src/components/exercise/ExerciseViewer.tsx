@@ -5,8 +5,10 @@ import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState,
 import { ActivityIndicator, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as THREE from 'three';
 import { createHuman } from '@/three/human';
-import { MOTIONS, sampleMotion } from '@/three/motions';
-import { applyPose, createFloor, createProps, createRig, type Muscle } from '@/three/rig';
+import { motionDuration, MOTIONS, sampleMotion } from '@/three/motions';
+import { bakeStaticProps, createFloor, createProps } from '@/three/equipment';
+import { motionBounds, placeCamera } from '@/three/framing';
+import { applyPose, createRig, type Muscle } from '@/three/rig';
 import { brand } from '@/theme';
 import { ExerciseFigure2D } from './ExerciseFigure2D';
 import { initial3DMode, mark3DDone, mark3DFailed, mark3DStart, reset3D, type Mode3D } from './safe3d';
@@ -50,14 +52,6 @@ type SceneProps = Props & {
   onFrame: () => void; onFail: (where: string, e: unknown) => void;
 };
 
-/** كاميرا تدور حول المجسّم */
-function orbit(camera: THREE.Camera, m: (typeof MOTIONS)[string], yaw: number) {
-  const a = -THREE.MathUtils.degToRad((m.view?.yaw ?? 35) + yaw);
-  const dist = m.view?.dist ?? 3.9; const y = m.view?.y ?? 0.9;
-  camera.position.set(Math.sin(a) * dist, y + 0.4, Math.cos(a) * dist);
-  camera.lookAt(0, y, 0);
-}
-
 function Scene({ motion, gender, focus, playing, yaw, speed, onFrame, onFail }: SceneProps) {
   const { useLoader, useFrame, GLTFLoader } = loadEngine()!;
   const gltf = useLoader(GLTFLoader, MODELS[gender] as unknown as string);
@@ -72,8 +66,20 @@ function Scene({ motion, gender, focus, playing, yaw, speed, onFrame, onFail }: 
     const floor = createFloor();
     const world = new THREE.Group();
     world.add(human.object, props.group, floor);
-    return { driver, human, props, world };
+    // حدود اللاعب والجهاز خلال الحركة كلها: الكاميرا تقرّب عليها تلقائياً
+    const bounds = motionBounds(driver, props, m, () => human.sync(!!m.ground));
+    // دمج أجزاء الأجهزة الثابتة (أسرع بالرسم)
+    const dur = motionDuration(m);
+    bakeStaticProps(props.group, [0, 0.21, 0.43, 0.62, 0.81].map((f) => () => {
+      applyPose(driver, sampleMotion(m, f * dur), { ground: m.ground });
+      human.sync(!!m.ground);
+      props.update();
+    }));
+    const center = bounds.getCenter(new THREE.Vector3());
+    return { driver, human, props, world, bounds, center };
   }, [gltf, m]);
+  const cam = useRef({ dist: 0 });
+  const perf = useRef({ n: 0, t0: 0, sent: false });
 
   useEffect(() => {
     try {
@@ -90,10 +96,19 @@ function Scene({ motion, gender, focus, playing, yaw, speed, onFrame, onFail }: 
       applyPose(rig.driver, sampleMotion(m, t.current), { ground: m.ground });
       rig.human.sync(!!m.ground);
       rig.props.update();
-      // الكاميرا تدور حول المجسّم (المجسّم والأدوات محسوبة بإحداثيات العالم فلا ندوّرها)
-      orbit(camera, m, yaw.current);
+      // الكاميرا تدور حول اللاعب وتقرّب لأقصى حد يظهر فيه هو والجهاز
+      placeCamera(camera as THREE.PerspectiveCamera, rig.bounds, rig.center, (m.view?.yaw ?? 35) + yaw.current, cam.current);
       gl.render(scene, camera);
       onFrame();
+      // قياس سلاسة الحركة مرة وحدة (عدد الإطارات بالثانية ودقة الرسم)
+      const pf = perf.current;
+      pf.n += 1;
+      if (pf.n === 30) pf.t0 = Date.now();
+      if (pf.n === 150 && !pf.sent) {
+        pf.sent = true;
+        const c = gl.getContext();
+        logEvent('3d_perf', { motion, fps: Math.round(120000 / Math.max(1, Date.now() - pf.t0)), bufW: c.drawingBufferWidth, bufH: c.drawingBufferHeight, calls: gl.info.render.calls, tris: gl.info.render.triangles, dpr: gl.getPixelRatio() }, { once: true });
+      }
     } catch (e) {
       dead.current = true;
       onFail('frame', e);
@@ -113,7 +128,7 @@ class Guard extends Component<{ fallback: ReactNode; onError: (e: unknown) => vo
 
 const READY_FRAMES = 30;
 
-export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
+export function ExerciseViewer({ motion, gender, focus, height = 420 }: Props) {
   const [playing, setPlaying] = useState(true);
   const [slow, setSlow] = useState(false);
   // 3D (النموذج الواقعي) أو 2D (رسم بدون كرت الرسومات). نبدأ بالتحقق: هل طيّح 3D التطبيق قبل؟
@@ -231,7 +246,7 @@ export function ExerciseViewer({ motion, gender, focus, height = 380 }: Props) {
   );
 }
 
-export function ViewerLoading({ height = 380 }: { height?: number }) {
+export function ViewerLoading({ height = 420 }: { height?: number }) {
   return <View style={[styles.wrap, { height, alignItems: 'center', justifyContent: 'center' }]}><ActivityIndicator color={brand.orange} /></View>;
 }
 

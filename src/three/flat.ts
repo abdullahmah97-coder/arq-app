@@ -3,7 +3,9 @@
 // نرسم الأبعد أولاً، ونضيف طبقة "مضيئة" من النقاط المواجهة للضوء عشان يبان المجسّم مجسّم.
 import * as THREE from 'three';
 import { MOTIONS, sampleMotion, type Motion } from './motions';
-import { applyPose, createFloor, createProps, createRig, type Muscle, type Rig } from './rig';
+import { createFloor, createProps } from './equipment';
+import { motionBounds, placeCamera } from './framing';
+import { applyPose, createRig, type Muscle, type Rig } from './rig';
 
 export interface FlatShape { pts: string; fill: string; opacity?: number }
 export interface FlatLine { pts: string; stroke: string }
@@ -15,6 +17,7 @@ interface Part {
   nrm: Float32Array;   // اتجاهات السطح لنفس النقاط
   center: THREE.Vector3;
   floor: boolean;
+  shadow: boolean;
 }
 
 const MAX_POINTS = 44;
@@ -75,6 +78,9 @@ export function createFlatScene(motionId: keyof typeof MOTIONS): FlatScene {
   const floor = createFloor();
   world.add(floor, rig.object, props.group);
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
+  const bounds = motionBounds(rig, props, motion);
+  const center = bounds.getCenter(new THREE.Vector3());
+  const cam = { dist: 0 };
 
   const parts: Part[] = [];
   const lines: THREE.Line[] = [];
@@ -86,7 +92,7 @@ export function createFlatScene(motionId: keyof typeof MOTIONS): FlatScene {
     let s = cache.get(mesh.geometry);
     if (!s) { s = sampleGeometry(mesh.geometry); cache.set(mesh.geometry, s); }
     mesh.geometry.computeBoundingSphere();
-    parts.push({ mesh, ...s, center: new THREE.Vector3(), floor: floor.children.includes(mesh) });
+    parts.push({ mesh, ...s, center: new THREE.Vector3(), floor: floor.children.includes(mesh), shadow: !!mesh.userData.shadow });
   });
 
   const setHighlight = (focus: Muscle | null) => {
@@ -106,13 +112,10 @@ export function createFlatScene(motionId: keyof typeof MOTIONS): FlatScene {
     props.update();
     world.updateMatrixWorld(true);
 
-    const a = -THREE.MathUtils.degToRad((motion.view?.yaw ?? 35) + yaw);
-    const dist = motion.view?.dist ?? 3.9; const y = motion.view?.y ?? 0.9;
     camera.aspect = w / h;
-    camera.position.set(Math.sin(a) * dist, y + 0.4, Math.cos(a) * dist);
-    camera.lookAt(0, y, 0);
-    camera.updateMatrixWorld(true);
     camera.updateProjectionMatrix();
+    placeCamera(camera, bounds, center, (motion.view?.yaw ?? 35) + yaw, cam, 0.3);
+    camera.updateMatrixWorld(true);
     // الضوء ثابت بالنسبة للكاميرا: من فوق ويسار وقدّام
     _light.set(-0.45, 0.75, 0.5).normalize().transformDirection(camera.matrixWorld);
 
@@ -123,7 +126,7 @@ export function createFlatScene(motionId: keyof typeof MOTIONS): FlatScene {
       const bs = part.mesh.geometry.boundingSphere!;
       part.center.copy(bs.center).applyMatrix4(part.mesh.matrixWorld);
       _v.copy(part.center).applyMatrix4(view);
-      order.push({ part, depth: part.floor ? -1e9 : _v.z });
+      order.push({ part, depth: part.floor ? -1e9 : part.shadow ? -1e8 : _v.z });
     }
     order.sort((p, q) => p.depth - q.depth); // الأبعد (z أصغر) أولاً
 
@@ -148,6 +151,7 @@ export function createFlatScene(motionId: keyof typeof MOTIONS): FlatScene {
       const pts = hull.map((i) => `${xs[i].toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
       const mat = mesh.material as THREE.MeshStandardMaterial;
       if (part.floor) { shapes.push({ pts, fill: hex(mat, 1), opacity: mat.opacity ?? 1 }); continue; }
+      if (part.shadow) { shapes.push({ pts, fill: '#0A1F1A', opacity: 0.14 }); continue; }
       shapes.push({ pts, fill: hex(mat, 0.62) });
       if (lx.length >= 3) {
         const lh = convexHull(lx, ly);

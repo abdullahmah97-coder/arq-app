@@ -171,7 +171,7 @@ export const MOTIONS: Record<string, Motion> = {
   // ---------------- صدر ----------------
   bench_bb: {
     keys: [pressTop(14), pressBottom()], tempo: [1.8, 1.2], hold: [0.2, 0.2],
-    props: [{ kind: 'barbell' }, { kind: 'bench', pos: [0, 0, -0.3] }], primary: ['chest'], secondary: ['triceps', 'shoulders'], view: { yaw: 60, y: 0.7 },
+    props: [{ kind: 'barbell' }, { kind: 'benchPress', pos: [0, 0, -0.3] }], primary: ['chest'], secondary: ['triceps', 'shoulders'], view: { yaw: 60, y: 0.7 },
   },
   bench_db: {
     keys: [pressTop(10), pressBottom()], tempo: [1.8, 1.2], hold: [0.2, 0.2],
@@ -181,7 +181,7 @@ export const MOTIONS: Record<string, Motion> = {
     keys: [
       seated({ ...sym({ shoulder: [-10, 66, 0], elbow: 88 }) }),
       seated({ ...sym({ shoulder: [88, 18, 0], elbow: 5 }) }),
-    ], tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'seatBack', pos: [0, 0, -0.05] }],
+    ], tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'chestPress', pos: [0, 0, -0.05] }],
     primary: ['chest'], secondary: ['triceps', 'shoulders'], view: { yaw: 55 },
   },
   incline_db_press: {
@@ -219,7 +219,7 @@ export const MOTIONS: Record<string, Motion> = {
   },
   shoulder_press_machine: {
     keys: [seated(pressOverheadBottom), seated(pressOverheadTop)], tempo: [1.2, 1.8], hold: [0.2, 0.2],
-    props: [{ kind: 'seatBack', pos: [0, 0, -0.05] }], primary: ['shoulders'], secondary: ['triceps'], view: { yaw: 35, y: 1.0 },
+    props: [{ kind: 'shoulderPress', pos: [0, 0, -0.05] }], primary: ['shoulders'], secondary: ['triceps'], view: { yaw: 35, y: 1.0 },
   },
   lateral_raise: {
     keys: [sym({ shoulder: [8, 10, 0], elbow: 15, hip: [0, 5, 0] }), sym({ shoulder: [8, 86, 0], elbow: 15, hip: [0, 5, 0] })],
@@ -241,12 +241,12 @@ export const MOTIONS: Record<string, Motion> = {
   // ---------------- ظهر ----------------
   lat_pulldown: {
     keys: [seated(sym({ shoulder: [170, 30, 0], elbow: 5, spine: -8 })), seated({ ...sym({ shoulder: [15, 55, 90], elbow: 115 }), spine: -12 })],
-    tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'latBar' }, { kind: 'seat', pos: [0, 0, -0.02] }],
+    tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'latBar' }, { kind: 'latMachine', pos: [0, 0, -0.02] }],
     primary: ['lats'], secondary: ['biceps', 'upperBack', 'rearDelts'], view: { yaw: 150, y: 1.2 },
   },
   lat_pulldown_close: {
     keys: [seated(sym({ shoulder: [168, 10, 0], elbow: 5, spine: -8 })), seated({ ...sym({ shoulder: [35, 12, 0], elbow: 110 }), spine: -14 })],
-    tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'latBar' }, { kind: 'seat', pos: [0, 0, -0.02] }],
+    tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'latBar' }, { kind: 'latMachine', pos: [0, 0, -0.02] }],
     primary: ['lats'], secondary: ['biceps', 'upperBack'], view: { yaw: 150, y: 1.2 },
   },
   pullup: {
@@ -360,7 +360,7 @@ export const MOTIONS: Record<string, Motion> = {
   },
   hip_abduction: {
     keys: [seated({ lHip: [88, 8, 0], rHip: [88, 8, 0], ...sym({ shoulder: [15, 18, 0], elbow: 20 }) }), seated({ lHip: [88, 38, 0], rHip: [88, 38, 0], ...sym({ shoulder: [15, 18, 0], elbow: 20 }) })],
-    tempo: [1.2, 1.8], hold: [0.1, 0.5], props: [{ kind: 'seatBack', pos: [0, 0, -0.05] }], primary: ['glutes'], secondary: [], view: { yaw: 20, y: 0.8 },
+    tempo: [1.2, 1.8], hold: [0.1, 0.5], props: [{ kind: 'hipAbduction', pos: [0, 0, -0.05] }], primary: ['glutes'], secondary: [], view: { yaw: 20, y: 0.8 },
   },
   seated_calf_raise: {
     keys: [seated({ lAnkle: 0, rAnkle: 0, ...sym({ shoulder: [30, 12, 0], elbow: 60 }) }), seated({ lAnkle: 34, rAnkle: 34, ...sym({ shoulder: [30, 12, 0], elbow: 60 }) })],
@@ -399,7 +399,7 @@ export const MOTIONS: Record<string, Motion> = {
   },
   close_grip_bench: {
     keys: [pressTop(5), { root: SUPINE_ROOT, ...supineLegs, ...sym({ shoulder: [-10, 22, 0], elbow: 100 }) }], tempo: [1.8, 1.2], hold: [0.2, 0.2],
-    props: [{ kind: 'barbell' }, { kind: 'bench', pos: [0, 0, -0.3] }], primary: ['triceps', 'chest'], secondary: ['shoulders'], view: { yaw: 60, y: 0.7 },
+    props: [{ kind: 'barbell' }, { kind: 'benchPress', pos: [0, 0, -0.3] }], primary: ['triceps', 'chest'], secondary: ['shoulders'], view: { yaw: 60, y: 0.7 },
   },
   push_up: {
     keys: [

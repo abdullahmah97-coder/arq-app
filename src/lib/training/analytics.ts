@@ -1,4 +1,5 @@
 // تحليلات سجل التمارين: أعمدة أسبوعية، توزيع المجموعات على العضلات، وتقدم أهم الرفعات — كلها بمقارنات
+import { getExercise } from '../../three/catalog';
 import { MOTIONS } from '../../three/motions';
 import type { Muscle } from '../../three/rig';
 import { e1rm, summarize, type SessionData } from './stats';
@@ -49,7 +50,7 @@ export function muscleSets(history: SessionData[], days = 28, now = Date.now()) 
     if (!bucket || age < 0) continue;
     for (const set of s.sets) {
       if (set.reps <= 0) continue;
-      const groups = new Set((MOTIONS[set.exercise_id as keyof typeof MOTIONS]?.primary ?? []).map((m) => GROUP_OF[m]));
+      const groups = new Set((MOTIONS[(getExercise(set.exercise_id)?.motion ?? set.exercise_id) as keyof typeof MOTIONS]?.primary ?? []).map((m) => GROUP_OF[m]));
       // المجموعة تنحسب مرة لكل عضلة كبيرة أساسية فيها
       for (const g of groups) res[g][bucket]++;
     }

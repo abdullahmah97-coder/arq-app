@@ -1,5 +1,5 @@
 // اختبار المدرب المحلي: node (عبر esbuild) — يتأكد أن كل الطلبات الشائعة تعطي رداً صحيحاً
-import { localCoach } from '../src/lib/coach/local';
+import { buildWorkout, localCoach } from '../src/lib/coach/local';
 import { getExercise } from '../src/three/catalog';
 import { MOTIONS } from '../src/three/motions';
 import type { CoachContext } from '../src/lib/coach/types';
@@ -9,10 +9,12 @@ const ok = (c: boolean, m: string) => { if (!c) { fail++; console.log('FAIL', m)
 const ar: CoachContext = { lang: 'ar', goal: 'lose', level: 'intermediate', zone: 'green', protein_g: 172, calories: 2250 };
 const en: CoachContext = { ...ar, lang: 'en' };
 const valid = (ids: string[]) => ids.every((id) => !!getExercise(id));
+/** حركة التمرين عبر الكتالوج (بعض التمارين تشارك حركة غيرها) */
+const mo = (id: string) => MOTIONS[(getExercise(id)?.motion ?? id) as keyof typeof MOTIONS];
 
 const chest = localCoach('عطني تمرين صدر ٣٠ دقيقة', ar);
 ok(!!chest.workout && chest.workout.minutes === 30 && valid(chest.workout.exercises.map((e) => e.exercise_id)), 'chest 30 min (arabic digits)');
-ok(!!chest.workout && MOTIONS[chest.workout.exercises[0].exercise_id as keyof typeof MOTIONS].primary.includes('chest'), 'chest workout starts with a chest exercise');
+ok(!!chest.workout && mo(chest.workout.exercises[0].exercise_id).primary.includes('chest'), 'chest workout starts with a chest exercise');
 ok(chest.workout!.exercises.length >= 3 && chest.workout!.exercises.length <= 5, `count fits time (${chest.workout!.exercises.length})`);
 
 const home = localCoach('تمرين بالبيت بدون أدوات', ar);
@@ -22,7 +24,7 @@ const HOME = new Set(['split_squat', 'glute_bridge', 'plank', 'walking_lunge', '
 ok(!!home.workout && home.workout.exercises.every((e) => HOME.has(e.exercise_id)), 'home = no-equipment only');
 
 const legsEn = localCoach('45 min legs and glutes with dumbbells', en);
-ok(!!legsEn.workout && legsEn.workout.minutes === 45 && legsEn.workout.exercises.every((e) => MOTIONS[e.exercise_id as keyof typeof MOTIONS].props.every((p) => ['dumbbells', 'goblet', 'hammerDumbbells', 'dumbbellR', 'mat', 'bench', 'benchBehind', 'benchSideRow', 'inclineBench', 'seatBack'].includes(p.kind))), 'english legs+glutes with dumbbells');
+ok(!!legsEn.workout && legsEn.workout.minutes === 45 && legsEn.workout.exercises.every((e) => mo(e.exercise_id).props.every((p) => ['dumbbells', 'goblet', 'hammerDumbbells', 'dumbbellR', 'mat', 'bench', 'benchBehind', 'benchSideRow', 'inclineBench', 'seatBack'].includes(p.kind))), 'english legs+glutes with dumbbells');
 ok(legsEn.text.includes('Legs'), 'english reply');
 
 const red = localCoach('تمرين ظهر', { ...ar, zone: 'red' });
@@ -43,6 +45,20 @@ const today = localCoach('وش أتمرن اليوم حسب جاهزيتي؟', {
 ok(!!today.workout && today.workout.exercises.length === 3 && today.workout.exercises[2].sets === 2 && today.workout.exercises[0].sets === 4, 'today from plan, adapted (yellow)');
 ok(localCoach('وش أتمرن اليوم', { ...ar, today: { focus: '-', rest: true, exercises: [] } }).text.includes('راحة'), 'rest day');
 ok((localCoach('مرحبا', ar).chips?.length ?? 0) >= 3, 'unknown → help + chips');
+
+// كل أيام الشهر × كل المجموعات × كل الأدوات: ما ينهار وكل التمارين موجودة في الكتالوج
+let crash = '';
+for (let seed = 1; seed <= 31 && !crash; seed++) {
+  for (const g of ['chest', 'back', 'legs', 'glutes', 'shoulders', 'arms', 'core'] as const) {
+    for (const eq of ['gym', 'dumbbells', 'none'] as const) {
+      try {
+        const w = buildWorkout(ar, [g], 45, eq, seed);
+        if (!valid(w.exercises.map((e) => e.exercise_id))) crash = `invalid id ${g}/${eq}/${seed}`;
+      } catch (e) { crash = `${g}/${eq}/${seed}: ${(e as Error).message}`; }
+    }
+  }
+}
+ok(!crash, `workouts for every seed/group/equipment ${crash}`);
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL COACH TESTS PASSED');
 if (fail) process.exit(1);

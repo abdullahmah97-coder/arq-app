@@ -32,6 +32,8 @@ export interface Human {
   propRig: Rig;
   sync(ground: boolean): void;
   setHighlight(primary: Muscle[], secondary: Muscle[]): void;
+  /** قبضة الأصابع: 0 مفتوح … 1 مقفل */
+  setGrip(amount: number): void;
 }
 
 const _q = new THREE.Quaternion();
@@ -131,21 +133,44 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
     .sub(driver.root.getWorldPosition(new THREE.Vector3()))
     .applyQuaternion(rootQ.clone().invert());
 
-  // قبضة اليد: ثني الأصابع
-  const fingerBones: { b: THREE.Bone; rest: THREE.Quaternion; side: 1 | -1; thumb: boolean }[] = [];
-  model.traverse((o) => {
-    const b = o as THREE.Bone;
-    if (!b.isBone) return;
-    const m = b.name.replace(/[:_]/g, '').match(/mixamorig(Left|Right)Hand(Thumb|Index|Middle|Ring|Pinky)[123]$/);
-    if (m) fingerBones.push({ b, rest: b.quaternion.clone(), side: m[1] === 'Left' ? 1 : -1, thumb: m[2] === 'Thumb' });
-  });
-  const curl = new THREE.Quaternion();
-  // عظام MakeHuman محاورها موازية للعالم (الإصبع على ±X والكف للأسفل في وضعية T) → الثني عكس إشارة X Bot
-  const worldAligned = fingerBones.length > 0 && Math.abs(fingerBones[0].rest.w) > 0.9999;
-  for (const f of fingerBones) {
-    curl.setFromAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(f.thumb ? 25 : 72) * f.side * (worldAligned ? -1 : 1));
-    f.b.quaternion.copy(f.rest).multiply(curl);
+  // قبضة اليد: نثني كل إصبع باتجاه باطن الكف (المحور يُحسب من اتجاه الإصبع ونورمال الكف في وضعية T)
+  model.updateMatrixWorld(true);
+  const boneByName = new Map<string, THREE.Bone>();
+  model.traverse((o) => { const b = o as THREE.Bone; if (b.isBone) boneByName.set(b.name.replace(/[:_]/g, ''), b); });
+  type FingerJoint = { b: THREE.Bone; rest: THREE.Quaternion; axis: THREE.Vector3; max: number };
+  const fingerJoints: FingerJoint[] = [];
+  const wp = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3());
+  for (const side of ['Left', 'Right'] as const) {
+    const hand = boneByName.get(B(`${side}Hand`));
+    const idx = boneByName.get(B(`${side}HandIndex1`));
+    const pky = boneByName.get(B(`${side}HandPinky1`));
+    if (!hand || !idx || !pky) continue;
+    const h = wp(hand);
+    const palm = new THREE.Vector3().crossVectors(wp(idx).sub(h), wp(pky).sub(h)).normalize();
+    if (palm.y > 0) palm.negate(); // في وضعية T باطن الكف للأسفل
+    for (const f of ['Index', 'Middle', 'Ring', 'Pinky', 'Thumb'] as const) {
+      const chain = [1, 2, 3].map((i) => boneByName.get(B(`${side}Hand${f}${i}`))).filter(Boolean) as THREE.Bone[];
+      const thumb = f === 'Thumb';
+      const angles = thumb ? [12, 28, 30] : [62, 82, 52];
+      chain.forEach((b, i) => {
+        const next = chain[i + 1] ?? (b.children[0] as THREE.Object3D | undefined);
+        const along = next ? wp(next).sub(wp(b)) : wp(b).sub(wp(chain[i - 1] ?? hand));
+        along.normalize();
+        const axisW = new THREE.Vector3().crossVectors(along, palm).normalize();
+        const qw = b.getWorldQuaternion(new THREE.Quaternion());
+        fingerJoints.push({ b, rest: b.quaternion.clone(), axis: axisW.applyQuaternion(qw.invert()), max: THREE.MathUtils.degToRad(angles[i]) });
+      });
+    }
   }
+  const _fq = new THREE.Quaternion();
+  /** 0 = كف مفتوح، 1 = قبضة كاملة حول البار */
+  const setGrip = (amount: number) => {
+    for (const j of fingerJoints) {
+      _fq.setFromAxisAngle(j.axis, j.max * amount);
+      j.b.quaternion.copy(j.rest).multiply(_fq);
+    }
+  };
+  setGrip(0.85);
 
   // ------------------------------------------------------------------ نقاط الأدوات على جسم النموذج
   const armature = hips.parent!;
@@ -242,7 +267,7 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
     }
   };
 
-  return { object, propRig, sync, setHighlight };
+  return { object, propRig, sync, setHighlight, setGrip };
 }
 
 // ---------------------------------------------------------------------------
