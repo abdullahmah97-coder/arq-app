@@ -174,3 +174,15 @@ order by f.created_at desc limit 50;
 6. بعد الإطلاق، التحديثات الفورية للمستخدمين: `npm run update:production -- --message "..."`
 
 الموجود في التطبيق للمتطلبات: حذف الحساب من داخله ✅، وشرح استخدام كل صلاحية (الموقع، الصور، الكاميرا، الصحة، الحركة) ✅، وبيانات الصحة خاصة ✅.
+
+## أول نسخة iPhone من ويندوز (بدون خبرة تقنية)
+
+1. **Supabase (5 دقائق):** أنشئ مشروع مجاني في supabase.com ← SQL Editor ← New query ← الصق محتوى `supabase/setup_all.sql` كامل ← Run. بعدها من Project Settings ← API انسخ Project URL و anon public key.
+2. **شغّل الملف** `scripts/ARQ-first-iOS-build.cmd` (دبل كلك). لو طلع تحذير ويندوز «Windows protected your PC» اضغط More info ← Run anyway.
+   - يثبّت Node.js و Git لو ناقصة (لو طلب إذن اضغط Yes، وبعد التثبيت شغّل الملف مرة ثانية).
+   - ينزّل التطبيق من GitHub، ويطلب تسجيل الدخول في Expo (حساب مجاني من expo.dev/signup).
+   - يطلب مفاتيح Supabase (من الخطوة 1).
+   - يربط Apple: يسألك تسجيل الدخول بحساب Apple ← اكتب البريد وكلمة المرور والرمز اللي يوصل جوالك، ووافق على إنشاء الشهادة وملف التوزيع.
+   - يبني النسخة في سحابة Expo (~20 دقيقة) ويرفعها لـ TestFlight تلقائياً.
+3. **TestFlight:** بعد ما توصلك رسالة من Apple (5–30 دقيقة)، ثبّت تطبيق TestFlight على الآيفون وافتح ARQ.
+4. أرسل الـ Project ID اللي يطلع في آخر الشاشة، ومفاتيح Supabase، عشان تنحفظ في المستودع وتشتغل التحديثات الفورية.

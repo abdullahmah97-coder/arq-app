@@ -17,6 +17,9 @@
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
         "NSMotionUsageDescription": "لحساب خطواتك اليومية. To count your daily steps."
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {

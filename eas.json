@@ -57,9 +57,6 @@
   },
   "submit": {
     "beta": {
-      "ios": {
-        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID"
-      },
       "android": {
         "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
         "track": "internal",
@@ -67,9 +64,6 @@
       }
     },
     "production": {
-      "ios": {
-        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID"
-      },
       "android": {
         "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
         "track": "production",

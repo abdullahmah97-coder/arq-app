@@ -70,7 +70,8 @@
     "test:coach": "npx esbuild@0.25 tests/coach.test.ts --bundle --platform=node --log-level=error --outfile=node_modules/.cache/coach.test.js && node node_modules/.cache/coach.test.js",
     "test:training": "npx esbuild@0.25 tests/training.test.ts --bundle --platform=node --log-level=error --outfile=node_modules/.cache/training.test.js && node node_modules/.cache/training.test.js",
     "test:ranks": "node --experimental-strip-types --no-warnings tests/ranks.test.ts",
-    "test:clubs": "node --experimental-strip-types --no-warnings tests/clubs.test.ts"
+    "test:clubs": "node --experimental-strip-types --no-warnings tests/clubs.test.ts",
+    "db:bundle": "node tools/bundle-sql.mjs"
   },
   "private": true
 }
