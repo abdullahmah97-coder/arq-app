@@ -89,7 +89,7 @@ export function OfferCard({ o, rating, dark, width }: { o: Offer; rating?: { rat
         backgroundColor: dark ? night.card : colors.card, borderWidth: 1, borderColor: dark ? night.line : colors.border,
       })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <ClubLogo c={{ name: ch?.name_en || ch?.name || g?.name || '?', logo_path: ch?.logo_path ?? g?.logo_path }} size={38} />
+        <ClubLogo c={{ name: ch?.name_en || ch?.name || g?.name_en || g?.name || '?', logo_path: ch?.logo_path ?? g?.logo_path }} size={38} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text numberOfLines={1} style={{ color: ink, fontFamily: fonts.semibold, fontSize: 14, writingDirection: 'auto' }}>{title}</Text>
           <Text numberOfLines={1} style={{ color: muted, fontFamily: fonts.regular, fontSize: 11 }}>{sub}</Text>

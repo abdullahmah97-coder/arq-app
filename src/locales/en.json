@@ -850,7 +850,7 @@
     "offers": "Offers",
     "offersHint": "Add gym offers and membership prices. You can also assign a manager per gym to post their own offers (via SQL for now).",
     "inactive": "Paused",
-    "chainsLogos": "Chains & logos"
+    "chainsLogos": "Logos"
   },
   "clubs": {
     "title": "Gyms & offers",
