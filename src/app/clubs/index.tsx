@@ -6,6 +6,7 @@ import { ScrollView, View } from 'react-native';
 import { ChainRow, ClubRow, OfferCard } from '@/components/clubs/parts';
 import { Empty, Screen, Segmented, T } from '@/components/ui';
 import { loadChains, loadClubs, loadOffers, type Audience, type Chain, type Club, type Offer } from '@/lib/clubs';
+import { refreshNearbyGyms } from '@/lib/gyms';
 import { getCurrentPosition } from '@/lib/location';
 import { space } from '@/theme';
 
@@ -36,6 +37,7 @@ export default function Clubs() {
     if (v === 'near' && !near) {
       const pos = await getCurrentPosition().catch(() => null);
       if (!pos) { setLocDenied(true); setNear([]); return; }
+      await refreshNearbyGyms(pos); // نوادي المنطقة من الخريطة
       setNear(await loadClubs(pos));
     }
   };

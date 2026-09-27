@@ -21,3 +21,9 @@ export function isStale(o: { seen_on: string | null; confidence: string }, now =
   if (!o.seen_on) return o.confidence === 'article';
   return (now.getTime() - new Date(`${o.seen_on}T00:00:00`).getTime()) / 86400000 > 120;
 }
+
+/** النوادي اللي أنت داخلها الآن (ضمن نطاقها + هامش دقة GPS حتى 50م) — نفس قاعدة check_in في الخادم */
+export function gymsInRange<G extends { distance_m?: number | null; radius_m: number }>(gyms: G[], accuracy: number): G[] {
+  const slack = Math.min(Math.max(accuracy || 0, 0), 50);
+  return gyms.filter((g) => (g.distance_m ?? Infinity) <= g.radius_m + slack);
+}

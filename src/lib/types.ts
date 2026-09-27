@@ -52,6 +52,10 @@ export interface Gym {
   radius_m: number;
   verified: boolean;
   distance_m?: number;
+  /** العنوان (للنوادي المضافة من الخريطة) */
+  address?: string | null;
+  chain_id?: string | null;
+  source?: 'user' | 'osm' | 'google' | 'admin';
 }
 
 export interface CheckIn {

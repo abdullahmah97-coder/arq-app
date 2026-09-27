@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import { useLocalized } from '@/lib/i18n';
+import { nearbyGyms, refreshNearbyGyms } from '@/lib/gyms';
 import { getCurrentPosition } from '@/lib/location';
 import { errorKey, supabase } from '@/lib/supabase';
 import type { Gym } from '@/lib/types';
@@ -30,9 +31,9 @@ export function GymPicker({ userId, value, onChange }: {
     try {
       const pos = await getCurrentPosition();
       if (!pos) return Alert.alert(t('errors.locationDenied'));
-      const { data, error } = await supabase.rpc('nearby_gyms', { p_lat: pos.lat, p_lng: pos.lng, p_km: 30 });
-      if (error) throw error;
-      setGyms((data ?? []) as Gym[]);
+      // نجيب نوادي المنطقة من الخريطة أولاً (وقت اللياقة، جولدز… وأي نادي حقيقي قريب)
+      await refreshNearbyGyms(pos);
+      setGyms(await nearbyGyms(pos, 30));
     } catch (e) {
       Alert.alert(t(errorKey(e)));
     } finally {
@@ -78,7 +79,7 @@ export function GymPicker({ userId, value, onChange }: {
         <OptionCard
           key={g.id}
           title={gymName(g, lng)}
-          subtitle={[g.city, g.distance_m != null ? `${Math.round(g.distance_m)} m` : null, g.verified ? '✓' : null].filter(Boolean).join(' · ')}
+          subtitle={[g.address ?? g.city, g.distance_m != null ? (g.distance_m >= 1000 ? `${(g.distance_m / 1000).toFixed(1)} km` : `${Math.round(g.distance_m)} m`) : null, g.verified ? '✓' : null].filter(Boolean).join(' · ')}
           icon="barbell-outline"
           selected={value === g.id}
           onPress={() => onChange(g)}

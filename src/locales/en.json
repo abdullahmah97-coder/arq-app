@@ -966,5 +966,15 @@
     "sourceUrl": "Source link (optional)",
     "sourceHint": "Offer page or ad — shown to users with the date added",
     "reviewsTab": "Reviews"
+  },
+  "checkin": {
+    "whichGym": "You are near more than one gym — which one?",
+    "noneHere": "No gym found at your location",
+    "nearest": "Nearest gym: {{name}}, {{m}} m away. Check in when you get there.",
+    "noneNear": "No known gyms nearby. You can add yours here.",
+    "addHere": "Add my gym",
+    "searching": "Finding your gym…",
+    "anyGym": "Check in at any gym",
+    "auto": "We detect the gym from your location"
   }
 }

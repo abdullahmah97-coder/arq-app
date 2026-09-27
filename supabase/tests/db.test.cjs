@@ -386,6 +386,35 @@ grant usage on schema public, auth, storage to authenticated;
   const nb = await as(A, 'select * from nearby_gyms(24.69, 46.685, 5)');
   check('nearby gyms', nb.length >= 1 && nb[0].name === gym.name);
 
+  // provider gyms (map lookup via edge function, service role only)
+  const places = JSON.stringify([
+    { id: 'node/1', name: 'وقت اللياقة - النخيل', name_en: 'Fitness Time Al Nakheel', lat: 24.75, lng: 46.64, address: 'حي النخيل' },
+    { id: 'way/2', name: "Gold's Gym", lat: 24.751, lng: 46.641 },
+    { id: 'node/3', name: 'وقت اللياقة بلس', lat: 24.752, lng: 46.642 },
+    { id: 'node/4', name: 'نادي الحي', lat: 24.753, lng: 46.643 },
+    { id: 'node/5', name: '', lat: 1, lng: 1 },
+    { id: 'node/6', name: 'bad coords', lat: 200, lng: 1 },
+  ]);
+  await expectErr('users cannot add map gyms', () => as(A, 'select upsert_provider_gyms($1, $2::jsonb)', ['osm', places]), /permission denied/);
+  await db.exec('set role service_role;');
+  const nIns = (await q('select upsert_provider_gyms($1, $2::jsonb) n', ['osm', places]))[0].n;
+  const nAgain = (await q('select upsert_provider_gyms($1, $2::jsonb) n', ['osm', places]))[0].n;
+  await db.exec('reset role;');
+  check('map gyms: valid places added, bad ones skipped', nIns === 4 && nAgain === 4, `${nIns}/${nAgain}`);
+  const pg = await q(`select external_id, verified, radius_m, (select slug from gym_chains c where c.id = g.chain_id) slug from gyms g where source = 'osm' order by external_id`);
+  check('map gyms: idempotent + verified', pg.length === 4 && pg.every(r => r.verified && r.radius_m === 200), JSON.stringify(pg));
+  const slugOf = (id) => pg.find(r => r.external_id === id)?.slug ?? null;
+  check('map gyms linked to their chain', slugOf('node/1') === 'fitness-time' && slugOf('way/2') === 'golds-gym' && slugOf('node/3') === 'fitness-time-plus' && slugOf('node/4') === null,
+    JSON.stringify(pg.map(r => [r.external_id, r.slug])));
+  const nbm = await as(A, 'select * from nearby_gyms(24.7505, 46.6405, 1)');
+  check('nearby includes map gyms with address', nbm.length === 4 && nbm.some(g => g.address === 'حي النخيل'));
+  const mg = nbm.find(g => g.address === 'حي النخيل');
+  const ciMap = (await as(A, 'select * from check_in($1, $2, $3, 10)', [mg.id, mg.lat + 0.001, mg.lng]))[0];
+  check('check-in at a map gym (within 200m) works', !!ciMap.id, `dist=${ciMap.distance_m}`);
+  await as(A, 'select * from check_out($1)', [ciMap.id]);
+  { let hidden = false; try { hidden = (await as(A, 'select * from gym_area_scans')).length === 0; } catch (e) { hidden = /permission denied/.test(e.message); }
+    check('scan log is private', hidden); }
+
   // delete account (store requirement)
   await as(C, 'select delete_my_account()');
   check('account deleted with its data', (await q('select count(*)::int n from profiles where id = $1', [C]))[0].n === 0 && (await q('select count(*)::int n from auth.users where id = $1', [C]))[0].n === 0);
