@@ -49,10 +49,23 @@ const { setup } = require('./_harness.cjs');
   const g2 = (await as(null, `select * from gate_verify($1, $2)`, [gate.api_key, p1.code]))[0];
   check('gate opens after 3h', g2.allowed === true && g2.first_name === 'Ahmed', JSON.stringify(g2));
 
+  // اللون: الافتراضي النخيل، والعضو يختار (ويتذكره)
+  check('default theme palm', p1.theme === 'palm' && (await as(U.A, `select * from my_wallet_pass()`))[0].theme === 'palm');
+  const lt = (await as(U.A, `select * from wallet_link('lavender')`))[0];
+  const pt = (await asService(`select * from wallet_issue($1)`, [lt.token]))[0];
+  check('lavender theme chosen', pt.theme === 'lavender' && (await as(U.A, `select * from my_wallet_pass()`))[0].theme === 'lavender');
+  const lr = (await as(U.A, `select * from wallet_link()`))[0];
+  const pr = (await asService(`select * from wallet_issue($1)`, [lr.token]))[0];
+  check('theme remembered when not given', pr.theme === 'lavender');
+  const lx = (await as(U.A, `select * from wallet_link('neon')`))[0];
+  const px = (await asService(`select * from wallet_issue($1)`, [lx.token]))[0];
+  check('unknown theme falls back to palm', px.theme === 'palm');
+  await q(`delete from wallet_links`);
+
   // تنزيل بطاقة جديدة يلغي القديمة
   const l3 = (await as(U.A, `select * from wallet_link()`))[0];
   const p2 = (await asService(`select * from wallet_issue($1)`, [l3.token]))[0];
-  check('same serial, new code', p2.serial === p1.serial && p2.code !== p1.code);
+  check('same serial, new code', p2.serial === p1.serial && p2.code !== p1.code && p2.theme === 'palm');
   const old = (await as(U.C, `select * from verify_entry($1, $2)`, [p1.code, gym.id]))[0];
   check('old barcode stops working', old.allowed === false && old.reason === 'code_not_found');
 

@@ -17,15 +17,16 @@ export async function walletEnabled(): Promise<boolean> {
   return cached.enabled;
 }
 
-export async function addToWallet() {
-  const { data, error } = await supabase.rpc('wallet_link');
+export type WalletTheme = 'palm' | 'oasis' | 'dune' | 'sand' | 'lavender';
+export async function addToWallet(theme: WalletTheme) {
+  const { data, error } = await supabase.rpc('wallet_link', { p_theme: theme });
   if (error) throw error;
   const row = ((data ?? []) as { token: string }[])[0];
   if (!row) throw new Error('code_not_found');
   await Linking.openURL(`${FN}?t=${row.token}`);
 }
 
-export interface WalletStatus { has_pass: boolean; code_hint: string | null; rotated_at: string | null; last_used_at: string | null }
+export interface WalletStatus { has_pass: boolean; code_hint: string | null; rotated_at: string | null; last_used_at: string | null; theme: WalletTheme | null }
 export async function myWalletPass(): Promise<WalletStatus | null> {
   const { data, error } = await supabase.rpc('my_wallet_pass');
   if (error) return null;

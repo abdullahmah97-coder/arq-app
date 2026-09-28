@@ -1754,6 +1754,7 @@
     "revoke": "Turn off card",
     "revokeTitle": "Turn off your Wallet card?",
     "revokeBody": "If you lost your phone or think someone copied the card, turn it off. You can add a new one later.",
-    "revoked": "Card turned off. The old barcode no longer works."
+    "revoked": "Card turned off. The old barcode no longer works.",
+    "pickColor": "Pick your card color"
   }
 }
