@@ -69,6 +69,9 @@
         "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
         "track": "internal",
         "releaseStatus": "completed"
+      },
+      "ios": {
+        "ascAppId": "6816697338"
       }
     },
     "production": {
@@ -76,6 +79,9 @@
         "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
         "track": "production",
         "releaseStatus": "draft"
+      },
+      "ios": {
+        "ascAppId": "6816697338"
       }
     }
   }
