@@ -36,7 +36,9 @@ export default function OwnerNudges() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const inCat = useMemo(() => rows.filter((r) => r.category === cat), [rows, cat]);
-  const shown = inCat.filter((r) => who === 'all' || r.gender === who || r.gender === 'all');
+  // العربي أولاً، بعده الإنجليزي
+  const shown = inCat.filter((r) => who === 'all' || r.gender === who || r.gender === 'all')
+    .sort((a, b) => Number(a.locale !== 'ar') - Number(b.locale !== 'ar'));
   // تحذير لو فئة ما لها نص عربي مفعّل
   const missing = (['male', 'female'] as const).filter((g) => !inCat.some((r) => r.active && r.locale === 'ar' && (r.gender === g || r.gender === 'all')));
 

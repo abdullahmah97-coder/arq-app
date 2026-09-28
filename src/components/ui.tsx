@@ -120,9 +120,9 @@ export function Segmented<V extends string | number>({ options, value, onChange,
           <Pressable
             key={String(o.value)}
             onPress={() => onChange(o.value)}
+            // الشرائح (wrap) بدون flex:1: في Yoga قيمة flexBasis:'auto' ما تلغي flex:1، فتنضغط الشريحة لعرض صفر ويختفي النص
             style={[
-              styles.segmentItem,
-              wrap && styles.chip,
+              wrap ? styles.chip : styles.segmentItem,
               active && { backgroundColor: brand.deepGreen, borderColor: brand.deepGreen },
             ]}
           >
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, color: colors.text, paddingHorizontal: space.md, paddingVertical: 12, fontSize: font.md, fontFamily: fonts.regular, textAlign: 'auto', writingDirection: 'auto' },
   segment: { flexDirection: 'row', backgroundColor: colors.cardAlt, borderRadius: radius.md, padding: 4, gap: 4 },
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.sm, borderWidth: 1, borderColor: 'transparent' },
-  chip: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: space.lg, backgroundColor: colors.card, borderColor: colors.border, borderRadius: radius.pill },
+  chip: { alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: space.lg, borderWidth: 1, backgroundColor: colors.card, borderColor: colors.border, borderRadius: radius.pill },
   option: { flexDirection: 'row', alignItems: 'center', gap: space.md },
 });
 
