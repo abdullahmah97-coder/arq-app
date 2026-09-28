@@ -6,7 +6,7 @@ import { supabase } from './supabase';
 export type NotifKind =
   | 'follow' | 'friend_request' | 'friend_accept'
   | 'post_like' | 'post_comment' | 'checkin_like' | 'checkin_comment' | 'friend_here'
-  | 'challenge_invite' | 'challenge_win' | 'rank_up' | 'program_adopt' | 'gym_offer' | 'nudge';
+  | 'challenge_invite' | 'challenge_win' | 'rank_up' | 'program_adopt' | 'gym_offer' | 'nudge' | 'notice' | 'promo';
 
 export interface NotifRow {
   id: number;
@@ -69,6 +69,8 @@ export function notifHref(n: Pick<NotifRow, 'kind' | 'target_id' | 'actor_id' | 
     case 'rank_up': return '/ranks';
     case 'program_adopt': return n.target_id ? `/program/${n.target_id}` : null;
     case 'nudge': return typeof n.data?.url === 'string' && n.data.url.startsWith('/') ? n.data.url : '/checkin';
+    case 'notice':
+    case 'promo': return typeof n.data?.url === 'string' && n.data.url.startsWith('/') ? n.data.url : null;
     case 'gym_offer':
       if (n.data?.gym_id) return `/clubs/${n.data.gym_id}`;
       if (n.data?.chain_id) return `/clubs/chain/${n.data.chain_id}`;

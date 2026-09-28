@@ -10,6 +10,9 @@ const PROD_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL || PROD_URL;
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || PROD_ANON_KEY;
 
+/** رابط الخادم (لتوثيق ربط البوابات) */
+export const SUPABASE_URL = url;
+
 if (!url || !anonKey) {
   console.warn('Missing EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY — copy .env.example to .env');
 }
@@ -59,6 +62,16 @@ export async function uploadImage(
   return path;
 }
 
+/** رموز أخطاء الخادم اللي لها نص مترجم في srv.* */
+export const SERVER_CODES = new Set([
+  'not_allowed', 'not_authenticated', 'user_not_found', 'referral_not_found', 'membership_not_found', 'code_not_found', 'too_many_requests',
+  'request_pending', 'bad_days', 'transfer_same_chain_only', 'request_not_found', 'bad_status', 'rate_limited', 'class_not_found', 'bad_date',
+  'too_far_ahead', 'members_only', 'already_booked', 'booking_not_found', 'too_late_to_cancel', 'too_many_rows', 'gym_not_found',
+  'review_needs_visit', 'already_replied', 'not_enough_points', 'out_of_stock', 'reward_ended', 'reward_not_found', 'code_ended',
+  'consent_required', 'scope_not_granted', 'link_not_found', 'already_linked', 'slot_full', 'no_sessions_left', 'package_expired',
+  'payments_disabled', 'order_not_found', 'amount_mismatch', 'kind_not_available', 'not_a_coach', 'not_verified', 'brand_not_approved',
+]);
+
 /** يحوّل رسائل أخطاء الخادم إلى مفاتيح ترجمة */
 export function errorKey(e: unknown): string {
   const msg = String((e as any)?.message ?? e ?? '');
@@ -69,6 +82,9 @@ export function errorKey(e: unknown): string {
   if (msg.includes('duplicate key') && msg.includes('username')) return 'errors.usernameTaken';
   if (msg.includes('duplicate key')) return 'errors.duplicate';
   if (msg.includes('Network request failed') || msg.includes('Failed to fetch')) return 'errors.network';
+  const code = msg.match(/\b([a-z]+(?:_[a-z0-9]+)+)\b/)?.[1];
+  if (code && SERVER_CODES.has(code)) return `srv.${code}`;
+  if (msg.includes('row-level security')) return 'srv.not_allowed';
   return 'errors.generic';
 }
 

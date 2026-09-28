@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, I18nManager, Pressable, View } from 'react-native';
 import { checkForAppUpdate, isBeta, versionLabel } from '@/lib/appInfo';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { MembershipEntry } from '@/components/gymops/MembershipEntry';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { errorKey, supabase } from '@/lib/supabase';
@@ -54,6 +55,9 @@ export default function ProfileTab() {
           </T>
         </Card>
       ) : null}
+
+      {/* اشتراكي وبطاقة الدخول + إدارة النادي للموظفين */}
+      <MembershipEntry />
 
       <Card style={{ paddingVertical: space.xs }}>
         {owner ? <MenuItem icon="shield-checkmark-outline" label={`${t('owner.title')}${owner.reports + owner.brands ? ` · ${owner.reports + owner.brands}` : ''}`} onPress={() => router.push('/owner')} /> : null}

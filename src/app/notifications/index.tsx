@@ -32,6 +32,8 @@ const KIND_ICON: Record<NotifKind, { icon: IconName; color: string }> = {
   program_adopt: { icon: 'barbell', color: brand.green },
   gym_offer: { icon: 'pricetag', color: brand.orange },
   nudge: { icon: 'flame', color: brand.orange },
+  notice: { icon: 'notifications', color: brand.deepGreen },
+  promo: { icon: 'pricetag', color: brand.orange },
 };
 
 type Item = { type: 'label'; key: string; text: string } | { type: 'row'; key: string; n: NotifRow; fresh: boolean };
@@ -126,7 +128,7 @@ function useNotifText() {
   const { lng } = useLocalized();
   return (n: NotifRow): { parts: string[]; name: string } => {
     const name = n.full_name?.trim() || n.username || t('notif.someone');
-    if (n.kind === 'nudge') return { parts: [], name }; // نصه من المالك (data.title/body)، ما له مفتاح ترجمة
+    if (n.kind === 'nudge' || n.kind === 'notice' || n.kind === 'promo') return { parts: [], name }; // نصه جاهز من الخادم
     const d = n.data ?? {};
     const key = n.kind === 'follow' && d.mutual ? 'notif.followMutual' : `notif.${n.kind}`;
     const rank = n.kind === 'rank_up' ? RANKS[Number(d.level) || 0]?.name[lng] : undefined;
@@ -172,6 +174,12 @@ function NotifItem({ n, fresh, lng }: { n: NotifRow; fresh: boolean; lng: 'ar' |
           <>
             <T size="sm" bold>{n.data?.title ?? ''}</T>
             <T size="sm" style={{ lineHeight: 22 }}>{n.data?.body ?? ''}</T>
+          </>
+        ) : n.kind === 'notice' || n.kind === 'promo' ? (
+          // تنبيه بنص جاهز بالعربي والإنجليزي (اشتراك، حصة، رد النادي، عرض…)
+          <>
+            <T size="sm" bold>{(lng === 'en' && n.data?.title_en) || n.data?.title_ar || ''}</T>
+            <T size="sm" style={{ lineHeight: 22 }}>{(lng === 'en' && n.data?.body_en) || n.data?.body_ar || ''}</T>
           </>
         ) : (
           <T size="sm" style={{ lineHeight: 22 }}>
