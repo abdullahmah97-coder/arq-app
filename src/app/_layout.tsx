@@ -114,6 +114,7 @@ function RootNavigator() {
         <Stack.Screen name="food/add" options={{ title: t('food.addFood'), presentation: 'modal' }} />
         <Stack.Screen name="notifications/index" options={{ title: t('notif.title') }} />
         <Stack.Screen name="notifications/settings" options={{ title: t('notif.settings') }} />
+        <Stack.Screen name="owner-nudges" options={{ title: t('nudge.title') }} />
       </Stack.Protected>
     </Stack>
   );

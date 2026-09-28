@@ -30,6 +30,7 @@ const KIND_ICON: Record<NotifKind, { icon: IconName; color: string }> = {
   rank_up: { icon: 'arrow-up-circle', color: brand.orange },
   program_adopt: { icon: 'barbell', color: brand.green },
   gym_offer: { icon: 'pricetag', color: brand.orange },
+  nudge: { icon: 'flame', color: brand.orange },
 };
 
 type Item = { type: 'label'; key: string; text: string } | { type: 'row'; key: string; n: NotifRow; fresh: boolean };
@@ -164,11 +165,19 @@ function NotifItem({ n, fresh, lng }: { n: NotifRow; fresh: boolean; lng: 'ar' |
         ) : null}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <T size="sm" style={{ lineHeight: 22 }}>
-          {parts.map((p, i) => (
-            <T key={i} size="sm">{p}{i < parts.length - 1 ? <T size="sm" bold>{name}</T> : null}</T>
-          ))}
-        </T>
+        {n.kind === 'nudge' ? (
+          // تنبيه تحفيزي: عنوانه ونصه مكتوبين من المالك
+          <>
+            <T size="sm" bold>{n.data?.title ?? ''}</T>
+            <T size="sm" style={{ lineHeight: 22 }}>{n.data?.body ?? ''}</T>
+          </>
+        ) : (
+          <T size="sm" style={{ lineHeight: 22 }}>
+            {parts.map((p, i) => (
+              <T key={i} size="sm">{p}{i < parts.length - 1 ? <T size="sm" bold>{name}</T> : null}</T>
+            ))}
+          </T>
+        )}
         <T size="xs" muted>{timeAgo(n.created_at, lng)}</T>
       </View>
       {fresh ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} /> : null}

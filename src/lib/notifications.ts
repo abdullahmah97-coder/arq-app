@@ -6,7 +6,7 @@ import { supabase } from './supabase';
 export type NotifKind =
   | 'follow' | 'friend_request' | 'friend_accept'
   | 'post_like' | 'post_comment' | 'checkin_like' | 'checkin_comment' | 'friend_here'
-  | 'challenge_invite' | 'challenge_win' | 'rank_up' | 'program_adopt' | 'gym_offer';
+  | 'challenge_invite' | 'challenge_win' | 'rank_up' | 'program_adopt' | 'gym_offer' | 'nudge';
 
 export interface NotifRow {
   id: number;
@@ -22,10 +22,10 @@ export interface NotifRow {
 }
 
 /** أنواع التنبيهات في الإعدادات (نفس مفاتيح notify_prefs في القاعدة) */
-export const NOTIFY_CATEGORIES = ['messages', 'social', 'activity', 'progress', 'offers'] as const;
+export const NOTIFY_CATEGORIES = ['messages', 'social', 'activity', 'progress', 'nudges', 'offers'] as const;
 export type NotifyCategory = (typeof NOTIFY_CATEGORIES)[number];
 export type NotifyPrefs = Record<NotifyCategory, boolean>;
-export const DEFAULT_PREFS: NotifyPrefs = { messages: true, social: true, activity: true, progress: true, offers: true };
+export const DEFAULT_PREFS: NotifyPrefs = { messages: true, social: true, activity: true, progress: true, nudges: true, offers: true };
 
 export async function loadNotifications(before?: number, limit = 40): Promise<NotifRow[]> {
   const { data, error } = await supabase.rpc('my_notifications', { p_before: before ?? null, p_limit: limit });
@@ -67,6 +67,7 @@ export function notifHref(n: Pick<NotifRow, 'kind' | 'target_id' | 'actor_id' | 
     case 'challenge_win': return n.target_id ? `/challenge/${n.target_id}` : null;
     case 'rank_up': return '/ranks';
     case 'program_adopt': return n.target_id ? `/program/${n.target_id}` : null;
+    case 'nudge': return typeof n.data?.url === 'string' && n.data.url.startsWith('/') ? n.data.url : '/checkin';
     case 'gym_offer':
       if (n.data?.gym_id) return `/clubs/${n.data.gym_id}`;
       if (n.data?.chain_id) return `/clubs/chain/${n.data.chain_id}`;

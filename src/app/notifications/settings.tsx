@@ -15,6 +15,7 @@ const ICON: Record<NotifyCategory, IconName> = {
   social: 'people-outline',
   activity: 'heart-outline',
   progress: 'trophy-outline',
+  nudges: 'flame-outline',
   offers: 'pricetag-outline',
 };
 

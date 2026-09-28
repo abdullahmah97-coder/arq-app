@@ -510,6 +510,61 @@ grant usage on schema public, auth, storage to authenticated;
   await as(B, 'select unregister_push_token($1)', [TOK]);
   check('push: sign-out removes the device', (await as(B, 'select * from push_tokens')).length === 0);
 
+  // motivational nudges (written by the owner, sent by the server on a schedule)
+  await q(`update profiles set onboarded = true, notify_prefs = notify_prefs - 'nudges' where id in ($1, $2)`, [A, B]);
+  await q(`update health_profiles set gender = 'male' where user_id = $1`, [A]);
+  await q(`update health_profiles set gender = 'female' where user_id = $1`, [B]);
+  await q(`update plans set active = false`);
+  check('nudges: default texts for men and women exist',
+    (await q(`select count(*)::int n from nudge_templates where gender = 'male'`))[0].n >= 10 && (await q(`select count(*)::int n from nudge_templates where gender = 'female'`))[0].n >= 10);
+  await expectErr('nudges: regular users cannot read the texts', async () => {
+    const r = await as(A, 'select * from nudge_templates'); if (r.length === 0) throw new Error('row-level security (hidden)'); }, /row-level security|permission denied/);
+  await expectErr('nudges: regular users cannot add texts', () => as(A, `insert into nudge_templates (category, title, body) values ('gym', 'x', 'spam spam')`), /row-level security/);
+  const nt = (await as(B, `insert into nudge_templates (category, gender, locale, title, body) values ('gym', 'female', 'ar', 'اختبار', 'يا {name} روحي {gym}') returning id, created_by`))[0];
+  check('nudges: the owner can add a text (stamped with her id)', nt.created_by === B);
+  // a fixed future Sunday so "today" is clean: 17:10 Riyadh (default gym slot = 18:00 - 1h)
+  const T17 = '2030-01-06 17:10:00+03';
+  await q(`insert into check_ins (user_id, gym_id, checked_in_at) values ($1, $2, '2030-01-06 16:30:00+03')`, [B, gym.id]);
+  const sent1 = (await q('select run_nudges($1) n', [T17]))[0].n;
+  const nudgeA = (await q(`select data, actor_id from notifications where user_id = $1 and kind = 'nudge' order by id desc limit 1`, [A]))[0];
+  const bName = (await q(`select split_part(coalesce(nullif(btrim(full_name), ''), username), ' ', 1) n from profiles where id = $1`, [B]))[0].n;
+  check('nudges: friend went to the gym and you did not → "friend beat you" with her name', sent1 >= 1 && nudgeA?.actor_id === B && nudgeA.data.cat === 'friend'
+    && (nudgeA.data.title + nudgeA.data.body).includes(bName) && !(nudgeA.data.title + nudgeA.data.body).includes('{'), JSON.stringify(nudgeA));
+  check('nudges: whoever already went today gets nothing', (await q(`select count(*)::int n from nudge_log where user_id = $1 and day = '2030-01-06'`, [B]))[0].n === 0);
+  check('nudges: no duplicates within the same slot', (await q('select run_nudges($1) n', ['2030-01-06 17:40:00+03']))[0].n === 0);
+  check('nudges: quiet at night', (await q('select run_nudges($1) n', ['2030-01-06 23:30:00+03']))[0].n === 0);
+  // streak saver at 21:00 for A (5-day streak, went yesterday, not today)
+  await q(`update profiles set streak = 5, last_checkin_on = '2030-01-06' where id = $1`, [A]);
+  await q('select run_nudges($1)', ['2030-01-07 21:05:00+03']);
+  const stk = (await q(`select data from notifications where user_id = $1 and kind = 'nudge' order by id desc limit 1`, [A]))[0];
+  check('nudges: streak saver mentions the streak', stk?.data.cat === 'streak' && (stk.data.title + stk.data.body).includes('5'), JSON.stringify(stk));
+  // meal at 13:00 for B (female texts), skipped once she logs food
+  await q(`insert into food_logs (user_id, eaten_on, slot, name, kcal) values ($1, '2030-01-07', 'breakfast', 'تمر', 90)`, [A]);
+  await q('select run_nudges($1)', ['2030-01-07 13:05:00+03']);
+  const mealB = (await q(`select data from notifications where user_id = $1 and kind = 'nudge' and data->>'cat' = 'meal' order by id desc limit 1`, [B]))[0];
+  check('nudges: meal reminder only for who has not logged food', !(await q(`select 1 from nudge_log where user_id = $1 and slot = 'meal'`, [A])).length);
+  check('nudges: women get the feminine text', !mealB || /ي/.test(mealB.data.body), JSON.stringify(mealB));
+  // cap: at most 3 a day
+  await q(`insert into nudge_log (user_id, day, slot, category) values ($1, '2030-01-08', 'workout', 'workout'), ($1, '2030-01-08', 'meal', 'meal'), ($1, '2030-01-08', 'streak', 'streak')`, [A]);
+  await q('select run_nudges($1)', ['2030-01-08 17:05:00+03']);
+  check('nudges: never more than 3 a day', (await q(`select count(*)::int n from nudge_log where user_id = $1 and day = '2030-01-08'`, [A]))[0].n === 3);
+  // user switched nudges off
+  await q(`update profiles set notify_prefs = notify_prefs || '{"nudges": false}' where id = $1`, [A]);
+  await q('select run_nudges($1)', ['2030-01-09 17:05:00+03']);
+  check('nudges: respects "motivation off" in settings', (await q(`select count(*)::int n from nudge_log where user_id = $1 and day = '2030-01-09'`, [A]))[0].n === 0);
+  await q(`update profiles set notify_prefs = notify_prefs - 'nudges' where id = $1`, [A]);
+  await q('select run_nudges($1)', ['2030-01-10 17:05:00+03']);
+  const gA = (await q(`select data, actor_id from notifications where user_id = $1 and kind = 'nudge' order by id desc limit 1`, [A]))[0];
+  check('nudges: no friend went → the normal gym reminder (men\'s text)', gA?.data.cat === 'gym' && gA.actor_id === null && !/روحي|تخلين/.test(gA.data.body), JSON.stringify(gA));
+  // owner tries a text on herself
+  await as(B, 'select send_test_nudge($1)', [nt.id]);
+  const tb = (await q(`select data from notifications where user_id = $1 and kind = 'nudge' and data ? 'test' order by id desc limit 1`, [B]))[0];
+  check('nudges: owner test shows the filled text', tb?.data.body.startsWith('يا ') && !tb.data.body.includes('{'), JSON.stringify(tb));
+  await expectErr('nudges: only the owner can send tests', () => as(A, 'select send_test_nudge($1)', [nt.id]), /forbidden/);
+  await expectErr('nudges: users cannot trigger the scheduler', () => as(A, 'select run_nudges()'), /permission denied/);
+  const txtN = (await q(`select _notif_text('nudge', null, '{"title":"النادي يناديك","body":"يلا"}', 'ar') t`))[0].t;
+  check('nudges: phone text = the written title and body', txtN[0] === 'النادي يناديك' && txtN[1] === 'يلا');
+
   // delete account (store requirement)
   await as(C, 'select delete_my_account()');
   check('account deleted with its data', (await q('select count(*)::int n from profiles where id = $1', [C]))[0].n === 0 && (await q('select count(*)::int n from auth.users where id = $1', [C]))[0].n === 0);

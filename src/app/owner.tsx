@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, Modal, Pressable, TextInput, View } from 'react-native';
+import { Alert, I18nManager, Linking, Modal, Pressable, TextInput, View } from 'react-native';
 import { Num } from '@/components/pulse/widgets';
 import { BrandLogo } from '@/components/store/parts';
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
@@ -54,6 +54,17 @@ export default function Owner() {
         <Stat n={count('fixed')} label={t('owner.fixed')} color={STATUS_COLOR.fixed} />
         <Stat n={pending.length} label={t('owner.pendingBrands')} color={brand.orange} />
       </View>
+      <Pressable onPress={() => router.push('/owner-nudges')} accessibilityRole="button"
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, backgroundColor: brand.deepGreen, borderRadius: radius.md, padding: space.md, opacity: pressed ? 0.85 : 1 })}>
+        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: brand.orange, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="flame" size={22} color={brand.cream} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <T semibold color={brand.cream}>{t('nudge.button')}</T>
+          <T size="xs" color="rgba(248,237,218,0.75)">{t('nudge.buttonHint')}</T>
+        </View>
+        <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={brand.cream} />
+      </Pressable>
       <Segmented value={tab} onChange={setTab} options={[{ value: 'reports', label: `${t('owner.reports')} (${reports.length})` }, { value: 'brands', label: `${t('owner.brands')} (${pending.length})` }, { value: 'offers', label: `${t('owner.offers')} (${offers.length})` }]} />
 
       {tab === 'offers' ? (
