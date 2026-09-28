@@ -1,5 +1,8 @@
 # إرسال نسخة آيفون مبنية مسبقاً إلى TestFlight (بدون بناء جديد)
 # يُشغَّل يدوياً من expo.dev ← Workflows ← Run workflow، مع رقم البناء (build id)
+# Git ref: testflight-submit — فيه ascAppId داخل eas.json. ما أضفناه لـ main/beta لأن eas.json
+# جزء من بصمة النسخة (runtime)، وتغييره يمنع التحديثات الفورية عن نسخة TestFlight الحالية.
+# أضفه لـ main مع أول بناء أصلي (native) جديد.
 name: Submit iOS build to TestFlight
 
 on:
@@ -15,7 +18,6 @@ jobs:
     type: submit
     env:
       APP_VARIANT: beta
-      EXPO_DEBUG: '1'
     params:
       build_id: ${{ inputs.build_id }}
       profile: beta
