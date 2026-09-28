@@ -38,13 +38,47 @@ export function durationLabel(fromIso: string, lng: 'ar' | 'en', now = Date.now(
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 
-export function timeAgo(iso: string, lng: 'ar' | 'en'): string {
-  const rtf = new Intl.RelativeTimeFormat(lng, { numeric: 'auto' });
-  const diff = (new Date(iso).getTime() - Date.now()) / 1000;
+type Unit = 'minute' | 'hour' | 'day';
+// العربي: ١ دقيقة، ٢ دقيقتين، ٣–١٠ دقائق، ١١+ دقيقة
+const AR: Record<Unit, [string, string, string]> = {
+  minute: ['دقيقة', 'دقيقتين', 'دقائق'],
+  hour: ['ساعة', 'ساعتين', 'ساعات'],
+  day: ['يوم', 'يومين', 'أيام'],
+};
+const EN: Record<Unit, string> = { minute: 'min', hour: 'hr', day: 'day' };
+
+function arCount(n: number, u: Unit): string {
+  const [one, two, few] = AR[u];
+  if (n === 1) return one;
+  if (n === 2) return two;
+  if (n >= 3 && n <= 10) return `${n} ${few}`;
+  return `${n} ${one}`;
+}
+
+/**
+ * «قبل ٥ دقائق» / «5 min ago». مكتوبة يدوياً لأن محرك Hermes في الجوال ما فيه Intl.RelativeTimeFormat
+ * (استخدامه كان يقفل التطبيق عند فتح التنبيهات والمنشورات).
+ */
+export function timeAgo(iso: string, lng: 'ar' | 'en', now = Date.now()): string {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return '';
+  const diff = (t - now) / 1000;
+  const past = diff <= 0;
   const abs = Math.abs(diff);
-  if (abs < 60) return rtf.format(Math.round(diff), 'second');
-  if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');
-  if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour');
-  if (abs < 86400 * 7) return rtf.format(Math.round(diff / 86400), 'day');
-  return new Date(iso).toLocaleDateString(lng === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-US', { day: 'numeric', month: 'short' });
+  if (abs < 60) return lng === 'ar' ? 'الآن' : 'just now';
+  let n: number; let u: Unit;
+  if (abs < 3600) { n = Math.round(abs / 60); u = 'minute'; }
+  else if (abs < 86400) { n = Math.round(abs / 3600); u = 'hour'; }
+  else if (abs < 86400 * 7) { n = Math.round(abs / 86400); u = 'day'; }
+  else {
+    try {
+      return new Date(t).toLocaleDateString(lng === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-US', { day: 'numeric', month: 'short' });
+    } catch {
+      return isoDate(new Date(t));
+    }
+  }
+  if (u === 'day' && n === 1) return lng === 'ar' ? (past ? 'أمس' : 'بكرة') : past ? 'yesterday' : 'tomorrow';
+  if (lng === 'ar') return `${past ? 'قبل' : 'بعد'} ${arCount(n, u)}`;
+  const label = `${n} ${EN[u]}${u === 'day' && n > 1 ? 's' : ''}`;
+  return past ? `${label} ago` : `in ${label}`;
 }
