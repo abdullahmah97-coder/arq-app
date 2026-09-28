@@ -1,0 +1,18 @@
+# إرسال نسخة آيفون مبنية مسبقاً إلى TestFlight (بدون بناء جديد)
+# يُشغَّل يدوياً من expo.dev ← Workflows ← Run workflow، مع رقم البناء (build id)
+name: Submit iOS build to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        type: string
+        required: true
+        description: 'EAS build id of the iOS build to send to TestFlight'
+
+jobs:
+  submit_ios:
+    type: submit
+    params:
+      build_id: ${{ inputs.build_id }}
+      profile: beta
