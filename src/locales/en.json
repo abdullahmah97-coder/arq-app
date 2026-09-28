@@ -1572,7 +1572,8 @@
     "cancelBooking": "Cancel booking",
     "joinWaitlist": "Join waitlist",
     "book": "Book",
-    "noClassesSoon": "No classes in the next two weeks"
+    "noClassesSoon": "No classes in the next two weeks",
+    "reason_recent_entry": "Entered with this card less than 3 hours ago"
   },
   "srv": {
     "not_allowed": "You don't have permission for this",
@@ -1617,7 +1618,9 @@
     "kind_not_available": "Not available yet",
     "not_a_coach": "This is for coaches",
     "not_verified": "Needs verification first",
-    "brand_not_approved": "Brand awaiting approval"
+    "brand_not_approved": "Brand awaiting approval",
+    "code_used": "That link was already used, try again",
+    "code_expired": "That link expired, try again"
   },
   "trust": {
     "liveNow_one": "1 person here now",
@@ -1741,5 +1744,16 @@
     "goalQ": "How many days a week do you plan to train?",
     "goalHint": "Your rate is based on your goal, not every day of the month.",
     "attendancePrivate": "Your attendance is private. Only you can see it."
+  },
+  "wallet": {
+    "add": "Add to Apple Wallet",
+    "update": "Update Wallet card",
+    "hint": "Enter the club with your phone from Wallet, without opening the app.",
+    "hasPass": "Your Wallet card is active (ends in {{hint}}). Adding a new one turns off the old one.",
+    "lastUsed": "Last used {{ago}}",
+    "revoke": "Turn off card",
+    "revokeTitle": "Turn off your Wallet card?",
+    "revokeBody": "If you lost your phone or think someone copied the card, turn it off. You can add a new one later.",
+    "revoked": "Card turned off. The old barcode no longer works."
   }
 }

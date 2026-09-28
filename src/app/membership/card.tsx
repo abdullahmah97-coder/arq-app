@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { AppState, View } from 'react-native';
 import { BrandGradient } from '@/brand/Brand';
 import { QrCode } from '@/components/gymops/QrCode';
+import { WalletButton } from '@/components/gymops/WalletButton';
 import { Avatar, Button, Empty, Loading, Screen, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { entryLink, loadMyMemberships, newEntryToken, type MyMembership } from '@/lib/gymops';
@@ -66,6 +67,7 @@ export default function EntryCard() {
         {mem ? <T size="sm" semibold color={brand.cream}>{t('gymops.daysLeft', { count: mem.days_left })}</T> : null}
       </BrandGradient>
       <T size="sm" muted center>{t('gymops.cardHint')}</T>
+      <WalletButton />
       {!mem ? <Empty icon="card-outline" text={t('gymops.noActiveHint')} /> : null}
       <Button variant="secondary" icon="refresh" title={t('gymops.newCode')} onPress={refresh} />
     </Screen>
