@@ -66,6 +66,9 @@ export default function ProfileTab() {
         <MenuItem icon="barbell-outline" label={t('workout.history')} onPress={() => router.push('/workout/history')} />
         <MenuItem icon="calendar-outline" label={t('trust.attendanceTitle')} onPress={() => router.push('/attendance')} />
         <MenuItem icon="git-compare-outline" label={t('trust.compareTitle')} onPress={() => router.push('/clubs/compare')} />
+        <MenuItem icon="barbell-outline" label={t('coaching.myCoach')} onPress={() => router.push('/my-coach')} />
+        <MenuItem icon="document-text-outline" label={t('coaching.myRecord')} onPress={() => router.push('/record')} />
+        <MenuItem icon="ribbon-outline" label={t('coaching.forCoaches')} onPress={() => router.push('/coaching')} />
         <MenuItem icon="pulse-outline" label={t('health.title')} onPress={() => router.push('/health')} />
         <MenuItem icon="watch-outline" label={t('health.devices')} onPress={() => router.push('/devices')} />
         <MenuItem icon="analytics-outline" label={t('profile.inbody')} onPress={() => router.push('/inbody')} />

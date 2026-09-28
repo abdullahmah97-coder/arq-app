@@ -7,6 +7,7 @@ import { Linking, Platform, Pressable, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { GymServices } from '@/components/clubs/GymServices';
 import { ClubLogo, OfferCard, Stars } from '@/components/clubs/parts';
+import { GymCoaches } from '@/components/coaching/GymCoaches';
 import { gymName } from '@/components/GymPicker';
 import { ManageGymButton } from '@/components/gymops/ManageGymButton';
 import { Num } from '@/components/pulse/widgets';
@@ -91,6 +92,9 @@ export default function ClubPage() {
 
       {/* أوقات الذروة */}
       <PeakTimes gymId={club.id} />
+
+      {/* مدربين النادي */}
+      <GymCoaches gymId={club.id} />
 
       {/* التقييم */}
       <Card style={{ gap: space.md }}>

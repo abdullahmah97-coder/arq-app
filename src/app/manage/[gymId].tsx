@@ -38,6 +38,7 @@ export default function ManageGym() {
     { key: 'broadcast', icon: 'megaphone-outline', href: `/manage/broadcast${q}`, managerOnly: true },
     { key: 'import', icon: 'cloud-upload-outline', href: `/manage/import${q}`, managerOnly: true },
     { key: 'staff', icon: 'id-card-outline', href: `/manage/staff${q}`, managerOnly: true },
+    { key: 'coaches', icon: 'barbell-outline', href: `/manage/coaches${q}`, managerOnly: true },
     { key: 'gates', icon: 'git-network-outline', href: `/manage/gates${q}`, managerOnly: true },
     { key: 'services', icon: 'water-outline', href: `/clubs/services${q}`, managerOnly: true },
     { key: 'offers', icon: 'pricetags-outline', href: `/clubs/offer${q}`, managerOnly: true },
