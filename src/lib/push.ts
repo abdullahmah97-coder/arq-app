@@ -3,10 +3,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 import { unreadCount } from './messages';
+import { openHref } from './nav';
 import { onUnreadBadge, refreshUnreadBadge, unreadNotifications } from './notifications';
 import { supabase } from './supabase';
 
@@ -104,21 +104,22 @@ async function syncAppBadge() {
 }
 
 /** يشتغل مرة وحدة بعد تسجيل الدخول: يحدّث تسجيل الجهاز، يفتح الصفحة لما تضغط إشعار، ويزامن الأرقام */
-export function usePushSetup(signedIn: boolean) {
+export function usePushSetup(signedIn: boolean, navReady = true) {
   const last = Notifications.useLastNotificationResponse();
   const handled = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!signedIn || !last) return;
+    // ننتظر لين يجهز التنقّل (فتح التطبيق من إشعار وهو مقفول) عشان ما يضيع الضغط أو يقفل التطبيق
+    if (!signedIn || !navReady || !last) return;
     const id = last.notification.request.identifier;
     if (handled.current === id) return;
     handled.current = id;
     const url = (last.notification.request.content.data as { url?: unknown } | undefined)?.url;
     if (typeof url === 'string' && url.startsWith('/')) {
-      setTimeout(() => { try { router.push(url as any); } catch { /* صفحة غير معروفة */ } }, 60);
+      setTimeout(() => { try { openHref(url); } catch { /* صفحة غير معروفة */ } }, 60);
     }
     Notifications.clearLastNotificationResponseAsync().catch(() => {});
-  }, [signedIn, last]);
+  }, [signedIn, navReady, last]);
 
   useEffect(() => {
     if (!signedIn) return;

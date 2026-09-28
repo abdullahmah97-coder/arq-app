@@ -18,6 +18,7 @@ import { fmtDuration, useHealth } from '@/lib/health';
 import { useLocalized } from '@/lib/i18n';
 import { publicUrl, supabase } from '@/lib/supabase';
 import { brand, night, pulse, space } from '@/theme';
+import { openHref } from '@/lib/nav';
 
 interface StepRow { user_id: string; username: string; full_name: string | null; avatar_url: string | null; steps: number; rank: number }
 
@@ -149,9 +150,9 @@ export default function HealthScreen() {
               <View style={{ gap: 6, marginTop: 4 }}>
                 {zones.map((m, i) => (
                   <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <NT size={11} faint style={{ width: 22 }}>Z{i + 1}</NT>
+                    <NT size={11} faint style={{ width: 22 }}>{t('health.zoneN', { n: i + 1 })}</NT>
                     <View style={{ flex: 1 }}><ChevronBar value={m / zoneMax} color={zonePalette()[i]} height={8} /></View>
-                    <Num size={13} color={night.muted} style={{ width: 40, textAlign: 'right' }}>{m}m</Num>
+                    <Num size={13} color={night.muted} style={{ width: 40, textAlign: 'right' }}>{m}{t('social.minShort')}</Num>
                   </View>
                 ))}
               </View>
@@ -168,12 +169,12 @@ export default function HealthScreen() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                   <View>
                     <NT size={12} muted>{t('health.asleep')}</NT>
-                    <Num size={40} color={pulse.sleep}>{fmtDuration(asleep, 'en')}</Num>
+                    <Num size={40} color={pulse.sleep}>{fmtDuration(asleep, lng)}</Num>
                   </View>
                   {s ? (
                     <View style={{ alignItems: 'flex-end' }}>
                       <NT size={11} faint>{t('health.sleepNeed')}</NT>
-                      <Num size={20}>{fmtDuration(s.sleep_need_min, 'en')}</Num>
+                      <Num size={20}>{fmtDuration(s.sleep_need_min, lng)}</Num>
                     </View>
                   ) : null}
                 </View>
@@ -187,7 +188,7 @@ export default function HealthScreen() {
                         <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: c }} />
                           <NT size={11} muted>{t(`health.${k}`)}</NT>
-                          <Num size={13}>{fmtDuration(stages[k], 'en')}</Num>
+                          <Num size={13}>{fmtDuration(stages[k], lng)}</Num>
                         </View>
                       ))}
                     </View>
@@ -206,7 +207,7 @@ export default function HealthScreen() {
           <DashboardList />
 
           {/* الخطوات + ترتيب الأصدقاء */}
-          <NSection title={t('health.leaderboard')} action={t('compete.title')} onAction={() => router.push('/(tabs)/compete')} />
+          <NSection title={t('health.leaderboard')} action={t('compete.title')} onAction={() => openHref('/(tabs)/compete')} />
           <NCard>
             {board.length === 0 ? <NT muted>—</NT> : board.slice(0, 8).map((r) => {
               const me = r.user_id === userId;

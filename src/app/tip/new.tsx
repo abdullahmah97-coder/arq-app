@@ -1,5 +1,5 @@
 // نشر نصيحة للمجتمع (متاح لرتبة «متقدم» فأعلى أو المدرب الموثّق)
-import { router } from 'expo-router';
+
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, TextInput, View } from 'react-native';
@@ -10,6 +10,7 @@ import { canPublish, RANKS } from '@/lib/ranks';
 import { publishTip, TIP_TAGS, type TipTag } from '@/lib/social';
 import { errorKey } from '@/lib/supabase';
 import { colors, fonts } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 export default function NewTip() {
   const { t } = useTranslation();
@@ -28,7 +29,7 @@ export default function NewTip() {
     setBusy(true);
     try {
       await publishTip(userId, body, tag);
-      router.back();
+      goBackOrHome();
     } catch (e) {
       Alert.alert(t(errorKey(e)));
     } finally { setBusy(false); }

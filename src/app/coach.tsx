@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabase';
 import { startWorkout } from '@/lib/training';
 import { getExercise } from '@/three/catalog';
 import { brand, fonts, night, space } from '@/theme';
+import { openHref } from '@/lib/nav';
 
 const KEY = 'arq.coach.history';
 const ROUTE_PATH: Record<CoachRoute, string> = {
@@ -80,7 +81,7 @@ export default function Coach() {
   };
 
   const addToToday = async (w: CoachWorkout) => {
-    if (!plan) return router.push('/(tabs)/plan');
+    if (!plan) return openHref('/(tabs)/plan');
     const data = structuredClone(plan.data);
     const idx = data.days.findIndex((d) => d.day === todayIndex());
     const exercises: PlanExercise[] = w.exercises.map((e) => {
@@ -98,7 +99,7 @@ export default function Coach() {
   const open = (r: CoachReply['open']) => {
     if (!r) return;
     if (r.kind === 'exercise') router.push({ pathname: '/exercise/[id]', params: { id: r.id } });
-    else router.push(ROUTE_PATH[r.route] as never);
+    else openHref(ROUTE_PATH[r.route]);
   };
 
   const chips = msgs.length ? (msgs[msgs.length - 1].reply?.chips ?? []) : starterChips(ctx.lang);

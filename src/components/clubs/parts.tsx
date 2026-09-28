@@ -52,7 +52,7 @@ export function periodLabel(months: number, t: (k: string, o?: any) => string) {
   if (months === 0) return t('clubs.perVisit');
   if (months === 1) return t('clubs.perMonth');
   if (months === 12) return t('clubs.perYear');
-  return t('clubs.perMonths', { n: months });
+  return t('clubs.perMonths', { n: months, count: months });
 }
 
 /** مصدر السعر وتاريخه: رسمي / موقع عروض / غير مؤكد / من النادي، مع تنبيه لو قديم */
@@ -111,7 +111,7 @@ export function OfferCard({ o, rating, dark, width }: { o: Offer; rating?: { rat
           </View>
         ) : <Text style={{ color: muted, fontFamily: fonts.regular, fontSize: 11 }}>{t('clubs.noRatingYet')}</Text>}
         <Text style={{ color: left != null && left <= 5 ? brand.orange : muted, fontFamily: fonts.regular, fontSize: 11 }}>
-          {left != null ? t('clubs.daysLeft', { n: left }) : o.months > 1 ? t('clubs.equivMonthly', { n: Math.round(monthly(o)) }) : ''}
+          {left != null ? t('clubs.daysLeft', { n: left, count: left }) : o.months > 1 ? t('clubs.equivMonthly', { n: Math.round(monthly(o)) }) : ''}
         </Text>
       </View>
       <SourceTag o={o} dark={dark} />
@@ -133,7 +133,7 @@ export function ChainRow({ c, rank }: { c: Chain; rank?: number }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {c.rating ? <><Stars value={c.rating} size={11} /><T size="xs" semibold>{c.rating.toFixed(1)}</T><T size="xs" muted>({c.reviews})</T></> : <T size="xs" muted>{t('clubs.noRatingYet')}</T>}
         </View>
-        <T size="xs" muted numberOfLines={1}>{[t(`clubs.aud_${c.audience}`), c.branches ? t('clubs.branchesN', { n: c.branches }) : null, c.nearest_m != null ? t('clubs.nearestKm', { n: (c.nearest_m / 1000).toFixed(1) }) : null].filter(Boolean).join(' · ')}</T>
+        <T size="xs" muted numberOfLines={1}>{[t(`clubs.aud_${c.audience}`), c.branches ? t('clubs.branchesN', { n: c.branches, count: c.branches }) : null, c.nearest_m != null ? t('clubs.nearestKm', { n: (c.nearest_m / 1000).toFixed(1) }) : null].filter(Boolean).join(' · ')}</T>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         {c.best_monthly != null ? (
@@ -142,7 +142,7 @@ export function ChainRow({ c, rank }: { c: Chain; rank?: number }) {
             <T bold color={brand.orange}>{Math.round(c.best_monthly)} <T size="xs" muted>{t('clubs.sarMonth')}</T></T>
           </>
         ) : null}
-        <T size="xs" color={c.offers ? colors.primary : colors.muted}>{c.offers ? t('clubs.offersN', { n: c.offers }) : t('clubs.noPricesYet')}</T>
+        <T size="xs" color={c.offers ? colors.primary : colors.muted}>{c.offers ? t('clubs.offersN', { n: c.offers, count: c.offers }) : t('clubs.noPricesYet')}</T>
       </View>
     </Pressable>
   );
@@ -168,7 +168,7 @@ export function ClubRow({ c, rank }: { c: Club; rank?: number }) {
         <View style={{ alignItems: 'flex-end' }}>
           <T size="xs" muted>{t('clubs.from')}</T>
           <T bold color={brand.orange}>{Math.round(c.best_monthly)} <T size="xs" muted>{t('clubs.sarMonth')}</T></T>
-          {c.offers ? <T size="xs" color={colors.primary}>{t('clubs.offersN', { n: c.offers })}</T> : null}
+          {c.offers ? <T size="xs" color={colors.primary}>{t('clubs.offersN', { n: c.offers, count: c.offers })}</T> : null}
         </View>
       ) : null}
     </Pressable>

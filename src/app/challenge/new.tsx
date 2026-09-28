@@ -62,7 +62,7 @@ export default function NewChallenge() {
       ))}
       <T size="sm" muted>{t('compete.duration')}</T>
       <Segmented value={duration} onChange={setDuration}
-        options={[7, 14, 30].map((d) => ({ value: d, label: `${d} ${t('common.days')}` }))} />
+        options={[7, 14, 30].map((d) => ({ value: d, label: t('compete.daysN', { count: d }) }))} />
 
       <T size="sm" muted>{t('compete.inviteFriends')}</T>
       {friends.length === 0 ? (

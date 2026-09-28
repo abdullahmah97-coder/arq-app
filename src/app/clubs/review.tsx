@@ -1,6 +1,6 @@
 // قيّم النادي: من ١ إلى ٥ نجوم مع تعليق (تقييم واحد لكل مستخدم ويقدر يعدّله أو يحذفه)
 import { Ionicons } from '@expo/vector-icons';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, TextInput, View } from 'react-native';
@@ -10,6 +10,7 @@ import { useUser } from '@/lib/auth';
 import { deleteReview, loadReviews, saveReview } from '@/lib/clubs';
 import { errorKey } from '@/lib/supabase';
 import { colors, fonts, space } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 export default function RateClub() {
   const { gym, name } = useLocalSearchParams<{ gym: string; name?: string }>();
@@ -26,7 +27,7 @@ export default function RateClub() {
   const save = async () => {
     if (!rating) return Alert.alert(t('clubs.pickStars'));
     setBusy(true);
-    try { await saveReview(userId, String(gym), rating, body); router.back(); } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
+    try { await saveReview(userId, String(gym), rating, body); goBackOrHome(); } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
   };
 
   return (
@@ -36,7 +37,7 @@ export default function RateClub() {
         <T bold>{t('clubs.howWas')}</T>
         <Row gap={10}>
           {[1, 2, 3, 4, 5].map((i) => (
-            <Pressable key={i} onPress={() => setRating(i)} hitSlop={6} accessibilityRole="button" accessibilityLabel={`${i}`}>
+            <Pressable key={i} onPress={() => setRating(i)} hitSlop={6} accessibilityRole="button" accessibilityLabel={t('clubs.starsA11y', { count: i })}>
               <Ionicons name={rating >= i ? 'star' : 'star-outline'} size={38} color={rating >= i ? STAR : colors.muted} />
             </Pressable>
           ))}
@@ -50,7 +51,7 @@ export default function RateClub() {
         <T size="xs" muted>{t('clubs.reviewRules')}</T>
       </View>
       <Button title={t('clubs.publishReview')} icon="checkmark" loading={busy} onPress={save} />
-      {exists ? <Button variant="ghost" title={t('clubs.deleteReview')} icon="trash-outline" onPress={async () => { await deleteReview(userId, String(gym)); router.back(); }} /> : null}
+      {exists ? <Button variant="ghost" title={t('clubs.deleteReview')} icon="trash-outline" onPress={async () => { await deleteReview(userId, String(gym)); goBackOrHome(); }} /> : null}
     </Screen>
   );
 }

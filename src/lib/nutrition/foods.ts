@@ -30,7 +30,7 @@ const DATA: Record<FoodCategory, Row[]> = {
     ['harees', 'هريس', 'Harees', 'صحن', 'bowl', 250, 320, 18, 40, 9],
     ['margoog', 'مرقوق', 'Margoog', 'صحن', 'bowl', 300, 380, 18, 45, 13],
     ['mutabbaq', 'مطبق لحم', 'Meat mutabbaq', 'حبة', 'piece', 200, 520, 20, 40, 31],
-    ['foul', 'فول مدمس', 'Foul medames', 'كوب', 'cup', 250, 260, 13, 35, 8],
+    ['foul', 'فول مدمس', 'Ful medames (fava beans)', 'كوب', 'cup', 250, 260, 13, 35, 8],
     ['falafel', 'فلافل', 'Falafel', '٥ حبات', '5 pieces', 85, 285, 11, 27, 15],
     ['hummus', 'حمص بالطحينة', 'Hummus', 'نصف كوب', 'half cup', 120, 200, 9.5, 17, 11.5],
     ['shakshuka', 'شكشوكة (بيضتين)', 'Shakshuka (2 eggs)', 'صحن', 'plate', 250, 280, 14, 12, 19],

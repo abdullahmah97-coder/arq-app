@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
@@ -9,6 +9,7 @@ import { daysBetween } from '@/lib/dates';
 import { errorKey, publicUrl, supabase } from '@/lib/supabase';
 import type { Challenge, ChallengeStanding } from '@/lib/types';
 import { colors, space } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 const MEDAL = [colors.gold, colors.silver, colors.bronze];
 
@@ -22,7 +23,7 @@ export default function ChallengeDetail() {
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('challenges').select('*').eq('id', id).maybeSingle();
-    if (!data) return router.back();
+    if (!data) { goBackOrHome(); return; }
     setC(data as Challenge);
     const { data: st } = await supabase.rpc('challenge_standings', { p_challenge: id });
     setRows(((st ?? []) as ChallengeStanding[]).map((r) => ({ ...r, score: Number(r.score) })));
@@ -49,7 +50,7 @@ export default function ChallengeDetail() {
   const leave = () => Alert.alert(t('compete.leave'), '', [
     { text: t('common.cancel'), style: 'cancel' },
     { text: t('compete.leave'), style: 'destructive', onPress: () =>
-      act(() => supabase.from('challenge_members').delete().eq('challenge_id', id).eq('user_id', userId), () => router.back()) },
+      act(() => supabase.from('challenge_members').delete().eq('challenge_id', id).eq('user_id', userId), goBackOrHome) },
   ]);
 
   return (
@@ -58,7 +59,7 @@ export default function ChallengeDetail() {
         <H>{c.title}</H>
         <T muted>{t(`compete.metric_${c.metric}`)} · {c.starts_on} → {c.ends_on}</T>
         <T bold style={{ color: ended ? colors.muted : colors.fire }}>
-          {ended ? t('compete.ended') : t('compete.endsIn', { days: left + 1 })}
+          {ended ? t('compete.ended') : t('compete.endsIn', { days: left + 1, count: left + 1 })}
         </T>
       </View>
 

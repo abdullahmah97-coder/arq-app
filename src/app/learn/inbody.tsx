@@ -11,10 +11,8 @@ import { brand, colors, radius, space } from '@/theme';
 
 export default function InBodyGuide() {
   const { t } = useTranslation();
-  const { L, lng } = useLocalized();
+  const { L } = useLocalized();
   const [open, setOpen] = useState<string | null>(G.sections[0].key);
-
-  const lbl = (ar: string, en: string) => (lng === 'ar' ? ar : en);
 
   return (
     <Screen edges={['bottom']}>
@@ -26,7 +24,7 @@ export default function InBodyGuide() {
 
       <T style={{ lineHeight: 28 }}>{L(G.intro)}</T>
 
-      <SectionTitle title={lbl('أقسام التقرير', 'Report sections')} />
+      <SectionTitle title={t('inbody.learnSections')} />
       {G.sections.map((s, i) => {
         const isOpen = open === s.key;
         return (
@@ -48,12 +46,12 @@ export default function InBodyGuide() {
             </Pressable>
             {isOpen ? (
               <View style={{ paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md }}>
-                <Block label={lbl('وش يعني؟', 'What it means')} text={L(s.what)} />
-                <Block label={lbl('كيف تقرأه', 'How to read it')} text={L(s.read)} />
+                <Block label={t('inbody.learnWhat')} text={L(s.what)} />
+                <Block label={t('inbody.learnHow')} text={L(s.read)} />
                 <View style={{ backgroundColor: brand.deepGreen, borderRadius: radius.md, padding: space.md, gap: 4 }}>
                   <Row gap={6}>
                     <Ionicons name="sparkles" size={14} color={brand.amber} />
-                    <T size="xs" semibold color={brand.amber}>{lbl('في تطبيق أرك', 'In the ARQ app')}</T>
+                    <T size="xs" semibold color={brand.amber}>{t('inbody.learnInApp')}</T>
                   </Row>
                   <T size="sm" color={brand.cream} style={{ lineHeight: 22 }}>{L(s.app)}</T>
                 </View>

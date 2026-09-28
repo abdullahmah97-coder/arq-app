@@ -89,7 +89,7 @@ export default function ReviewReport() {
         <Card style={{ gap: space.sm }}>
           <Row>
             <View style={{ flex: 1.4 }} />
-            <T size="xs" muted style={{ flex: 1, textAlign: 'center' }}>kg</T>
+            <T size="xs" muted style={{ flex: 1, textAlign: 'center' }}>{t('common.kg')}</T>
             <T size="xs" muted style={{ flex: 1, textAlign: 'center' }}>%</T>
           </Row>
           {SEGS.map((s) => (

@@ -1,7 +1,7 @@
 // أرسل ملاحظة / تقرير: يوصل لمالك التطبيق فقط مع رقم النسخة والجهاز وصورة اختيارية، وتشوف حالة تقاريرك
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
@@ -14,6 +14,7 @@ import { pickImage } from '@/lib/images';
 import { loadMyReports, STATUS_COLOR, uploadReportShot, type Report } from '@/lib/owner';
 import { errorKey, supabase } from '@/lib/supabase';
 import { colors, radius, space } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 type Category = 'bug' | 'idea' | 'design' | 'other';
 const ICONS = { bug: 'bug-outline', idea: 'bulb-outline', design: 'color-palette-outline', other: 'chatbubble-ellipses-outline' } as const;
@@ -40,7 +41,7 @@ export default function Feedback() {
       });
       if (error) throw error;
       Alert.alert(t('beta.thanks'));
-      router.back();
+      goBackOrHome();
     } catch (e) {
       Alert.alert(t(errorKey(e)));
     } finally { setBusy(false); }

@@ -10,7 +10,7 @@ import { gymName } from '@/components/GymPicker';
 import { Num } from '@/components/pulse/widgets';
 import { RankBadge } from '@/components/social/RankBadge';
 import { Avatar, Button, Card, Empty, Loading, Row, Screen, T } from '@/components/ui';
-import { canManageGym, loadClubs, loadOffers, loadReviews, ratingBars, type Club, type Offer, type Review } from '@/lib/clubs';
+import { canManageGym, loadClub, loadOffers, loadReviews, ratingBars, type Club, type Offer, type Review } from '@/lib/clubs';
 import { timeAgo } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import { publicUrl } from '@/lib/supabase';
@@ -26,8 +26,7 @@ export default function ClubPage() {
   const [manage, setManage] = useState(false);
 
   useFocusEffect(useCallback(() => {
-    loadClubs().then((cs) => {
-      const c = cs.find((x) => x.id === id) ?? null;
+    loadClub(String(id)).then((c) => {
       setClub(c);
       loadOffers({ gymId: String(id), chainId: c?.chain_id }).then(setOffers).catch(() => {});
     }).catch(() => setClub(null));
@@ -68,7 +67,7 @@ export default function ClubPage() {
         <View style={{ alignItems: 'center', gap: 4, width: 96 }}>
           <Num size={40} color={colors.text}>{reviews.length ? avg.toFixed(1) : '—'}</Num>
           <Stars value={avg} size={14} />
-          <T size="xs" muted>{t('clubs.reviewsN', { n: reviews.length })}</T>
+          <T size="xs" muted>{t('clubs.reviewsN', { n: reviews.length, count: reviews.length })}</T>
         </View>
         <View style={{ flex: 1, gap: 4 }}>
           {bars.map((b) => (

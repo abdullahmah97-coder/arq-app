@@ -60,9 +60,10 @@ export function notifHref(n: Pick<NotifRow, 'kind' | 'target_id' | 'actor_id' | 
     case 'friend_accept': return n.actor_id ? `/user/${n.actor_id}` : '/friends';
     case 'post_like':
     case 'post_comment': return n.target_id ? `/post/${n.target_id}` : null;
+    case 'friend_here': if (typeof n.data?.gym_id === 'string') return `/gym/${n.data.gym_id}`;
+      return n.target_id ? `/checkin/${n.target_id}` : null;
     case 'checkin_like':
-    case 'checkin_comment':
-    case 'friend_here': return n.target_id ? `/checkin/${n.target_id}` : null;
+    case 'checkin_comment': return n.target_id ? `/checkin/${n.target_id}` : null;
     case 'challenge_invite':
     case 'challenge_win': return n.target_id ? `/challenge/${n.target_id}` : null;
     case 'rank_up': return '/ranks';

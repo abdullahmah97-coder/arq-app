@@ -3,19 +3,21 @@ import '@/polyfills/process';
 import {
   NotoKufiArabic_300Light, NotoKufiArabic_400Regular, NotoKufiArabic_600SemiBold, NotoKufiArabic_700Bold, useFonts,
 } from '@expo-google-fonts/noto-kufi-arabic';
-import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { HeaderBack } from '@/components/HeaderBack';
-import { Loading } from '@/components/ui';
+import { ScreenErrorBoundary } from '@/components/ScreenErrorBoundary';
+import { Button, Loading, T } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { flushLastFatal, installGlobalErrorLogger } from '@/lib/events';
 import { HealthProvider } from '@/lib/health';
 import { restoreLocale } from '@/lib/i18n';
 import { usePushSetup } from '@/lib/push';
-import { colors, fontAssets, fonts, type ThemeId } from '@/theme';
+import { colors, fontAssets, fonts, space, type ThemeId } from '@/theme';
 import { restoreTheme, saveTheme, ThemeCtx } from '@/lib/appTheme';
 
 /** الصفحات اللي تفتح كنافذة من تحت: زر إغلاق بدل سهم الرجوع */
@@ -30,13 +32,31 @@ const navTheme = () => ({
   colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.bg, text: colors.text, border: colors.border, primary: colors.primary },
 });
 
+/** مسجّل دخول بس ما قدرنا نجيب الحساب (غالباً بدون إنترنت): نعرض إعادة محاولة بدل صفحة البداية */
+function ProfileRetry() {
+  const { t } = useTranslation();
+  const { refreshProfile } = useAuth();
+  const [busy, setBusy] = useState(false);
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md, padding: space.xl, backgroundColor: colors.bg }}>
+      <T bold center>{t('errors.profileLoad')}</T>
+      <T size="sm" muted center>{t('errors.network')}</T>
+      <Button title={t('common.retry')} icon="refresh" loading={busy} style={{ alignSelf: 'stretch' }}
+        onPress={async () => { setBusy(true); try { await refreshProfile(); } finally { setBusy(false); } }} />
+    </View>
+  );
+}
+
 function RootNavigator() {
   const { session, loading, profile } = useAuth();
   const { t } = useTranslation();
-  // إشعارات الجوال: ربط الجهاز بالحساب وفتح الصفحة لما تضغط إشعار
-  usePushSetup(!!session && !!profile?.onboarded);
+  const navReady = !!useRootNavigationState()?.key;
+  // إشعارات الجوال: ربط الجهاز بالحساب وفتح الصفحة لما تضغط إشعار (بعد ما يجهز التنقّل)
+  usePushSetup(!!session && !!profile?.onboarded && !loading, navReady);
 
-  if (loading && session) return <Loading />;
+  // ننتظر لين نعرف حالة الدخول (بدل ما تومض صفحة تسجيل الدخول عند كل فتح)
+  if (loading) return <Loading />;
+  if (session && !profile) return <ProfileRetry />;
 
   const signedIn = !!session;
   const onboarded = !!profile?.onboarded;
@@ -54,6 +74,8 @@ function RootNavigator() {
         headerLeft: () => <HeaderBack close={MODAL_ROUTES.has(route.name)} />,
         gestureEnabled: true,
       })}
+      // خطأ داخل صفحة يعرض رسالة مع زر رجوع بدل ما يقفل التطبيق
+      screenLayout={({ children, route }) => <ScreenErrorBoundary name={route.name}>{children}</ScreenErrorBoundary>}
     >
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -138,19 +160,20 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      {/* تغيير الثيم يعيد تركيب الواجهة (key) لتقرأ الرموز الجديدة */}
-      <ThemeProvider value={navTheme()} key={themeId}>
-        <StatusBar style="dark" />
-        {ready && fontsLoaded ? (
-          <ThemeCtx.Provider value={themeCtx}>
-            <AuthProvider>
-              <HealthProvider>
+      {/* الدخول والصحة فوق الثيم: تغيير الثيم يعيد رسم الواجهة بدون ما يضيع تسجيل الدخول */}
+      <AuthProvider>
+        <HealthProvider>
+          {/* تغيير الثيم يعيد تركيب الواجهة (key) لتقرأ الرموز الجديدة */}
+          <ThemeProvider value={navTheme()} key={themeId}>
+            <StatusBar style="dark" />
+            {ready && fontsLoaded ? (
+              <ThemeCtx.Provider value={themeCtx}>
                 <RootNavigator />
-              </HealthProvider>
-            </AuthProvider>
-          </ThemeCtx.Provider>
-        ) : <Loading />}
-      </ThemeProvider>
+              </ThemeCtx.Provider>
+            ) : <Loading />}
+          </ThemeProvider>
+        </HealthProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

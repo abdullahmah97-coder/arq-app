@@ -78,9 +78,9 @@ export const ProgramCard = memo(function ProgramCard({ p, hideAuthor }: { p: Use
     <Card onPress={() => router.push({ pathname: '/program/[id]', params: { id: p.id } })} style={{ gap: space.md, padding: 0, overflow: 'hidden' }}>
       <View style={{ backgroundColor: brand.deepGreen, padding: space.lg, gap: 6 }}>
         <Row gap={6} style={{ flexWrap: 'wrap' }}>
-          <Chip text={t('programs.days', { n: p.days.length })} />
+          <Chip text={t('programs.days', { n: p.days.length, count: p.days.length })} />
           <Chip text={t(`onboarding.level_${p.level}`)} />
-          <Chip text={t('social.exercisesN', { n: total })} />
+          <Chip text={t('social.exercisesN', { n: total, count: total })} />
         </Row>
         <T size="lg" bold color={brand.cream} numberOfLines={2}>{p.title}</T>
         {p.description ? <T size="sm" color={brand.sand} numberOfLines={2}>{p.description}</T> : null}

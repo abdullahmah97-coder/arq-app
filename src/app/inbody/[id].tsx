@@ -12,6 +12,7 @@ import type { InBodyAnalysis, InsightLevel, Segment } from '@/lib/inbody/types';
 import { useLocalized } from '@/lib/i18n';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
+import { goBackOrHome, openHref } from '@/lib/nav';
 
 const LEVEL: Record<InsightLevel, { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string }> = {
   alert: { icon: 'warning', color: brand.orange, bg: '#FDEBDD' },
@@ -32,7 +33,7 @@ export default function ReportResult() {
 
   const load = useCallback(async () => {
     const rep = await getReport(id);
-    if (!rep) return router.back();
+    if (!rep) { goBackOrHome(); return; }
     setR(rep);
     const all = await listReports(userId);
     const i = all.findIndex((x) => x.id === id);
@@ -51,7 +52,7 @@ export default function ReportResult() {
       const res = await applyReportToPlan(userId, r, health);
       await Promise.all([refreshPlan(), refreshProfile()]);
       Alert.alert(t('inbody.appliedDone'), res.source === 'rules' ? undefined : '✨');
-      router.push('/(tabs)/plan');
+      openHref('/(tabs)/plan');
     } catch (e) {
       Alert.alert(t(errorKey(e)));
     } finally {
@@ -61,13 +62,18 @@ export default function ReportResult() {
 
   const remove = () => Alert.alert(t('inbody.deleteConfirm'), '', [
     { text: t('common.cancel'), style: 'cancel' },
-    { text: t('common.delete'), style: 'destructive', onPress: async () => { await deleteReport(r); router.back(); } },
+    { text: t('common.delete'), style: 'destructive', onPress: async () => { await deleteReport(r); goBackOrHome(); } },
   ]);
 
   const insightText = (key: string, params?: Record<string, string | number>) => {
     const p = { ...params };
     if (key === 'weak_segments' && typeof p.list === 'string') {
       p.list = p.list.split(',').map((s) => t(`inbody.seg.${s}`)).join(lng === 'ar' ? '، ' : ', ');
+    }
+    if (key === 'target') {
+      // المدة بالأسابيع بصيغة الجمع الصحيحة، أو بدونها لو ما فيه مدة (هدف «الحفاظ»)
+      const weeks = Number(p.weeks);
+      return weeks > 0 ? t('inbody.insight.target', { ...p, count: weeks }) : t('inbody.insight.targetNoWeeks', p);
     }
     return t(`inbody.insight.${key}`, p);
   };
@@ -100,20 +106,20 @@ export default function ReportResult() {
         <Row gap={space.lg} style={{ flexWrap: 'wrap' }}>
           <HeroStat label={t('inbody.recommendedGoal')} value={t(`inbody.goal.${a.recommended_goal}`)} />
           {a.weekly_rate_kg ? <HeroStat label={t('inbody.weeklyRate')} value={`${a.weekly_rate_kg} ${t('inbody.perWeek')}`} /> : null}
-          {a.weeks_to_target ? <HeroStat label={t('inbody.weeks')} value={t('inbody.weeksN', { n: a.weeks_to_target })} /> : null}
+          {a.weeks_to_target ? <HeroStat label={t('inbody.weeks')} value={t('inbody.weeksN', { n: a.weeks_to_target, count: a.weeks_to_target })} /> : null}
         </Row>
       </BrandGradient>
 
       {/* أهم الأرقام */}
       <Row gap={space.sm}>
-        <Metric label={lng === 'ar' ? 'الوزن' : 'Weight'} value={m.weight_kg} unit="kg" delta={delta('weight_kg')} goodDown />
-        <Metric label={lng === 'ar' ? 'الدهون' : 'Body fat'} value={m.pbf_pct} unit="%" delta={delta('pbf_pct')} goodDown />
-        <Metric label={lng === 'ar' ? 'العضل' : 'Muscle'} value={m.smm_kg} unit="kg" delta={delta('smm_kg')} />
+        <Metric label={t('inbody.m_weight')} value={m.weight_kg} unit={t('common.kg')} delta={delta('weight_kg')} goodDown />
+        <Metric label={t('inbody.m_fat')} value={m.pbf_pct} unit="%" delta={delta('pbf_pct')} goodDown />
+        <Metric label={t('inbody.m_muscle')} value={m.smm_kg} unit={t('common.kg')} delta={delta('smm_kg')} />
       </Row>
       <Row gap={space.sm}>
-        <Metric label="BMR" value={m.bmr_kcal} unit="kcal" />
-        <Metric label={lng === 'ar' ? 'الحشوية' : 'Visceral'} value={m.visceral_fat_level ?? m.visceral_fat_area_cm2} unit={m.visceral_fat_level != null ? '' : 'cm²'} warn={a.visceral_status === 'high'} />
-        <Metric label="ECW" value={m.ecw_ratio} unit="" warn={a.caution_ecw} />
+        <Metric label={t('inbody.m_bmr')} value={m.bmr_kcal} unit={t('common.kcal')} />
+        <Metric label={t('inbody.m_visceral')} value={m.visceral_fat_level ?? m.visceral_fat_area_cm2} unit={m.visceral_fat_level != null ? '' : `${t('common.cm')}²`} warn={a.visceral_status === 'high'} />
+        <Metric label={t('inbody.m_ecw')} value={m.ecw_ratio} unit="" warn={a.caution_ecw} />
       </Row>
       {prev ? <T size="xs" muted>{t('inbody.compare')}: {prev.test_date ?? ''}</T> : null}
 
@@ -143,7 +149,7 @@ export default function ReportResult() {
                 <View key={s} style={{ gap: 4 }}>
                   <Row style={{ justifyContent: 'space-between' }}>
                     <T size="sm">{t(`inbody.seg.${s}`)}</T>
-                    <T size="sm" semibold color={weak ? brand.orange : colors.text}>{v.kg ?? '—'} kg · {v.pct ?? '—'}%</T>
+                    <T size="sm" semibold color={weak ? brand.orange : colors.text}>{v.kg ?? '—'} {t('common.kg')} · {v.pct ?? '—'}%</T>
                   </Row>
                   <View style={{ height: 8, backgroundColor: colors.cardAlt, borderRadius: 4, overflow: 'hidden' }}>
                     <View style={{ width: `${Math.min(100, (pct / 150) * 100)}%`, height: 8, backgroundColor: weak ? brand.orange : brand.green, borderRadius: 4 }} />
@@ -153,7 +159,7 @@ export default function ReportResult() {
             })}
             <Row gap={6}>
               <View style={{ width: 2, height: 10, backgroundColor: colors.muted }} />
-              <T size="xs" muted>100% = {lng === 'ar' ? 'طبيعي' : 'normal'}</T>
+              <T size="xs" muted>{t('inbody.pctNormal')}</T>
             </Row>
           </Card>
         </>

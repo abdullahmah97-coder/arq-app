@@ -188,7 +188,7 @@ function BrandRequest({ b, onDone }: { b: Brand; onDone: () => void }) {
         <BrandLogo b={b} size={52} />
         <View style={{ flex: 1, gap: 2 }}>
           <T bold>{b.name}</T>
-          <T size="xs" muted>{t(`store.cat_${b.category}`)} · {t('store.productsN', { n: b.brand_products?.length ?? 0 })}</T>
+          <T size="xs" muted>{t(`store.cat_${b.category}`)} · {t('store.productsN', { n: b.brand_products?.length ?? 0, count: b.brand_products?.length ?? 0 })}</T>
         </View>
       </Row>
       {b.tagline ? <T size="sm">{b.tagline}</T> : null}

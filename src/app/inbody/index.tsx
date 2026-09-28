@@ -9,14 +9,12 @@ import { useUser } from '@/lib/auth';
 import { pickImage } from '@/lib/images';
 import { extractReport, listReports, pickPdf, setDraft, uploadReport, type InBodyReport } from '@/lib/inbody';
 import { emptyMetrics } from '@/lib/inbody/normalize';
-import { useLocalized } from '@/lib/i18n';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 import type { IconName } from '@/components/ui';
 
 export default function InBodyHub() {
   const { t } = useTranslation();
-  const { lng } = useLocalized();
   const { userId } = useUser();
   const [reports, setReports] = useState<InBodyReport[]>([]);
   const [busy, setBusy] = useState(false);
@@ -108,9 +106,9 @@ export default function InBodyHub() {
             {r.applied ? <T size="xs" semibold color={colors.accent}>{t('inbody.applied')}</T> : null}
           </Row>
           <Row gap={space.lg}>
-            <Mini label={lng === 'ar' ? 'الوزن' : 'Weight'} value={r.metrics.weight_kg} />
-            <Mini label="PBF %" value={r.metrics.pbf_pct} />
-            <Mini label="SMM" value={r.metrics.smm_kg} />
+            <Mini label={t('inbody.m_weight')} value={r.metrics.weight_kg} />
+            <Mini label={t('inbody.m_pbf')} value={r.metrics.pbf_pct} />
+            <Mini label={t('inbody.m_smm')} value={r.metrics.smm_kg} />
             {r.analysis?.caution_ecw ? <Ionicons name="warning" size={18} color={brand.orange} /> : null}
           </Row>
         </Card>

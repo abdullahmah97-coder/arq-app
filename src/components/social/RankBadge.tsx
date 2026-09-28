@@ -1,5 +1,6 @@
 // شارة الرتبة (مبتدئ ← نخبة) + علامة المدرب الموثّق
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
@@ -27,5 +28,6 @@ export function RankBadge({ points, coach, small, onDark }: { points: number; co
 }
 
 export function CoachCheck({ size = 16 }: { size?: number }) {
-  return <Ionicons name="checkmark-circle" size={size} color={brand.orange} accessibilityLabel="coach" />;
+  const { t } = useTranslation();
+  return <Ionicons name="checkmark-circle" size={size} color={brand.orange} accessibilityLabel={t('social.verifiedCoach')} />;
 }

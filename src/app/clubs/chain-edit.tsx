@@ -1,6 +1,6 @@
 // تعديل بيانات السلسلة وشعارها (للمالك ومدير السلسلة فقط — مفروض في القاعدة)
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
@@ -11,6 +11,7 @@ import { saveChain, type Audience } from '@/lib/clubs';
 import { pickImage } from '@/lib/images';
 import { errorKey, supabase, uploadImage } from '@/lib/supabase';
 import { colors, space } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 export default function ChainEdit() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,7 +46,7 @@ export default function ChainEdit() {
     setBusy(true);
     try {
       await saveChain(String(id), { name: name.trim(), name_en: nameEn.trim() || null, audience, website: web, instagram: instagram.trim().replace(/^@/, '') || null, description: description.trim() || null, logo_path: logo });
-      router.back();
+      goBackOrHome();
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
   };
 

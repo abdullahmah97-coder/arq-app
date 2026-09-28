@@ -1,3 +1,5 @@
+// قبل i18next: قواعد الجمع (يوم/يومين/أيام) لأن محرك الجوال ما فيه Intl.PluralRules
+import '../polyfills/pluralRules';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocales } from 'expo-localization';
 import i18n from 'i18next';

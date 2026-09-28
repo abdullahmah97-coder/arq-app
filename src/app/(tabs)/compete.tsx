@@ -133,7 +133,7 @@ export default function Compete() {
               {c.my_status === 'invited' ? <T size="xs" bold style={{ color: colors.fire }}>{t('compete.pendingInvite')}</T> : null}
             </Row>
             <T size="sm" muted>
-              {t(`compete.metric_${c.metric}`)} · {left < 0 ? t('compete.ended') : starts > 0 ? t('compete.startsIn', { days: starts }) : t('compete.endsIn', { days: left + 1 })}
+              {t(`compete.metric_${c.metric}`)} · {left < 0 ? t('compete.ended') : starts > 0 ? t('compete.startsIn', { days: starts, count: starts }) : t('compete.endsIn', { days: left + 1, count: left + 1 })}
             </T>
           </Card>
         );

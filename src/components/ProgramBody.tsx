@@ -13,6 +13,7 @@ import { savePlan } from '@/lib/plan';
 import { errorKey } from '@/lib/supabase';
 import { getExercise } from '@/three/catalog';
 import { brand, colors, space } from '@/theme';
+import { openHref } from '@/lib/nav';
 
 export function ProgramBody({ p, onAdopted }: { p: Program; onAdopted?: () => Promise<unknown> | void }) {
   const { t } = useTranslation();
@@ -34,16 +35,16 @@ export function ProgramBody({ p, onAdopted }: { p: Program; onAdopted?: () => Pr
   const adopt = async () => {
     if (!plan) {
       Alert.alert(t('programs.needPlan'));
-      return router.push('/(tabs)/plan');
+      return openHref('/(tabs)/plan');
     }
-    if (schedule.length !== p.daysPerWeek) return Alert.alert(t('programs.pickDays', { n: p.daysPerWeek }));
+    if (schedule.length !== p.daysPerWeek) return Alert.alert(t('programs.pickDays', { n: p.daysPerWeek, count: p.daysPerWeek }));
     setBusy(true);
     try {
       await savePlan(userId, { plan: applyProgram(p, plan.data, schedule), source: plan.source });
       await onAdopted?.();
       await refreshPlan();
       Alert.alert(t('programs.adopted'));
-      router.replace('/(tabs)/plan');
+      openHref('/(tabs)/plan');
     } catch (e) {
       Alert.alert(t(errorKey(e)));
     } finally { setBusy(false); }
@@ -96,13 +97,13 @@ export function ProgramBody({ p, onAdopted }: { p: Program; onAdopted?: () => Pr
             const on = schedule.includes(d);
             return (
               <Pressable key={d} onPress={() => toggleDay(d)} style={[styles.day, on && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
-                <T size="xs" bold color={on ? brand.cream : colors.text}>{w}</T>
+                <T size="xs" bold fit color={on ? brand.cream : colors.text}>{w}</T>
                 {on ? <T size="xs" color={brand.cream}>{schedule.indexOf(d) + 1}</T> : null}
               </Pressable>
             );
           })}
         </View>
-        <T size="xs" muted>{t('programs.picked', { n: schedule.length, total: p.daysPerWeek })}</T>
+        <T size="xs" muted>{t('programs.picked', { n: schedule.length, total: p.daysPerWeek, count: p.daysPerWeek })}</T>
       </Card>
 
       <Button title={active ? t('programs.reapply') : t('programs.adopt')} icon="checkmark-circle-outline" onPress={adopt} loading={busy} />

@@ -97,7 +97,7 @@ function PersonRow({ r, onFive }: { r: PresenceRow; onFive: (r: PresenceRow) => 
   const here = isHere(r);
   const when = here
     ? t('presence.since', { time: durationLabel(r.checked_in_at, lng) })
-    : t('presence.was', { time: new Date(r.checked_in_at).toLocaleTimeString(lng === 'ar' ? 'ar-SA' : 'en-US', { hour: 'numeric', minute: '2-digit' }), dur: durationLabel(r.checked_in_at, lng, Date.parse(r.checked_out_at!)) });
+    : t('presence.was', { time: new Date(r.checked_in_at).toLocaleTimeString(lng === 'ar' ? 'ar-SA-u-nu-latn' : 'en-US', { hour: 'numeric', minute: '2-digit' }), dur: durationLabel(r.checked_in_at, lng, Date.parse(r.checked_out_at!)) });
   return (
     <Card style={{ gap: space.md }}>
       <Row>

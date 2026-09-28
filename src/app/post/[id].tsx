@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
@@ -12,6 +12,7 @@ import { normalizeFeed, setLike } from '@/lib/posts';
 import { errorKey, publicUrl, supabase } from '@/lib/supabase';
 import type { Comment, FeedPost } from '@/lib/types';
 import { colors, font, radius, space } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 export default function PostDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,7 +27,7 @@ export default function PostDetail() {
   const load = useCallback(async () => {
     const { data } = await supabase.rpc('feed', { p_post: id, p_limit: 1 });
     const p = normalizeFeed(data)[0];
-    if (!p) return router.back();
+    if (!p) { goBackOrHome(); return; }
     setPost(p);
     const { data: cs } = await supabase.from('comments')
       .select('*, profiles(username, avatar_url)').eq('post_id', id).order('created_at');

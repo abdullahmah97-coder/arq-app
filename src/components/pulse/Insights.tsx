@@ -3,7 +3,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useId, useMemo, useState, type ComponentProps } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { useAuth } from '@/lib/auth';
 import { useHealth } from '@/lib/health';
@@ -66,7 +66,7 @@ export function MonitorCards() {
               {calibrating ? t('insight.calibrating') : m.measured === 0 ? t('insight.noData') : allOk ? t('insight.withinRange') : t('insight.outOfRange')}
             </NT>
             <NT size={11} faint numberOfLines={1}>
-              {calibrating ? t('insight.nightsLeft', { n: m.nightsNeeded }) : m.measured ? t('insight.metricsCount', { a: m.inRange, b: m.measured }) : '—'}
+              {calibrating ? t('insight.nightsLeft', { n: m.nightsNeeded, count: m.nightsNeeded }) : m.measured ? t('insight.metricsCount', { a: m.inRange, b: m.measured }) : '—'}
             </NT>
           </View>
         </View>
@@ -370,8 +370,8 @@ export function HealthMonitorCard() {
         <StatusBox status={m.measured === 0 ? 'none' : out.length ? 'out' : 'ok'} />
         <NT size={12} style={{ flex: 1, lineHeight: 19 }}>
           {m.nightsNeeded > 0 && m.measured === 0
-            ? t('insight.calibratingLong', { n: m.nightsNeeded })
-            : m.measured === 0 ? t('insight.monitorNoData')
+            ? t('insight.calibratingLong', { n: m.nightsNeeded, count: m.nightsNeeded })
+            : m.measured === 0 ? t('insight.monitorNoData', { source: t(Platform.OS === 'android' ? 'health.source_health_connect' : 'health.source_apple_health') })
             : out.length ? t('insight.monitorOut', { list: out.map((i) => t(`insight.mon_${i.key}`)).join(lng === 'ar' ? '، ' : ', ') })
             : t('insight.monitorOk', { a: m.inRange, b: m.measured })}
         </NT>
@@ -389,6 +389,7 @@ export function FitnessAgeCard() {
   const f = x.fitness;
   const size = 210;
   const younger = f && f.diff < 0;
+  const gap = f ? Number(Math.abs(f.diff).toFixed(1)) : 0; // 3.0 → 3 عشان «3 سنوات» مو «3.0»
   const c1 = younger ? pulse.green : brand.amber;
   return (
     <NCard style={{ alignItems: 'center' }}>
@@ -413,7 +414,7 @@ export function FitnessAgeCard() {
             <Num size={48}>{f.age.toFixed(1)}</Num>
             <NT size={11} semibold muted>{t('insight.fitnessAgeShort')}</NT>
             <NT size={13} bold color={c1} style={{ marginTop: 4 }}>
-              {Math.abs(f.diff) < 0.5 ? t('insight.sameAge') : younger ? t('insight.younger', { n: Math.abs(f.diff).toFixed(1) }) : t('insight.older', { n: Math.abs(f.diff).toFixed(1) })}
+              {Math.abs(f.diff) < 0.5 ? t('insight.sameAge') : t(younger ? 'insight.younger' : 'insight.older', { n: gap, count: gap })}
             </NT>
           </>
         ) : (

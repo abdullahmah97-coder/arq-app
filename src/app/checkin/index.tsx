@@ -15,6 +15,7 @@ import { locate, type Position } from '@/lib/location';
 import { errorKey, supabase, tooFarMeters } from '@/lib/supabase';
 import type { CheckIn, Gym } from '@/lib/types';
 import { brand, colors, radius, space } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 type Phase = 'locating' | 'searching' | 'ready' | 'denied' | 'off' | 'timeout';
 
@@ -144,7 +145,7 @@ export default function CheckInScreen() {
           <T size="sm" center muted>{t('checkin.doneHint')}</T>
         </Card>
         <Button title={t('home.shareSession')} icon="camera-outline" onPress={() => router.replace({ pathname: '/post/new', params: { checkIn: done.row.id } })} />
-        <Button title={t('checkin.back')} variant="secondary" onPress={() => router.back()} />
+        <Button title={t('checkin.back')} variant="secondary" onPress={goBackOrHome} />
       </Screen>
     );
   }

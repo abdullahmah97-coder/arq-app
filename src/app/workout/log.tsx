@@ -19,6 +19,7 @@ import {
 } from '@/lib/training';
 import { getExercise } from '@/three/catalog';
 import { brand, fonts, night, pulse, space } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 interface Draft { weight: string; reps: string }
 
@@ -39,7 +40,7 @@ export default function WorkoutLog() {
   const [friends, setFriends] = useState<Record<string, FriendBest[]>>({});
 
   useFocusEffect(useCallback(() => {
-    getActiveWorkout().then((a) => { if (!a) router.back(); else setW(a); });
+    getActiveWorkout().then((a) => { if (!a) goBackOrHome(); else setW(a); });
     loadHistory(80).then(setHistory);
   }, []));
   const exKey = w?.exercises.map((e) => e.exercise_id).join(',') ?? '';
@@ -93,7 +94,7 @@ export default function WorkoutLog() {
     if (!w.done.length) {
       return Alert.alert(t('workout.nothingLogged'), '', [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('workout.discard'), style: 'destructive', onPress: async () => { await discardWorkout(w); router.back(); } },
+        { text: t('workout.discard'), style: 'destructive', onPress: async () => { await discardWorkout(w); goBackOrHome(); } },
       ]);
     }
     setBusy(true);
@@ -121,7 +122,7 @@ export default function WorkoutLog() {
       <LinearGradient colors={[night.bg2, night.bg]} style={StyleSheet.absoluteFill} end={{ x: 0, y: 0.4 }} />
       <FullSafeView edges={['top', 'bottom']} style={{ flex: 1 }}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10} style={styles.iconBtn}><Ionicons name="chevron-down" size={22} color={night.text} /></Pressable>
+          <Pressable onPress={goBackOrHome} hitSlop={10} style={styles.iconBtn}><Ionicons name="chevron-down" size={22} color={night.text} /></Pressable>
           <View style={{ alignItems: 'center', flex: 1 }}>
             <NT size={15} bold numberOfLines={1}>{w.title}</NT>
             <Num size={20} color={brand.amber}>{mmss(elapsed)}</Num>
@@ -162,7 +163,7 @@ export default function WorkoutLog() {
                     <View style={styles.lastBox}>
                       <Ionicons name="time-outline" size={14} color={night.muted} />
                       <NT size={12} muted style={{ flex: 1 }}>
-                        {daysAgo(inf.last.session.started_at) === 0 ? t('workout.lastToday') : t('workout.lastTime', { days: daysAgo(inf.last.session.started_at) })}{' '}
+                        {daysAgo(inf.last.session.started_at) === 0 ? t('workout.lastToday') : t('workout.lastTime', { days: daysAgo(inf.last.session.started_at), count: daysAgo(inf.last.session.started_at) })}{' '}
                         <NT size={12} semibold color={night.text}>{inf.last.sets.map(fmtSet).join(' · ')}</NT>
                       </NT>
                     </View>
@@ -202,7 +203,7 @@ export default function WorkoutLog() {
                           placeholder="0" placeholderTextColor={night.faint} style={[styles.input, { fontFamily: fonts.display }]} selectTextOnFocus />
                         <TextInput value={d.reps} onChangeText={(v) => set({ reps: v })} keyboardType="number-pad" editable={!done}
                           placeholder="0" placeholderTextColor={night.faint} style={[styles.input, { fontFamily: fonts.display }]} selectTextOnFocus />
-                        <Pressable onPress={() => toggle(e.exercise_id, i, e.reps, e.rest_sec)} style={[styles.check, done && { backgroundColor: brand.amber, borderColor: brand.amber }]} accessibilityLabel={`set ${i}`}>
+                        <Pressable onPress={() => toggle(e.exercise_id, i, e.reps, e.rest_sec)} style={[styles.check, done && { backgroundColor: brand.amber, borderColor: brand.amber }]} accessibilityLabel={t('workout.a11ySet', { n: i + 1 })}>
                           <Ionicons name="checkmark" size={18} color={done ? brand.deepGreen : night.muted} />
                         </Pressable>
                       </View>
@@ -217,7 +218,7 @@ export default function WorkoutLog() {
                       <View style={{ gap: 4, marginTop: 4 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                           <NT size={11} faint>{t('workout.volVsLast')}</NT>
-                          <NT size={11} semibold color={pct >= 1 ? pulse.green : night.muted}>{`\u2066${Math.round(vNow).toLocaleString('en-US')} / ${Math.round(vPrev).toLocaleString('en-US')} kg\u2069`}{pct >= 1 ? ' ✓' : ''}</NT>
+                          <NT size={11} semibold color={pct >= 1 ? pulse.green : night.muted}>{`\u2066${Math.round(vNow).toLocaleString('en-US')} / ${Math.round(vPrev).toLocaleString('en-US')}\u2069 ${t('workout.kg')}`}{pct >= 1 ? ' ✓' : ''}</NT>
                         </View>
                         <View style={styles.progress}><View style={[styles.progressFill, { width: `${Math.min(100, pct * 100)}%`, backgroundColor: pct >= 1 ? pulse.green : brand.amber }]} /></View>
                       </View>

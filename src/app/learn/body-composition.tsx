@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { BrandGradient, Diamond, SaduPattern } from '@/brand/Brand';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
@@ -19,13 +20,14 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function BodyComposition() {
-  const { L, lng } = useLocalized();
+  const { t } = useTranslation();
+  const { L } = useLocalized();
 
   return (
     <Screen edges={['bottom']}>
       <BrandGradient name="ember" style={{ borderRadius: radius.lg, padding: space.xl, overflow: 'hidden', gap: space.sm }}>
         <SaduPattern variant="peaks" opacity={0.12} />
-        <T size="xs" semibold color={brand.amber}>InBody · {lng === 'ar' ? 'التكنولوجيا' : 'Technology'}</T>
+        <T size="xs" semibold color={brand.amber}>InBody · {t('inbody.technology')}</T>
         <T size="xxl" bold color={brand.cream}>{L(C.title)}</T>
       </BrandGradient>
 
@@ -84,9 +86,9 @@ export default function BodyComposition() {
       <Row style={{ justifyContent: 'center', marginVertical: space.sm }}>
         <Diamond /><Diamond color={brand.amber} /><Diamond color={brand.deepGreen} />
       </Row>
-      <Button title={lng === 'ar' ? 'كيف أقرأ تقرير InBody؟' : 'How to read an InBody report'} variant="dark" icon="document-text-outline"
+      <Button title={t('inbody.howToRead')} variant="dark" icon="document-text-outline"
         onPress={() => router.push('/learn/inbody')} />
-      <Button title={lng === 'ar' ? 'أضف تقرير InBody' : 'Add InBody report'} icon="add-circle-outline"
+      <Button title={t('inbody.addReport')} icon="add-circle-outline"
         onPress={() => router.push('/inbody')} />
     </Screen>
   );

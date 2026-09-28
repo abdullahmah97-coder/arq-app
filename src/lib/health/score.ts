@@ -136,6 +136,7 @@ export function adaptWorkout(day: PlanDay, zone: RecoveryZone | null): AdaptedDa
 /** دقائق → "7س 32د" / "7h 32m" */
 export function fmtDuration(min: number | null | undefined, lang: string): string {
   if (min == null) return '—';
-  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  const total = Math.round(min); // تقريب قبل القسمة عشان ما يطلع «7س 60د»
+  const h = Math.floor(total / 60), m = total % 60;
   return lang.startsWith('ar') ? `${h}س ${m}د` : `${h}h ${m}m`;
 }

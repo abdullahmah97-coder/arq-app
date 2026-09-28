@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import { gymName } from '@/components/GymPicker';
 import { ProfileView } from '@/components/social/ProfileView';
-import { Button, Loading, Row, Screen } from '@/components/ui';
+import { Button, Empty, Loading, Row, Screen } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { acceptRequest, relationTo, removeFriendship, sendRequest, type Relation } from '@/lib/friends';
 import { useLocalized } from '@/lib/i18n';
@@ -21,7 +21,7 @@ export default function UserProfile() {
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const { userId } = useUser();
-  const [p, setP] = useState<PublicProfile | null>(null);
+  const [p, setP] = useState<PublicProfile | null | undefined>(undefined);
   const [gym, setGym] = useState<Gym | null>(null);
   const [rel, setRel] = useState<{ relation: Relation; id?: string }>({ relation: 'none' });
   const [following, setFollowing] = useState(false);
@@ -31,8 +31,9 @@ export default function UserProfile() {
   const [busy, setBusy] = useState<'follow' | 'friend' | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
-    setP(data as PublicProfile);
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
+    if (error && !data) return; // بدون إنترنت: نخلي آخر حالة
+    setP((data as PublicProfile) ?? null);
     if (data?.gym_id) {
       const { data: g } = await supabase.from('gyms').select('*').eq('id', data.gym_id).single();
       setGym(g as Gym);
@@ -43,7 +44,8 @@ export default function UserProfile() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (!p) return <Loading />;
+  if (p === undefined) return <Loading />;
+  if (!p) return <Screen><Empty icon="person-outline" text={t('errors.userNotFound')} /></Screen>;
   const self = p.id === userId;
 
   const toggleFollow = async () => {

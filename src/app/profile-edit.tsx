@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
@@ -9,6 +9,7 @@ import { pickImage, type PickedImage } from '@/lib/images';
 import { errorKey, publicUrl, supabase, uploadImage } from '@/lib/supabase';
 import type { Gender, Goal, Level } from '@/lib/types';
 import { space } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 export default function ProfileEdit() {
   const { t } = useTranslation();
@@ -43,7 +44,7 @@ export default function ProfileEdit() {
       }).eq('user_id', userId);
       if (hErr) throw hErr;
       await refreshProfile();
-      router.back();
+      goBackOrHome();
     } catch (e) {
       Alert.alert(t(errorKey(e)));
     } finally {

@@ -1,5 +1,5 @@
 // إضافة / تعديل عرض نادي (لمالك التطبيق ومدير النادي المعتمد فقط — مفروض في القاعدة)
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, Switch, View } from 'react-native';
@@ -10,6 +10,7 @@ import { canManageChain, canManageGym, deleteOffer, loadChains, loadClubs, saveO
 import { useLocalized } from '@/lib/i18n';
 import { errorKey, supabase } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 const MONTHS = [0, 1, 3, 6, 12];
 const toNum = (s: string) => { const v = Number(s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(',', '.')); return Number.isFinite(v) ? v : NaN; };
@@ -86,7 +87,7 @@ export default function OfferForm() {
     setBusy(true);
     try {
       await saveOffer({ gym_id: gymId, chain_id: gymId ? null : chainId, source_url: source || null, title, details, price_sar: p, old_price_sar: op, months, ends_on: endsOn || null, url: url || null, promo_code: code || null, active }, id);
-      router.back();
+      goBackOrHome();
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
   };
 
@@ -109,7 +110,7 @@ export default function OfferForm() {
         <Row gap={6} style={{ flexWrap: 'wrap' }}>
           {MONTHS.map((m) => (
             <Pressable key={m} onPress={() => setMonths(m)} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: months === m ? brand.deepGreen : colors.cardAlt }}>
-              <T size="sm" semibold color={months === m ? brand.cream : colors.text}>{m === 0 ? t('clubs.dayPass') : t('clubs.monthsN', { n: m })}</T>
+              <T size="sm" semibold color={months === m ? brand.cream : colors.text}>{m === 0 ? t('clubs.dayPass') : t('clubs.monthsN', { n: m, count: m })}</T>
             </Pressable>
           ))}
         </Row>
@@ -122,7 +123,7 @@ export default function OfferForm() {
       <View style={{ gap: 6 }}>
         <Input label={t('clubs.endsOn')} value={endsOn} onChangeText={setEndsOn} placeholder="2026-10-31" autoCapitalize="none" />
         <Row gap={6}>
-          {[7, 14, 30].map((d) => <Pressable key={d} onPress={() => setEndsOn(plusDays(d))} style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.cardAlt }}><T size="xs" semibold>{t('clubs.plusDays', { n: d })}</T></Pressable>)}
+          {[7, 14, 30].map((d) => <Pressable key={d} onPress={() => setEndsOn(plusDays(d))} style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.cardAlt }}><T size="xs" semibold>{t('clubs.plusDays', { n: d, count: d })}</T></Pressable>)}
           <Pressable onPress={() => setEndsOn('')} style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.cardAlt }}><T size="xs" semibold>{t('clubs.noEnd')}</T></Pressable>
         </Row>
       </View>
@@ -131,7 +132,7 @@ export default function OfferForm() {
       <Input label={t('clubs.promo')} value={code} onChangeText={setCode} autoCapitalize="characters" maxLength={30} placeholder="ARQ10" />
       <Row style={{ justifyContent: 'space-between' }}><T semibold>{t('clubs.activeOffer')}</T><Switch value={active} onValueChange={setActive} trackColor={{ true: brand.orange }} /></Row>
       <Button title={t('clubs.saveOffer')} icon="checkmark" loading={busy} onPress={save} />
-      {id ? <Button variant="ghost" icon="trash-outline" title={t('common.delete')} onPress={async () => { await deleteOffer(id); router.back(); }} /> : null}
+      {id ? <Button variant="ghost" icon="trash-outline" title={t('common.delete')} onPress={async () => { await deleteOffer(id); goBackOrHome(); }} /> : null}
     </Screen>
   );
 }

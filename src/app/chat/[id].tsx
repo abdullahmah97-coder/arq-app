@@ -56,7 +56,7 @@ export default function Chat() {
   };
 
   const name = p ? p.full_name || p.username : '';
-  const time = (iso: string) => new Date(iso).toLocaleTimeString(lng === 'ar' ? 'ar-SA' : 'en-US', { hour: 'numeric', minute: '2-digit' });
+  const time = (iso: string) => new Date(iso).toLocaleTimeString(lng === 'ar' ? 'ar-SA-u-nu-latn' : 'en-US', { hour: 'numeric', minute: '2-digit' });
 
   return (
     <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.bg }}>

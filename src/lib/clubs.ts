@@ -30,11 +30,22 @@ export interface Review {
 
 const num = (v: unknown) => (v == null ? null : Number(v));
 
+const toClub = (g: any): Club => ({
+  ...g, rating: num(g.rating), reviews: Number(g.reviews), offers: Number(g.offers), best_monthly: num(g.best_monthly), distance_m: num(g.distance_m),
+});
+
 export async function loadClubs(pos?: { lat: number; lng: number } | null): Promise<Club[]> {
   const { data } = await supabase.rpc('gyms_directory', { p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null, p_city: null });
-  return ((data ?? []) as any[]).map((g) => ({
-    ...g, rating: num(g.rating), reviews: Number(g.reviews), offers: Number(g.offers), best_monthly: num(g.best_monthly), distance_m: num(g.distance_m),
-  }));
+  return ((data ?? []) as any[]).map(toClub);
+}
+
+/** نادي واحد برقمه (صفحة النادي) — يرجع null لو ما هو موجود */
+export async function loadClub(id: string): Promise<Club | null> {
+  const { data, error } = await supabase.rpc('gym_card', { p_id: id });
+  // احتياط لو الخادم ما فيه gym_card للحين: نبحث في الدليل مثل قبل
+  if (error) return (await loadClubs()).find((c) => c.id === id) ?? null;
+  const row = ((data ?? []) as any[])[0];
+  return row ? toClub(row) : null;
 }
 
 const OSEL = 'id, gym_id, chain_id, title, details, price_sar, old_price_sar, months, ends_on, url, promo_code, active, created_at, source_url, seen_on, confidence, gyms(id, name, name_en, chain, city, district, audience, logo_path), gym_chains(id, name, name_en, audience, logo_path)';

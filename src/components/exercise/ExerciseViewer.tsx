@@ -242,13 +242,13 @@ export function ExerciseViewer({ motion, gender, focus, muscles, height = 420 }:
         </Guard>
       )}
       <View style={styles.controls} pointerEvents="box-none">
-        <Pressable onPress={() => setPlaying((p) => !p)} style={styles.btn} accessibilityLabel={playing ? 'Pause' : 'Play'}>
+        <Pressable onPress={() => setPlaying((p) => !p)} style={styles.btn} accessibilityLabel={t(playing ? 'exercise.a11yPause' : 'exercise.a11yPlay')}>
           <Ionicons name={playing ? 'pause' : 'play'} size={18} color={brand.cream} />
         </Pressable>
-        <Pressable onPress={() => setSlow((s) => !s)} style={[styles.btn, slow && { backgroundColor: brand.orange }]} accessibilityLabel="Slow motion">
+        <Pressable onPress={() => setSlow((s) => !s)} style={[styles.btn, slow && { backgroundColor: brand.orange }]} accessibilityLabel={t('exercise.a11ySlow')}>
           <Ionicons name="speedometer-outline" size={18} color={brand.cream} />
         </Pressable>
-        <Pressable onPress={() => { yaw.current += 90; }} style={styles.btn} accessibilityLabel="Rotate">
+        <Pressable onPress={() => { yaw.current += 90; }} style={styles.btn} accessibilityLabel={t('exercise.a11yRotate')}>
           <Ionicons name="sync" size={18} color={brand.cream} />
         </Pressable>
       </View>
@@ -264,7 +264,7 @@ export function ExerciseViewer({ motion, gender, focus, muscles, height = 420 }:
         </View>
       ) : null}
       {mode === '2d' ? (
-        <Pressable onPress={retry3D} style={styles.try3d} accessibilityLabel="3D">
+        <Pressable onPress={retry3D} style={styles.try3d} accessibilityLabel={t('exercise.a11y3d')}>
           <Ionicons name="cube-outline" size={14} color={brand.cream} />
           <Text style={styles.try3dText}>3D</Text>
         </Pressable>

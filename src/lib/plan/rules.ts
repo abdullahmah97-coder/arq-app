@@ -319,7 +319,7 @@ const MEALS: MealTemplate[] = [
     portions: [P('شوفان', 'Oats', 60), P('حليب قليل الدسم', 'Low-fat milk', 250, 'ml'), P('موز', 'Banana', 1, 'pc'), P('زبدة فول سوداني', 'Peanut butter', 10)] },
   { slot: 'breakfast', name: t('بيض وخبز بر وخضار', 'Eggs, wholewheat bread & veggies'), kcal: 430, protein_g: 26,
     portions: [P('بيض', 'Eggs', 3, 'pc'), P('خبز بر', 'Wholewheat bread', 60), P('طماطم وخيار', 'Tomato & cucumber', 150)] },
-  { slot: 'breakfast', name: t('فول بزيت الزيتون مع بيض', 'Foul with olive oil & eggs'), kcal: 470, protein_g: 27,
+  { slot: 'breakfast', name: t('فول بزيت الزيتون مع بيض', 'Ful medames with olive oil & eggs'), kcal: 470, protein_g: 27,
     portions: [P('فول مدمس', 'Fava beans', 200), P('بيض مسلوق', 'Boiled eggs', 2, 'pc'), P('زيت زيتون', 'Olive oil', 7, 'ml'), P('خبز بر', 'Wholewheat bread', 40)] },
   { slot: 'breakfast', name: t('زبادي يوناني بالتوت والشوفان', 'Greek yogurt, berries & oats'), kcal: 400, protein_g: 30,
     portions: [P('زبادي يوناني', 'Greek yogurt', 250), P('توت', 'Berries', 100), P('شوفان', 'Oats', 30), P('عسل', 'Honey', 10)] },

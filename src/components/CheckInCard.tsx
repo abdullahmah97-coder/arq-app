@@ -58,7 +58,7 @@ export function CheckInCard({ onChange }: { onChange?: () => void }) {
       if (error) throw error;
       const row = data as CheckIn;
       const minutes = Math.round((new Date(row.checked_out_at!).getTime() - new Date(row.checked_in_at).getTime()) / 60000);
-      Alert.alert(t('home.checkedOut', { minutes }), row.points_awarded > before ? t('home.longBonus') : undefined);
+      Alert.alert(t('home.checkedOut', { minutes, count: minutes }), row.points_awarded > before ? t('home.longBonus') : undefined);
       setOpen(null);
       await refreshProfile();
       onChange?.();

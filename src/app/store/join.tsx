@@ -52,7 +52,7 @@ export default function JoinStore() {
     try {
       await saveBrand(userId, { name, tagline, description, category, website, instagram, logo_path: logo }, existing?.id);
       if (!existing) Alert.alert(t('store.submitted'), t('store.submittedBody'));
-      router.replace('/store/manage');
+      router.dismissTo('/store/manage');
     } catch (e) {
       Alert.alert(t(errorKey(e)));
     } finally { setBusy(false); }

@@ -1,6 +1,6 @@
 // برنامج من المجتمع: صاحبه ورتبته، التمارين، والاعتماد كخطتي (+10 نقاط لصاحبه)
 import { Ionicons } from '@expo/vector-icons';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
@@ -11,6 +11,7 @@ import { Empty, Loading, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { adoptProgramRpc, deleteProgram, loadProgram, toProgramShape, type UserProgram } from '@/lib/social';
 import { brand, radius, space } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 export default function CommunityProgram() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,7 +27,7 @@ export default function CommunityProgram() {
 
   const remove = () => Alert.alert(t('social.deleteProgram'), '', [
     { text: t('common.cancel'), style: 'cancel' },
-    { text: t('common.delete'), style: 'destructive', onPress: async () => { await deleteProgram(p.id); router.back(); } },
+    { text: t('common.delete'), style: 'destructive', onPress: async () => { await deleteProgram(p.id); goBackOrHome(); } },
   ]);
 
   return (
@@ -37,7 +38,7 @@ export default function CommunityProgram() {
       <BrandGradient name="ember" style={{ borderRadius: radius.lg, overflow: 'hidden', padding: space.xl, gap: space.sm }}>
         <SaduPattern variant="peaks" opacity={0.1} />
         <Row gap={6} style={{ flexWrap: 'wrap' }}>
-          <Tag text={t('programs.days', { n: p.days.length })} />
+          <Tag text={t('programs.days', { n: p.days.length, count: p.days.length })} />
           <Tag text={t(`onboarding.level_${p.level}`)} />
           <Tag text={t('social.adoptsN', { n: p.adopts })} />
         </Row>

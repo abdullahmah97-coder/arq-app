@@ -46,6 +46,7 @@ export default function WorkoutSummary() {
   };
 
   const date = session ? new Date(session.started_at).toLocaleDateString(lng === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+  const prevDays = session && cmp?.previous ? daysAgo(cmp.previous.started_at, Date.parse(session.started_at)) : 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: night.bg }}>
@@ -67,7 +68,7 @@ export default function WorkoutSummary() {
               {cmp.prs > 0 ? <NT size={28}>🏆</NT> : null}
               <NT size={22} bold center>{session.title || t('workout.title')}</NT>
               <NT size={12} muted>{date}</NT>
-              {Number(points) > 0 ? <NT size={12} semibold color={brand.amber}>+{points} {t('home.points')}</NT> : null}
+              {Number(points) > 0 ? <NT size={12} semibold color={brand.amber}>+{points} {t('common.points')}</NT> : null}
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -82,7 +83,7 @@ export default function WorkoutSummary() {
               <NT size={16} bold>{t('workout.compareTitle')}</NT>
               <NT size={12} muted>
                 {cmp.previous
-                  ? t('workout.compareWith', { title: cmp.previous.title || t('workout.title'), days: daysAgo(cmp.previous.started_at, Date.parse(session.started_at)) })
+                  ? t('workout.compareWith', { title: cmp.previous.title || t('workout.title'), days: prevDays, count: prevDays })
                   : t('workout.noPrevious')}
               </NT>
             </View>

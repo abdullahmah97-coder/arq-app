@@ -42,7 +42,7 @@ export default function Programs() {
                     <LinearGradient colors={['rgba(10,51,45,0.2)', 'rgba(10,51,45,0.95)']} style={[StyleSheet.absoluteFill, { borderRadius: 20 }]} />
                     <View style={{ flex: 1, justifyContent: 'flex-end', padding: space.lg, gap: 6 }}>
                       <Row gap={6} style={{ flexWrap: 'wrap' }}>
-                        <Tag text={t('programs.days', { n: p.daysPerWeek })} />
+                        <Tag text={t('programs.days', { n: p.daysPerWeek, count: p.daysPerWeek })} />
                         <Tag text={t(`onboarding.level_${p.level}`)} />
                         {p.audience !== 'all' ? <Tag text={t(`programs.for_${p.audience}`)} /> : null}
                         {active ? <Tag text={t('programs.active')} strong /> : null}

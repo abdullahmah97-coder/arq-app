@@ -29,7 +29,7 @@ export default function Devices() {
     try {
       const ok = await h.connect();
       if (!ok) Alert.alert(t('health.unavailable'));
-      else router.replace('/health');
+      else router.dismissTo('/health');
     } finally { setBusy(false); }
   };
 
@@ -88,7 +88,7 @@ export default function Devices() {
       <Card style={{ gap: space.sm }}>
         <Row><Ionicons name="flask-outline" size={18} color={brand.green} /><T bold>{t('health.demo')}</T></Row>
         <Button title={h.source === 'demo' ? t('health.disconnect') : t('health.demo')} variant="secondary"
-          onPress={() => (h.source === 'demo' ? h.disconnect() : (h.useDemo(), router.replace('/health')))} />
+          onPress={() => (h.source === 'demo' ? h.disconnect() : (h.useDemo(), router.dismissTo('/health')))} />
       </Card>
 
       <Row style={{ alignItems: 'flex-start' }}>

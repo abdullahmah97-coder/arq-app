@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Platform, Switch } from 'react-native';
@@ -8,6 +8,7 @@ import { useUser } from '@/lib/auth';
 import { pickImage, type PickedImage } from '@/lib/images';
 import { errorKey, supabase, uploadImage } from '@/lib/supabase';
 import { colors, radius } from '@/theme';
+import { goBackOrHome } from '@/lib/nav';
 
 export default function NewPost() {
   const { t } = useTranslation();
@@ -41,7 +42,7 @@ export default function NewPost() {
         check_in_id: attach ? todayCheckIn : null,
       });
       if (error) throw error;
-      router.back();
+      goBackOrHome();
     } catch (e) {
       Alert.alert(t(errorKey(e)));
     } finally {

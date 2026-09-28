@@ -69,7 +69,7 @@ export default function Store() {
                 <T bold size="lg">{b.name}</T>
                 <T size="xs" muted numberOfLines={2}>{b.tagline || t(`store.cat_${b.category}`)}</T>
               </View>
-              <T size="xs" muted>{t('store.productsN', { n: products.length })}</T>
+              <T size="xs" muted>{t('store.productsN', { n: products.length, count: products.length })}</T>
             </Row>
             {products.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.md }}>

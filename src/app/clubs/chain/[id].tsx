@@ -56,7 +56,7 @@ export default function ChainPage() {
       </BrandGradient>
 
       <View style={{ flexDirection: 'row', gap: space.sm }}>
-        <Stat value={chain.rating ? chain.rating.toFixed(1) : '—'} label={t('clubs.reviewsN', { n: chain.reviews })} extra={chain.rating ? <Stars value={chain.rating} size={10} /> : null} />
+        <Stat value={chain.rating ? chain.rating.toFixed(1) : '—'} label={t('clubs.reviewsN', { n: chain.reviews, count: chain.reviews })} extra={chain.rating ? <Stars value={chain.rating} size={10} /> : null} />
         <Stat value={chain.best_monthly != null ? String(Math.round(chain.best_monthly)) : '—'} label={t('clubs.fromMonthlyLabel')} />
         <Stat value={String(chain.branches)} label={t('clubs.branchesInApp')} />
       </View>

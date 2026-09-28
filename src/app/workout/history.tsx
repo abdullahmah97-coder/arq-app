@@ -150,7 +150,7 @@ export default function WorkoutHistory() {
               <View key={x.exercise_id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
                 <Pressable style={{ flex: 1, gap: 2 }} onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: x.exercise_id } })}>
                   <T size="sm" semibold numberOfLines={1}>{g ? L(g.name) : x.exercise_id}</T>
-                  <T size="xs" muted>{x.top ? `${t('workout.best')}: ${fmtSet(x.top)}` : ''} · {t('workout.sessionsN', { n: x.sessions })}</T>
+                  <T size="xs" muted>{x.top ? `${t('workout.best')}: ${fmtSet(x.top)}` : ''} · {t('workout.sessionsN', { n: x.sessions, count: x.sessions })}</T>
                 </Pressable>
                 <View style={{ width: 70, height: 30, flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
                   {x.series.map((v, i) => (
@@ -172,7 +172,7 @@ export default function WorkoutHistory() {
           <View key={wk} style={{ gap: space.sm }}>
             <Row style={{ justifyContent: 'space-between', paddingHorizontal: 4 }}>
               <T size="xs" semibold color={colors.primary}>{wk === weekStart(now) ? t('workout.thisWeek') : t('workout.weekOf', { d: dateFmt(wk) })}</T>
-              <T size="xs" muted>{t('workout.weekTotals', { n: ss.length, v: nf(vol) })}</T>
+              <T size="xs" muted>{t('workout.weekTotals', { n: ss.length, v: nf(vol), count: ss.length })}</T>
             </Row>
             {ss.map((s) => {
               const c = compareSession(s, list);

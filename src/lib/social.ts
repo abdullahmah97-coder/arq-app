@@ -82,7 +82,7 @@ export function toProgramShape(p: UserProgram): Program {
     credit: p.author_p ? `@${p.author_p.username}` : undefined,
     days: p.days.map((d) => ({
       title: txt(d.title),
-      exercises: d.exercises.map((e) => ({
+      exercises: (d.exercises ?? []).map((e) => ({
         exercise_id: e.exercise_id,
         original: getExercise(e.exercise_id)?.name.en ?? e.exercise_id,
         target: txt(''),

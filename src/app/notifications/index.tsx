@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, IconButton, T } from '@/components/ui';
 import { timeAgo } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
+import { openHref } from '@/lib/nav';
 import { loadNotifications, markNotificationsRead, notifHref, setUnreadBadge, type NotifKind, type NotifRow } from '@/lib/notifications';
 import { RANKS } from '@/lib/ranks';
 import { publicUrl } from '@/lib/supabase';
@@ -125,6 +126,7 @@ function useNotifText() {
   const { lng } = useLocalized();
   return (n: NotifRow): { parts: string[]; name: string } => {
     const name = n.full_name?.trim() || n.username || t('notif.someone');
+    if (n.kind === 'nudge') return { parts: [], name }; // نصه من المالك (data.title/body)، ما له مفتاح ترجمة
     const d = n.data ?? {};
     const key = n.kind === 'follow' && d.mutual ? 'notif.followMutual' : `notif.${n.kind}`;
     const rank = n.kind === 'rank_up' ? RANKS[Number(d.level) || 0]?.name[lng] : undefined;
@@ -142,7 +144,7 @@ function NotifItem({ n, fresh, lng }: { n: NotifRow; fresh: boolean; lng: 'ar' |
   const system = !n.actor_id;
   return (
     <Pressable
-      onPress={() => { if (href) router.push(href as any); }}
+      onPress={() => { if (href) openHref(href); }}
       accessibilityRole="button"
       style={({ pressed }) => ({
         flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: 16,

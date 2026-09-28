@@ -67,8 +67,8 @@ export default function Clubs() {
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             <Segmented<number | 'all'> wrap value={months} onChange={setMonths} options={[
-              { value: 'all', label: t('clubs.anyLength') }, { value: 1, label: t('clubs.monthsN', { n: 1 }) }, { value: 3, label: t('clubs.monthsN', { n: 3 }) },
-              { value: 6, label: t('clubs.monthsN', { n: 6 }) }, { value: 12, label: t('clubs.monthsN', { n: 12 }) }, { value: 0, label: t('clubs.dayPass') },
+              { value: 'all', label: t('clubs.anyLength') }, { value: 1, label: t('clubs.monthsN', { n: 1, count: 1 }) }, { value: 3, label: t('clubs.monthsN', { n: 3, count: 3 }) },
+              { value: 6, label: t('clubs.monthsN', { n: 6, count: 6 }) }, { value: 12, label: t('clubs.monthsN', { n: 12, count: 12 }) }, { value: 0, label: t('clubs.dayPass') },
             ]} />
           </ScrollView>
           <T size="xs" muted>{t('clubs.offersHint')}</T>

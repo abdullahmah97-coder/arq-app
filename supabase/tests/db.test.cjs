@@ -372,6 +372,9 @@ grant usage on schema public, auth, storage to authenticated;
   await q(`update gyms set chain_id = $1 where id = $2`, [pgc.id, gym.id]);
   const gd = (await as(A, 'select * from gyms_directory() where id = $1', [gym.id]))[0];
   check('branch directory includes chain offers + name', Number(gd.best_monthly) === 96 && gd.chain === 'PureGym KSA' && gd.chain_id === pgc.id, JSON.stringify([gd.best_monthly, gd.chain]));
+  const card = (await as(A, 'select * from gym_card($1)', [gym.id]))[0];
+  check('gym_card: one club by id, same numbers as the directory', card && card.id === gym.id && Number(card.best_monthly) === 96 && card.chain === 'PureGym KSA', JSON.stringify(card && [card.best_monthly, card.chain]));
+  check('gym_card: unknown id -> no row', (await as(A, 'select * from gym_card(gen_random_uuid())')).length === 0);
   const cd = (await as(A, 'select * from chains_directory(24.69, 46.685)')).find(c => c.slug === 'puregym');
   check('chain: branches, aggregated rating, nearest branch', Number(cd.branches) === 1 && Number(cd.reviews) >= 1 && cd.nearest_m < 1000, JSON.stringify([cd.branches, cd.rating, cd.reviews, Math.round(cd.nearest_m)]));
   await expectErr('users cannot add chain offers', () => as(A, `insert into gym_offers (chain_id, title, price_sar) values ($1, 'عرض مزيف', 1)`, [pgc.id]), /row-level security/);
@@ -472,6 +475,14 @@ grant usage on schema public, auth, storage to authenticated;
   check('notif: gym members told about a new offer (not expired ones)',
     nA.filter(r => r.kind === 'gym_offer').length === 1 && nA.some(r => r.kind === 'gym_offer' && r.data.price === '450' && r.data.gym === gym.name),
     JSON.stringify(nA.filter(r => r.kind === 'gym_offer').map(r => r.data)));
+  { // «صاحبك في النادي» يودّي لصفحة الموجودين بالنادي
+    await q(`update check_ins set checked_out_at = now() where user_id = any($1)`, [[A, B]]);
+    await q(`update profiles set presence_visibility = 'friends' where id = any($1)`, [[A, B]]);
+    await q(`insert into check_ins (user_id, gym_id) values ($1, $2)`, [A, gym.id]);
+    await q(`insert into check_ins (user_id, gym_id) values ($1, $2)`, [B, gym.id]);
+    const fh = (await as(A, `select * from my_notifications() where kind = 'friend_here'`))[0];
+    check('notif: friend at your gym links to who-is-here', fh && fh.data.gym_id === gym.id && fh.actor_id === B, JSON.stringify(fh && fh.data));
+  }
   const selfLikeBefore = (await q(`select count(*)::int n from notifications where user_id = $1 and actor_id = $1`, [A]))[0].n;
   await as(A, `insert into post_likes (post_id, user_id) values ($1, $2)`, [post.id, A]);
   check('notif: liking your own post does not notify you', (await q(`select count(*)::int n from notifications where user_id = $1 and actor_id = $1`, [A]))[0].n === selfLikeBefore && selfLikeBefore === 0);
