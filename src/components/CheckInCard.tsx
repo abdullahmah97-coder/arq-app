@@ -1,29 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, I18nManager, Pressable, View } from 'react-native';
 import { useUser } from '@/lib/auth';
 import { durationLabel } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
-import { gymsInRange, nearbyGyms, refreshNearbyGyms } from '@/lib/gyms';
-import { getCurrentPosition } from '@/lib/location';
 import { isHere, loadPresence, type PresenceRow } from '@/lib/presence';
-import { errorKey, publicUrl, supabase, tooFarMeters } from '@/lib/supabase';
+import { errorKey, publicUrl, supabase } from '@/lib/supabase';
 import type { CheckIn, Gym } from '@/lib/types';
 import { brand, colors, space } from '@/theme';
 import { gymName } from './GymPicker';
 import { Avatar, Button, Card, Row, T } from './ui';
-
-/** يسأل المستخدم أي نادي إذا كان داخل أكثر من نادي بنفس الوقت */
-function pickGym(gyms: Gym[], lng: 'ar' | 'en', t: (k: string) => string): Promise<Gym | null> {
-  return new Promise((resolve) => {
-    Alert.alert(t('checkin.whichGym'), undefined, [
-      ...gyms.slice(0, 4).map((g) => ({ text: gymName(g, lng), onPress: () => resolve(g) })),
-      { text: t('common.cancel'), style: 'cancel' as const, onPress: () => resolve(null) },
-    ], { cancelable: true, onDismiss: () => resolve(null) });
-  });
-}
 
 export function CheckInCard({ onChange }: { onChange?: () => void }) {
   const { t } = useTranslation();
@@ -32,7 +20,6 @@ export function CheckInCard({ onChange }: { onChange?: () => void }) {
   const [gym, setGym] = useState<Gym | null>(null);
   const [open, setOpen] = useState<CheckIn | null>(null);
   const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState<'locating' | 'searching' | null>(null);
   const [, tick] = useState(0);
   const [presence, setPresence] = useState<{ rows: PresenceRow[]; presentNow: number } | null>(null);
 
@@ -49,7 +36,8 @@ export function CheckInCard({ onChange }: { onChange?: () => void }) {
     if (shownId) loadPresence(shownId).then(setPresence).catch(() => {}); else setPresence(null);
   }, [userId, profile.gym_id]);
 
-  useEffect(() => { load(); }, [load]);
+  // نحدّث البطاقة كل ما رجعت للصفحة (مثلاً بعد تسجيل الحضور)
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // تحديث العدّاد كل دقيقة أثناء التواجد في النادي
   useEffect(() => {
@@ -58,58 +46,8 @@ export function CheckInCard({ onChange }: { onChange?: () => void }) {
     return () => clearInterval(id);
   }, [open]);
 
-  /** يحدد موقعك، يجيب النوادي القريبة من الخريطة، ويسجّل حضورك في النادي اللي أنت فيه */
-  const checkIn = async () => {
-    setBusy(true);
-    try {
-      setStep('locating');
-      const pos = await getCurrentPosition();
-      if (!pos) return Alert.alert(t('errors.locationDenied'));
-      setStep('searching');
-      await refreshNearbyGyms(pos);
-      const near = await nearbyGyms(pos, 3);
-      const inRange = gymsInRange(near, pos.accuracy);
-      let target = inRange.find((g) => g.id === profile.gym_id) ?? (inRange.length === 1 ? inRange[0] : null);
-      if (!target && inRange.length > 1) {
-        target = await pickGym(inRange, lng, t);
-        if (!target) return;
-      }
-      if (!target) {
-        const nearest = near[0];
-        Alert.alert(
-          t('checkin.noneHere'),
-          nearest ? t('checkin.nearest', { name: gymName(nearest, lng), m: Math.round(nearest.distance_m ?? 0) }) : t('checkin.noneNear'),
-          [
-            { text: t('common.ok'), style: 'cancel' },
-            { text: t('checkin.addHere'), onPress: () => router.push('/profile-edit') },
-          ],
-        );
-        return;
-      }
-      const { data, error } = await supabase.rpc('check_in', {
-        p_gym: target.id, p_lat: pos.lat, p_lng: pos.lng, p_accuracy: pos.accuracy,
-      });
-      if (error) throw error;
-      const row = data as CheckIn;
-      setOpen(row);
-      setGym(target);
-      loadPresence(target.id).then(setPresence).catch(() => {});
-      // أول مرة: نخلي هذا ناديك الأساسي
-      if (!profile.gym_id) await supabase.from('profiles').update({ gym_id: target.id }).eq('id', userId);
-      Alert.alert(
-        gymName(target, lng),
-        row.points_awarded > 0 ? t('home.checkedIn', { points: row.points_awarded }) : t('home.checkedInNoPoints'),
-      );
-      await refreshProfile();
-      onChange?.();
-    } catch (e) {
-      const m = tooFarMeters(e);
-      Alert.alert(m != null ? t('errors.tooFar', { m }) : t(errorKey(e)));
-    } finally {
-      setBusy(false);
-      setStep(null);
-    }
-  };
+  /** يفتح صفحة تسجيل الحضور: تحدد موقعك وتوضح النوادي حولك وكم تبعد عنها */
+  const checkIn = () => router.push('/checkin');
 
   const checkOut = async () => {
     if (!open) return;
@@ -132,8 +70,6 @@ export function CheckInCard({ onChange }: { onChange?: () => void }) {
     }
   };
 
-  const busyLabel = step === 'searching' ? t('checkin.searching') : t('home.checkingIn');
-
   return (
     <Card style={{ gap: space.md, borderColor: open ? colors.primary : colors.border }}>
       <Row>
@@ -151,7 +87,7 @@ export function CheckInCard({ onChange }: { onChange?: () => void }) {
             onPress={() => router.push({ pathname: '/post/new', params: { checkIn: open.id } })} />
         </Row>
       ) : (
-        <Button title={busy ? busyLabel : t('home.checkIn')} icon="finger-print" onPress={checkIn} loading={busy} />
+        <Button title={t('home.checkIn')} icon="finger-print" onPress={checkIn} />
       )}
       {gym && presence ? <PresenceStrip gymId={gym.id} here={!!open} data={presence} /> : null}
     </Card>

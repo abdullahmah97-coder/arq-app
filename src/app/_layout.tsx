@@ -21,6 +21,7 @@ import { restoreTheme, saveTheme, ThemeCtx } from '@/lib/appTheme';
 const MODAL_ROUTES = new Set([
   'post/new', 'challenge/new', 'feedback', 'program/new', 'tip/new',
   'clubs/chain-edit', 'clubs/review', 'clubs/offer', 'store/join', 'store/product', 'food/add', 'exercise/[id]',
+  'checkin/index',
 ]);
 
 const navTheme = () => ({
@@ -100,6 +101,7 @@ function RootNavigator() {
         <Stack.Screen name="clubs/offer" options={{ title: t('clubs.addOffer'), presentation: 'modal' }} />
         <Stack.Screen name="chat/[id]" options={{ title: '' }} />
         <Stack.Screen name="checkin/[id]" options={{ title: t('presence.comments') }} />
+        <Stack.Screen name="checkin/index" options={{ title: t('checkin.title'), presentation: 'modal' }} />
         <Stack.Screen name="store/index" options={{ title: t('store.title') }} />
         <Stack.Screen name="store/[id]" options={{ title: '' }} />
         <Stack.Screen name="store/join" options={{ title: t('store.addYours'), presentation: 'modal' }} />

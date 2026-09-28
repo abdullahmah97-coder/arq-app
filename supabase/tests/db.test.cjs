@@ -433,6 +433,9 @@ grant usage on schema public, auth, storage to authenticated;
   check('events: owner reads them', !isAdminB || (await as(B, 'select * from app_events')).length === 1);
   { let hidden = false; try { hidden = (await as(A, 'select * from gym_area_scans')).length === 0; } catch (e) { hidden = /permission denied/.test(e.message); }
     check('scan log is private', hidden); }
+  { let hidden = false; try { hidden = (await as(A, 'select * from gym_search_log')).length === 0; } catch (e) { hidden = /permission denied/.test(e.message); }
+    check('gym search log is private', hidden); }
+  await expectErr('gym search log: users cannot write it', () => as(A, `insert into gym_search_log (user_id, q) values ($1, 'x')`, [A]), /permission denied|row-level security/);
 
   // delete account (store requirement)
   await as(C, 'select delete_my_account()');
