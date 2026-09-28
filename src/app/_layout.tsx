@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { flushLastFatal, installGlobalErrorLogger } from '@/lib/events';
 import { HealthProvider } from '@/lib/health';
 import { restoreLocale } from '@/lib/i18n';
+import { usePushSetup } from '@/lib/push';
 import { colors, fontAssets, fonts, type ThemeId } from '@/theme';
 import { restoreTheme, saveTheme, ThemeCtx } from '@/lib/appTheme';
 
@@ -32,6 +33,8 @@ const navTheme = () => ({
 function RootNavigator() {
   const { session, loading, profile } = useAuth();
   const { t } = useTranslation();
+  // إشعارات الجوال: ربط الجهاز بالحساب وفتح الصفحة لما تضغط إشعار
+  usePushSetup(!!session && !!profile?.onboarded);
 
   if (loading && session) return <Loading />;
 

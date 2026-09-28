@@ -12,6 +12,7 @@ import { Logo, SaduPattern } from '@/brand/Brand';
 import { CheckInCard } from '@/components/CheckInCard';
 import { HomeClubOffers } from '@/components/clubs/HomeClubOffers';
 import { NotificationBell } from '@/components/NotificationBell';
+import { PushPrompt } from '@/components/PushPrompt';
 import { ChevronBar, MiniBars, Rings } from '@/components/pulse/Rings';
 import { MetricChip, NCard, NSection, NT, Num, OnDark, Pill, zoneColor } from '@/components/pulse/widgets';
 import { Avatar } from '@/components/ui';
@@ -101,6 +102,8 @@ export default function Home() {
               </Pressable>
             </View>
           </View>
+
+          <PushPrompt />
 
           {/* الحلقات */}
           <Pressable onPress={() => router.push(connected ? '/health' : '/devices')} style={{ alignItems: 'center', marginTop: space.sm }}>

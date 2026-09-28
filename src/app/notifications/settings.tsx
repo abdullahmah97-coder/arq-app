@@ -2,10 +2,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, ScrollView, Switch, View } from 'react-native';
-import { Row, T } from '@/components/ui';
+import { Alert, AppState, Linking, ScrollView, Switch, View } from 'react-native';
+import { Button, Row, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { DEFAULT_PREFS, loadNotifyPrefs, NOTIFY_CATEGORIES, saveNotifyPrefs, type NotifyCategory, type NotifyPrefs } from '@/lib/notifications';
+import { enablePush, pushStatus, type PushStatus } from '@/lib/push';
 import { brand, colors, space } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -37,6 +38,7 @@ export default function NotificationSettings() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: space.lg, gap: space.md }}>
+      <PhonePush />
       <T size="sm" muted style={{ lineHeight: 22 }}>{t('notif.prefsIntro')}</T>
       <View style={{ backgroundColor: colors.card, borderRadius: 18, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}>
         {NOTIFY_CATEGORIES.map((k, i) => (
@@ -62,5 +64,41 @@ export default function NotificationSettings() {
         ))}
       </View>
     </ScrollView>
+  );
+}
+
+/** حالة إشعارات الجوال على هذا الجهاز + زر التفعيل أو فتح الإعدادات */
+function PhonePush() {
+  const { t } = useTranslation();
+  const [st, setSt] = useState<PushStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    pushStatus().then(setSt);
+    // لما يرجع من إعدادات الجوال نحدّث الحالة ونسجّل الجهاز لو فعّلها
+    const sub = AppState.addEventListener('change', (a) => { if (a === 'active') enablePush(false).then(setSt); });
+    return () => sub.remove();
+  }, []);
+
+  if (!st) return null;
+  const on = st === 'on';
+  return (
+    <View style={{ backgroundColor: on ? colors.card : colors.cardAlt, borderRadius: 18, borderWidth: 1, borderColor: on ? colors.border : brand.amber, padding: space.md, gap: space.sm }}>
+      <Row gap={space.md} style={{ alignItems: 'center' }}>
+        <Ionicons name={on ? 'notifications' : 'notifications-off-outline'} size={22} color={on ? brand.green : colors.primary} />
+        <View style={{ flex: 1 }}>
+          <T semibold>{t('notif.phoneTitle')}</T>
+          <T size="xs" muted style={{ lineHeight: 18 }}>
+            {on ? t('notif.phoneOn') : st === 'off' ? t('notif.phoneOff') : st === 'ask' ? t('notif.phoneAskHint') : t('notif.phoneUnsupported')}
+          </T>
+        </View>
+      </Row>
+      {st === 'ask' ? (
+        <Button small title={t('notif.phoneAsk')} icon="notifications-outline" loading={busy}
+          onPress={async () => { setBusy(true); setSt(await enablePush(true)); setBusy(false); }} />
+      ) : st === 'off' ? (
+        <Button small variant="ghost" title={t('notif.openSettings')} icon="settings-outline" onPress={() => Linking.openSettings()} />
+      ) : null}
+    </View>
   );
 }

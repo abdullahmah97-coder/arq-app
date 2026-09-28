@@ -82,6 +82,11 @@ export function setUnreadBadge(n: number) {
   lastCount = n;
   listeners.forEach((l) => l(n));
 }
+/** يتابع تغيّر عدد غير المقروء (مثلاً لتحديث رقم أيقونة التطبيق) */
+export function onUnreadBadge(cb: (n: number) => void) {
+  listeners.add(cb);
+  return () => { listeners.delete(cb); };
+}
 export async function refreshUnreadBadge() {
   try { setUnreadBadge(await unreadNotifications()); } catch { /* بدون اتصال: نخلي العدد كما هو */ }
 }

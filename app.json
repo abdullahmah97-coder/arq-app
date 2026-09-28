@@ -95,6 +95,14 @@
         {
           "motionPermission": "لحساب خطواتك اليومية. To count your daily steps."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#F1551D",
+          "defaultChannel": "default"
+        }
       ]
     ],
     "experiments": {
