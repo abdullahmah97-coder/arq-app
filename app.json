@@ -43,6 +43,10 @@
         "android.permission.health.READ_RESTING_HEART_RATE",
         "android.permission.health.READ_HEART_RATE_VARIABILITY",
         "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_RESPIRATORY_RATE",
+        "android.permission.health.READ_OXYGEN_SATURATION",
+        "android.permission.health.READ_SKIN_TEMPERATURE",
+        "android.permission.health.READ_VO2_MAX",
         "android.permission.ACTIVITY_RECOGNITION"
       ]
     },

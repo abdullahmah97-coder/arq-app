@@ -1,6 +1,7 @@
 // اختبار محرك الجاهزية/الإجهاد/النوم: node --experimental-strip-types tests/health.test.ts
 import { adaptWorkout, dayLoad, recoveryZone, scoreDay, sleepNeed, strainFromLoad } from '../src/lib/health/score.ts';
 import { hrZoneMinutes, mergedMinutes, summarizeSleep } from '../src/lib/health/aggregate.ts';
+import { dashboardRows, fitnessAge, healthMonitor, stressSeries, stressSummary } from '../src/lib/health/insights.ts';
 import type { DailyHealth } from '../src/lib/health/types.ts';
 import type { PlanDay } from '../src/lib/plan/types.ts';
 
@@ -80,6 +81,48 @@ ok(summarizeSleep([]) === null, 'no sleep → null');
 const hrS = Array.from({ length: 61 }, (_, i) => ({ t: t0 + i * M, bpm: i < 30 ? 100 : 160 }));
 const z = hrZoneMinutes(hrS, 30); // max 190 → z1≥95, z4≥152
 ok(z[0] === 29 && z[1] === 1 && z[3] === 30 && z.reduce((a, b) => a + b) === 60, `hr zones ${z}`);
+
+// ---------------- مؤشرات إضافية من الساعة
+// التوتر: راحة (60) → منخفض، 85 → متوسط، 100 → عالي، 140 → تمرين (مستبعد)
+const T0 = Date.UTC(2026, 8, 28, 9, 0);
+const hrDay = [...Array(6)].map((_, i) => ({ t: T0 + i * 2 * M, bpm: 62 }))
+  .concat([...Array(6)].map((_, i) => ({ t: T0 + 10 * M + i * 2 * M, bpm: 86 })))
+  .concat([...Array(6)].map((_, i) => ({ t: T0 + 20 * M + i * 2 * M, bpm: 100 })))
+  .concat([...Array(6)].map((_, i) => ({ t: T0 + 30 * M + i * 2 * M, bpm: 150 })));
+const ser = stressSeries(hrDay, { restingHr: 60, age: 30, dayStart: T0 });
+ok(ser.length === 5 && ser[0].v! < 1 && ser[1].v! >= 1 && ser[1].v! < 2 && ser[2].v! >= 2 && ser[3].v === null && ser[3].activity,
+  `stress levels low/medium/high/activity ${JSON.stringify(ser.map((p) => [p.v, p.activity]))}`);
+const sum = stressSummary(ser);
+ok(sum.current === ser[2].v && sum.level === 'high' && sum.highMin === 10, `stress summary ${JSON.stringify(sum)}`);
+const asleepSer = stressSeries(hrDay, { restingHr: 60, age: 30, dayStart: T0, sleep: { start: new Date(T0).toISOString(), end: new Date(T0 + 50 * M).toISOString() } });
+ok(asleepSer.every((p) => p.asleep) && stressSummary(asleepSer).highMin === 0, 'sleep time is not counted as stress');
+ok(stressSeries([], { restingHr: 60, age: 30 }).length === 0, 'no heart data → no stress chart');
+
+// مراقبة الصحة: يتعاير أول ٤ ليالي، بعدها يقارن بالمعدل الشخصي
+const nights = Array.from({ length: 10 }, (_, i) => day(i + 1, { resp_rate: 14 + (i % 2) * 0.4, spo2: 97, skin_temp: 34.5, hrv_ms: 60 + (i % 3), resting_hr: 56 }));
+const mon = healthMonitor(day(11, { resp_rate: 14.3, spo2: 96.8, skin_temp: 34.6, hrv_ms: 61, resting_hr: 57 }), nights);
+ok(mon.inRange === 5 && mon.measured === 5 && mon.nightsNeeded === 0, `within range 5/5 ${JSON.stringify(mon.items.map((x) => x.status))}`);
+const sick = healthMonitor(day(11, { resp_rate: 17.5, spo2: 97, skin_temp: 35.6, hrv_ms: 40, resting_hr: 66 }), nights);
+ok(sick.inRange === 1 && sick.items.find((x) => x.key === 'temp')!.status === 'out', `out of range flagged ${JSON.stringify(sick.items.map((x) => [x.key, x.status]))}`);
+const fresh = healthMonitor(day(3, { resp_rate: 14 }), nights.slice(0, 2));
+ok(fresh.nightsNeeded === 2 && fresh.items.find((x) => x.key === 'resp')!.status === 'calibrating', 'calibrating until 4 nights');
+
+// لوحتي: اليوم مقابل المعدل
+const scored = nights.map((d, i) => ({ day: d, scores: scoreDay(d, nights.slice(0, i)) }));
+const rows = dashboardRows([...scored, { day: day(11, { hrv_ms: 70, steps: 12000, resting_hr: 52, hr_zone_min: [30, 10, 5, 2, 0] }), scores: scoreDay(day(11), nights) }]);
+const hrvRow = rows.find((r) => r.key === 'hrv')!;
+ok(hrvRow.value === 70 && Math.round(hrvRow.base!) === 61 && hrvRow.trend === 'up', `hrv vs 30-day average ${JSON.stringify(hrvRow)}`);
+ok(rows.find((r) => r.key === 'rhr')!.trend === 'down' && rows.find((r) => r.key === 'steps')!.value === 12000, 'resting HR down, steps today');
+ok(rows.find((r) => r.key === 'restorative_h')!.value === 180 && rows.find((r) => r.key === 'zones13')!.value === 45, 'restorative sleep and weekly zones');
+ok(!rows.some((r) => r.key === 'vo2max'), 'hidden when the watch has no data');
+
+// العمر الرياضي
+const fitHist = Array.from({ length: 10 }, (_, i) => day(i + 1, { vo2max: 45, resting_hr: 55 }));
+const fa = fitnessAge(fitHist, { age: 35, gender: 'male' });
+ok(!!fa && fa.basis === 'vo2max' && fa.age < 35 && fa.diff < 0, `good VO2 max → younger (${JSON.stringify(fa)})`);
+const faLow = fitnessAge(Array.from({ length: 10 }, (_, i) => day(i + 1, { resting_hr: 78, steps: 2500 })), { age: 35, gender: 'male' });
+ok(!!faLow && faLow.basis === 'vitals' && faLow.diff > 0 && faLow.age <= 50, `high resting HR + few steps → older, capped (${JSON.stringify(faLow)})`);
+ok(fitnessAge(fitHist, { age: null, gender: null }) === null, 'no birth year → no estimate');
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL HEALTH TESTS PASSED');
 if (fail) process.exit(1);

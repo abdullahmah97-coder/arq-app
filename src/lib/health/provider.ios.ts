@@ -19,6 +19,11 @@ const READ = [
   'HKQuantityTypeIdentifierHeartRateVariabilitySDNN',
   'HKQuantityTypeIdentifierHeartRate',
   'HKCategoryTypeIdentifierSleepAnalysis',
+  // مراقبة الصحة (Apple Watch / WHOOP / Oura تكتبها في Health)
+  'HKQuantityTypeIdentifierRespiratoryRate',
+  'HKQuantityTypeIdentifierOxygenSaturation',
+  'HKQuantityTypeIdentifierAppleSleepingWristTemperature',
+  'HKQuantityTypeIdentifierVO2Max',
 ] as const;
 
 // CategoryValueSleepAnalysis: 0 inBed, 1 asleepUnspecified, 2 awake, 3 core, 4 deep, 5 REM
@@ -37,10 +42,13 @@ const mean = async (id: (typeof READ)[number], unit: string, start: Date, end: D
   return r.averageQuantity?.quantity ?? null;
 };
 
+const safe = async <T,>(p: Promise<T>): Promise<T | null> => { try { return await p; } catch { return null; } };
+
 async function readDay(day: string, age: number): Promise<DailyHealth> {
   const { start, end } = dayRange(day);
   const sw = sleepWindow(day);
-  const [steps, kcal, dist, rhr, hrv, hr, sleep] = await Promise.all([
+  const vo2From = new Date(end.getTime() - 60 * 86_400_000);
+  const [steps, kcal, dist, rhr, hrv, hr, sleep, resp, spo2, temp, vo2] = await Promise.all([
     sum('HKQuantityTypeIdentifierStepCount', 'count', start, end),
     sum('HKQuantityTypeIdentifierActiveEnergyBurned', 'kcal', start, end),
     sum('HKQuantityTypeIdentifierDistanceWalkingRunning', 'm', start, end),
@@ -49,6 +57,14 @@ async function readDay(day: string, age: number): Promise<DailyHealth> {
     mean('HKQuantityTypeIdentifierHeartRateVariabilitySDNN', 'ms', sw.start, sw.end),
     queryQuantitySamples('HKQuantityTypeIdentifierHeartRate', { limit: 0, unit: 'count/min', filter: { date: { startDate: start, endDate: end } } }),
     queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', { limit: 0, filter: { date: { startDate: sw.start, endDate: sw.end } } }),
+    // مؤشرات الليل: التنفس والأكسجين وحرارة المعصم تُقاس أثناء النوم
+    safe(mean('HKQuantityTypeIdentifierRespiratoryRate', 'count/min', sw.start, sw.end)),
+    safe(mean('HKQuantityTypeIdentifierOxygenSaturation', '%', sw.start, sw.end)),
+    safe(mean('HKQuantityTypeIdentifierAppleSleepingWristTemperature', 'degC', sw.start, sw.end)),
+    // VO₂ Max يُقاس نادراً (مع المشي/الجري) → أحدث قياس خلال شهرين
+    safe(queryQuantitySamples('HKQuantityTypeIdentifierVO2Max', {
+      limit: 1, ascending: false, unit: 'ml/(kg*min)', filter: { date: { startDate: vo2From, endDate: end } },
+    })),
   ]);
   const segs: SleepSegment[] = sleep
     .map((s) => ({ start: new Date(s.startDate).getTime(), end: new Date(s.endDate).getTime(), kind: SLEEP_KIND[Number(s.value)] }))
@@ -64,18 +80,28 @@ async function readDay(day: string, age: number): Promise<DailyHealth> {
     avg_hr: avg(hrs.map((h) => h.bpm)),
     hr_zone_min: hrs.length > 20 ? hrZoneMinutes(hrs, age) : null,
     sleep: summarizeSleep(segs),
+    resp_rate: resp == null ? null : Math.round(resp * 10) / 10,
+    // HealthKit يرجع النسبة ككسر (0.97) → نحولها لـ 97
+    spo2: spo2 == null ? null : Math.round((spo2 <= 1.5 ? spo2 * 100 : spo2) * 10) / 10,
+    skin_temp: temp == null ? null : Math.round(temp * 100) / 100,
+    vo2max: vo2 && vo2.length ? Math.round(vo2[0].quantity * 10) / 10 : null,
+    hr_series: hrs,
     source: 'apple_health',
   };
 }
 
 export const provider: HealthProvider = {
   id: 'apple_health',
+  // لو زادت أنواع قراءة جديدة نرفع الرقم فنطلب الإذن مرة ثانية (iOS يسأل عن الجديد فقط)
+  readVersion: 2,
   isAvailable: () => isHealthDataAvailableAsync(),
   // Apple لا تكشف هل مُنحت القراءة (للخصوصية)، فنعتبر الطلب ناجحاً ونعرض "لا بيانات" إن رُفض
   requestAccess: () => requestAuthorization({ toRead: READ }),
   async readDays(n, age) {
     const out: DailyHealth[] = [];
     for (const d of lastDays(n)) out.push(await readDay(d, age));
+    // عينات النبض نحتاجها لليوم الحالي فقط (رسم التوتر)
+    out.forEach((d, i) => { if (i < out.length - 1) d.hr_series = null; });
     return out;
   },
   openSettings: () => { Linking.openURL('x-apple-health://').catch(() => Linking.openSettings()); },

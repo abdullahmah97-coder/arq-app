@@ -32,6 +32,16 @@ export interface DailyHealth {
   avg_hr?: number | null;
   /** دقائق في مناطق النبض 1..5 (إن توفرت عينات النبض) */
   hr_zone_min?: number[] | null;
+  /** معدل التنفس أثناء النوم (نفَس/دقيقة) */
+  resp_rate?: number | null;
+  /** تشبّع الأكسجين أثناء النوم (%) */
+  spo2?: number | null;
+  /** حرارة المعصم أثناء النوم (°م) — نقارنها بمعدلك الشخصي */
+  skin_temp?: number | null;
+  /** أحدث قياس VO₂ Max (مل/كغ/دقيقة) */
+  vo2max?: number | null;
+  /** عينات النبض لليوم الحالي فقط (لرسم التوتر) */
+  hr_series?: { t: number; bpm: number }[] | null;
   sleep: SleepNight | null;
   source: HealthSource;
 }

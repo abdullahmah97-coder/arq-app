@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SaduPattern } from '@/brand/Brand';
+import { DashboardList, FitnessAgeCard, HealthMonitorCard, StrainRecoveryChart, StressCard } from '@/components/pulse/Insights';
 import { ChevronBar, MiniBars, Rings } from '@/components/pulse/Rings';
 import { NCard, NSection, NT, Num, Pill, zoneColor } from '@/components/pulse/widgets';
 import { Avatar } from '@/components/ui';
@@ -98,6 +99,11 @@ export default function HealthScreen() {
             {s ? <NT size={12} muted>{t('health.target', { a: s.strain_target[0], b: s.strain_target[1] })}</NT> : null}
           </View>
 
+          {/* العمر الرياضي + مراقبة الصحة + التوتر */}
+          <FitnessAgeCard />
+          <HealthMonitorCard />
+          <StressCard />
+
           <NSection title={t('health.components')} action={t('health.howTitle')} onAction={() => setHow((x) => !x)} />
           {how ? <NCard><NT muted style={{ lineHeight: 23 }}>{t('health.howBody')}</NT></NCard> : null}
           <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -152,6 +158,8 @@ export default function HealthScreen() {
             ) : null}
           </NCard>
 
+          <StrainRecoveryChart />
+
           {/* النوم */}
           <NSection title={t('health.sleep')} />
           <NCard>
@@ -192,6 +200,10 @@ export default function HealthScreen() {
               </>
             ) : <NT muted>{t('health.noSleep')}</NT>}
           </NCard>
+
+          {/* لوحتي: كل المؤشرات مقابل معدلك */}
+          {h.status === 'connected' ? <NSection title={t('insight.myDashboard')} /> : null}
+          <DashboardList />
 
           {/* الخطوات + ترتيب الأصدقاء */}
           <NSection title={t('health.leaderboard')} action={t('compete.title')} onAction={() => router.push('/(tabs)/compete')} />

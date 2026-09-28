@@ -14,6 +14,7 @@ export { adaptWorkout, fmtDuration, DEFAULT_STEP_GOAL } from './score';
 
 type Status = 'loading' | 'disconnected' | 'connected' | 'unavailable';
 const KEY = 'arq.health.connected';
+const PERM_KEY = 'arq.health.readVersion';
 const HISTORY_DAYS = 30;
 
 interface HealthState {
@@ -84,7 +85,14 @@ export function HealthProvider({ children }: { children: ReactNode }) {
     (async () => {
       const saved = (await AsyncStorage.getItem(KEY)) as HealthSource | null;
       if (saved === 'demo' || (saved && saved === provider.id)) {
-        setSource(saved); setStatus('connected'); load(saved);
+        setSource(saved); setStatus('connected');
+        // أنواع جديدة (تنفّس، أكسجين، حرارة، VO₂ Max): نطلب إذنها مرة وحدة قبل القراءة
+        const v = Number(await AsyncStorage.getItem(PERM_KEY).catch(() => null)) || 1;
+        if (saved !== 'demo' && (provider.readVersion ?? 1) > v) {
+          await provider.requestAccess().catch(() => false);
+          await AsyncStorage.setItem(PERM_KEY, String(provider.readVersion ?? 1)).catch(() => {});
+        }
+        load(saved);
       } else {
         const ok = Platform.OS === 'web' ? true : await provider.isAvailable().catch(() => false);
         setStatus(ok ? 'disconnected' : 'unavailable');
@@ -102,6 +110,7 @@ export function HealthProvider({ children }: { children: ReactNode }) {
     const ok = await provider.requestAccess().catch(() => false);
     if (!ok) return false;
     await AsyncStorage.setItem(KEY, provider.id);
+    await AsyncStorage.setItem(PERM_KEY, String(provider.readVersion ?? 1)).catch(() => {});
     setSource(provider.id); setStatus('connected');
     await load(provider.id);
     return true;

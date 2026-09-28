@@ -13,6 +13,7 @@ import { CheckInCard } from '@/components/CheckInCard';
 import { HomeClubOffers } from '@/components/clubs/HomeClubOffers';
 import { NotificationBell } from '@/components/NotificationBell';
 import { PushPrompt } from '@/components/PushPrompt';
+import { DashboardList, MonitorCards, StrainRecoveryChart, StressCard } from '@/components/pulse/Insights';
 import { ChevronBar, MiniBars, Rings } from '@/components/pulse/Rings';
 import { MetricChip, NCard, NSection, NT, Num, OnDark, Pill, zoneColor } from '@/components/pulse/widgets';
 import { Avatar } from '@/components/ui';
@@ -159,6 +160,9 @@ export default function Home() {
             <NT size={12} muted center>{t('health.target', { a: s.strain_target[0], b: s.strain_target[1] })} · {h.syncing ? t('health.syncing') : t(`health.source_${h.source}`)}</NT>
           ) : null}
 
+          {/* مراقبة الصحة + مراقبة التوتر (من الساعة) */}
+          <MonitorCards />
+
           {active ? (
             <Pressable onPress={() => router.push('/workout/log')} style={styles.resume}>
               <Ionicons name="barbell" size={20} color={brand.deepGreen} />
@@ -202,6 +206,16 @@ export default function Home() {
               </OnDark>
             </ImageBackground>
           </Pressable>
+
+          {/* لوحتي: التوتر اليوم، الإجهاد والجاهزية أسبوعياً، ومؤشراتك مقابل معدلك */}
+          {connected ? (
+            <>
+              <NSection title={t('insight.myDashboard')} action={t('insight.allMetrics')} onAction={() => router.push('/health')} />
+              <StressCard onPress={() => router.push('/health')} />
+              <StrainRecoveryChart />
+              <DashboardList limit={6} />
+            </>
+          ) : null}
 
           {/* الخطوات */}
           <NCard onPress={() => router.push(connected ? '/health' : '/devices')}>

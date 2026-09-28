@@ -29,8 +29,28 @@ export function demoDays(n: number, now = new Date()): DailyHealth[] {
         in_bed_min: asleep + 28, asleep_min: asleep,
         stages: { deep, rem, light: asleep - deep - rem, awake: 28 },
       },
+      resp_rate: Math.round((14.2 + r() * 1.2) * 10) / 10,
+      spo2: Math.round((96 + r() * 2.5) * 10) / 10,
+      skin_temp: Math.round((34.4 + r() * 0.5) * 100) / 100,
+      vo2max: 44.5,
+      hr_series: i === n - 1 ? demoHr(day, r) : null,
       source: 'demo' as const,
     };
   });
+}
+
+/** نبض يوم كامل كل ٥ دقائق: نوم هادئ، يوم عمل، تمرين العصر، وتوتر خفيف قبله */
+function demoHr(day: string, r: () => number) {
+  const [y, m, d] = day.split('-').map(Number);
+  const start = new Date(y, m - 1, d, 0, 0).getTime();
+  const now = Math.min(Date.now(), start + 86_400_000);
+  const out: { t: number; bpm: number }[] = [];
+  for (let t = start; t <= now; t += 5 * 60_000) {
+    const h = (t - start) / 3_600_000;
+    let bpm = h < 6.5 ? 54 + r() * 4 : h < 17 ? 68 + r() * 10 + (h > 15.5 ? 14 * r() : 0) : h < 18 ? 128 + r() * 25 : 72 + r() * 8;
+    if (r() < 0.04) bpm += 18;
+    out.push({ t, bpm: Math.round(bpm) });
+  }
+  return out;
 }
 
