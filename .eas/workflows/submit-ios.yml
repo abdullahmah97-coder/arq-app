@@ -13,6 +13,9 @@ on:
 jobs:
   submit_ios:
     type: submit
+    env:
+      APP_VARIANT: beta
+      EXPO_DEBUG: '1'
     params:
       build_id: ${{ inputs.build_id }}
       profile: beta
