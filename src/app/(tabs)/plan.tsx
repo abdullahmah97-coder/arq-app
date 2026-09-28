@@ -9,7 +9,7 @@ import { Button, Card, Empty, H, Row, Screen, SectionTitle, Segmented, T } from 
 import { useUser } from '@/lib/auth';
 import { todayIndex } from '@/lib/dates';
 import { adaptWorkout, useHealth } from '@/lib/health';
-import { findExercise } from '@/three/catalog';
+import { ALL_EXERCISES, findExercise } from '@/three/catalog';
 import { startWorkout } from '@/lib/training';
 import { showRir } from '@/components/rir';
 import { useLocalized } from '@/lib/i18n';
@@ -97,6 +97,7 @@ export default function PlanScreen() {
         <H>{t('plan.title')}</H>
         <Empty text={t('home.noPlan')} icon="calendar-outline" />
         <Button title={t('home.makePlan')} onPress={regenerate} loading={busy} />
+        <LibraryLink />
         <CalorieCard entries={food} targets={null} onDelete={removeFood} />
       </Screen>
     );
@@ -134,6 +135,7 @@ export default function PlanScreen() {
           <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.muted} />
         </Row>
       </Pressable>
+      <LibraryLink />
 
       {p.based_on_inbody ? (
         <Pressable onPress={() => router.push('/inbody')}>
@@ -315,5 +317,22 @@ function MealsDay({ d, today, logged, onAte }: { d: PlanMealDay; today: boolean;
         </Card>
       ))}
     </View>
+  );
+}
+
+/** مدخل مكتبة التمارين (كل التمارين بالصور والشرح) */
+function LibraryLink() {
+  const { t } = useTranslation();
+  return (
+    <Pressable onPress={() => router.push('/exercises')}>
+      <Row style={{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: space.md }}>
+        <Ionicons name="library-outline" size={20} color={colors.primary} />
+        <View style={{ flex: 1 }}>
+          <T semibold>{t('library.title')}</T>
+          <T size="xs" muted numberOfLines={1}>{t('library.intro', { count: ALL_EXERCISES.length })}</T>
+        </View>
+        <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.muted} />
+      </Row>
+    </Pressable>
   );
 }

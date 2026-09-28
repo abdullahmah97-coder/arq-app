@@ -104,6 +104,7 @@ function RootNavigator() {
         <Stack.Screen name="devices" options={{ title: t('health.devices') }} />
         {/* صفحة التمرين تفتح كنافذة من تحت: ترجع منها دائماً (حتى لو فتحتها من داخل تمرين شغّال) */}
         <Stack.Screen name="exercise/[id]" options={{ title: '', presentation: 'modal', gestureEnabled: true }} />
+        <Stack.Screen name="exercises" options={{ title: t('library.title') }} />
         <Stack.Screen name="feedback" options={{ title: t('beta.feedback'), presentation: 'modal' }} />
         {/* نافذة من تحت: تنسحب لتحت للإغلاق، وفيها زر إغلاق واضح */}
         <Stack.Screen name="coach" options={{ headerShown: false, presentation: 'modal', gestureEnabled: true }} />

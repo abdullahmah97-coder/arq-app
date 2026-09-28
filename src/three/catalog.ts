@@ -2,6 +2,7 @@
 import type { I18nText } from '../lib/types';
 import type { Muscle } from './rig';
 import { MOTIONS } from './motions';
+import { CURATED_PHOTOS, FEDB_EXERCISES, type LibCategory, type LibEquipment, type LibLevel } from './fedb';
 
 const t = (ar: string, en: string): I18nText => ({ ar, en });
 
@@ -23,6 +24,13 @@ export interface ExerciseGuide {
   secondary?: Muscle[];
   /** الأدوات (نص إنجليزي مختصر للمدرب الذكي) */
   equipment?: string;
+  /** مصدر التمرين: fedb = المكتبة الموسّعة (Free Exercise DB) */
+  source?: 'fedb';
+  /** صور بداية ونهاية الحركة (مسارات داخل حاوية exercises) */
+  photos?: string[];
+  category?: LibCategory;
+  equip?: LibEquipment;
+  level?: LibLevel;
 }
 
 export const MUSCLE_NAMES: Record<Muscle, I18nText> = {
@@ -1864,7 +1872,12 @@ export const EXERCISES: ExerciseGuide[] = [
   },
 ];
 
-const BY_ID = new Map(EXERCISES.map((e) => [e.id, e]));
+// صور حقيقية لتمارين أرك الأصلية المطابقة من نفس المصدر
+for (const e of EXERCISES) if (CURATED_PHOTOS[e.id]) e.photos = CURATED_PHOTOS[e.id];
+
+/** كل التمارين: تمارين أرك (بحركة 3D) ثم المكتبة الموسّعة. المدرب المحلي يستخدم EXERCISES فقط */
+export const ALL_EXERCISES: ExerciseGuide[] = [...EXERCISES, ...FEDB_EXERCISES];
+const BY_ID = new Map(ALL_EXERCISES.map((e) => [e.id, e]));
 
 /** العضلات الأساسية والمساعدة للتمرين (من الدليل أو من حركته) */
 export function exerciseMuscles(e: ExerciseGuide): { primary: Muscle[]; secondary: Muscle[] } {
@@ -1886,12 +1899,46 @@ export function exerciseEquipment(e: ExerciseGuide): string {
   if (e.equipment) return e.equipment;
   return MOTIONS[e.motion].props.map((p) => p.kind).join(',') || 'bodyweight';
 }
+
+// تصنيف الأداة والنوع لتمارين أرك الأصلية (تمارين المكتبة الموسّعة معها تصنيفها)
+const EQUIP_RULES: [RegExp, LibEquipment][] = [
+  [/ez ?bar/, 'ez_bar'], [/barbell|smith|trap bar|rackpins/, 'barbell'], [/dumbbell|goblet/, 'dumbbell'], [/kettlebell/, 'kettlebell'],
+  [/cable|latbar|latmachine|rowstation/, 'cable'],
+  [/machine|legpress|leg press|legextension|legcurl|chestpress|pecdeck|shoulderpress|hipab|hipad/, 'machine'],
+  [/band/, 'bands'], [/medball|slam ball/, 'medicine_ball'],
+  [/treadmill|bike|rower|stair|battle|wrist roller|weight plates/, 'other'],
+];
+const CURATED_CATEGORY: Record<string, LibCategory> = {
+  jump_rope: 'cardio', rowing_machine: 'cardio', treadmill_run: 'cardio', stationary_bike: 'cardio', stair_climber: 'cardio',
+  battle_ropes: 'cardio', jumping_jack: 'cardio', high_knees: 'cardio', burpee: 'cardio', mountain_climber: 'cardio',
+  box_jump: 'plyometrics', jump_squat: 'plyometrics', plyo_push_up: 'plyometrics', med_ball_slam: 'plyometrics', power_clean: 'olympic',
+};
+/** الأداة الأساسية للتمرين (لفلاتر المكتبة) */
+export function equipOf(e: ExerciseGuide): LibEquipment {
+  if (e.equip) return e.equip;
+  const s = exerciseEquipment(e).toLowerCase();
+  for (const [re, k] of EQUIP_RULES) if (re.test(s)) return k;
+  return 'bodyweight';
+}
+/** نوع التمرين (قوة، إطالة، كارديو...) */
+export function categoryOf(e: ExerciseGuide): LibCategory {
+  return e.category ?? CURATED_CATEGORY[e.id] ?? 'strength';
+}
+
+/** تطبيع للبحث بالعربي والإنجليزي: بدون تشكيل، والهمزات والتاء المربوطة والياء موحّدة */
+export const normSearch = (s: string) => s.toLowerCase()
+  .replace(/[\u064B-\u0652\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي')
+  .replace(/[^a-z0-9\u0600-\u06FF]+/g, ' ').trim();
+
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const BY_NAME = new Map<string, ExerciseGuide>();
 for (const e of EXERCISES) {
   BY_NAME.set(norm(e.name.en), e);
   for (const a of e.aliases ?? []) BY_NAME.set(norm(a), e);
 }
+// أسماء المكتبة الموسّعة: تستخدم بعد الكلمات المفتاحية عشان تبقى تمارين أرك (بحركة 3D) هي الأولى
+const LIB_BY_NAME = new Map<string, ExerciseGuide>();
+for (const e of FEDB_EXERCISES) if (!LIB_BY_NAME.has(norm(e.name.en))) LIB_BY_NAME.set(norm(e.name.en), e);
 
 // كلمات مفتاحية لربط أي اسم تمرين (من الذكاء الاصطناعي) بأقرب حركة
 const KEYWORDS: [RegExp, string][] = [
@@ -1966,7 +2013,7 @@ export function findExercise(idOrName: string | null | undefined): ExerciseGuide
   const exact = BY_NAME.get(n);
   if (exact) return exact;
   for (const [re, id] of KEYWORDS) if (re.test(n)) return BY_ID.get(id) ?? null;
-  return null;
+  return LIB_BY_NAME.get(n) ?? null;
 }
 
 export function getExercise(id: string): ExerciseGuide | null {

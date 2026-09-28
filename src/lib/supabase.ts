@@ -35,7 +35,7 @@ if (Platform.OS !== 'web') {
 }
 
 /** رابط عام لملف في حاوية عامة (avatars / posts) */
-export function publicUrl(bucket: 'avatars' | 'posts' | 'brands', path: string | null | undefined): string | undefined {
+export function publicUrl(bucket: 'avatars' | 'posts' | 'brands' | 'exercises', path: string | null | undefined): string | undefined {
   if (!path) return undefined;
   if (path.startsWith('http')) return path;
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;

@@ -5,7 +5,7 @@ import { e1rm, summarize, type SessionData } from './stats';
 
 export type MuscleGroup = 'chest' | 'back' | 'shoulders' | 'arms' | 'legs' | 'core';
 export const MUSCLE_GROUPS: MuscleGroup[] = ['chest', 'back', 'shoulders', 'arms', 'legs', 'core'];
-const GROUP_OF: Record<Muscle, MuscleGroup> = {
+export const GROUP_OF: Record<Muscle, MuscleGroup> = {
   chest: 'chest', upperBack: 'back', lats: 'back', lowerBack: 'back', shoulders: 'shoulders', rearDelts: 'shoulders',
   triceps: 'arms', biceps: 'arms', forearms: 'arms', quads: 'legs', hamstrings: 'legs', glutes: 'legs', calves: 'legs', abs: 'core',
 };

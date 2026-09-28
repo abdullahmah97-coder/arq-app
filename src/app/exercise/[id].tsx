@@ -4,13 +4,14 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
+import { ExercisePhotos } from '@/components/exercise/ExercisePhotos';
 import { ExerciseViewer, ViewerLoading, type Gender } from '@/components/exercise/ExerciseViewer';
 import { Card, Empty, Row, Screen, Segmented, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
 import { e1rm, fmtSet, loadHistory, summarize, type SessionData } from '@/lib/training';
 import { ANATOMY } from '@/three/anatomy';
-import { exerciseMuscles, getExercise, MUSCLE_NAMES } from '@/three/catalog';
+import { categoryOf, equipOf, exerciseMuscles, getExercise, MUSCLE_NAMES } from '@/three/catalog';
 import type { Muscle } from '@/three/rig';
 import { brand, colors, space } from '@/theme';
 
@@ -42,12 +43,27 @@ export default function ExerciseScreen() {
     <Screen edges={['bottom']}>
       <Stack.Screen options={{ title: L(ex.name) }} />
 
+      {/* تمارين المكتبة: الصور الحقيقية أولاً ثم خريطة العضلات. تمارين أرك: المجسّم 3D أولاً ثم الصور */}
+      {ex.library && ex.photos?.length ? <ExercisePhotos photos={ex.photos} /> : null}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
+        {ex.level ? <Meta icon="speedometer-outline" label={t(`library.lvl_${ex.level}`)} /> : null}
+        <Meta icon="barbell-outline" label={t(`library.eq_${equipOf(ex)}`)} />
+        <Meta icon="pricetag-outline" label={t(`library.cat_${categoryOf(ex)}`)} />
+        {!ex.library ? <Meta icon="cube-outline" label="3D" /> : null}
+      </View>
+
       <Suspense fallback={<ViewerLoading />}>
         <ExerciseViewer motion={ex.motion} gender={gender} focus={focus} muscles={ex.library ? m : undefined} />
       </Suspense>
       <T size="xs" muted center>{t(ex.library ? 'exercise.mapHint' : 'exercise.dragHint')}</T>
       <Segmented value={gender} onChange={setGender}
         options={[{ value: 'male', label: t('exercise.male') }, { value: 'female', label: t('exercise.female') }]} />
+      {!ex.library && ex.photos?.length ? (
+        <View style={{ gap: space.sm }}>
+          <T bold>{t('library.photos')}</T>
+          <ExercisePhotos photos={ex.photos} />
+        </View>
+      ) : null}
 
       {/* العضلات */}
       <Card style={{ gap: space.md }}>
@@ -107,15 +123,17 @@ export default function ExerciseScreen() {
         ))}
       </Card>
 
-      <Card style={{ gap: space.sm }}>
-        <T bold>{t('exercise.mistakes')}</T>
-        {ex.mistakes.map((s, i) => (
-          <Row key={i} style={{ alignItems: 'flex-start' }}>
-            <Ionicons name="close-circle" size={18} color={colors.danger} style={{ marginTop: 3 }} />
-            <T style={{ flex: 1 }}>{L(s)}</T>
-          </Row>
-        ))}
-      </Card>
+      {ex.mistakes.length ? (
+        <Card style={{ gap: space.sm }}>
+          <T bold>{t('exercise.mistakes')}</T>
+          {ex.mistakes.map((s, i) => (
+            <Row key={i} style={{ alignItems: 'flex-start' }}>
+              <Ionicons name="close-circle" size={18} color={colors.danger} style={{ marginTop: 3 }} />
+              <T style={{ flex: 1 }}>{L(s)}</T>
+            </Row>
+          ))}
+        </Card>
+      ) : null}
 
       <Card style={{ gap: space.sm }}>
         <Row><Ionicons name="leaf-outline" size={18} color={colors.accent} /><T bold>{t('exercise.breathing')}</T></Row>
@@ -127,7 +145,17 @@ export default function ExerciseScreen() {
           </>
         ) : null}
       </Card>
+      {ex.source === 'fedb' ? <T size="xs" muted center>{t('library.credit')}</T> : null}
     </Screen>
+  );
+}
+
+function Meta({ icon, label }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string }) {
+  return (
+    <Row gap={4} style={{ backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.border }}>
+      <Ionicons name={icon} size={13} color={colors.primary} />
+      <T size="xs" semibold>{label}</T>
+    </Row>
   );
 }
 
