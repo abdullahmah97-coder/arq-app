@@ -1,10 +1,10 @@
 // Supabase Edge Function: gyms-nearby — يجيب النوادي الحقيقية حول موقع المستخدم من الخريطة ويضيفها للقاعدة
 // عشان تسجيل الحضور يلقى ناديك تلقائياً (بدون ما أحد يضيفه يدوياً).
 //
-// المزود:
-//   * OpenStreetMap (Overpass) — مجاني بدون مفتاح (الافتراضي)
-//   * Google Places — أدق في السعودية، يشتغل تلقائياً إذا أضفت المفتاح:
-//       supabase secrets set GOOGLE_MAPS_API_KEY=...
+// المزود (أول واحد مفتاحه موجود، ولو فشل نرجع للمجاني):
+//   * Google Places        — GOOGLE_MAPS_API_KEY
+//   * Foursquare Places    — FOURSQUARE_API_KEY (Service Key من console.foursquare.com)
+//   * OpenStreetMap        — مجاني بدون مفتاح (الافتراضي)
 // كل منطقة (~٢ كم) تُمسح مرة كل أسبوعين فقط، وبعدها القراءة من القاعدة مباشرة.
 //
 // الطلبات (POST، بتوكن المستخدم):
@@ -33,6 +33,10 @@ const SEARCH_PER_HOUR = 40;  // حد البحث بالاسم لكل مستخدم
 // أنواع أماكن قوقل اللي نعتبرها نادي رياضي
 const GOOGLE_GYM_TYPES = new Set(['gym', 'fitness_center', 'sports_club', 'sports_complex', 'yoga_studio', 'sports_activity_location', 'athletic_field']);
 const UA = 'ARQ-app/1.0 (gym check-in; contact via app)';
+// تصنيف «Gym and Studio» في Foursquare (يشمل الجيم، الملاكمة، اليوغا، الكروس فت…)
+const FSQ_GYM = '4bf58dd8d48988d175941735';
+const FSQ_FIELDS = 'fsq_place_id,name,latitude,longitude,location,categories,date_closed';
+type Provider = 'google' | 'foursquare' | 'osm';
 
 function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371000, r = Math.PI / 180;
@@ -145,6 +149,40 @@ async function searchOsm(q: string, near?: { lat: number; lng: number }): Promis
   return out;
 }
 
+function fsqHeaders(key: string) {
+  return { Authorization: `Bearer ${key}`, 'X-Places-Api-Version': '2025-06-17', Accept: 'application/json', 'Accept-Language': 'ar' };
+}
+
+function fsqPlaces(d: any): Place[] {
+  const out: Place[] = [];
+  for (const p of d.results ?? []) {
+    const name: string | undefined = p.name;
+    const la = p.latitude ?? p.geocodes?.main?.latitude;
+    const lo = p.longitude ?? p.geocodes?.main?.longitude;
+    const id = p.fsq_place_id ?? p.fsq_id;
+    if (!id || !name || la == null || lo == null || p.date_closed) continue;
+    const l = p.location ?? {};
+    const address = [l.address, Array.isArray(l.neighborhood) ? l.neighborhood[0] : undefined].filter(Boolean).join('، ') || l.formatted_address;
+    out.push({ id: String(id), name, name_en: hasLatin(name) ? name : undefined, lat: Number(la), lng: Number(lo), city: l.locality, address: address || undefined });
+  }
+  return out;
+}
+
+async function fsqSearch(key: string, params: Record<string, string>): Promise<Place[]> {
+  const u = new URL('https://places-api.foursquare.com/places/search');
+  for (const [k, v] of Object.entries({ fsq_category_ids: FSQ_GYM, fields: FSQ_FIELDS, ...params })) u.searchParams.set(k, v);
+  const r = await fetch(u, { headers: fsqHeaders(key), signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(`foursquare_${r.status}`);
+  return fsqPlaces(await r.json());
+}
+
+const fromFoursquare = (lat: number, lng: number, key: string, radius = RADIUS_M) =>
+  fsqSearch(key, { ll: `${lat},${lng}`, radius: String(radius), limit: '50', sort: 'DISTANCE' });
+
+/** بحث Foursquare بالاسم يحتاج موقع تقريبي (بدونه نستخدم OpenStreetMap على مستوى المملكة) */
+const searchFoursquare = (q: string, key: string, near: { lat: number; lng: number }) =>
+  fsqSearch(key, { query: q, ll: `${near.lat},${near.lng}`, radius: '50000', limit: '30', sort: 'RELEVANCE' });
+
 async function fromGoogle(lat: number, lng: number, key: string, radius = RADIUS_M): Promise<Place[]> {
   const r = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
     method: 'POST',
@@ -188,7 +226,8 @@ Deno.serve(async (req) => {
 
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const googleKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
-  const provider: 'google' | 'osm' = googleKey ? 'google' : 'osm';
+  const fsqKey = Deno.env.get('FOURSQUARE_API_KEY');
+  const provider: Provider = googleKey ? 'google' : fsqKey ? 'foursquare' : 'osm';
   const near = hasPos ? { lat, lng } : undefined;
 
   // ---------------------------------------------------------------- بحث بالاسم
@@ -200,22 +239,26 @@ Deno.serve(async (req) => {
     await admin.from('gym_search_log').insert({ user_id: user.id, q });
 
     let places: Place[] = [];
-    let used: 'google' | 'osm' = provider;
+    let used: Provider = provider === 'foursquare' && !near ? 'osm' : provider;
     try {
-      places = provider === 'google' ? await searchGoogle(q, googleKey!, near) : await searchOsm(q, near);
+      places = used === 'google' ? await searchGoogle(q, googleKey!, near)
+        : used === 'foursquare' ? await searchFoursquare(q, fsqKey!, near!)
+        : await searchOsm(q, near);
     } catch (e) {
-      if (provider !== 'google') return json({ error: String(e) }, 502);
+      if (used === 'osm') return json({ error: String(e) }, 502);
       try { places = await searchOsm(q, near); used = 'osm'; } catch (e2) { return json({ error: String(e2) }, 502); }
     }
     if (!places.length) return json({ provider: used, gyms: [] });
-    const { error } = await admin.rpc('upsert_provider_gyms', { p_source: used, p_places: places });
+    const { data: ids, error } = await admin.rpc('upsert_provider_gyms_ids', { p_source: used, p_places: places });
     if (error) return json({ error: error.message }, 500);
+    const idMap = (ids ?? {}) as Record<string, string>;
+    const rank = new Map<string, number>();
+    places.forEach((p, i) => { const g = idMap[p.id]; if (g && !rank.has(g)) rank.set(g, i); });
     const { data: rows, error: e2 } = await admin.from('gyms')
-      .select('id, name, name_en, city, lat, lng, radius_m, verified, address, chain_id, external_id')
-      .eq('source', used).in('external_id', places.map((p) => p.id));
+      .select('id, name, name_en, city, lat, lng, radius_m, verified, address, chain_id')
+      .in('id', [...rank.keys()]);
     if (e2) return json({ error: e2.message }, 500);
-    const rank = new Map(places.map((p, i) => [p.id, i]));
-    const gyms = (rows ?? []).map(({ external_id, ...g }: any) => ({ ...g, distance_m: near ? Math.round(distanceM(near, g)) : null, _rank: rank.get(external_id) ?? 99 }));
+    const gyms = (rows ?? []).map((g: any) => ({ ...g, distance_m: near ? Math.round(distanceM(near, g)) : null, _rank: rank.get(g.id) ?? 99 }));
     // الأقرب أولاً لو نعرف موقعك، وإلا بترتيب المزود
     gyms.sort((a: any, b: any) => (near ? a.distance_m - b.distance_m : a._rank - b._rank));
     for (const g of gyms) delete (g as any)._rank;
@@ -233,15 +276,14 @@ Deno.serve(async (req) => {
   if (fresh) return json({ provider, scanned: false });
 
   let places: Place[] = [];
-  let used: 'google' | 'osm' = provider;
+  let used: Provider = provider;
   try {
-    places = provider === 'google' ? await fromGoogle(lat, lng, googleKey!, radius) : await fromOsm(lat, lng, radius);
+    places = provider === 'google' ? await fromGoogle(lat, lng, googleKey!, radius)
+      : provider === 'foursquare' ? await fromFoursquare(lat, lng, fsqKey!, radius)
+      : await fromOsm(lat, lng, radius);
   } catch (e) {
-    if (provider === 'google') {
-      try { places = await fromOsm(lat, lng, radius); used = 'osm'; } catch (e2) { return json({ error: String(e2) }, 502); }
-    } else {
-      return json({ error: String(e) }, 502);
-    }
+    if (provider === 'osm') return json({ error: String(e) }, 502);
+    try { places = await fromOsm(lat, lng, radius); used = 'osm'; } catch (e2) { return json({ error: String(e2) }, 502); }
   }
 
   const { data: n, error } = await admin.rpc('upsert_provider_gyms', { p_source: used, p_places: places });

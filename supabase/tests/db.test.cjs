@@ -414,6 +414,25 @@ grant usage on schema public, auth, storage to authenticated;
   check('check-in at a map gym (within 200m) works', !!ciMap.id, `dist=${ciMap.distance_m}`);
   await as(A, 'select * from check_out($1)', [ciMap.id]);
 
+  // a second map provider (Foursquare) must not duplicate gyms we already have
+  const fsq = JSON.stringify([
+    { id: 'fsq-a', name: "Gold's Gym", lat: 24.7512, lng: 46.6411 },                      // same gym as way/2 (~15 m away)
+    { id: 'fsq-b', name: 'Fitness Time Al Nakheel', lat: 24.7501, lng: 46.6401 },          // matches node/1 by English name
+    { id: 'fsq-c', name: 'CrossFit Nakheel', lat: 24.7540, lng: 46.6440, address: 'طريق الملك فهد' }, // new
+    { id: 'fsq-d', name: "Gold's Gym", lat: 24.7600, lng: 46.6500 },                      // same name but ~1 km away → another branch
+  ]);
+  await db.exec('set role service_role;');
+  const ids1 = (await q('select upsert_provider_gyms_ids($1, $2::jsonb) m', ['foursquare', fsq]))[0].m;
+  const ids2 = (await q('select upsert_provider_gyms_ids($1, $2::jsonb) m', ['foursquare', fsq]))[0].m;
+  await db.exec('reset role;');
+  const idOf = async (src, ext) => (await q('select id from gyms where source = $1 and external_id = $2', [src, ext]))[0]?.id;
+  check('foursquare: same gym from another map is reused, not duplicated',
+    ids1['fsq-a'] === await idOf('osm', 'way/2') && ids1['fsq-b'] === await idOf('osm', 'node/1'), JSON.stringify(ids1));
+  check('foursquare: new gyms and far branches are added once',
+    ids1['fsq-c'] === await idOf('foursquare', 'fsq-c') && ids1['fsq-d'] === await idOf('foursquare', 'fsq-d') && JSON.stringify(ids1) === JSON.stringify(ids2)
+    && (await q(`select count(*)::int n from gyms where source = 'foursquare'`))[0].n === 2);
+  await expectErr('foursquare: unknown sources rejected', async () => { await db.exec('set role service_role;'); try { await q('select upsert_provider_gyms_ids($1, $2::jsonb)', ['yelp', fsq]); } finally { await db.exec('reset role;'); } }, /bad_source/);
+
   // food log (calories)
   await as(A, `insert into food_logs (slot, name, food_id, servings, kcal, protein_g, carbs_g, fat_g) values
     ('breakfast', 'فول مدمس', 'foul', 1, 260, 13, 35, 8), ('lunch', 'كبسة دجاج', 'kabsa_chicken', 1.5, 1125, 60, 127.5, 39)`);
