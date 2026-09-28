@@ -1,13 +1,13 @@
-// صفحة الحساب (لي أو لغيري): الرتبة، المتابعين، البرامج والنصائح والمنشورات
+// صفحة الحساب (لي أو لغيري): الخلفية، الرتبة، المتابعين، البرامج والنصائح والمنشورات
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, I18nManager, Pressable, View } from 'react-native';
-import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { Num } from '@/components/pulse/widgets';
 import { Avatar, Card, Empty, Row, Segmented, T } from '@/components/ui';
+import type { CoverId } from '@/lib/cover';
 import { useLocalized } from '@/lib/i18n';
 import { canPublish, rankProgress, RANKS } from '@/lib/ranks';
 import { deleteTip, likeTip, loadPrograms, loadTips, profileCounts, type PublicProfile, type Tip, type UserProgram } from '@/lib/social';
@@ -16,6 +16,7 @@ import { errorKey, publicUrl, supabase, uploadImage } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 import { ProgramCard, TipCard } from './cards';
 import { CoachCheck, RankBadge } from './RankBadge';
+import { CoverPicker, coverPhotoUrl, ProfileCover } from './Cover';
 
 type Tab = 'programs' | 'tips' | 'posts';
 type PostTile = { id: string; image_path: string | null; caption: string | null };
@@ -67,6 +68,12 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
       setLocalAvatar(null); Alert.alert(t(errorKey(e)));
     } finally { setAvatarBusy(false); }
   };
+  // خلفية الهيدر: لون أو صورة (صاحب الحساب يغيّرها من زر الألوان)
+  // اختيار صاحب الحساب يبان فوراً، وبعدها يتحدّث من الخادم
+  const [coverLocal, setCoverLocal] = useState<{ cover: CoverId; photoPath: string | null; localUri?: string } | null>(null);
+  const cover = coverLocal ?? { cover: p.cover ?? 'auto', photoPath: p.cover_url ?? null };
+  const [coverOpen, setCoverOpen] = useState(false);
+
   const like = async (x: Tip) => {
     setTips((ts) => ts?.map((y) => (y.id === x.id ? { ...y, liked: !y.liked, likes: y.likes + (y.liked ? -1 : 1) } : y)) ?? null);
     const { error } = await likeTip(x, me);
@@ -80,8 +87,15 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
   return (
     <View style={{ gap: space.lg }}>
       {/* الهيدر */}
-      <BrandGradient name="ember" style={{ borderRadius: radius.lg, overflow: 'hidden', padding: space.xl, alignItems: 'center', gap: space.sm }}>
-        <SaduPattern variant="arrows" opacity={0.12} />
+      <ProfileCover cover={cover.cover} photo={cover.localUri ?? coverPhotoUrl(cover.photoPath)}
+        style={{ borderRadius: radius.lg, overflow: 'hidden', padding: space.xl, alignItems: 'center', gap: space.sm }}>
+        {self ? (
+          <Pressable onPress={() => setCoverOpen(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('profile.changeCover')}
+            style={{ position: 'absolute', top: space.md, end: space.md, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(10,51,45,0.45)',
+              borderWidth: 1, borderColor: 'rgba(248,237,218,0.35)', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>
+            <Ionicons name="color-palette-outline" size={18} color={brand.cream} />
+          </Pressable>
+        ) : null}
         <Pressable disabled={!self || avatarBusy} onPress={changeAvatar} accessibilityRole={self ? 'button' : undefined} accessibilityLabel={self ? t('profile.changePhoto') : undefined}
           style={{ borderWidth: 3, borderColor: prog.cur.level === 4 ? brand.amber : prog.cur.color, borderRadius: 60, padding: 3 }}>
           <Avatar size={92} uri={localAvatar ?? publicUrl('avatars', p.avatar_url)} name={p.full_name ?? p.username} />
@@ -106,7 +120,11 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
           <Count n={p.points} label={t('social.points')} onPress={() => router.push('/ranks')} />
           <Count n={p.streak} label={t('home.streak')} icon="flame" />
         </View>
-      </BrandGradient>
+      </ProfileCover>
+      {self ? (
+        <CoverPicker visible={coverOpen} me={me} cover={cover.cover} photoPath={cover.photoPath} onClose={() => setCoverOpen(false)}
+          onChanged={(next) => { setCoverLocal(next); if (!next.localUri) onProfileChanged?.(); }} />
+      ) : null}
 
       {actions}
 

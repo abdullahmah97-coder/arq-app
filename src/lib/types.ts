@@ -27,6 +27,9 @@ export interface Profile {
   is_coach: boolean;
   /** مين يشوفني في النادي: gym (الموجودين معي + الأصدقاء) | friends | hidden */
   presence_visibility: PresenceVisibility;
+  /** خلفية الهيدر: لون من ألوان أرك ('auto' يتبع ثيم التطبيق) أو صورة في مجلد المستخدم */
+  cover?: 'auto' | 'ember' | 'palm' | 'oasis' | 'dune' | 'lavender' | 'night' | 'gold';
+  cover_url?: string | null;
 }
 
 export type PresenceVisibility = 'gym' | 'friends' | 'hidden';

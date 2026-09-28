@@ -255,7 +255,13 @@
     "theme": "App color",
     "deleteAccount": "Delete account",
     "deleteConfirm": "Your account and all your data (plan, photos, InBody reports, health data, posts) will be permanently deleted. This cannot be undone. Are you sure?",
-    "deleteYes": "Delete permanently"
+    "deleteYes": "Delete permanently",
+    "changeCover": "Change background",
+    "coverTitle": "Profile background",
+    "coverAutoHint": "\"Auto\" follows the app theme. Other colours look the same for everyone.",
+    "coverPhoto": "Photo from your device",
+    "coverChangePhoto": "Change photo",
+    "coverRemovePhoto": "Remove photo"
   },
   "errors": {
     "generic": "Something went wrong, please try again",
