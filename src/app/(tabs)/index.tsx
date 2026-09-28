@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Logo, SaduPattern } from '@/brand/Brand';
 import { CheckInCard } from '@/components/CheckInCard';
 import { HomeClubOffers } from '@/components/clubs/HomeClubOffers';
+import { NotificationBell } from '@/components/NotificationBell';
 import { ChevronBar, MiniBars, Rings } from '@/components/pulse/Rings';
 import { MetricChip, NCard, NSection, NT, Num, OnDark, Pill, zoneColor } from '@/components/pulse/widgets';
 import { Avatar } from '@/components/ui';
@@ -93,9 +94,12 @@ export default function Home() {
                 <NT size={11} faint>{dateStr}</NT>
               </View>
             </View>
-            <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.avatarRing} accessibilityLabel={t('profile.title')}>
-              <Avatar uri={publicUrl('avatars', profile.avatar_url)} name={profile.full_name ?? profile.username} size={38} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <NotificationBell color={night.text} ring={night.bg2} />
+              <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.avatarRing} accessibilityLabel={t('profile.title')}>
+                <Avatar uri={publicUrl('avatars', profile.avatar_url)} name={profile.full_name ?? profile.username} size={38} />
+              </Pressable>
+            </View>
           </View>
 
           {/* الحلقات */}

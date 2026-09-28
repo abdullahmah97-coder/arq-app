@@ -109,6 +109,8 @@ function RootNavigator() {
         <Stack.Screen name="store/product" options={{ title: t('store.product'), presentation: 'modal' }} />
         <Stack.Screen name="follows/[id]" options={{ title: '' }} />
         <Stack.Screen name="food/add" options={{ title: t('food.addFood'), presentation: 'modal' }} />
+        <Stack.Screen name="notifications/index" options={{ title: t('notif.title') }} />
+        <Stack.Screen name="notifications/settings" options={{ title: t('notif.settings') }} />
       </Stack.Protected>
     </Stack>
   );

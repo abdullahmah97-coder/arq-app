@@ -40,7 +40,7 @@ grant usage on schema public, auth, storage to authenticated;
   await db.exec(fs.readFileSync(`${ROOT}/seed.sql`, 'utf8'));
   await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                  revoke update on public.profiles from authenticated;
-                 grant update (username, full_name, avatar_url, bio, gym_id, locale, onboarded, presence_visibility) on public.profiles to authenticated;
+                 grant update (username, full_name, avatar_url, bio, gym_id, locale, onboarded, presence_visibility, notify_prefs) on public.profiles to authenticated;
                  revoke insert, update on public.program_adopts from authenticated;
                  revoke insert, update, delete on public.app_admins from authenticated;`);
   console.log('ok   migration + seed applied');
@@ -436,6 +436,60 @@ grant usage on schema public, auth, storage to authenticated;
   { let hidden = false; try { hidden = (await as(A, 'select * from gym_search_log')).length === 0; } catch (e) { hidden = /permission denied/.test(e.message); }
     check('gym search log is private', hidden); }
   await expectErr('gym search log: users cannot write it', () => as(A, `insert into gym_search_log (user_id, q) values ($1, 'x')`, [A]), /permission denied|row-level security/);
+
+  // notifications: written by the server from what happened above, private, deduplicated
+  const nA = await as(A, 'select * from my_notifications()');
+  const nB = await as(B, 'select * from my_notifications()');
+  const kinds = (rows) => rows.map(r => r.kind);
+  check('notif: A told about the comment with a preview', nA.some(r => r.kind === 'post_comment' && r.data.preview === 'كفو!' && r.username));
+  check('notif: A told about the like', nA.filter(r => r.kind === 'post_like').length === 1);
+  check('notif: A told friend request accepted', kinds(nA).includes('friend_accept'));
+  check('notif: B got the friend request', kinds(nB).includes('friend_request'));
+  check('notif: B invited to the challenge with its title', nB.some(r => r.kind === 'challenge_invite' && r.data.title === 'تحدي الأسبوع'));
+  check('notif: A told they won the challenge', nA.some(r => r.kind === 'challenge_win' && Number(r.data.points) === 50));
+  check('notif: B told about check-in like and comment', kinds(nB).includes('checkin_like') && kinds(nB).includes('checkin_comment'));
+  check('notif: follow/unfollow/follow notifies once', nB.filter(r => r.kind === 'follow' && r.actor_id === A).length === 1, JSON.stringify(kinds(nB)));
+  check('notif: follow-back is marked mutual', nA.some(r => r.kind === 'follow' && r.actor_id === B && r.data.mutual === true));
+  check('notif: gym members told about a new offer (not expired ones)',
+    nA.filter(r => r.kind === 'gym_offer').length === 1 && nA.some(r => r.kind === 'gym_offer' && r.data.price === '450' && r.data.gym === gym.name),
+    JSON.stringify(nA.filter(r => r.kind === 'gym_offer').map(r => r.data)));
+  const selfLikeBefore = (await q(`select count(*)::int n from notifications where user_id = $1 and actor_id = $1`, [A]))[0].n;
+  await as(A, `insert into post_likes (post_id, user_id) values ($1, $2)`, [post.id, A]);
+  check('notif: liking your own post does not notify you', (await q(`select count(*)::int n from notifications where user_id = $1 and actor_id = $1`, [A]))[0].n === selfLikeBefore && selfLikeBefore === 0);
+  check('notif: others cannot read mine', (await as(B, 'select * from notifications where user_id = $1', [A])).length === 0);
+  await expectErr('notif: users cannot write notifications', () => as(A, `insert into notifications (user_id, kind) values ($1, 'follow')`, [B]), /row-level security|permission denied/);
+  check('notif: users cannot edit notifications directly', (await as(B, `update notifications set read_at = now() where user_id = $1 returning id`, [A])).length === 0);
+  await expectErr('notif: users cannot fire notifications themselves', () => as(A, `select _notify($1, $2, 'follow', $2, '{}', '/')`, [B, A]), /permission denied/);
+  const unread = async (u) => (await as(u, 'select count(*)::int n from notifications where read_at is null'))[0].n;
+  const unreadB = await unread(B);
+  await as(A, 'select mark_notifications_read()');
+  check('notif: mark all read (only mine)', (await unread(A)) === 0 && (await unread(B)) === unreadB && unreadB > 0);
+  const lvlBefore = (await q('select rank_level(points) l from profiles where id = $1', [B]))[0].l;
+  await q(`update profiles set points = 2600 where id = $1`, [B]);
+  check('notif: rank up', (await as(B, `select * from my_notifications() where kind = 'rank_up'`)).some(r => r.data.level === 4) && lvlBefore < 4);
+  await q(`update profiles set points = 10 where id = $1`, [B]);
+  await q(`update profiles set points = 2600 where id = $1`, [B]);
+  check('notif: same rank not announced twice', (await as(B, `select * from my_notifications() where kind = 'rank_up'`)).length === 1);
+  const txt = (await q(`select _notif_text('gym_offer', null, '{"gym":"وقت اللياقة","title":"شهر","price":"199"}', 'ar') t`))[0].t;
+  check('notif: push text in Arabic', txt[0] === 'عرض جديد في وقت اللياقة' && txt[1] === 'شهر — 199 ر.س', JSON.stringify(txt));
+  const txtEn = (await q(`select _notif_text('rank_up', null, '{"level":3}', 'en') t`))[0].t;
+  check('notif: push text in English', txtEn[1] === 'You reached “Pro”', JSON.stringify(txtEn));
+  // phone push tokens
+  const TOK = 'ExponentPushToken[abcDEF123456789xyz]';
+  await as(A, 'select register_push_token($1, $2)', [TOK, 'ios']);
+  check('push: device registered to me', (await as(A, 'select * from push_tokens')).length === 1);
+  await expectErr('push: junk tokens rejected', () => as(A, 'select register_push_token($1, $2)', ['http://evil', 'ios']), /check constraint/);
+  await as(B, 'select register_push_token($1, $2)', [TOK, 'ios']);
+  check('push: same phone signing into another account moves the token', (await as(A, 'select * from push_tokens')).length === 0 && (await as(B, 'select * from push_tokens')).length === 1);
+  check('push: tokens are private', (await as(A, 'select * from push_tokens where user_id = $1', [B])).length === 0);
+  await as(B, `insert into messages (sender, recipient, body) values ($1, $2, 'تجربة إشعار')`, [B, A]).catch(() => {});
+  await as(A, `insert into follows (follower, followee) values ($1, $2) on conflict do nothing`, [A, B]);
+  await as(A, `insert into messages (sender, recipient, body) values ($1, $2, 'وصل؟')`, [A, B]);
+  check('push: message with a registered device still sends fine without pg_net', true);
+  await as(B, `update profiles set notify_prefs = '{"messages":false,"social":true,"activity":true,"progress":true,"offers":false}' where id = $1`, [B]);
+  check('push: user can change notification settings', (await as(B, 'select notify_prefs from profiles where id = $1', [B]))[0].notify_prefs.messages === false);
+  await as(B, 'select unregister_push_token($1)', [TOK]);
+  check('push: sign-out removes the device', (await as(B, 'select * from push_tokens')).length === 0);
 
   // delete account (store requirement)
   await as(C, 'select delete_my_account()');
