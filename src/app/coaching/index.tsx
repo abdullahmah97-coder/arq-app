@@ -4,7 +4,7 @@ import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
-import { VerifiedBadge } from '@/components/coaching/parts';
+import { ReviewStatus, VerifiedBadge } from '@/components/coaching/parts';
 import { Avatar, Button, Card, Empty, Input, Loading, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { fmtRiyadh, inviteClient, loadCoachClients, loadMyCoachProfile, loadSessions, respondLink, setSessionStatus, type CoachClient, type CoachProfile, type CoachSession } from '@/lib/coaching';
@@ -69,6 +69,8 @@ export default function CoachHub() {
         <Pressable onPress={() => router.push({ pathname: '/coaches/[id]', params: { id: userId } })} hitSlop={8}><T size="xs" semibold color={colors.primary}>{t('coaching.viewPublic')}</T></Pressable>
       </Card>
 
+      {me.status !== 'approved' ? <ReviewStatus status={me.status} note={me.review_note} onEdit={() => router.push('/coaching/profile')} /> : null}
+
       <Row gap={space.sm}>
         <Tool icon="create-outline" label={t('coaching.editProfile')} onPress={() => router.push('/coaching/profile')} />
         <Tool icon="pricetags-outline" label={t('coaching.packages')} onPress={() => router.push('/coaching/packages')} />
@@ -88,7 +90,7 @@ export default function CoachHub() {
         </Card>
       ))}
 
-      <Card style={{ gap: space.sm }}>
+      {me.status === 'approved' ? <Card style={{ gap: space.sm }}>
         <T semibold>{t('coaching.inviteTitle')}</T>
         <Row gap={space.sm}>
           <View style={{ flex: 1 }}><Input value={invite} onChangeText={setInvite} placeholder="@username" autoCapitalize="none" autoCorrect={false} /></View>
@@ -96,7 +98,7 @@ export default function CoachHub() {
         </Row>
         <T size="xs" muted>{t('coaching.inviteHint')}</T>
         {pending.filter((c) => c.requested_by === 'coach').map((c) => <T key={c.link_id} size="xs" muted>⏳ @{c.username} · {t('coaching.waitingApproval')}</T>)}
-      </Card>
+      </Card> : null}
 
       <T size="lg" bold>{t('coaching.myClients')}</T>
       {active.length ? active.map((c) => (

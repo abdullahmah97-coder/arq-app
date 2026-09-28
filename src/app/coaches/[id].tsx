@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Pressable, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { STAR } from '@/components/clubs/parts';
-import { Chip, ScopePicker, VerifiedBadge } from '@/components/coaching/parts';
+import { Chip, ReviewStatus, ScopePicker, VerifiedBadge } from '@/components/coaching/parts';
 import { Avatar, Button, Card, Empty, Input, Loading, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { loadCoach, loadCoachReviews, loadPackages, rateCoach, requestCoach, type CoachDetail, type CoachPackage, type CoachReview, type Scope } from '@/lib/coaching';
@@ -66,6 +66,9 @@ export default function CoachPage() {
         </Row>
       </BrandGradient>
 
+      {c.status === 'approved' ? null : c.is_me ? <ReviewStatus status={c.status} note={c.review_note} onEdit={() => router.push('/coaching/profile')} />
+        : <Card><T size="sm" muted center>{t('coaching.notPublic')}{c.review_note ? ` · ${c.review_note}` : ''}</T></Card>}
+
       {c.is_me ? <Button icon="create-outline" title={t('coaching.editProfile')} onPress={() => router.push('/coaching/profile')} />
         : c.my_link_status === 'active' ? (
           <Row gap={space.sm}>
@@ -75,7 +78,8 @@ export default function CoachPage() {
         ) : c.my_link_status === 'pending' ? (
           <Card><T center semibold>{c.my_link_by === 'client' ? t('coaching.requestPending') : t('coaching.inviteWaiting')}</T>
             {c.my_link_by === 'coach' ? <Button small title={t('coaching.openInvites')} onPress={() => router.push('/my-coach')} /> : null}</Card>
-        ) : !c.accepting ? <Card><T center muted>{t('coaching.notAccepting')}</T></Card>
+        ) : c.status !== 'approved' ? null
+        : !c.accepting ? <Card><T center muted>{t('coaching.notAccepting')}</T></Card>
         : asking ? (
           <Card style={{ gap: space.sm }}>
             <T semibold>{t('coaching.whatCanSee', { name })}</T>

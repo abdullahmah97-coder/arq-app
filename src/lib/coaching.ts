@@ -32,6 +32,8 @@ export interface CoachDetail extends Omit<CoachCard, 'gyms'> {
   gyms: { id: string; name: string; name_en: string | null }[];
   my_link_id: string | null; my_link_status: 'pending' | 'active' | null; my_link_by: 'coach' | 'client' | null; my_scopes: Scope[] | null;
   can_review: boolean; is_me: boolean;
+  /** حالة المراجعة، وسبب الرفض/الإيقاف (يظهر للمدرب نفسه والمالك فقط) */
+  status: CoachStatus; review_note: string | null;
 }
 export async function loadCoach(id: string): Promise<CoachDetail | null> {
   const r = (await rpc<CoachDetail>('coach_detail', { p_coach: id }))[0];
@@ -45,21 +47,20 @@ export async function rateCoach(me: string, coachId: string, rating: number, bod
 }
 
 // ---------- ملفي كمدرب ----------
+/** الملف ينرسل للوحة المالك تلقائياً، وما يظهر للناس إلا بعد الاعتماد */
+export type CoachStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 export interface CoachProfile {
   user_id: string; headline: string | null; bio: string | null; specialties: Specialty[]; years_exp: number | null; certifications: string | null;
   languages: string[]; trains: 'any' | 'men' | 'women'; city: string | null; online: boolean; in_person: boolean; price_from_sar: number | null;
-  accepting: boolean; instagram: string | null; verify_requested_at: string | null;
+  accepting: boolean; instagram: string | null;
+  status: CoachStatus; submitted_at: string; review_note: string | null;
 }
 export async function loadMyCoachProfile(me: string): Promise<CoachProfile | null> {
   const { data } = await supabase.from('coach_profiles').select('*').eq('user_id', me).maybeSingle();
   return data ? ({ ...data, price_from_sar: n(data.price_from_sar) } as CoachProfile) : null;
 }
-export async function saveCoachProfile(me: string, p: Omit<CoachProfile, 'user_id' | 'verify_requested_at'>) {
+export async function saveCoachProfile(me: string, p: Omit<CoachProfile, 'user_id' | 'status' | 'submitted_at' | 'review_note'>) {
   const { error } = await supabase.from('coach_profiles').upsert({ ...p, user_id: me }, { onConflict: 'user_id' });
-  if (error) throw error;
-}
-export async function requestVerification(me: string) {
-  const { error } = await supabase.from('coach_profiles').update({ verify_requested_at: new Date().toISOString() }).eq('user_id', me);
   if (error) throw error;
 }
 export interface MyCoachGym { gym_id: string; status: 'pending' | 'approved'; gyms: { name: string; name_en: string | null } | null }
@@ -185,10 +186,21 @@ export async function savePackage(p: Omit<CoachPackage, 'id' | 'coach_id'>, id?:
 }
 export async function deletePackage(id: string) { await supabase.from('coach_packages').delete().eq('id', id); }
 
-// ---------- لوحة المالك: طلبات التوثيق ----------
-export interface VerifyReq { user_id: string; username: string; full_name: string | null; headline: string | null; certifications: string | null; years_exp: number | null; requested_at: string }
-export const loadVerificationQueue = () => rpc<VerifyReq>('coach_verification_queue').catch(() => [] as VerifyReq[]);
-export const setVerified = (userId: string, value: boolean) => rpc('set_coach', { p_user: userId, p_value: value });
+// ---------- لوحة المالك: ملفات المدربين للمراجعة ----------
+export interface VerifyReq {
+  user_id: string; username: string; full_name: string | null; avatar_url: string | null; headline: string | null; bio: string | null;
+  specialties: Specialty[]; years_exp: number | null; certifications: string | null; languages: string[]; trains: 'any' | 'men' | 'women';
+  city: string | null; online: boolean; in_person: boolean; price_from_sar: number | null; instagram: string | null; submitted_at: string; gyms: string[];
+}
+export async function loadVerificationQueue(): Promise<VerifyReq[]> {
+  try {
+    const r = await rpc<VerifyReq>('coach_verification_queue');
+    return r.map((x) => ({ ...x, price_from_sar: n(x.price_from_sar), specialties: x.specialties ?? [], languages: x.languages ?? [], gyms: x.gyms ?? [] }));
+  } catch { return []; }
+}
+/** قرار المالك: اعتماد (يوثّق ويُظهر) أو رفض بسبب أو إيقاف */
+export const reviewCoach = (userId: string, decision: 'approved' | 'rejected' | 'suspended', note?: string) =>
+  rpc('review_coach', { p_user: userId, p_decision: decision, p_note: note?.trim() || null });
 
 /** «YYYY-MM-DD HH:MM» بتوقيت الرياض → Date */
 export function parseRiyadh(s: string): Date | null {

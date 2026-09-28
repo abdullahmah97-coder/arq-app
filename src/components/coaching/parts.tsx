@@ -1,11 +1,11 @@
-// أجزاء مشتركة للمدربين: بطاقة مدرب، شارة التوثيق، شرائح التخصص، ومنتقي الصلاحيات
+// أجزاء مشتركة للمدربين: بطاقة مدرب، شارة التوثيق، حالة مراجعة الملف، شرائح التخصص، ومنتقي الصلاحيات
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { STAR } from '@/components/clubs/parts';
-import { Avatar, Row, T } from '@/components/ui';
-import { SCOPES, type CoachCard, type Scope } from '@/lib/coaching';
+import { Avatar, Button, Card, Row, T } from '@/components/ui';
+import { SCOPES, type CoachCard, type CoachStatus, type Scope } from '@/lib/coaching';
 import { publicUrl } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 
@@ -16,6 +16,28 @@ export function VerifiedBadge({ small }: { small?: boolean }) {
       <Ionicons name="checkmark-circle" size={small ? 13 : 16} color={colors.success} />
       {!small ? <T size="xs" semibold color={colors.success}>{t('coaching.verified')}</T> : null}
     </Row>
+  );
+}
+
+/** حالة ملف المدرب عند إدارة أرك: قيد المراجعة / يحتاج تعديل (مع السبب) / موقوف / معتمد وظاهر */
+export function ReviewStatus({ status, note, onEdit }: { status: CoachStatus; note?: string | null; onEdit?: () => void }) {
+  const { t } = useTranslation();
+  const look = {
+    pending: { icon: 'time-outline', color: brand.amber },
+    approved: { icon: 'checkmark-circle', color: colors.success },
+    rejected: { icon: 'alert-circle-outline', color: colors.danger },
+    suspended: { icon: 'pause-circle-outline', color: colors.danger },
+  }[status] as { icon: keyof typeof Ionicons.glyphMap; color: string };
+  return (
+    <Card style={{ gap: space.sm, borderColor: look.color, borderWidth: 1 }}>
+      <Row gap={8}>
+        <Ionicons name={look.icon} size={20} color={look.color} />
+        <T semibold style={{ flex: 1 }}>{t(`coaching.rs_${status}`)}</T>
+      </Row>
+      <T size="sm" muted>{t(`coaching.rsBody_${status}`)}</T>
+      {note && status !== 'approved' ? <T size="sm">{t('coaching.reviewNote')}: {note}</T> : null}
+      {onEdit && status === 'rejected' ? <Button small icon="create-outline" title={t('coaching.fixAndResubmit')} onPress={onEdit} /> : null}
+    </Card>
   );
 }
 

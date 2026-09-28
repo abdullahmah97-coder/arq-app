@@ -69,7 +69,7 @@ export const SERVER_CODES = new Set([
   'too_far_ahead', 'members_only', 'already_booked', 'booking_not_found', 'too_late_to_cancel', 'too_many_rows', 'gym_not_found',
   'review_needs_visit', 'already_replied', 'not_a_client', 'not_enough_points', 'out_of_stock', 'reward_ended', 'reward_not_found', 'code_ended',
   'consent_required', 'scope_not_granted', 'link_not_found', 'already_linked', 'slot_full', 'no_sessions_left', 'package_expired',
-  'payments_disabled', 'order_not_found', 'amount_mismatch', 'kind_not_available', 'not_a_coach', 'not_verified', 'brand_not_approved',
+  'payments_disabled', 'order_not_found', 'amount_mismatch', 'kind_not_available', 'not_a_coach', 'coach_pending_review', 'not_verified', 'brand_not_approved',
 ]);
 
 /** يحوّل رسائل أخطاء الخادم إلى مفاتيح ترجمة */

@@ -11,7 +11,35 @@ const { setup } = require('./_harness.cjs');
   await as(U.B, `insert into coach_profiles (user_id, headline, specialties, years_exp, city, price_from_sar) values ($1, 'مدربة لياقة وتنشيف', '{fat_loss,women}', 6, 'الرياض', 250)`, [U.B]);
   await expectErr('bad specialty rejected', () => as(U.B, `update coach_profiles set specialties = '{magic}' where user_id = $1`, [U.B]), /check constraint/);
   await expectErr('cannot create a profile for someone else', () => as(U.C, `insert into coach_profiles (user_id) values ($1)`, [U.A]), /row-level security/);
-  check('directory lists the coach', (await as(U.C, `select * from coaches_directory(null, 'fat_loss', null, null)`)).some((c) => c.user_id === U.B && c.verified === false));
+
+  // ---------- المراجعة من لوحة المالك ----------
+  check('new profile waits for review', (await q(`select status from coach_profiles where user_id = $1`, [U.B]))[0].status === 'pending');
+  check('owner notified of the new profile', (await q(`select count(*)::int n from notifications where user_id = $1 and data->>'key' like 'cpr:%'`, [U.E]))[0].n === 1);
+  check('pending coach hidden from directory', !(await as(U.C, `select * from coaches_directory()`)).some((c) => c.user_id === U.B));
+  check('pending coach page hidden from people', (await as(U.C, `select * from coach_detail($1)`, [U.B])).length === 0);
+  check('pending profile row hidden (RLS)', (await as(U.C, `select * from coach_profiles`)).length === 0);
+  check('coach still sees own pending profile', (await as(U.B, `select status from coach_detail($1)`, [U.B]))[0]?.status === 'pending');
+  await as(U.B, `update coach_profiles set status = 'approved', review_note = 'x' where user_id = $1`, [U.B]);
+  check('coach cannot self-approve', (await q(`select status, review_note from coach_profiles where user_id = $1`, [U.B]))[0].status === 'pending');
+  await expectErr('no invites before approval', () => as(U.B, `select coach_invite('ahmed')`), /coach_pending_review/);
+  check('owner queue has the profile with details', (await as(U.E, `select * from coach_verification_queue()`)).some((r) => r.user_id === U.B && r.certifications === null && r.specialties.includes('women')));
+  check('queue is owner-only', (await as(U.A, `select * from coach_verification_queue()`)).length === 0);
+  await expectErr('only the owner can decide', () => as(U.D, `select review_coach($1, 'approved')`, [U.B]), /not_allowed/);
+  await as(U.E, `select review_coach($1, 'rejected', 'أضف شهاداتك')`, [U.B]);
+  const rej = (await q(`select c.status, c.review_note, p.is_coach from coach_profiles c join profiles p on p.id = c.user_id where c.user_id = $1`, [U.B]))[0];
+  check('rejected with a reason', rej.status === 'rejected' && rej.review_note === 'أضف شهاداتك' && rej.is_coach === false);
+  check('coach told why', (await q(`select count(*)::int n from notifications where user_id = $1 and data->>'body_ar' = 'أضف شهاداتك'`, [U.B]))[0].n === 1);
+  check('coach sees the note, others do not', (await as(U.B, `select review_note from coach_detail($1)`, [U.B]))[0].review_note === 'أضف شهاداتك');
+  await as(U.B, `update coach_profiles set certifications = 'NASM CPT' where user_id = $1`, [U.B]);
+  check('editing after rejection resubmits', (await q(`select status from coach_profiles where user_id = $1`, [U.B]))[0].status === 'pending');
+  check('owner notified again', (await q(`select count(*)::int n from notifications where user_id = $1 and data->>'key' like 'cpr:%'`, [U.E]))[0].n === 2);
+  await as(U.E, `select review_coach($1, 'approved')`, [U.B]);
+  check('approved = verified badge', (await q(`select is_coach from profiles where id = $1`, [U.B]))[0].is_coach === true);
+  check('coach told of approval', (await q(`select count(*)::int n from notifications where user_id = $1 and data->>'key' like 'cpd:%'`, [U.B]))[0].n === 2);
+  check('queue empty after decision', (await as(U.E, `select * from coach_verification_queue()`)).length === 0);
+  await as(U.B, `update coach_profiles set headline = 'مدربة لياقة وتنشيف وقوة' where user_id = $1`, [U.B]);
+  check('editing an approved profile keeps it live', (await q(`select status from coach_profiles where user_id = $1`, [U.B]))[0].status === 'approved');
+  check('directory lists the approved coach', (await as(U.C, `select * from coaches_directory(null, 'fat_loss', null, null)`)).some((c) => c.user_id === U.B && c.verified === true));
 
   // ---------- النادي يعتمد ----------
   await as(U.B, `insert into coach_gyms (coach_id, gym_id, status) values ($1, $2, 'approved')`, [U.B, gym.id]);
@@ -95,6 +123,8 @@ const { setup } = require('./_harness.cjs');
   await as(U.C, `insert into coach_profiles (user_id, accepting) values ($1, false)`, [U.C]);
   await expectErr('coach not accepting', () => as(U.A, `select coach_request($1, '{workouts}')`, [U.C]), /not_a_coach/);
   await as(U.C, `update coach_profiles set accepting = true where user_id = $1`, [U.C]);
+  await expectErr('cannot request an unapproved coach', () => as(U.A, `select coach_request($1, '{workouts}')`, [U.C]), /not_a_coach/);
+  await as(U.E, `select review_coach($1, 'approved')`, [U.C]);
   const l2 = (await as(U.A, `select coach_request($1, '{health}', 'ابي أنزل وزن')::text id`, [U.C]))[0].id;
   await expectErr('client cannot accept own request', () => as(U.A, `select coach_link_respond($1, true)`, [l2]), /not_allowed/);
   await as(U.C, `select coach_link_respond($1, false)`, [l2]);
@@ -106,7 +136,18 @@ const { setup } = require('./_harness.cjs');
   check('review stays after ending', (await q(`select count(*)::int n from coach_reviews where coach_id = $1`, [U.B]))[0].n === 1);
   void done;
 
-  // توثيق المدرب: طابور المالك
-  await as(U.B, `update coach_profiles set verify_requested_at = now() where user_id = $1`, [U.B]);
-  check('owner sees verification queue', (await as(U.E, `select * from coach_verification_queue()`)).length === 1 && (await as(U.A, `select * from coach_verification_queue()`)).length === 0);
+  // ---------- الإيقاف يقطع الوصول فوراً ----------
+  const l3 = (await as(U.C, `select coach_invite('ahmed')::text id`))[0].id;
+  await as(U.A, `select coach_link_respond($1, true, '{workouts}')`, [l3]);
+  check('approved coach reads granted data', (await as(U.C, `select * from client_timeline($1)`, [U.A])).some((r) => r.kind === 'workout'));
+  await as(U.E, `select review_coach($1, 'suspended', 'تحت المراجعة')`, [U.C]);
+  await expectErr('suspended coach loses access at once', () => as(U.C, `select * from client_timeline($1)`, [U.A]), /not_allowed/);
+  await expectErr('suspended coach cannot add notes', () => as(U.C, `insert into coach_notes (client_id, body) values ($1, 'x')`, [U.A]), /row-level security/);
+  check('suspended coach hidden from directory', !(await as(U.B, `select * from coaches_directory()`)).some((c) => c.user_id === U.C));
+  check('linked client can still open the page', (await as(U.A, `select * from coach_detail($1)`, [U.C])).length === 1);
+  check('stranger cannot open it', (await as(U.B, `select * from coach_detail($1)`, [U.C])).length === 0);
+  check('only the coach sees the note', (await as(U.C, `select review_note from coach_detail($1)`, [U.C]))[0].review_note === 'تحت المراجعة'
+    && (await as(U.A, `select review_note from coach_detail($1)`, [U.C]))[0].review_note === null);
+  await as(U.E, `select set_coach($1, true)`, [U.C]);
+  check('owner badge toggle re-approves the profile', (await q(`select status from coach_profiles where user_id = $1`, [U.C]))[0].status === 'approved');
 })();
