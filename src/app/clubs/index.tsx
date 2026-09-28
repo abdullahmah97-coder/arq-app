@@ -1,14 +1,17 @@
 // النوادي: كل العروض (مرتبة بالسعر الشهري)، كل السلاسل، والفروع الأقرب لك
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { ServiceIcon } from '@/components/clubs/GymServices';
 import { ChainRow, ClubRow, OfferCard } from '@/components/clubs/parts';
 import { Empty, Screen, Segmented, T } from '@/components/ui';
 import { loadChains, loadClubs, loadOffers, type Audience, type Chain, type Club, type Offer } from '@/lib/clubs';
 import { refreshNearbyGyms } from '@/lib/gyms';
+import { useLocalized } from '@/lib/i18n';
 import { getCurrentPosition } from '@/lib/location';
-import { space } from '@/theme';
+import { chainsWithServices, FILTER_KEYS, gymsWithServices, loadServiceCatalog, serviceName, type ServiceDef } from '@/lib/services';
+import { brand, colors, space } from '@/theme';
 
 type Tab = 'offers' | 'chains' | 'near';
 type Sort = 'price' | 'rating';
@@ -25,6 +28,20 @@ export default function Clubs() {
   const [clubs, setClubs] = useState<Club[] | null>(null);
   const [near, setNear] = useState<Club[] | null>(null);
   const [locDenied, setLocDenied] = useState(false);
+  const { lng } = useLocalized();
+  const [catalog, setCatalog] = useState<ServiceDef[]>([]);
+  const [svc, setSvc] = useState<string[]>([]);
+  const [svcGyms, setSvcGyms] = useState<Set<string> | null>(null);
+  const [svcChains, setSvcChains] = useState<Set<string> | null>(null);
+  useEffect(() => { loadServiceCatalog().then((c) => setCatalog(c.filter((x) => (FILTER_KEYS as readonly string[]).includes(x.key)))).catch(() => {}); }, []);
+  useEffect(() => {
+    if (!svc.length) { setSvcGyms(null); setSvcChains(null); return; }
+    gymsWithServices(svc).then(setSvcGyms);
+    chainsWithServices(svc).then(setSvcChains);
+  }, [svc]);
+  const toggleSvc = (k: string) => setSvc((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
+  const okGym = (id?: string | null) => !svcGyms || (!!id && svcGyms.has(id));
+  const okChain = (id?: string | null) => !svcChains || (!!id && svcChains.has(id));
 
   useFocusEffect(useCallback(() => {
     loadOffers().then(setOffers).catch(() => setOffers([]));
@@ -46,11 +63,12 @@ export default function Clubs() {
   const chainById = new Map((chains ?? []).map((c) => [c.id, c]));
   const clubById = new Map((clubs ?? []).map((c) => [c.id, c]));
   const ratingOf = (o: Offer) => (o.chain_id ? chainById.get(o.chain_id) : o.gym_id ? clubById.get(o.gym_id) : null) ?? null;
-  const shownOffers = (offers ?? []).filter((o) => okAud((o.gym_chains ?? o.gyms)?.audience) && (months === 'all' || o.months === months));
-  const shownChains = (chains ?? []).filter((c) => okAud(c.audience)).sort((a, b) => sort === 'rating'
+  const shownOffers = (offers ?? []).filter((o) => okAud((o.gym_chains ?? o.gyms)?.audience) && (months === 'all' || o.months === months)
+    && (!svc.length || (o.chain_id ? okChain(o.chain_id) : okGym(o.gym_id))));
+  const shownChains = (chains ?? []).filter((c) => okAud(c.audience) && okChain(c.id)).sort((a, b) => sort === 'rating'
     ? ((b.rating ?? 0) - (a.rating ?? 0)) || b.reviews - a.reviews
     : ((a.best_monthly ?? 1e9) - (b.best_monthly ?? 1e9)) || b.offers - a.offers);
-  const nearList = (near ?? []).filter((c) => okAud(c.audience));
+  const nearList = (near ?? []).filter((c) => okAud(c.audience) && okGym(c.id));
 
   return (
     <Screen edges={['bottom']}>
@@ -62,6 +80,22 @@ export default function Clubs() {
       <Segmented<Audience | 'all'> wrap value={aud} onChange={setAud} options={[
         { value: 'all', label: t('store.all') }, { value: 'men', label: t('clubs.aud_men') }, { value: 'women', label: t('clubs.aud_women') },
       ]} />
+      {catalog.length ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }} accessibilityLabel={t('services.filterA11y')}>
+          {catalog.map((c) => {
+            const on = svc.includes(c.key);
+            return (
+              <Pressable key={c.key} onPress={() => toggleSvc(c.key)} accessibilityRole="button" accessibilityState={{ selected: on }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+                  backgroundColor: on ? brand.deepGreen : colors.card, borderWidth: 1, borderColor: on ? brand.deepGreen : colors.border }}>
+                <ServiceIcon icon={c.icon} size={15} color={on ? brand.amber : colors.muted} />
+                <T size="xs" semibold color={on ? brand.cream : colors.text}>{serviceName(c, lng)}</T>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+      {svc.length ? <T size="xs" muted>{t('services.filterNote')}</T> : null}
 
       {tab === 'offers' ? (
         <>

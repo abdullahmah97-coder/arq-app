@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
+import { ChainServicesCard } from '@/components/clubs/GymServices';
 import { ClubLogo, ClubRow, OfferCard, Stars } from '@/components/clubs/parts';
 import { Num } from '@/components/pulse/widgets';
 import { Avatar, Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
@@ -60,6 +61,8 @@ export default function ChainPage() {
         <Stat value={chain.best_monthly != null ? String(Math.round(chain.best_monthly)) : '—'} label={t('clubs.fromMonthlyLabel')} />
         <Stat value={String(chain.branches)} label={t('clubs.branchesInApp')} />
       </View>
+
+      <ChainServicesCard chainId={chain.id} manage={manage} />
 
       {manage ? (
         <Row gap={space.sm}>

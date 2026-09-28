@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Platform, Pressable, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
+import { GymServices } from '@/components/clubs/GymServices';
 import { ClubLogo, OfferCard, Stars } from '@/components/clubs/parts';
 import { gymName } from '@/components/GymPicker';
 import { Num } from '@/components/pulse/widgets';
@@ -81,6 +82,9 @@ export default function ClubPage() {
           ))}
         </View>
       </Card>
+
+      {/* خدمات الفرع: مسبح، سونا، جاكوزي… */}
+      <GymServices gymId={club.id} />
 
       {/* العروض */}
       <Row style={{ justifyContent: 'space-between' }}>
