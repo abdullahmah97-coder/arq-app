@@ -7,7 +7,7 @@ import { I18nManager, Pressable, Text, View } from 'react-native';
 import { gymName } from '@/components/GymPicker';
 import { Num } from '@/components/pulse/widgets';
 import { T } from '@/components/ui';
-import { daysLeft, discountPct, isStale, monthly, type Chain, type Club, type Offer } from '@/lib/clubs';
+import { daysLeft, discountPct, fullPrice, isStale, monthly, type Chain, type Club, type Offer } from '@/lib/clubs';
 import { useLocalized } from '@/lib/i18n';
 import { publicUrl } from '@/lib/supabase';
 import { brand, colors, fonts, night, radius, space } from '@/theme';
@@ -102,6 +102,16 @@ export function OfferCard({ o, rating, dark, width }: { o: Offer; rating?: { rat
         <Text style={{ color: muted, fontFamily: fonts.regular, fontSize: 12, marginBottom: 3 }}>{t('clubs.sar')} / {periodLabel(o.months, t)}</Text>
         {o.old_price_sar ? <Text style={{ color: muted, fontFamily: fonts.regular, fontSize: 12, marginBottom: 3, textDecorationLine: 'line-through' }}>{(+o.old_price_sar).toLocaleString('en-US')}</Text> : null}
       </View>
+      {(() => {
+        const fp = fullPrice(o);
+        const bits = [
+          fp.changed ? t('trust.fullPriceLine', { total: fp.total.toLocaleString('en-US') }) : null,
+          o.join_fee_sar ? t('trust.inclJoin', { fee: (+o.join_fee_sar).toLocaleString('en-US') }) : null,
+          o.vat_included === false ? t('trust.plusVat') : o.vat_included ? t('trust.vatIncl') : null,
+          o.min_months ? t('trust.minCommit', { n: o.min_months, count: o.min_months }) : null,
+        ].filter(Boolean);
+        return bits.length ? <Text style={{ color: fp.changed ? ink : muted, fontFamily: fp.changed ? fonts.semibold : fonts.regular, fontSize: 11, lineHeight: 17 }}>{bits.join(' · ')}</Text> : null;
+      })()}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
         {rating?.rating ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>

@@ -20,6 +20,7 @@ export interface Offer {
   id: string; gym_id: string | null; chain_id: string | null; title: string; details: string | null; price_sar: number; old_price_sar: number | null;
   months: number; ends_on: string | null; url: string | null; promo_code: string | null; active: boolean; created_at: string;
   source_url: string | null; seen_on: string | null; confidence: Confidence;
+  join_fee_sar?: number | null; vat_included?: boolean | null; min_months?: number | null; terms?: string | null;
   gyms?: Pick<Club, 'id' | 'name' | 'name_en' | 'chain' | 'city' | 'district' | 'audience' | 'logo_path'> | null;
   gym_chains?: Pick<Chain, 'id' | 'name' | 'name_en' | 'audience' | 'logo_path'> | null;
 }
@@ -48,7 +49,7 @@ export async function loadClub(id: string): Promise<Club | null> {
   return row ? toClub(row) : null;
 }
 
-const OSEL = 'id, gym_id, chain_id, title, details, price_sar, old_price_sar, months, ends_on, url, promo_code, active, created_at, source_url, seen_on, confidence, gyms(id, name, name_en, chain, city, district, audience, logo_path), gym_chains(id, name, name_en, audience, logo_path)';
+const OSEL = 'id, gym_id, chain_id, title, details, price_sar, old_price_sar, months, ends_on, url, promo_code, active, created_at, source_url, seen_on, confidence, join_fee_sar, vat_included, min_months, terms, gyms(id, name, name_en, chain, city, district, audience, logo_path), gym_chains(id, name, name_en, audience, logo_path)';
 const toOffer = (o: any): Offer => ({ ...o, price_sar: Number(o.price_sar), old_price_sar: num(o.old_price_sar) });
 
 /** العروض الفعّالة مرتبة بالسعر الشهري المكافئ — لفرع (مع عروض سلسلته) أو لسلسلة */
@@ -111,11 +112,18 @@ export async function canManageGym(gymId: string) {
   return data === true;
 }
 
-export type OfferInput = Pick<Offer, 'gym_id' | 'chain_id' | 'source_url' | 'title' | 'details' | 'price_sar' | 'old_price_sar' | 'months' | 'ends_on' | 'url' | 'promo_code' | 'active'>;
+/** السعر الكامل اللي بيدفعه المشترك فعلياً: السعر + رسوم التسجيل + الضريبة (١٥٪) لو ما كانت شاملة */
+export const VAT = 0.15;
+export function fullPrice(o: Pick<Offer, 'price_sar' | 'join_fee_sar' | 'vat_included'>): { total: number; changed: boolean } {
+  const base = Number(o.price_sar) + Number(o.join_fee_sar ?? 0);
+  const total = o.vat_included === false ? base * (1 + VAT) : base;
+  return { total: Math.round(total * 100) / 100, changed: total !== Number(o.price_sar) };
+}
+export type OfferInput = Pick<Offer, 'gym_id' | 'chain_id' | 'source_url' | 'title' | 'details' | 'price_sar' | 'old_price_sar' | 'months' | 'ends_on' | 'url' | 'promo_code' | 'active' | 'join_fee_sar' | 'vat_included' | 'min_months' | 'terms'>;
 export async function saveOffer(o: OfferInput, id?: string) {
   const url = (o.url ?? '').trim();
   const src = (o.source_url ?? '').trim();
-  const row = { ...o, source_url: src ? (/^https:\/\//i.test(src) ? src : `https://${src.replace(/^http:\/\//i, '')}`) : null, title: o.title.trim(), details: o.details?.trim() || null, promo_code: o.promo_code?.trim() || null,
+  const row = { ...o, source_url: src ? (/^https:\/\//i.test(src) ? src : `https://${src.replace(/^http:\/\//i, '')}`) : null, title: o.title.trim(), details: o.details?.trim() || null, promo_code: o.promo_code?.trim() || null, terms: o.terms?.trim() || null,
     url: url ? (/^https:\/\//i.test(url) ? url : `https://${url.replace(/^http:\/\//i, '')}`) : null };
   const { error } = id ? await supabase.from('gym_offers').update(row).eq('id', id) : await supabase.from('gym_offers').insert(row);
   if (error) throw error;

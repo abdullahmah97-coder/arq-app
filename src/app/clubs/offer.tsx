@@ -36,6 +36,10 @@ export default function OfferForm() {
   const [url, setUrl] = useState('');
   const [code, setCode] = useState('');
   const [active, setActive] = useState(true);
+  const [joinFee, setJoinFee] = useState('');
+  const [vat, setVat] = useState<'yes' | 'no' | 'unknown'>('unknown');
+  const [minMonths, setMinMonths] = useState('');
+  const [terms, setTerms] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { loadClubs().then(setClubs).catch(() => {}); loadChains().then(setChains).catch(() => {}); }, []);
@@ -49,6 +53,8 @@ export default function OfferForm() {
       if (!o) return;
       setTitle(o.title); setDetails(o.details ?? ''); setPrice(String(+o.price_sar)); setOldPrice(o.old_price_sar ? String(+o.old_price_sar) : '');
       setMonths(o.months); setEndsOn(o.ends_on ?? ''); setUrl(o.url ?? ''); setCode(o.promo_code ?? ''); setActive(o.active);
+      setJoinFee(o.join_fee_sar != null ? String(+o.join_fee_sar) : ''); setVat(o.vat_included == null ? 'unknown' : o.vat_included ? 'yes' : 'no');
+      setMinMonths(o.min_months != null ? String(o.min_months) : ''); setTerms(o.terms ?? '');
       setSource(o.source_url ?? ''); if (o.chain_id) setChainId(o.chain_id); if (o.gym_id) setGymId(o.gym_id);
     });
   }, [id]);
@@ -84,9 +90,14 @@ export default function OfferForm() {
     if (!(p >= 0)) return Alert.alert(t('errors.invalidNumber'));
     if (op != null && !(op > p)) return Alert.alert(t('clubs.err_oldPrice'));
     if (endsOn && !/^\d{4}-\d{2}-\d{2}$/.test(endsOn)) return Alert.alert(t('clubs.err_date'));
+    const jf = joinFee.trim() ? toNum(joinFee) : null;
+    const mm = minMonths.trim() ? Math.round(toNum(minMonths)) : null;
+    if (jf != null && !(jf >= 0)) return Alert.alert(t('errors.invalidNumber'));
+    if (mm != null && !(mm >= 0 && mm <= 36)) return Alert.alert(t('errors.invalidNumber'));
     setBusy(true);
     try {
-      await saveOffer({ gym_id: gymId, chain_id: gymId ? null : chainId, source_url: source || null, title, details, price_sar: p, old_price_sar: op, months, ends_on: endsOn || null, url: url || null, promo_code: code || null, active }, id);
+      await saveOffer({ gym_id: gymId, chain_id: gymId ? null : chainId, source_url: source || null, title, details, price_sar: p, old_price_sar: op, months, ends_on: endsOn || null, url: url || null, promo_code: code || null, active,
+        join_fee_sar: jf, vat_included: vat === 'unknown' ? null : vat === 'yes', min_months: mm, terms: terms || null }, id);
       goBackOrHome();
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
   };
@@ -119,6 +130,24 @@ export default function OfferForm() {
         <View style={{ flex: 1 }}><Input label={t('clubs.priceNow')} value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="399" /></View>
         <View style={{ flex: 1 }}><Input label={t('clubs.priceBefore')} value={oldPrice} onChangeText={setOldPrice} keyboardType="decimal-pad" placeholder="550" /></View>
       </Row>
+      {/* السعر الكامل: رسوم التسجيل + الضريبة + أقل مدة التزام + الشروط */}
+      <View style={{ gap: space.sm, padding: space.md, borderRadius: radius.md, backgroundColor: colors.cardAlt }}>
+        <T size="sm" semibold>{t('trust.fullPriceTitle')}</T>
+        <Row gap={space.md}>
+          <View style={{ flex: 1 }}><Input label={t('trust.joinFee')} value={joinFee} onChangeText={setJoinFee} keyboardType="decimal-pad" placeholder="0" /></View>
+          <View style={{ flex: 1 }}><Input label={t('trust.minMonths')} value={minMonths} onChangeText={setMinMonths} keyboardType="number-pad" placeholder="1" /></View>
+        </Row>
+        <T size="xs" semibold>{t('trust.vatQ')}</T>
+        <Row gap={6} style={{ flexWrap: 'wrap' }}>
+          {(['yes', 'no', 'unknown'] as const).map((v) => (
+            <Pressable key={v} onPress={() => setVat(v)} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: vat === v ? brand.deepGreen : colors.card }}>
+              <T size="sm" semibold color={vat === v ? brand.cream : colors.text}>{t(`trust.vat_${v}`)}</T>
+            </Pressable>
+          ))}
+        </Row>
+        <Input label={t('trust.terms')} value={terms} onChangeText={setTerms} maxLength={400} multiline style={{ minHeight: 60, textAlignVertical: 'top' }} placeholder={t('trust.termsPh')} />
+        <T size="xs" muted>{t('trust.fullPriceHint')}</T>
+      </View>
       <Input label={t('clubs.details')} value={details} onChangeText={setDetails} maxLength={400} multiline style={{ minHeight: 70, textAlignVertical: 'top' }} placeholder={t('clubs.detailsPh')} />
       <View style={{ gap: 6 }}>
         <Input label={t('clubs.endsOn')} value={endsOn} onChangeText={setEndsOn} placeholder="2026-10-31" autoCapitalize="none" />

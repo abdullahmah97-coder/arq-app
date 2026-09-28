@@ -1618,5 +1618,128 @@
     "not_a_coach": "This is for coaches",
     "not_verified": "Needs verification first",
     "brand_not_approved": "Brand awaiting approval"
+  },
+  "trust": {
+    "liveNow_one": "1 person here now",
+    "liveNow_other": "{{count}} people here now",
+    "liveNow_zero": "No one checked in right now",
+    "compare": "Compare",
+    "inCompare": "In compare",
+    "compareTitle": "Compare gyms",
+    "compareEmpty": "Pick 2 or 3 gyms from each gym's page (the “Compare” button) to see them side by side here.",
+    "pickClubs": "Pick gyms",
+    "addToCompare": "Add a third gym",
+    "removeCompare": "Remove from compare",
+    "compareNote": "Green is the best in each row. Prices come from current offers; ratings from verified visitors.",
+    "cmpRating": "Rating",
+    "cmpReviews": "Ratings count",
+    "cmpMonthly": "Cheapest monthly price",
+    "cmpNow": "Here now (fewer is quieter)",
+    "peakTitle": "Peak times",
+    "busiestAt": "Busiest around {{hour}}",
+    "quietSuggestion": "Going at {{hour}} would be quieter than your usual time",
+    "peakNote": "Average people present per hour over the last 8 weeks, from ARQ check-ins. No names.",
+    "peakNotEnough": "Not enough check-ins for this gym yet. The more people check in, the more accurate this gets.",
+    "facet_clean": "Cleanliness",
+    "facet_equipment": "Equipment",
+    "facet_crowd": "Crowding",
+    "facet_coaches": "Coaches",
+    "facet_staff": "Staff",
+    "facetsTitle": "Rate in detail (optional)",
+    "facetsHint": "Helps others see what's great and what's missing. For “Crowding”, 5 stars means quiet.",
+    "facetsFrom_one": "From 1 detailed rating",
+    "facetsFrom_other": "From {{count}} detailed ratings",
+    "verifiedShare": "{{pct}}% of ratings are from people who actually checked in",
+    "verifiedVisitor": "Verified visitor",
+    "visitRule": "You need to have checked in at this gym (or a branch of the same chain) to rate it.",
+    "gymReply": "Gym's reply",
+    "replyPh": "Reply politely and say what you did…",
+    "publishReply": "Publish reply",
+    "replyRule": "Your reply shows publicly under the rating. You can't delete or edit a member's rating.",
+    "editReply": "Edit reply",
+    "replyAsGym": "Reply as the gym",
+    "flagTitle": "Report rating",
+    "flagBody": "What's wrong with this rating?",
+    "flag_fake": "Fake or not genuine",
+    "flag_offensive": "Offensive",
+    "flag_spam": "Ad or spam",
+    "flagged": "Thanks, we got your report and will review it.",
+    "integrityLink": "How do we keep ratings real?",
+    "integrityTitle": "Integrity policy",
+    "integrityIntro": "We want you to trust what you see in ARQ. These rules apply to everyone, partner gyms included.",
+    "integrityContact": "See something wrong? Report it with the flag on the rating, or message us from “Feedback”.",
+    "policy": [
+      {
+        "icon": "checkmark-circle-outline",
+        "title": "Ratings from real visitors",
+        "body": "You can only rate a gym after checking in there (or at a branch of the same chain). Every rating shows a “Verified visitor” badge."
+      },
+      {
+        "icon": "lock-closed-outline",
+        "title": "Gyms can't delete or edit",
+        "body": "A gym manager can't delete or edit your rating. They can only post a public reply under it."
+      },
+      {
+        "icon": "person-outline",
+        "title": "One rating per person",
+        "body": "Each user has one rating per gym and can edit or delete it any time."
+      },
+      {
+        "icon": "flag-outline",
+        "title": "Reports",
+        "body": "Anyone can report a fake or offensive rating. The ARQ team reviews reports and removes violations."
+      },
+      {
+        "icon": "cash-outline",
+        "title": "No paid ratings",
+        "body": "We don't sell ratings or rank them for money. Partnerships and ads never change rating order or numbers."
+      },
+      {
+        "icon": "megaphone-outline",
+        "title": "Ads say “Ad”",
+        "body": "Any paid content is clearly labelled “Ad”."
+      },
+      {
+        "icon": "people-outline",
+        "title": "Crowd and peak data has no names",
+        "body": "“Here now” counts people who checked in within the last 6 hours and haven't checked out. Peak times average the last 8 weeks: numbers only, no names."
+      },
+      {
+        "icon": "pricetag-outline",
+        "title": "Full price",
+        "body": "We ask gyms to show joining fees, VAT and minimum commitment, so the price you see is the price you pay."
+      },
+      {
+        "icon": "medkit-outline",
+        "title": "Your health data is yours",
+        "body": "Body, InBody, watch and food data is never used for ads, and a coach only sees it with your consent, which you can withdraw any time."
+      }
+    ],
+    "fullPriceTitle": "Full price (shown to members)",
+    "joinFee": "Joining fee (SAR)",
+    "minMonths": "Minimum commitment (months)",
+    "vatQ": "Does the price include VAT (15%)?",
+    "vat_yes": "Included",
+    "vat_no": "Not included",
+    "vat_unknown": "Not sure",
+    "terms": "Key terms",
+    "termsPh": "e.g. non-refundable, one freeze allowed…",
+    "termsShort": "Terms",
+    "fullPriceHint": "Offers that show the full price earn more trust.",
+    "fullPriceLine": "Full price {{total}} SAR",
+    "inclJoin": "incl. {{fee}} joining fee",
+    "plusVat": "+ 15% VAT",
+    "vatIncl": "VAT included",
+    "minCommit_one": "Min. 1 month commitment",
+    "minCommit_other": "Min. {{count}} months commitment",
+    "attendanceTitle": "My attendance",
+    "thisMonthRate": "Your attendance this month",
+    "visitsOfPlanned": "You went {{visits}} of {{planned}} planned days so far",
+    "monthGoal": "Month goal: {{visits}} of {{planned}}",
+    "lastMonthRate": "Last month: {{pct}}%",
+    "aboveGoal": "Above your goal, well done! 🔥",
+    "goalQ": "How many days a week do you plan to train?",
+    "goalHint": "Your rate is based on your goal, not every day of the month.",
+    "attendancePrivate": "Your attendance is private. Only you can see it."
   }
 }

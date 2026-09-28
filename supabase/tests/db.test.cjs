@@ -349,11 +349,14 @@ grant usage on schema public, auth, storage to authenticated;
   await as(B, `insert into gym_offers (gym_id, title, price_sar, months, ends_on) values ($1, 'عرض منتهي', 50, 1, current_date - 1)`, [gym.id]);
   check('expired offers hidden from users', (await as(A, 'select title from gym_offers where gym_id = $1', [gym.id])).length === 1);
   await expectErr('old price must be higher', () => as(B, `insert into gym_offers (gym_id, title, price_sar, old_price_sar) values ($1, 'غلط غلط', 100, 90)`, [gym.id]), /check constraint/);
+  // التقييم للي زاروا فقط (20260929000300): زيارات قديمة لـ C في النادي ولـ A في النرجس
+  await q(`insert into check_ins (user_id, gym_id, checked_in_at, checked_out_at) values ($1, $2, now() - interval '20 days', now() - interval '20 days' + interval '1 hour'), ($3, $4, now() - interval '20 days', now() - interval '20 days' + interval '1 hour')`, [C, gym.id, A, g2.id]);
+  await expectErr('review needs a real visit', () => as(C, `insert into gym_reviews (gym_id, user_id, rating) values ($1, $2, 4)`, [g2.id, C]), /review_needs_visit/);
   await as(A, `insert into gym_reviews (gym_id, user_id, rating, body) values ($1, $2, 5, 'أجهزة ممتازة ونظيف')`, [gym.id, A]);
   await as(C, `insert into gym_reviews (gym_id, user_id, rating, body) values ($1, $2, 3, 'زحمة وقت الذروة')`, [gym.id, C]);
   await expectErr('one review per user per gym', () => as(A, `insert into gym_reviews (gym_id, user_id, rating) values ($1, $2, 4)`, [gym.id, A]), /duplicate key/);
   await expectErr('rating 1..5 only', () => as(A, `insert into gym_reviews (gym_id, user_id, rating) values ($1, $2, 6)`, [g2.id, A]), /check constraint/);
-  await expectErr('cannot review as someone else', () => as(A, `insert into gym_reviews (gym_id, user_id, rating) values ($1, $2, 1)`, [g2.id, C]), /row-level security/);
+  await expectErr('cannot review as someone else', () => as(A, `insert into gym_reviews (gym_id, user_id, rating) values ($1, $2, 1)`, [g2.id, C]), /row-level security|review_needs_visit/);
   const dir = await as(A, 'select * from gyms_directory(24.69, 46.685)');
   const dg = dir.find(d => d.id === gym.id);
   check('directory: avg rating, count, best monthly price, distance', Number(dg.rating) === 4 && Number(dg.reviews) === 2 && Number(dg.best_monthly) === 150 && dg.distance_m < 1000 && dir[0].id === gym.id, JSON.stringify([dg.rating, dg.reviews, dg.best_monthly, Math.round(dg.distance_m)]));
