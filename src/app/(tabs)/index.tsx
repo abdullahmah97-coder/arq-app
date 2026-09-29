@@ -14,6 +14,7 @@ import { CheckInCard } from '@/components/CheckInCard';
 import { HomeClubOffers } from '@/components/clubs/HomeClubOffers';
 import { NotificationBell } from '@/components/NotificationBell';
 import { HomeNutrition } from '@/components/nutrition/HomeNutrition';
+import { HomeShortcuts } from '@/components/Shortcuts';
 import { HomeRecovery } from '@/components/recovery/HomeRecovery';
 import { PushPrompt } from '@/components/PushPrompt';
 import { HomeArrange } from '@/components/pulse/HomeArrange';
@@ -138,6 +139,7 @@ export default function Home() {
             <NT size={12} muted center>{t('health.target', { a: s.strain_target[0], b: s.strain_target[1] })} · {h.syncing ? t('health.syncing') : t(`health.source_${h.source}`)}</NT>
           ) : null}
           </>,
+    shortcuts: <HomeShortcuts />,
     monitors: <MonitorCards />,
     mission: <>
           {/* مهمة اليوم */}

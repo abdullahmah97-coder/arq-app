@@ -7,6 +7,7 @@ import { Alert, I18nManager, Pressable, View } from 'react-native';
 import { checkForAppUpdate, isBeta, versionLabel } from '@/lib/appInfo';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { MembershipEntry } from '@/components/gymops/MembershipEntry';
+import { ShortcutMenu } from '@/components/Shortcuts';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { errorKey, supabase } from '@/lib/supabase';
@@ -62,20 +63,7 @@ export default function ProfileTab() {
       <Card style={{ paddingVertical: space.xs }}>
         {owner ? <MenuItem icon="shield-checkmark-outline" label={`${t('owner.title')}${owner.reports + owner.brands ? ` · ${owner.reports + owner.brands}` : ''}`} onPress={() => router.push('/owner')} /> : null}
         {isBeta ? <MenuItem icon="chatbubble-ellipses-outline" label={t('beta.feedback')} onPress={() => router.push('/feedback')} /> : null}
-        <MenuItem icon="ribbon-outline" label={t('social.ranksTitle')} onPress={() => router.push('/ranks')} />
-        <MenuItem icon="barbell-outline" label={t('workout.history')} onPress={() => router.push('/workout/history')} />
-        <MenuItem icon="calendar-outline" label={t('trust.attendanceTitle')} onPress={() => router.push('/attendance')} />
-        <MenuItem icon="git-compare-outline" label={t('trust.compareTitle')} onPress={() => router.push('/clubs/compare')} />
-        <MenuItem icon="barbell-outline" label={t('coaching.myCoach')} onPress={() => router.push('/my-coach')} />
-        <MenuItem icon="document-text-outline" label={t('coaching.myRecord')} onPress={() => router.push('/record')} />
-        <MenuItem icon="ribbon-outline" label={t('coaching.forCoaches')} onPress={() => router.push('/coaching')} />
-        <MenuItem icon="pulse-outline" label={t('health.title')} onPress={() => router.push('/health')} />
-        <MenuItem icon="watch-outline" label={t('health.devices')} onPress={() => router.push('/devices')} />
-        <MenuItem icon="analytics-outline" label={t('profile.inbody')} onPress={() => router.push('/inbody')} />
-        <MenuItem icon="trending-down-outline" label={t('profile.progress')} onPress={() => router.push('/progress')} />
-        <MenuItem icon="people-outline" label={t('profile.friends')} onPress={() => router.push('/friends')} />
-        <MenuItem icon="create-outline" label={t('profile.edit')} onPress={() => router.push('/profile-edit')} />
-        <MenuItem icon="book-outline" label={t('profile.learn')} onPress={() => router.push('/learn/body-composition')} />
+        <ShortcutMenu />
       </Card>
 
       <Card style={{ gap: space.md }}>

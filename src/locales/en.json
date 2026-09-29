@@ -2136,7 +2136,8 @@
     "s_clubs": "Gym offers",
     "s_store": "Partner store",
     "s_rules": "How points work",
-    "s_recovery": "Recovery"
+    "s_recovery": "Recovery",
+    "s_shortcuts": "My shortcuts"
   },
   "recovery": {
     "title": "Recovery",
@@ -2287,5 +2288,13 @@
     "fromMany": "From restaurant subscriptions",
     "noMealsDay": "The restaurant hasn't scheduled meals for this day yet.",
     "pendingWith": "Your subscription request to {{name}} is awaiting a reply"
+  },
+  "shortcuts": {
+    "title": "My shortcuts",
+    "arrange": "Arrange",
+    "arrangeLong": "Long-press to arrange",
+    "arrangeTitle": "Arrange your shortcuts",
+    "arrangeHint": "Long-press and drag a shortcut to set its priority. The first 8 appear on Home; use the eye to hide ones you don't need.",
+    "a11yHint": "Long-press to arrange shortcuts"
   }
 }

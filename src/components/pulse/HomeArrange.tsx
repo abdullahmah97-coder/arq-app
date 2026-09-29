@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Animated, Modal, PanResponder, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NT } from '@/components/pulse/widgets';
-import { DEFAULT_LAYOUT, isDefaultLayout, SECTION_META, type HomeLayout, type HomeSection } from '@/lib/homeLayout';
+import { DEFAULT_LAYOUT, SECTION_META, type HomeLayout, type HomeSection } from '@/lib/homeLayout';
 import type { IconName } from '@/components/ui';
 import { brand, night, space } from '@/theme';
 
@@ -15,34 +15,37 @@ const ROW_H = 54;
 const GAP = 8;
 const STEP = ROW_H + GAP;
 
-export function HomeArrange({ visible, layout, onSave, onClose }: {
-  visible: boolean; layout: HomeLayout; onSave: (l: HomeLayout) => void; onClose: () => void;
+/** قائمة ترتيب عامة (أقسام الرئيسية، الاختصارات…): سحب بعد ضغط مطول + إخفاء/إظهار + رجوع للترتيب الأصلي */
+export function ArrangeSheet<K extends string>({ title, hint, order: initialOrder, hidden: initialHidden, defaults, meta, onSave, onClose }: {
+  title: string; hint: string; order: K[]; hidden: K[]; defaults: readonly K[];
+  meta: (k: K) => { icon: string; label: string };
+  onSave: (l: { order: K[]; hidden: K[] }) => void; onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const [order, setOrder] = useState<HomeSection[]>(layout.order);
-  const [hidden, setHidden] = useState<Set<HomeSection>>(new Set(layout.hidden));
+  const [order, setOrder] = useState<K[]>(initialOrder);
+  const [hidden, setHidden] = useState<Set<K>>(new Set(initialHidden));
   const [dragging, setDragging] = useState(false);
 
-  const toggle = (k: HomeSection) => {
+  const toggle = (k: K) => {
     Haptics.selectionAsync().catch(() => {});
     setHidden((h) => { const n = new Set(h); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   };
   const done = () => { onSave({ order, hidden: [...hidden] }); onClose(); };
-  const reset = () => { setOrder([...DEFAULT_LAYOUT.order]); setHidden(new Set()); };
-  const isDefault = isDefaultLayout({ order, hidden: [...hidden] });
+  const reset = () => { setOrder([...defaults]); setHidden(new Set()); };
+  const isDefault = !hidden.size && order.every((k, i) => k === defaults[i]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={done}>
+    <Modal visible animationType="slide" transparent onRequestClose={done}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <SafeAreaView edges={['bottom']} style={{ maxHeight: '90%', backgroundColor: night.bg2, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: space.lg }}>
           <View style={{ paddingHorizontal: space.lg, gap: 4, marginBottom: space.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <NT size={18} bold>{t('homeLayout.title')}</NT>
+              <NT size={18} bold>{title}</NT>
               <Pressable onPress={done} hitSlop={8} style={{ backgroundColor: brand.amber, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 }}>
                 <NT size={13} bold color={brand.deepGreen}>{t('homeLayout.done')}</NT>
               </Pressable>
             </View>
-            <NT size={12} muted>{t('homeLayout.hint')}</NT>
+            <NT size={12} muted>{hint}</NT>
           </View>
           <ScrollView scrollEnabled={!dragging} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}>
             <SortableList
@@ -53,14 +56,15 @@ export function HomeArrange({ visible, layout, onSave, onClose }: {
               moveDownLabel={t('homeLayout.moveDown')}
               renderRow={(k, active) => {
                 const off = hidden.has(k);
+                const m = meta(k);
                 return (
                   <View style={{
                     height: ROW_H, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, borderRadius: 16,
                     backgroundColor: active ? night.cardStrong : night.card, borderWidth: 1, borderColor: active ? brand.amber : night.line,
                   }}>
                     <Ionicons name="reorder-three" size={22} color={active ? brand.amber : night.muted} />
-                    <Ionicons name={SECTION_META[k].icon as IconName} size={18} color={off ? night.faint : brand.orange} />
-                    <NT size={14} semibold style={{ flex: 1, opacity: off ? 0.45 : 1 }} numberOfLines={1}>{t(SECTION_META[k].label)}</NT>
+                    <Ionicons name={m.icon as IconName} size={18} color={off ? night.faint : brand.orange} />
+                    <NT size={14} semibold style={{ flex: 1, opacity: off ? 0.45 : 1 }} numberOfLines={1}>{m.label}</NT>
                     <Pressable onPress={() => toggle(k)} hitSlop={10} accessibilityRole="switch" accessibilityState={{ checked: !off }}
                       accessibilityLabel={t(off ? 'homeLayout.show' : 'homeLayout.hide')}>
                       <Ionicons name={off ? 'eye-off-outline' : 'eye-outline'} size={20} color={off ? night.faint : night.text} />
@@ -79,6 +83,15 @@ export function HomeArrange({ visible, layout, onSave, onClose }: {
         </SafeAreaView>
       </View>
     </Modal>
+  );
+}
+
+/** ترتيب أقسام الرئيسية */
+export function HomeArrange({ layout, onSave, onClose }: { visible?: boolean; layout: HomeLayout; onSave: (l: HomeLayout) => void; onClose: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <ArrangeSheet<HomeSection> title={t('homeLayout.title')} hint={t('homeLayout.hint')} order={layout.order} hidden={layout.hidden}
+      defaults={DEFAULT_LAYOUT.order} meta={(k) => ({ icon: SECTION_META[k].icon, label: t(SECTION_META[k].label) })} onSave={onSave} onClose={onClose} />
   );
 }
 
