@@ -58,9 +58,9 @@ export default function Bookings() {
           {b.status === 'pending' && upcoming(b) ? <T size="xs" muted>{t('book.donePendingHint')}</T> : null}
           {upcoming(b) ? (
             <Row gap={space.sm}>
-              {b.maps_url ? <Button small style={{ flex: 1 }} variant="secondary" icon="navigate-outline" title={t('book.directions')} onPress={() => Linking.openURL(b.maps_url!).catch(() => {})} /> : null}
+              {b.maps_url ? <Button small style={{ flex: 1 }} variant="secondary" icon="navigate-outline" title={t('book.directionsShort')} onPress={() => Linking.openURL(b.maps_url!).catch(() => {})} /> : null}
               {b.phone ? <Button small style={{ flex: 1 }} variant="secondary" icon="call-outline" title={t('book.call')} onPress={() => Linking.openURL(`tel:${b.phone!.replace(/\s/g, '')}`).catch(() => {})} /> : null}
-              {Date.parse(b.starts_at) > now ? <Button small variant="ghost" icon="close" title={t('book.cancel')} onPress={() => cancel(b)} /> : null}
+              {Date.parse(b.starts_at) > now ? <Button small variant="ghost" icon="close" title={t('book.cancelShort')} onPress={() => cancel(b)} /> : null}
             </Row>
           ) : (
             <Button small variant="secondary" icon="repeat" title={t('book.again')} onPress={() => router.push({ pathname: '/book/[id]', params: { id: b.venue_id, sport: b.sport } })} />
