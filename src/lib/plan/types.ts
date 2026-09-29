@@ -65,6 +65,10 @@ export interface WeeklyPlan {
   based_on_inbody?: boolean;
   /** البرنامج الجاهز المعتمد (إن وجد) */
   program?: { id: string; name: I18nText; credit?: string };
+  /** خطتي الخاصة: المستخدم اختار الأيام والتمارين بنفسه */
+  custom?: boolean;
+  /** معرّف طلب الذكاء الاصطناعي (نلقى فيه الخطة لو انقطع الاتصال) */
+  request_id?: string;
 }
 
 export interface PlanInput {

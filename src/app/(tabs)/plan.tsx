@@ -14,9 +14,8 @@ import { ALL_EXERCISES, findExercise } from '@/three/catalog';
 import { startWorkout } from '@/lib/training';
 import { showRir } from '@/components/rir';
 import { useLocalized } from '@/lib/i18n';
-import { latestAppliedAnalysis } from '@/lib/inbody';
 import { deleteFood, effectiveTargets, estimateCarbsFat, loadFoodDay, logFood, type FoodEntry } from '@/lib/nutrition';
-import { generatePlan, savePlan } from '@/lib/plan';
+import { planKind } from '@/lib/plan';
 import type { PlanDay, PlanMeal, PlanMealDay, PlanTargets } from '@/lib/plan/types';
 import { errorKey, supabase } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
@@ -24,7 +23,7 @@ import { brand, colors, radius, space } from '@/theme';
 export default function PlanScreen() {
   const { t } = useTranslation();
   const { L } = useLocalized();
-  const { userId, plan, health, profile, refreshPlan, refreshProfile } = useUser();
+  const { userId, plan, profile, refreshProfile } = useUser();
   const zone = useHealth().scores?.zone ?? null;
   const [tab, setTab] = useState<'workouts' | 'meals'>('workouts');
   const [day, setDay] = useState(todayIndex());
@@ -45,43 +44,6 @@ export default function PlanScreen() {
     } catch (err) { Alert.alert(t(errorKey(err))); }
   };
 
-  const regenerate = async () => {
-    if (!health?.height_cm || !health.birth_year || !health.gender || !health.goal || !health.level || !health.days_per_week) {
-      return Alert.alert(t('errors.required'));
-    }
-    setBusy(true);
-    try {
-      const ib = await latestAppliedAnalysis(userId);
-      const { data: last } = await supabase.from('body_logs').select('weight_kg, photo_path')
-        .eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle();
-      const lastPhoto = await supabase.from('body_logs').select('photo_path')
-        .eq('user_id', userId).not('photo_path', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
-      const g = await generatePlan({
-        gender: health.gender,
-        age: new Date().getFullYear() - health.birth_year,
-        height_cm: Number(health.height_cm),
-        weight_kg: Number(last?.weight_kg ?? health.weight_kg),
-        goal: health.goal,
-        level: health.level,
-        days_per_week: health.days_per_week,
-        inbody: ib?.analysis ?? null,
-      }, lastPhoto.data?.photo_path ?? null);
-      await savePlan(userId, g, ib?.id ?? null);
-      await refreshPlan();
-      if (g.source === 'rules') Alert.alert(t('plan.aiFallback'));
-    } catch (e) {
-      Alert.alert(t(errorKey(e)));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const confirmRegenerate = () =>
-    Alert.alert(t('plan.regenerate'), t('plan.regenerateConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.ok'), onPress: regenerate },
-    ]);
-
   const completeToday = async () => {
     if (!plan) return;
     setBusy(true);
@@ -97,7 +59,7 @@ export default function PlanScreen() {
       <Screen>
         <H>{t('plan.title')}</H>
         <Empty text={t('home.noPlan')} icon="calendar-outline" />
-        <Button title={t('home.makePlan')} onPress={regenerate} loading={busy} />
+        <Button title={t('home.makePlan')} icon="sparkles-outline" onPress={() => router.push('/plan-new')} />
         <LibraryLink />
         <CalorieCard entries={food} targets={null} onDelete={removeFood} />
       </Screen>
@@ -105,6 +67,7 @@ export default function PlanScreen() {
   }
 
   const p = plan.data;
+  const kind = planKind(plan) ?? 'rules';
   const rawWorkout = p.days.find((d) => d.day === day);
   // تمرين اليوم يتكيّف مع جاهزيتك من الساعة (أحمر = أخف، أصفر = حجم أقل)
   const adapted = rawWorkout && day === todayIndex() ? adaptWorkout(rawWorkout, zone) : null;
@@ -117,11 +80,11 @@ export default function PlanScreen() {
         <View style={{ flex: 1 }}>
           <H>{t('plan.title')}</H>
           <Row gap={space.xs}>
-            <Ionicons name={plan.source === 'ai' ? 'sparkles' : 'document-text-outline'} size={14} color={colors.primary} />
-            <T size="xs" muted>{plan.source === 'ai' ? t('plan.aiPlan') : t('plan.rulesPlan')}</T>
+            <Ionicons name={KIND_ICON[kind]} size={14} color={colors.primary} />
+            <T size="xs" muted numberOfLines={1} style={{ flexShrink: 1 }}>{kind === 'program' && p.program ? L(p.program.name) : t(`plan.kind_${kind}`)}</T>
           </Row>
         </View>
-        <Button small title={t('plan.regenerate')} icon="refresh" variant="secondary" onPress={confirmRegenerate} loading={busy} />
+        <Button small title={t('plan.regenerate')} icon="add-circle-outline" variant="secondary" onPress={() => router.push('/plan-new')} />
       </Row>
 
       <T muted>{L(p.summary)}</T>
@@ -191,6 +154,12 @@ export default function PlanScreen() {
         })}
       </ScrollView>
 
+      {tab === 'workouts' ? (
+        <Pressable onPress={() => router.push('/plan-builder')} accessibilityRole="button" style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="create-outline" size={16} color={colors.primary} />
+          <T size="sm" semibold color={colors.primary}>{t('plan.editWorkouts')}</T>
+        </Pressable>
+      ) : null}
       {tab === 'workouts' && adapted?.reason ? (
         <Pressable onPress={() => router.push('/health')}>
           <Row style={{ backgroundColor: brand.deepGreen, borderRadius: radius.lg, padding: space.md }}>
@@ -323,6 +292,8 @@ function MealsDay({ d, today, logged, onAte }: { d: PlanMealDay; today: boolean;
     </View>
   );
 }
+
+const KIND_ICON = { ai: 'sparkles', program: 'albums-outline', custom: 'create-outline', rules: 'document-text-outline' } as const;
 
 /** مدخل مكتبة التمارين والاستشفاء */
 function LibraryLink() {

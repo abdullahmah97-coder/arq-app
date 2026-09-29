@@ -7,7 +7,7 @@ import { Button, H, Input, OptionCard, Row, Screen, Segmented, T } from '@/compo
 import { useUser } from '@/lib/auth';
 import { pickImage, type PickedImage } from '@/lib/images';
 import { ACCOUNT_ICON, ACCOUNT_TYPES, type AccountType } from '@/lib/partners';
-import { generatePlan, savePlan } from '@/lib/plan';
+import { createPlanWithFallback } from '@/lib/plan';
 import { validateInput } from '@/lib/plan/rules';
 import type { PlanInput } from '@/lib/plan/types';
 import { errorKey, supabase, uploadImage } from '@/lib/supabase';
@@ -74,8 +74,8 @@ export default function Onboarding() {
       if (photo) photoPath = await uploadImage('body', userId, photo.uri, photo.mimeType);
       await supabase.from('body_logs').insert({ user_id: userId, weight_kg: i.weight_kg, photo_path: photoPath });
 
-      const generated = await generatePlan(i, photoPath);
-      await savePlan(userId, generated);
+      // خطة بالذكاء الاصطناعي (تجهز خلال ثواني والدالة تحفظها)، ولو ما زبطت خطة قياسية على طول
+      const generated = await createPlanWithFallback(userId, i, { photoPath });
       if (generated.source === 'rules') console.log('AI fallback:', generated.aiError);
 
       const { error: pErr } = await supabase.from('profiles').update({ gym_id: gymId, onboarded: true }).eq('id', userId);

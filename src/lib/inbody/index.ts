@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { generatePlan, savePlan } from '../plan';
+import { createPlanWithFallback } from '../plan';
 import type { PlanInput } from '../plan/types';
 import { supabase, uploadImage } from '../supabase';
 import type { HealthProfile } from '../types';
@@ -120,8 +120,9 @@ export async function applyReportToPlan(userId: string, report: InBodyReport, he
     days_per_week: health?.days_per_week ?? 3,
     inbody: a,
   };
-  const g = await generatePlan(input, null);
-  const planId = await savePlan(userId, g, report.id);
+  // خطة بالذكاء الاصطناعي مبنية على التقرير (الدالة تحفظها)، ولو ما زبطت خطة قياسية
+  const g = await createPlanWithFallback(userId, input, { inbodyReportId: report.id });
+  const planId = g.planId;
   await supabase.from('inbody_reports').update({ applied: false }).eq('user_id', userId).neq('id', report.id);
   await supabase.from('inbody_reports').update({ applied: true }).eq('id', report.id);
   return { planId, source: g.source };

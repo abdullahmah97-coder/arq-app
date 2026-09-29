@@ -115,6 +115,8 @@ function RootNavigator() {
         <Stack.Screen name="workout/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="workout/history" options={{ title: t('workout.history') }} />
         <Stack.Screen name="programs" options={{ title: t('programs.title') }} />
+        <Stack.Screen name="plan-new" options={{ title: t('planNew.title') }} />
+        <Stack.Screen name="plan-builder" options={{ title: t('builder.title') }} />
         <Stack.Screen name="program/[id]" options={{ title: t('social.program') }} />
         <Stack.Screen name="program/new" options={{ title: t('social.newProgram'), presentation: 'modal' }} />
         <Stack.Screen name="tip/new" options={{ title: t('social.newTip'), presentation: 'modal' }} />

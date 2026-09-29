@@ -9,7 +9,8 @@ import { Button, Card, Row, T } from '@/components/ui';
 import { applyProgram, RIR_INFO, type Program } from '@/content/programs';
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
-import { savePlan } from '@/lib/plan';
+import { loadPlanInput, savePlan } from '@/lib/plan';
+import { generateRulesPlan } from '@/lib/plan/rules';
 import { errorKey } from '@/lib/supabase';
 import { getExercise } from '@/three/catalog';
 import { brand, colors, space } from '@/theme';
@@ -18,7 +19,7 @@ import { openHref } from '@/lib/nav';
 export function ProgramBody({ p, onAdopted }: { p: Program; onAdopted?: () => Promise<unknown> | void }) {
   const { t } = useTranslation();
   const { L, lng } = useLocalized();
-  const { userId, plan, refreshPlan } = useUser();
+  const { userId, plan, health, refreshPlan } = useUser();
   const styles = S();
   const weekdays = t('weekdaysShort', { returnObjects: true }) as string[];
   const [schedule, setSchedule] = useState<number[]>(p.schedule);
@@ -33,14 +34,19 @@ export function ProgramBody({ p, onAdopted }: { p: Program; onAdopted?: () => Pr
   });
 
   const adopt = async () => {
-    if (!plan) {
-      Alert.alert(t('programs.needPlan'));
-      return openHref('/(tabs)/plan');
-    }
     if (schedule.length !== p.daysPerWeek) return Alert.alert(t('programs.pickDays', { n: p.daysPerWeek, count: p.daysPerWeek }));
     setBusy(true);
     try {
-      await savePlan(userId, { plan: applyProgram(p, plan.data, schedule), source: plan.source });
+      // ما عندك خطة: السعرات والوجبات من الخطة القياسية (حسب ملفك)، والتمارين من البرنامج
+      let base = plan?.data ?? null;
+      let source: 'ai' | 'rules' = plan?.source ?? 'rules';
+      if (!base) {
+        const inp = await loadPlanInput(userId, health);
+        if (!inp) { Alert.alert(t('planNew.incomplete')); return; }
+        base = generateRulesPlan(inp.input);
+        source = 'rules';
+      }
+      await savePlan(userId, { plan: { ...applyProgram(p, base, schedule), custom: undefined }, source });
       await onAdopted?.();
       await refreshPlan();
       Alert.alert(t('programs.adopted'));
