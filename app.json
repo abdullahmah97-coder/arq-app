@@ -20,7 +20,8 @@
       "bundleIdentifier": "sa.arq.app",
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
-        "NSMotionUsageDescription": "لحساب خطواتك اليومية. To count your daily steps."
+        "NSMotionUsageDescription": "لحساب خطواتك اليومية. To count your daily steps.",
+        "NSAlarmKitUsageDescription": "لتشغيل منبّه الصحيان اللي تضبطه من بطاقة النوم. To ring the wake-up alarm you set on the sleep card."
       },
       "config": {
         "usesNonExemptEncryption": false

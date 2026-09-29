@@ -18,6 +18,7 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { HomeNutrition } from '@/components/nutrition/HomeNutrition';
 import { HomeShortcuts } from '@/components/Shortcuts';
 import { HomeRecovery } from '@/components/recovery/HomeRecovery';
+import { HomeSleep } from '@/components/sleep/HomeSleep';
 import { PushPrompt } from '@/components/PushPrompt';
 import { HomeArrange } from '@/components/pulse/HomeArrange';
 import { PartnerHome } from '@/components/partners/PartnerHome';
@@ -162,6 +163,7 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
             <NT size={12} muted center>{t('health.target', { a: s.strain_target[0], b: s.strain_target[1] })} · {h.syncing ? t('health.syncing') : t(`health.source_${h.source}`)}</NT>
           ) : null}
           </>,
+    sleep: <HomeSleep />,
     shortcuts: <HomeShortcuts />,
     monitors: <MonitorCards />,
     mission: <>

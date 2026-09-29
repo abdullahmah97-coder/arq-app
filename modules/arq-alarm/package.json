@@ -1,0 +1,7 @@
+{
+  "name": "arq-alarm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "منبّه الصحيان في أرك: منبّه نظام حقيقي بـ AlarmKit (iOS 26+)",
+  "main": "index.ts"
+}

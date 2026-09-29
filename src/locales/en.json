@@ -2334,7 +2334,8 @@
     "style_segments": "Segments",
     "style_diamond": "Diamond",
     "style_hexagon": "Hexagon",
-    "style_bars": "Bars"
+    "style_bars": "Bars",
+    "s_sleep": "Sleep & wake-up alarm"
   },
   "recovery": {
     "title": "Recovery",
@@ -3234,5 +3235,43 @@
     "note": "Long-press − or + to change by 5. Rolling limit: each use frees up again 24 hours later.",
     "reset": "Back to default (barcode 2, photos 25)",
     "ownerSub": "Barcode {{b}} · meal photos {{m}} a day per user"
+  },
+  "sleep": {
+    "title": "Sleep",
+    "edit": "Set",
+    "bedBy": "Go to bed at",
+    "toWake": "to wake at {{wake}} with your full sleep need ({{need}} h)",
+    "cyclesTitle": "Or sleep in full cycles (wake between cycles, feeling fresher):",
+    "cycles": "{{n}} cycles · {{h}}",
+    "ifNow": "If you sleep now, the best times to wake: {{times}}",
+    "setAlarm": "Set a wake-up alarm",
+    "sheetTitle": "Wake-up alarm & bedtime",
+    "wakeAt": "I want to wake at",
+    "earlier": "5 minutes earlier",
+    "later": "5 minutes later",
+    "stepHint": "Long-press + or − to move by half an hour",
+    "days": "Alarm days",
+    "alarm": "Ringing alarm",
+    "alarmReal": "A real alarm like the Clock app: rings even on silent, with a 9-minute snooze.",
+    "alarmNotif": "A notification with sound at wake time. The real alarm needs iOS 26.",
+    "remind": "Remind me at bedtime",
+    "remindSub": "You'll get a reminder at {{at}} to be in bed by {{bed}}.",
+    "before": "{{n}} min before",
+    "summary": "Go to bed at {{bed}} to get your sleep need ({{need}} h). Your need comes from your watch and updates daily; without a watch we use 8 hours.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Done ✅",
+    "okAlarm": "Wake-up alarm set for {{at}} ⏰ — it rings like the Clock app.",
+    "okNotif": "You'll get a notification with sound at {{at}}.",
+    "okRemind": "Bedtime reminder at {{at}}.",
+    "alarmDenied": "Alarms are turned off for ARQ, so we set a notification instead. You can allow alarms in Settings.",
+    "notifDenied": "Notifications are off for ARQ, so we can't remind you. Turn them on in Settings.",
+    "openSettings": "Open Settings",
+    "wakeTitle": "Good morning ☀️",
+    "wakeBody": "Time to get up. Your day starts now 💪",
+    "bedTitle": "Bedtime is close 🌙",
+    "bedBody": "Go to bed at {{at}} to get your sleep and wake up fresh.",
+    "stop": "Stop",
+    "snooze": "Snooze"
   }
 }

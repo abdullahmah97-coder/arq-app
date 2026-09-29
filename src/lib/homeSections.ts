@@ -1,11 +1,12 @@
 // أقسام الرئيسية وترتيبها (منطق بحت بدون واجهة، عشان يتختبر)
 import { isDefaultOrder, mergeOrder } from './orderMerge.ts';
-export const HOME_SECTIONS = ['rings', 'shortcuts', 'monitors', 'mission', 'nutrition', 'recovery', 'dashboard', 'steps', 'stats', 'checkin', 'clubs', 'store', 'rules'] as const;
+export const HOME_SECTIONS = ['rings', 'sleep', 'shortcuts', 'monitors', 'mission', 'nutrition', 'recovery', 'dashboard', 'steps', 'stats', 'checkin', 'clubs', 'store', 'rules'] as const;
 export type HomeSection = (typeof HOME_SECTIONS)[number];
 
 /** الأيقونة ومفتاح الاسم لكل قسم (لقائمة الترتيب) */
 export const SECTION_META: Record<HomeSection, { icon: string; label: string }> = {
   rings: { icon: 'pulse', label: 'homeLayout.s_rings' },
+  sleep: { icon: 'moon-outline', label: 'homeLayout.s_sleep' },
   shortcuts: { icon: 'apps-outline', label: 'homeLayout.s_shortcuts' },
   monitors: { icon: 'heart-outline', label: 'homeLayout.s_monitors' },
   mission: { icon: 'barbell-outline', label: 'homeLayout.s_mission' },
