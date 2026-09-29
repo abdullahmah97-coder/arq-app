@@ -66,8 +66,17 @@
         "expo-image-picker",
         {
           "photosPermission": "لرفع صور التقدم والمنشورات، وإرسال الصور والفيديو في المحادثة. To upload progress photos and posts, and send photos and videos in chat.",
-          "cameraPermission": "لتصوير الجسم والمنشورات، والصور والفيديو في المحادثة. To take body and post photos, and photos and videos for chat.",
+          "cameraPermission": "لتصوير وجباتك والجسم والمنشورات، ومسح باركود المنتجات لحساب السعرات، والصور والفيديو في المحادثة. To photograph meals, body and posts, scan product barcodes for calories, and take photos and videos for chat.",
           "microphonePermission": "لتسجيل الصوت مع الفيديو اللي ترسله في المحادثة. To record sound with videos you send in chat."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "لتصوير وجباتك والجسم والمنشورات، ومسح باركود المنتجات لحساب السعرات، والصور والفيديو في المحادثة. To photograph meals, body and posts, scan product barcodes for calories, and take photos and videos for chat.",
+          "microphonePermission": "لتسجيل الصوت مع الفيديو اللي ترسله في المحادثة. To record sound with videos you send in chat.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
         }
       ],
       [

@@ -106,6 +106,13 @@ export function CalorieCard({ entries, targets, onDelete }: {
       <Row gap={space.sm}>
         <Button style={{ flex: 1 }} title={t('meal.snap')} icon="camera" onPress={() => router.push({ pathname: '/food/photo', params: { auto: 'camera' } })} />
         <Button style={{ flex: 1 }} title={t('food.add')} icon="add-circle-outline" variant="secondary" onPress={() => router.push('/food/add')} />
+        {/* مسح باركود منتج معلّب */}
+        <Pressable onPress={() => router.push({ pathname: '/food/photo', params: { scan: '1' } })} accessibilityRole="button"
+          accessibilityLabel={t('meal.scanBarcode')} hitSlop={4}
+          style={({ pressed }) => ({ width: 48, alignSelf: 'stretch', minHeight: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: colors.cardAlt, opacity: pressed ? 0.85 : 1 })}>
+          <Ionicons name="barcode-outline" size={22} color={colors.text} />
+        </Pressable>
       </Row>
       <T size="xs" muted center>{t('food.approx')}</T>
     </Card>

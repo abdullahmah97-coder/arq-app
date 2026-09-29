@@ -9,6 +9,7 @@ import { alertTexts, calorieGoal, caloriesLeftAlert, DEFAULT_KCAL_ALERT, KCAL_AL
 import type { Food } from './foods';
 import { scaleFood, totals, type Macros, type MealSlot } from './math';
 
+export * from './barcode';
 export * from './calorieAlert';
 export * from './foods';
 export * from './math';

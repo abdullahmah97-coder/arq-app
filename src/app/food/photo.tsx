@@ -1,15 +1,18 @@
 // صوّر وجبتك: الذكاء الاصطناعي يتعرف على الأكل ويقدّر السعرات والبروتين والكارب والدهون، وأنت تراجع وتعدّل الكمية قبل التسجيل
+// أو امسح باركود منتج معلّب: نجيب قيمه من Open Food Facts وتختار الكمية
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { BarcodeScanner } from '@/components/nutrition/BarcodeScanner';
 import { Button, Card, Input, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
 import {
-  analyzeMeal, logFoods, pickMealPhoto, scaleItem, slotForHour, totals, type MealAnalysis, type MealPhoto, type MealSlot,
+  analyzeMeal, defaultPortion, logFood, logFoods, lookupBarcode, pickMealPhoto, portionMacros, portions, productName, scaleItem, slotForHour, totals,
+  type BarcodeProduct, type MealAnalysis, type MealPhoto, type MealSlot, type PortionKey,
 } from '@/lib/nutrition';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
@@ -21,13 +24,16 @@ const ERR: Record<string, string> = {
   file_too_large: 'meal.errTooLarge', network: 'errors.network', permission_denied: 'meal.errPermission',
 };
 
-type Phase = 'pick' | 'analyzing' | 'review' | 'error' | 'saved';
+/** عدد الحصص/العبوات للمنتج الممسوح */
+const COUNTS = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+
+type Phase = 'pick' | 'analyzing' | 'review' | 'error' | 'saved' | 'lookup' | 'product' | 'unknown';
 
 export default function MealPhotoScreen() {
   const { t } = useTranslation();
   const { lng, num } = useLocalized();
   const { userId } = useUser();
-  const { auto } = useLocalSearchParams<{ auto?: string }>();
+  const { auto, scan } = useLocalSearchParams<{ auto?: string; scan?: string }>();
   const [slot, setSlot] = useState<MealSlot>(slotForHour(new Date().getHours()));
   const [photo, setPhoto] = useState<MealPhoto | null>(null);
   const [hint, setHint] = useState('');
@@ -39,6 +45,14 @@ export default function MealPhotoScreen() {
   const [busy, setBusy] = useState(false);
   const [savedKcal, setSavedKcal] = useState(0);
   const started = useRef(false);
+  // الباركود
+  const [scanOpen, setScanOpen] = useState(false);
+  const [code, setCode] = useState<{ data: string; type: string } | null>(null);
+  const [product, setProduct] = useState<BarcodeProduct | null>(null);
+  const [lookupErr, setLookupErr] = useState<'network' | 'invalid_code' | null>(null);
+  const [portionKey, setPortionKey] = useState<PortionKey>('serving');
+  const [count, setCount] = useState(1);
+  const [mode, setMode] = useState<'photo' | 'barcode'>('photo');
 
   const run = async (p: MealPhoto, h: string) => {
     setPhase('analyzing');
@@ -50,12 +64,13 @@ export default function MealPhotoScreen() {
     setPhase('review');
   };
 
-  const take = async (source: 'camera' | 'library') => {
+  const take = async (source: 'camera' | 'library', h = hint) => {
     try {
       const p = await pickMealPhoto(source);
       if (!p) return;
+      setMode('photo');
       setPhoto(p);
-      await run(p, hint);
+      await run(p, h);
     } catch (e) {
       setErr(e instanceof Error && e.message === 'permission_denied' ? 'permission_denied' : 'ai_failed');
       setPhase('error');
@@ -65,7 +80,71 @@ export default function MealPhotoScreen() {
   // فتح الكاميرا مباشرة لما تجي من زر «صوّر وجبتك»
   useEffect(() => {
     if (auto === 'camera' && !started.current) { started.current = true; void take('camera'); }
-  }, [auto]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (scan && !started.current) { started.current = true; setScanOpen(true); }
+  }, [auto, scan]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** بعد المسح: ندوّر المنتج ونجهّز الكمية الافتراضية */
+  const lookup = async (c: { data: string; type: string }) => {
+    setMode('barcode');
+    setCode(c);
+    setPhoto(null);
+    setLookupErr(null);
+    setPhase('lookup');
+    try {
+      const p = await lookupBarcode(c.data, c.type);
+      setProduct(p);
+      const d = p ? defaultPortion(portions(p)) : null;
+      if (!p || !d) { setPhase('unknown'); return; }
+      setPortionKey(d.key);
+      setCount(1);
+      setPhase('product');
+    } catch (e) {
+      setProduct(null);
+      setLookupErr(e instanceof Error && e.message === 'invalid_code' ? 'invalid_code' : 'network');
+      setPhase('unknown');
+    }
+  };
+
+  const onScanned = (data: string, type: string) => {
+    setScanOpen(false);
+    void lookup({ data, type });
+  };
+
+  const portionList = product ? portions(product) : [];
+  const portion = portionList.find((x) => x.key === portionKey) ?? portionList[0];
+  const productMacros = portion ? portionMacros(portion, count) : null;
+  const unitLabel = t(product?.unit === 'ml' ? 'common.ml' : 'common.g');
+  const portionLabel = (key: PortionKey, amount: number | null) => {
+    const size = amount ? ` ${num(amount)} ${unitLabel}` : '';
+    return key === 'hundred' ? `${num(100)} ${unitLabel}` : `${t(key === 'serving' ? 'meal.bcServing' : 'meal.bcPackage')}${size}`;
+  };
+
+  const saveProduct = async () => {
+    if (!product || !portion || !productMacros) return;
+    setBusy(true);
+    try {
+      const name = productName(product, lng === 'ar' ? 'ar' : 'en');
+      const label = portionLabel(portion.key, portion.amount);
+      await logFood(userId, {
+        slot, name: `${name.slice(0, 78 - label.length)} · ${label}`, servings: count, source: 'barcode', ...productMacros,
+      });
+      setSavedKcal(productMacros.kcal);
+      setPhase('saved');
+    } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
+  };
+
+  const stepCount = (dir: 1 | -1) => setCount((c) => {
+    const k = COUNTS.indexOf(c);
+    return COUNTS[Math.min(COUNTS.length - 1, Math.max(0, (k < 0 ? 1 : k) + dir))];
+  });
+
+  /** المنتج مو موجود: نصوّر ملصق القيم الغذائية والذكاء الاصطناعي يقراه */
+  const photoLabel = () => {
+    const name = product ? productName(product, lng === 'ar' ? 'ar' : 'en') : '';
+    const h = t('meal.bcLabelHint', { name: name ? ` (${name})` : '' });
+    setHint(h);
+    void take('camera', h);
+  };
 
   const items = (res?.items ?? []).map((it, i) => ({ it: scaleItem(it, factor[i] ?? 1), i })).filter((x) => !removed.has(x.i));
   const sum = totals(items.map((x) => x.it));
@@ -83,7 +162,11 @@ export default function MealPhotoScreen() {
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
   };
 
-  const reset = () => { setPhoto(null); setRes(null); setErr(''); setPhase('pick'); };
+  const reset = () => { setPhoto(null); setRes(null); setErr(''); setProduct(null); setCode(null); setPhase('pick'); };
+  const again = () => {
+    reset();
+    if (mode === 'barcode') setScanOpen(true);
+  };
   const step = (i: number, dir: 1 | -1) => setFactor((f) => {
     const k = FACTORS.indexOf(f[i] ?? 1);
     const next = FACTORS[Math.min(FACTORS.length - 1, Math.max(0, k + dir))];
@@ -109,6 +192,7 @@ export default function MealPhotoScreen() {
             </Card>
             <Input label={t('meal.hintLabel')} value={hint} onChangeText={setHint} placeholder={t('meal.hintPh')} maxLength={200} />
             <Button title={t('meal.takePhoto')} icon="camera" onPress={() => take('camera')} />
+            <Button title={t('meal.scanBarcode')} icon="barcode-outline" variant="dark" onPress={() => setScanOpen(true)} />
             <Button title={t('meal.fromLibrary')} icon="images-outline" variant="secondary" onPress={() => take('library')} />
             <T size="xs" muted center>{t('meal.privacy')}</T>
           </>
@@ -193,18 +277,100 @@ export default function MealPhotoScreen() {
           </>
         ) : null}
 
+        {phase === 'lookup' ? (
+          <Card style={{ alignItems: 'center', gap: space.sm, paddingVertical: space.xl }}>
+            <ActivityIndicator color={colors.primary} />
+            <T semibold>{t('meal.bcLooking')}</T>
+            {code ? <T size="xs" muted style={{ writingDirection: 'ltr' }}>{code.data}</T> : null}
+          </Card>
+        ) : null}
+
+        {phase === 'product' && product && portion && productMacros ? (
+          <>
+            <Card style={{ gap: space.md }}>
+              <Row gap={space.md} style={{ alignItems: 'flex-start' }}>
+                {product.image ? (
+                  <Image source={{ uri: product.image }} style={{ width: 72, height: 72, borderRadius: radius.md, backgroundColor: '#fff' }} contentFit="contain" />
+                ) : (
+                  <View style={{ width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="barcode-outline" size={30} color={colors.muted} />
+                  </View>
+                )}
+                <View style={{ flex: 1, gap: 2 }}>
+                  <T semibold>{productName(product, lng === 'ar' ? 'ar' : 'en')}</T>
+                  <T size="xs" muted style={{ writingDirection: 'ltr', textAlign: lng === 'ar' ? 'right' : 'left' }}>{product.code}</T>
+                </View>
+              </Row>
+              <Row style={{ alignItems: 'baseline' }} gap={6}>
+                <T size="xxl" bold color={colors.primary}>{num(productMacros.kcal)}</T>
+                <T size="sm" muted>{t('common.kcal')}</T>
+              </Row>
+              <Row gap={space.sm}>
+                <Macro label={t('plan.protein')} v={productMacros.protein_g} color={colors.text} />
+                <Macro label={t('plan.carbs')} v={productMacros.carbs_g} color={colors.accent} />
+                <Macro label={t('plan.fat')} v={productMacros.fat_g} color={colors.muted} />
+              </Row>
+            </Card>
+
+            <T size="sm" bold muted>{t('meal.bcHowMuch')}</T>
+            {portionList.length > 1 ? (
+              <Segmented value={portion.key} onChange={(k) => { setPortionKey(k); setCount(1); }} wrap
+                options={portionList.map((x) => ({ value: x.key, label: portionLabel(x.key, x.amount) }))} />
+            ) : null}
+            <Card style={{ gap: space.sm }}>
+              <Row style={{ justifyContent: 'space-between' }}>
+                <T semibold style={{ flex: 1 }}>{portionLabel(portion.key, portion.amount)}</T>
+                <Row gap={space.sm}>
+                  <Pressable onPress={() => stepCount(-1)} hitSlop={8} style={stepBtn} accessibilityLabel={t('meal.bcLess')}><Ionicons name="remove" size={16} color={colors.text} /></Pressable>
+                  <T bold style={{ minWidth: 44, textAlign: 'center' }}>×{num(count)}</T>
+                  <Pressable onPress={() => stepCount(1)} hitSlop={8} style={stepBtn} accessibilityLabel={t('meal.bcMore')}><Ionicons name="add" size={16} color={colors.text} /></Pressable>
+                </Row>
+              </Row>
+              {portion.amount && count !== 1 ? <T size="xs" muted>{t('meal.bcTotalAmount', { n: num(Math.round(portion.amount * count)), unit: unitLabel })}</T> : null}
+            </Card>
+
+            <Segmented value={slot} onChange={setSlot} options={SLOTS.map((s) => ({ value: s, label: t(`plan.slot_${s}`) }))} />
+            <Button title={`${t('food.addTo')} ${t(`plan.slot_${slot}`)}`} icon="checkmark" onPress={saveProduct} loading={busy} />
+            <Row gap={space.sm}>
+              <Button style={{ flex: 1 }} small title={t('meal.bcAnother')} icon="barcode-outline" variant="secondary" onPress={again} />
+              <Button style={{ flex: 1 }} small title={t('meal.bcWrong')} icon="camera-outline" variant="ghost" onPress={photoLabel} />
+            </Row>
+            <T size="xs" muted center>{t('meal.bcSource')}</T>
+          </>
+        ) : null}
+
+        {phase === 'unknown' ? (
+          <Card style={{ gap: space.md }}>
+            <Row style={{ alignItems: 'flex-start' }}>
+              <Ionicons name={lookupErr === 'network' ? 'cloud-offline-outline' : 'help-circle-outline'} size={22} color={colors.primary} />
+              <T bold style={{ flex: 1 }}>
+                {t(lookupErr === 'network' ? 'errors.network' : lookupErr === 'invalid_code' ? 'meal.bcBadCode' : product ? 'meal.bcNoValues' : 'meal.bcNotFound')}
+              </T>
+            </Row>
+            {product ? <T semibold>{productName(product, lng === 'ar' ? 'ar' : 'en')}</T> : null}
+            {lookupErr !== 'network' ? <T size="sm" muted>{t('meal.bcNotFoundHint')}</T> : null}
+            {code ? <T size="xs" muted style={{ writingDirection: 'ltr', textAlign: lng === 'ar' ? 'right' : 'left' }}>{code.data}</T> : null}
+            {lookupErr === 'network' && code ? <Button title={t('meal.retry')} icon="refresh" onPress={() => void lookup(code)} /> : null}
+            {lookupErr !== 'network' ? <Button title={t('meal.bcPhotoLabel')} icon="camera" onPress={photoLabel} /> : null}
+            <Button title={t('meal.bcScanAgain')} icon="barcode-outline" variant="secondary" onPress={() => { reset(); setScanOpen(true); }} />
+            <Button title={t('meal.bcManual')} icon="create-outline" variant="ghost" onPress={() => router.replace('/food/add')} />
+          </Card>
+        ) : null}
+
         {phase === 'saved' ? (
           <Card style={{ alignItems: 'center', gap: space.sm, paddingVertical: space.xl }}>
             <Ionicons name="checkmark-circle" size={40} color={colors.success} />
             <T bold size="lg">{t('meal.saved', { kcal: num(savedKcal) })}</T>
             <T muted center>{t('meal.savedHint', { slot: t(`plan.slot_${slot}`) })}</T>
             <Row gap={space.sm} style={{ marginTop: space.sm }}>
-              <Button small title={t('meal.another')} icon="camera-outline" variant="secondary" onPress={reset} />
+              <Button small title={t(mode === 'barcode' ? 'meal.bcAnother' : 'meal.another')} icon={mode === 'barcode' ? 'barcode-outline' : 'camera-outline'}
+                variant="secondary" onPress={again} />
               <Button small title={t('meal.done')} onPress={() => router.back()} />
             </Row>
           </Card>
         ) : null}
       </Screen>
+      <BarcodeScanner visible={scanOpen} onClose={() => setScanOpen(false)} onScanned={onScanned} />
     </KeyboardAvoidingView>
   );
 }

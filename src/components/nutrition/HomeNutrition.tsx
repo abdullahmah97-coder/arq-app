@@ -123,6 +123,14 @@ export function HomeNutrition() {
           <Ionicons name="camera" size={17} color={brand.cream} />
           <NT size={13} bold color={brand.cream}>{t('meal.snap')}</NT>
         </Pressable>
+        {/* مسح باركود منتج معلّب */}
+        <Pressable onPress={() => router.push({ pathname: '/food/photo', params: { scan: '1' } })} onLongPress={longPress} delayLongPress={LONG_PRESS_MS}
+          accessibilityRole="button" accessibilityLabel={t('meal.scanBarcode')} style={({ pressed }) => ({
+            width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: night.cardStrong, borderWidth: 1, borderColor: night.line, opacity: pressed ? 0.85 : 1,
+          })}>
+          <Ionicons name="barcode-outline" size={20} color={night.text} />
+        </Pressable>
         <Pressable onPress={() => router.push('/food/add')} onLongPress={longPress} delayLongPress={LONG_PRESS_MS}
           accessibilityRole="button" accessibilityLabel={t('food.add')} style={({ pressed }) => ({
             width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
