@@ -42,8 +42,19 @@ export async function sendMessage(me: string, other: string, body: string): Prom
   return data as Message;
 }
 
-export const markRead = (me: string, other: string) =>
-  supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('recipient', me).eq('sender', other).is('read_at', null);
+/**
+ * يعلّم رسائل هالشخص كمقروءة. لازم await: طلب supabase ما ينرسل إلا لما ننتظره (then)،
+ * وقبل كانت تنادى بدون انتظار فما تنحفظ القراءة وتبقى الرسالة «غير مقروءة» للأبد.
+ */
+export async function markRead(me: string, other: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('messages').update({ read_at: new Date().toISOString() })
+      .eq('recipient', me).eq('sender', other).is('read_at', null);
+    return !error;
+  } catch {
+    return false;
+  }
+}
 
 export async function unreadCount(me: string): Promise<number> {
   const { count } = await supabase.from('messages').select('id', { count: 'exact', head: true }).eq('recipient', me).is('read_at', null);

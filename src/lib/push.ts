@@ -15,12 +15,19 @@ const TOKEN_KEY = 'push.token';
 const ASKED_KEY = 'push.askedAt';
 const ASK_AGAIN_MS = 3 * 86_400_000;
 
+// المحادثة المفتوحة الحين: رسائلها تظهر في الشاشة نفسها، فما نعرض لها شريط إشعار
+let openChat: string | null = null;
+export function setOpenChat(other: string | null) { openChat = other; }
+
 // والتطبيق مفتوح: نعرض الإشعار كشريط علوي ونحدّث الرقم.
 // نهاية الراحة: المؤقت ظاهر داخل التطبيق، فنكتفي بالصوت بدون شريط
 Notifications.setNotificationHandler({
   handleNotification: async (n) => {
-    const rest = (n.request.content.data as { kind?: unknown } | undefined)?.kind === 'rest';
-    return { shouldShowBanner: !rest, shouldShowList: !rest, shouldPlaySound: true, shouldSetBadge: !rest };
+    const data = n.request.content.data as { kind?: unknown; url?: unknown } | undefined;
+    const rest = data?.kind === 'rest';
+    const sameChat = !!openChat && data?.url === `/chat/${openChat}`;
+    const quiet = rest || sameChat;
+    return { shouldShowBanner: !quiet, shouldShowList: !quiet, shouldPlaySound: !sameChat, shouldSetBadge: !quiet };
   },
 });
 
@@ -152,6 +159,21 @@ export async function shouldOfferPush(): Promise<boolean> {
 }
 export async function snoozePushOffer() {
   await AsyncStorage.setItem(ASKED_KEY, String(Date.now())).catch(() => {});
+}
+
+/**
+ * لما تفتح محادثة: نشيل إشعاراتها من شاشة الجوال (مثل واتساب) ونحدّث رقم الأيقونة.
+ * إشعار الرسالة رابطه /chat/<المرسل>.
+ */
+export async function clearChatNotifications(other: string) {
+  if (Platform.OS === 'web') return;
+  try {
+    const shown = await Notifications.getPresentedNotificationsAsync();
+    await Promise.all(shown
+      .filter((n) => (n.request.content.data as { url?: unknown } | undefined)?.url === `/chat/${other}`)
+      .map((n) => Notifications.dismissNotificationAsync(n.request.identifier).catch(() => {})));
+  } catch { /* غير مهم */ }
+  syncAppBadge();
 }
 
 /** رقم أيقونة التطبيق = التنبيهات غير المقروءة + الرسائل غير المقروءة */

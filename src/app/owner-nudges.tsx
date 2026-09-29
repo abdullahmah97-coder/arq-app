@@ -6,11 +6,14 @@ import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Empty, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
+import { timeAgo } from '@/lib/dates';
+import { useLocalized } from '@/lib/i18n';
 import {
-  deleteNudge, fillNudge, loadNudges, NUDGE_CATEGORIES, NUDGE_VARS, nudgeStats, sampleVars, saveNudge, sendTestNudge, setNudgeActive,
+  broadcastNudge, deleteNudge, fillNudge, loadNudges, NUDGE_CATEGORIES, NUDGE_VARS, nudgeStats, sampleVars, saveNudge, sendTestNudge, setNudgeActive,
   type NudgeCategory, type NudgeDraft, type NudgeGender, type NudgeTemplate,
 } from '@/lib/nudges';
 import { isAdmin } from '@/lib/owner';
+import { errorKey } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -19,7 +22,9 @@ const VAR_KEY: Record<string, string> = { '{name}': 'var_name', '{friend}': 'var
 
 export default function OwnerNudges() {
   const { t } = useTranslation();
+  const { lng } = useLocalized();
   const [ok, setOk] = useState<boolean | null>(null);
+  const [sending, setSending] = useState<string | null>(null);
   const [rows, setRows] = useState<NudgeTemplate[]>([]);
   const [stats, setStats] = useState<Record<string, { today: number; week: number }>>({});
   const [cat, setCat] = useState<NudgeCategory>('gym');
@@ -52,6 +57,26 @@ export default function OwnerNudges() {
   };
   const test = async (r: NudgeTemplate) => {
     try { await sendTestNudge(r.id); Alert.alert(t('nudge.testSent')); } catch { Alert.alert(t('errors.generic')); }
+  };
+  // «أرسل الحين»: نعرض كم بيوصله أول، وبعد التأكيد نرسل
+  const sendNow = async (r: NudgeTemplate) => {
+    setSending(r.id);
+    let n = 0;
+    try { n = await broadcastNudge(r.id, true); }
+    catch (e) { setSending(null); Alert.alert(t(errorKey(e))); return; }
+    setSending(null);
+    const rule = t(`nudge.rule_${r.category}`);
+    if (!n) { Alert.alert(t('nudge.nobodyNow'), t('nudge.nobodyBody', { rule })); return; }
+    const who = r.gender === 'all' ? t('nudge.aud_all') : t(`nudge.g_${r.gender}`);
+    Alert.alert(t('nudge.sendNowTitle'), t('nudge.sendNowBody', { count: n, who, lang: t(`nudge.lang_${r.locale}`), rule }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('nudge.send'), onPress: async () => {
+        setSending(r.id);
+        try { const sent = await broadcastNudge(r.id); Alert.alert(t('nudge.sentNow', { count: sent })); load(); }
+        catch (e) { Alert.alert(t(errorKey(e))); }
+        finally { setSending(null); }
+      } },
+    ]);
   };
   const remove = (r: NudgeTemplate) => Alert.alert(t('nudge.deleteConfirm'), r.title, [
     { text: t('common.cancel'), style: 'cancel' },
@@ -100,6 +125,10 @@ export default function OwnerNudges() {
           </Row>
           <VarText text={r.title} bold />
           <VarText text={r.body} />
+          <Button small icon="megaphone-outline" title={t('nudge.sendNow')} loading={sending === r.id} disabled={!!sending && sending !== r.id} onPress={() => sendNow(r)} />
+          {r.last_broadcast_at ? (
+            <T size="xs" muted>{t('nudge.lastSent', { ago: timeAgo(r.last_broadcast_at, lng), count: r.last_broadcast_n ?? 0 })}</T>
+          ) : null}
           <Row gap={space.lg}>
             <Action icon="paper-plane-outline" label={t('nudge.test')} onPress={() => test(r)} />
             <Action icon="create-outline" label={t('nudge.editShort')} onPress={() => setDraft({ ...r })} />

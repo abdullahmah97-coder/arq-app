@@ -73,6 +73,7 @@ export const SERVER_CODES = new Set([
   'note_required', 'status_locked',
   'too_late', 'bad_slot', 'slot_taken', 'class_full', 'venue_unavailable', 'too_many_bookings', 'too_early', 'bad_sport',
   'bad_username', 'name_too_long', 'username_taken', 'cannot_delete_self', 'cannot_delete_admin', 'not_trainee',
+  'quiet_hours', 'nudge_not_found',
 ]);
 
 /** يحوّل رسائل أخطاء الخادم إلى مفاتيح ترجمة */

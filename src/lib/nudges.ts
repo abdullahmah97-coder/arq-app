@@ -15,6 +15,9 @@ export interface NudgeTemplate {
   body: string;
   active: boolean;
   updated_at: string;
+  /** آخر «أرسل الحين» وكم وصل */
+  last_broadcast_at?: string | null;
+  last_broadcast_n?: number | null;
 }
 
 export const NUDGE_CATEGORIES: NudgeCategory[] = ['gym', 'friend', 'streak', 'workout', 'meal'];
@@ -42,8 +45,9 @@ export function fillNudge(text: string, vars: Record<string, string>): string {
 }
 
 export async function loadNudges(): Promise<NudgeTemplate[]> {
+  // * بدل قائمة الأعمدة: لو التحديث وصل قبل قاعدة البيانات ما تنكسر الصفحة
   const { data, error } = await supabase.from('nudge_templates')
-    .select('id, category, gender, friend_gender, locale, title, body, active, updated_at')
+    .select('*')
     .order('category').order('gender').order('created_at');
   if (error) throw error;
   return (data ?? []) as NudgeTemplate[];
@@ -75,6 +79,16 @@ export async function deleteNudge(id: string) {
 export async function sendTestNudge(id: string) {
   const { error } = await supabase.rpc('send_test_nudge', { p_template: id });
   if (error) throw error;
+}
+
+/**
+ * «أرسل الحين»: dryRun = true يرجع كم متدرب بيوصله (بدون إرسال)، وبدونها يرسل ويرجع كم انرسل.
+ * الخادم يرفض من ١٠ الليل لين ٨ الصبح (quiet_hours).
+ */
+export async function broadcastNudge(id: string, dryRun = false): Promise<number> {
+  const { data, error } = await supabase.rpc('admin_broadcast_nudge', { p_template: id, p_dry_run: dryRun });
+  if (error) throw error;
+  return Number(data ?? 0);
 }
 
 export async function nudgeStats(): Promise<Record<string, { today: number; week: number }>> {

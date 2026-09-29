@@ -11,6 +11,7 @@ import { useUser } from '@/lib/auth';
 import { acceptRequest, relationTo, sendRequest, type Relation } from '@/lib/friends';
 import { useLocalized } from '@/lib/i18n';
 import { canMessage, loadThread, markRead, sendMessage, useIncoming, type Message } from '@/lib/messages';
+import { clearChatNotifications, setOpenChat } from '@/lib/push';
 import { errorKey, publicUrl, supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
 import { brand, colors, fonts, radius, space } from '@/theme';
@@ -40,16 +41,21 @@ export default function Chat() {
         relationTo(userId, other).catch(() => ({ relation: 'none' as Relation })),
       ]);
       setP((prof.data as Profile) ?? null); setMsgs(th); setAllowed(ok); setRel(r);
-      markRead(userId, other);
+      // بعد ما تنحفظ القراءة: نشيل إشعارات المحادثة من الجوال ونحدّث رقم الأيقونة
+      markRead(userId, other).then(() => clearChatNotifications(other));
     } catch {
       setAllowed((a) => a ?? false);
     }
   }, [userId, other]);
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    setOpenChat(other);
+    load();
+    return () => setOpenChat(null);
+  }, [load, other]));
   useIncoming(userId, useCallback((m: Message) => {
     if (m.sender !== other) return;
     setMsgs((x) => (x.some((y) => y.id === m.id) ? x : [...x, m]));
-    markRead(userId, other);
+    markRead(userId, other).then(() => clearChatNotifications(other));
   }, [userId, other]));
 
   const send = async () => {

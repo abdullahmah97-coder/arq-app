@@ -1254,7 +1254,7 @@
     "title": "Motivation notifications",
     "button": "Motivation notifications ✍️",
     "buttonHint": "Write messages that push members to the gym, workouts and meals — for men and women",
-    "intro": "Write the notifications that motivate members to go to the gym. Each time, the app picks a random active text matching the member's gender and language. At most 3 a day per person, only between 8 AM and 10 PM.",
+    "intro": "Write the notifications that motivate members to go to the gym. Active texts go out automatically at their time — there's no publish step: each time the app picks a random active text matching the member's gender and language. Want one out right now? Tap “Send now” under the text. At most 3 a day per person, only between 8 AM and 10 PM.",
     "cat_gym": "Gym",
     "cat_friend": "Friend beat you",
     "cat_streak": "Streak",
@@ -1303,7 +1303,23 @@
     "test": "Send to me",
     "testSent": "Sent to you ✅ Check the bell 🔔",
     "empty": "No texts here yet. Add the first one 👆",
-    "tooShort": "Write a title and a message (at least 3 characters)"
+    "tooShort": "Write a title and a message (at least 3 characters)",
+    "sendNow": "Send now",
+    "send": "Send",
+    "sendNowTitle": "Send it now?",
+    "sendNowBody": "It will reach {{count}} members now ({{who}} · {{lang}}).\n{{rule}}\n\nEach member gets one notification of this type per day, so they won't get another one of this type today.",
+    "sentNow": "Sent to {{count}} members ✅",
+    "nobodyNow": "Nobody fits right now",
+    "nobodyBody": "{{rule}}\n\nEveryone who fits may already have had one of this type today (one a day), hit 3 today, or turned motivation off in settings. Try tomorrow or pick a text of another type.",
+    "rule_gym": "“Gym” goes to members who haven't checked in today (and it isn't a rest day in their plan).",
+    "rule_friend": "“Friend beat you” goes to members who haven't checked in today while a friend has.",
+    "rule_streak": "“Streak” goes to members with a 2+ day streak who haven't checked in today.",
+    "rule_workout": "“Workout” goes to members whose plan has a workout today that they haven't started.",
+    "rule_meal": "“Meals” goes to members who track food and haven't logged anything today.",
+    "aud_all": "men and women",
+    "lang_ar": "Arabic",
+    "lang_en": "English",
+    "lastSent": "Last sent: {{ago}} · reached {{count}}"
   },
   "insight": {
     "myDashboard": "My dashboard",
@@ -1727,7 +1743,9 @@
     "username_taken": "That username is taken",
     "cannot_delete_self": "You can't delete your own account here",
     "cannot_delete_admin": "Admin accounts can't be deleted here",
-    "not_trainee": "This is a partner account. Manage it from “Manage partners”"
+    "not_trainee": "This is a partner account. Manage it from “Manage partners”",
+    "quiet_hours": "Sending to members is allowed 8 AM–10 PM (Riyadh time) so we don't disturb them. You can still send it to yourself now with “Send to me”.",
+    "nudge_not_found": "This text was deleted. Refresh the page."
   },
   "trust": {
     "liveNow_one": "1 person here now",
