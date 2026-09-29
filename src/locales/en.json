@@ -1172,7 +1172,10 @@
     "cat_nuts": "Nuts & fats",
     "cat_drinks": "Drinks",
     "cat_sweets": "Sweets & snacks",
-    "cat_fast": "Fast food"
+    "cat_fast": "Fast food",
+    "kcalAlertOn": "Alerts you at {{n}} kcal left",
+    "kcalAlertOff": "Calorie alert off",
+    "kcalAlertA11y": "Turn the calorie alert on or off"
   },
   "notif": {
     "title": "Notifications",
@@ -2824,5 +2827,24 @@
     "err_range": "The end date must be on or after the start date",
     "err_url": "The link must start with https://",
     "previewLabel": "How users will see it"
+  },
+  "kcalAlert": {
+    "title": "Calorie alert",
+    "intro": "When a user logs food and has this many calories or fewer left for the day, they get one alert that day. Users can switch it off from the calories card.",
+    "enabled": "Alert on",
+    "enabledHint": "When off, nobody gets it",
+    "threshold": "Alert at (kcal left)",
+    "thresholdHint": "50 to 500. Default 200",
+    "textAr": "Arabic text",
+    "textEn": "English text (optional)",
+    "titleLabel": "Title",
+    "bodyLabel": "Message",
+    "placeholders": "You can use: {n} = kcal left, {eaten} = eaten so far, {goal} = daily target",
+    "preview": "Preview (target {{goal}}, eaten {{eaten}})",
+    "reset": "Restore the default text",
+    "err_threshold": "The number must be between 50 and 500",
+    "err_text": "Enter the Arabic title and message",
+    "ownerSubOn": "Alerts at {{n}} kcal left · edit the text",
+    "ownerSubOff": "Off for all users"
   }
 }

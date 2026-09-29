@@ -21,6 +21,7 @@ import { loadOffers, type Offer } from '@/lib/clubs';
 import { listLaunchAds, type LaunchAdRow } from '@/lib/launchAds';
 import { adState } from '@/lib/launchAdsCore';
 import { listAllEvents, nextHighlight, upcomingEvents, type LocalEvent } from '@/lib/localEvents';
+import { loadCalorieAlertConfig, type CalorieAlertConfig } from '@/lib/nutrition';
 import { KIND_ICON, PARTNER_KINDS, partnerOverview, type Overview, type PartnerKind } from '@/lib/partners';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
@@ -40,12 +41,14 @@ export default function Owner() {
   const [shot, setShot] = useState<string | null>(null);
   const [ads, setAds] = useState<LaunchAdRow[]>([]);
   const [events, setEvents] = useState<LocalEvent[]>([]);
+  const [kcal, setKcal] = useState<CalorieAlertConfig | null>(null);
 
   const load = useCallback(async () => {
     const admin = await isAdmin();
     setOk(admin);
     if (!admin) return;
     // كل جزء يتحمّل لحاله: لو تعطّل واحد تبقى باقي اللوحة شغالة
+    loadCalorieAlertConfig(true).then(setKcal).catch(() => {});
     const [r, b, o, v, a, ev] = await Promise.all([
       loadReports().catch(() => [] as Report[]), loadBrandRequests().catch(() => [] as Brand[]), loadOffers().catch(() => [] as Offer[]),
       partnerOverview().catch(() => ({})), listLaunchAds().catch(() => [] as LaunchAdRow[]), listAllEvents().catch(() => [] as LocalEvent[]),
@@ -86,6 +89,9 @@ export default function Owner() {
           ? t('events.adminSub', { count: shownEvents.length, name: lng === 'en' && homeEvent.title_en ? homeEvent.title_en : homeEvent.title })
           : t('events.adminSubCount', { count: shownEvents.length })}
         onPress={() => router.push('/owner-events')} />
+      <OwnerLink icon="nutrition" title={t('kcalAlert.title')}
+        sub={kcal && !kcal.enabled ? t('kcalAlert.ownerSubOff') : t('kcalAlert.ownerSubOn', { n: kcal?.threshold ?? 200 })}
+        onPress={() => router.push('/owner-calorie-alert')} />
 
       {/* طلبات الموافقة: ما يظهر أي شريك إلا بعد موافقتك */}
       <T size="lg" bold>{t('partners.approvalsTitle')}{pendingAll ? ` (${pendingAll})` : ''}</T>

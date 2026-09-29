@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { setCalorieGoal } from './nutrition/calorieAlert';
 import { supabase } from './supabase';
 import type { HealthProfile, Profile } from './types';
 import type { WeeklyPlan } from './plan/types';
@@ -67,6 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     Promise.all([refreshProfile(), refreshPlan()]).finally(() => setLoading(false));
   }, [uid, refreshProfile, refreshPlan]);
+
+  // هدف السعرات لتنبيه «باقي لك ٢٠٠ سعرة» بعد تسجيل الأكل
+  useEffect(() => { setCalorieGoal(plan?.data.targets?.calories ?? null); }, [plan]);
 
   return (
     <Ctx.Provider value={{ session, loading, profile, health, plan, refreshProfile, refreshPlan }}>

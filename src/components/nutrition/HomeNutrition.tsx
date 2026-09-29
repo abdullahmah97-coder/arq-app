@@ -9,7 +9,7 @@ import { NCard, NT, Num } from '@/components/pulse/widgets';
 import { useUser } from '@/lib/auth';
 import { LONG_PRESS_MS, useHomeLongPress } from '@/lib/homeLayout';
 import { useLocalized } from '@/lib/i18n';
-import { loadFoodDay, totals, type FoodEntry } from '@/lib/nutrition';
+import { kcalAlertOn, loadCalorieAlertConfig, loadFoodDay, setKcalAlertOn, totals, type CalorieAlertConfig, type FoodEntry } from '@/lib/nutrition';
 import { brand, night, pulse } from '@/theme';
 
 export function HomeNutrition() {
@@ -18,7 +18,15 @@ export function HomeNutrition() {
   const { userId, plan } = useUser();
   const longPress = useHomeLongPress();
   const [food, setFood] = useState<FoodEntry[]>([]);
-  useFocusEffect(useCallback(() => { loadFoodDay(userId).then(setFood).catch(() => {}); }, [userId]));
+  // زر تنبيه «باقي لك ٢٠٠ سعرة» (الرقم والنص من لوحة إدارة التطبيق)
+  const [cfg, setCfg] = useState<CalorieAlertConfig | null>(null);
+  const [alertOn, setAlertOn] = useState(true);
+  useFocusEffect(useCallback(() => {
+    loadFoodDay(userId).then(setFood).catch(() => {});
+    loadCalorieAlertConfig().then(setCfg).catch(() => {});
+    kcalAlertOn().then(setAlertOn);
+  }, [userId]));
+  const toggleAlert = () => { const v = !alertOn; setAlertOn(v); setKcalAlertOn(v); };
 
   const sum = totals(food);
   const tg = plan?.data.targets ?? null;
@@ -59,6 +67,17 @@ export function HomeNutrition() {
           </View>
         ))}
       </View>
+      {cfg?.enabled && goal ? (
+        <Pressable onPress={toggleAlert} onLongPress={longPress} delayLongPress={LONG_PRESS_MS}
+          accessibilityRole="switch" accessibilityState={{ checked: alertOn }} accessibilityLabel={t('food.kcalAlertA11y')}
+          style={({ pressed }) => ({
+            flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+            borderWidth: 1, borderColor: alertOn ? brand.amber : night.line, backgroundColor: alertOn ? 'rgba(254,169,79,0.12)' : 'transparent', opacity: pressed ? 0.8 : 1,
+          })}>
+          <Ionicons name={alertOn ? 'notifications' : 'notifications-off-outline'} size={15} color={alertOn ? brand.amber : night.muted} />
+          <NT size={12} semibold color={alertOn ? brand.amber : night.muted}>{alertOn ? t('food.kcalAlertOn', { n: num(cfg.threshold) }) : t('food.kcalAlertOff')}</NT>
+        </Pressable>
+      ) : null}
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Pressable onPress={() => router.push({ pathname: '/food/photo', params: { auto: 'camera' } })} onLongPress={longPress} delayLongPress={LONG_PRESS_MS}
           accessibilityRole="button" style={({ pressed }) => ({
