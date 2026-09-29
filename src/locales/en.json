@@ -2248,7 +2248,7 @@
     "errFailed": "We couldn't analyse the photo. Please try again.",
     "scanBarcode": "Scan a product barcode",
     "bcTorch": "Flash",
-    "bcAim": "Point the camera at the barcode and keep it inside the frame",
+    "bcAim": "Keep the barcode inside the frame",
     "bcTypeInstead": "Type the barcode number",
     "bcTypeTitle": "Barcode number",
     "bcTypeHint": "The digits printed under the barcode (8, 12 or 13 digits)",
@@ -2268,13 +2268,24 @@
     "bcAnother": "Scan another",
     "bcWrong": "Photo the label",
     "bcSource": "Values from Open Food Facts (open database). Check the label if you need more accuracy.",
-    "bcNotFound": "We couldn't find this product",
+    "bcNotFound": "We couldn't find this product, even with AI search",
     "bcNoValues": "Found the product, but it has no nutrition values",
     "bcNotFoundHint": "Take a photo of the nutrition label and we'll work it out, or add it manually.",
     "bcPhotoLabel": "Photo the nutrition label",
     "bcScanAgain": "Scan again",
     "bcLabelHint": "Nutrition facts label of a packaged product{{name}}: count one serving from the printed values",
-    "bcManual": "Add it manually"
+    "bcManual": "Add it manually",
+    "bcTypeShort": "Type number",
+    "bcDistance": "Hold the phone a little further away (about 20 cm) until the barcode is sharp; it reads it automatically",
+    "bcZoom": "Camera zoom",
+    "bcSearchingAi": "Not in the open database. Searching with AI…",
+    "bcSearchingAiHint": "Looking the barcode up on store and brand sites. This can take up to 20 seconds.",
+    "bcAiSource": "Found by AI web search ({{conf}}). Compare the numbers with the label before relying on them.",
+    "bcSourceLink": "Source: {{site}}",
+    "bcAiLimit": "You've reached today's AI search limit. Try tomorrow, or photo the label.",
+    "bcAiLeft_zero": "No AI searches left today",
+    "bcAiLeft_one": "1 AI search left today",
+    "bcAiLeft_other": "{{count}} AI searches left today"
   },
   "homeLayout": {
     "title": "Arrange home",
@@ -3184,5 +3195,20 @@
     "ownerSub_one": "1 trainee",
     "ownerSub_other": "{{count}} trainees",
     "ownerSubNew": "{{n}} new this week"
+  },
+  "aiLimits": {
+    "title": "AI limits",
+    "intro": "How many times a day each user can use AI. Changes apply to everyone right away.",
+    "barcode_per_day": "AI barcode search",
+    "barcode_per_day_hint": "When a product isn't in the open database we search the web for it. Products already found are free and don't count.",
+    "meal_photos_per_day": "Meal photo analysis",
+    "meal_photos_per_day_hint": "Each meal photo analysed by AI counts once.",
+    "perDay": "{{n}} a day per user",
+    "off": "Off (zero)",
+    "less": "Less",
+    "more": "More",
+    "note": "Long-press − or + to change by 5. Rolling limit: each use frees up again 24 hours later.",
+    "reset": "Back to default (barcode 2, photos 25)",
+    "ownerSub": "Barcode {{b}} · meal photos {{m}} a day per user"
   }
 }

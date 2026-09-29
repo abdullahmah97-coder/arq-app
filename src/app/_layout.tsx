@@ -156,6 +156,7 @@ function RootNavigator() {
         <Stack.Screen name="owner-events" options={{ title: t('events.title') }} />
         <Stack.Screen name="owner-event" options={{ title: t('events.new'), presentation: 'modal' }} />
         <Stack.Screen name="owner-calorie-alert" options={{ title: t('kcalAlert.title') }} />
+        <Stack.Screen name="owner-ai-limits" options={{ title: t('aiLimits.title') }} />
         <Stack.Screen name="owner-users" options={{ title: t('adminUsers.title') }} />
         <Stack.Screen name="book/index" options={{ title: t('book.title') }} />
         <Stack.Screen name="book/[id]" options={{ title: '' }} />

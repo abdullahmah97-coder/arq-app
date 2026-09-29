@@ -10,6 +10,7 @@ import type { Food } from './foods';
 import { scaleFood, totals, type Macros, type MealSlot } from './math';
 
 export * from './barcode';
+export * from './barcodeAi';
 export * from './calorieAlert';
 export * from './foods';
 export * from './math';

@@ -23,6 +23,7 @@ import { listLaunchAds, type LaunchAdRow } from '@/lib/launchAds';
 import { adState } from '@/lib/launchAdsCore';
 import { listAllEvents, nextHighlight, upcomingEvents, type LocalEvent } from '@/lib/localEvents';
 import { loadCalorieAlertConfig, type CalorieAlertConfig } from '@/lib/nutrition';
+import { loadAiLimits, type AiLimits } from '@/lib/aiLimits';
 import { adminUserStats, type AdminUserStats } from '@/lib/adminUsers';
 import { KIND_ICON, PARTNER_KINDS, partnerOverview, type Overview, type PartnerKind } from '@/lib/partners';
 import { errorKey } from '@/lib/supabase';
@@ -44,6 +45,7 @@ export default function Owner() {
   const [ads, setAds] = useState<LaunchAdRow[]>([]);
   const [events, setEvents] = useState<LocalEvent[]>([]);
   const [kcal, setKcal] = useState<CalorieAlertConfig | null>(null);
+  const [aiLim, setAiLim] = useState<AiLimits | null>(null);
   const [users, setUsers] = useState<AdminUserStats | null>(null);
 
   const load = useCallback(async () => {
@@ -52,6 +54,7 @@ export default function Owner() {
     if (!admin) return;
     // كل جزء يتحمّل لحاله: لو تعطّل واحد تبقى باقي اللوحة شغالة
     loadCalorieAlertConfig(true).then(setKcal).catch(() => {});
+    loadAiLimits().then(setAiLim).catch(() => {});
     adminUserStats().then(setUsers).catch(() => {});
     const [r, b, o, v, a, ev] = await Promise.all([
       loadReports().catch(() => [] as Report[]), loadBrandRequests().catch(() => [] as Brand[]), loadOffers().catch(() => [] as Offer[]),
@@ -96,6 +99,9 @@ export default function Owner() {
       <OwnerLink icon="nutrition" title={t('kcalAlert.title')}
         sub={kcal && !kcal.enabled ? t('kcalAlert.ownerSubOff') : t('kcalAlert.ownerSubOn', { n: kcal?.threshold ?? 200 })}
         onPress={() => router.push('/owner-calorie-alert')} />
+      <OwnerLink icon="sparkles" title={t('aiLimits.title')}
+        sub={aiLim ? t('aiLimits.ownerSub', { b: aiLim.barcode_per_day, m: aiLim.meal_photos_per_day }) : t('aiLimits.intro')}
+        onPress={() => router.push('/owner-ai-limits')} />
 
       {/* المتدربين: العدد والإيميلات والتعديل والحذف */}
       <OwnerLink icon="people" title={t('adminUsers.title')}

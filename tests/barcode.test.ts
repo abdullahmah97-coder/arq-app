@@ -1,5 +1,5 @@
 import {
-  barcodeCandidates, defaultPortion, parseOffProduct, portionMacros, portions, productName, upcEtoA, validGtin,
+  barcodeCandidates, canonicalBarcode, defaultPortion, fromAiLookup, parseOffProduct, portionMacros, portions, productName, siteName, upcEtoA, validGtin,
 } from '../src/lib/nutrition/barcode.ts';
 
 let failed = 0;
@@ -66,5 +66,18 @@ const litre = parseOffProduct({ status: 1, product: { product_name: 'Milk', quan
 ok(litre.unit === 'ml', '«1 L» is a liquid');
 const arabicMl = parseOffProduct({ status: 1, product: { product_name: 'لبن', quantity: '200 مل', nutriments: { 'energy-kcal_100g': 40 } } }, '1')!;
 ok(arabicMl.unit === 'ml', '«200 مل» is a liquid');
+
+// ---- رد بحث الذكاء الاصطناعي
+const ai = fromAiLookup('6281234567895', { found: true, confidence: 'high', source_url: 'https://www.carrefourksa.com/p/123',
+  product: { name_ar: 'لبن كامل الدسم', name_en: 'Full Fat Laban', brand: 'Test', unit: 'ml', servingSize: 180, packageSize: 180,
+    per100: { kcal: 60, protein_g: 3.1, carbs_g: 4.6, fat_g: 3.2 }, perServing: null } })!;
+ok(!!ai && ai.source === 'ai' && ai.confidence === 'high' && ai.unit === 'ml' && ai.per100!.kcal === 60, 'AI result becomes a product');
+ok(defaultPortion(portions(ai))!.key === 'serving' && portions(ai)[0].macros.kcal === 108, 'AI product portions work (180 ml laban)');
+ok(siteName(ai.sourceUrl) === 'carrefourksa.com' && siteName('javascript:x') === null && siteName(null) === null, 'site name from the source link');
+ok(fromAiLookup('1', { found: false }) === null, 'AI not found → null');
+ok(fromAiLookup('1', { found: true, product: { name_en: 'X', per100: { kcal: 3000 } } }) === null, 'AI impossible values → null');
+const bad = fromAiLookup('1', { found: true, confidence: 'sure', source_url: 'http://x.com', product: { name_en: 'Bar', perServing: { kcal: 200, protein_g: 20 } } })!;
+ok(bad.confidence === 'low' && bad.sourceUrl === null && portions(bad)[0].macros.kcal === 200, 'unknown confidence → low, http link dropped');
+ok(canonicalBarcode('04252614', 'upc_e') === '042100005264' && canonicalBarcode('3017620422003') === '3017620422003' && canonicalBarcode('123') === null, 'canonical code for the AI search');
 
 console.log(failed ? `${failed} FAILED` : 'all barcode checks passed');

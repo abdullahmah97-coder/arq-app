@@ -19,6 +19,11 @@ export interface BarcodeProduct {
   servingSize: number | null;
   /** حجم العبوة كاملة بالجرام/مل */
   packageSize: number | null;
+  /** من وين جات القيم: Open Food Facts أو بحث الذكاء الاصطناعي */
+  source?: 'off' | 'ai';
+  confidence?: 'high' | 'medium' | 'low';
+  /** الصفحة اللي أخذ منها الذكاء الاصطناعي القيم */
+  sourceUrl?: string | null;
 }
 
 export type PortionKey = 'serving' | 'package' | 'hundred';
@@ -121,8 +126,46 @@ export function parseOffProduct(json: any, code: string): BarcodeProduct | null 
     perServing,
     servingSize: serving && serving > 0 && serving <= 2000 ? serving : null,
     packageSize: pkg && pkg > 0 && pkg <= 10000 ? pkg : null,
+    source: 'off',
   };
 }
+
+/** رد دالة barcode-lookup (بحث الذكاء الاصطناعي) ← منتج نعرضه. نعيد الفحص هنا بعد الخادم احتياط */
+export function fromAiLookup(code: string, res: any): BarcodeProduct | null {
+  const p = res?.found === true ? res.product : null;
+  if (!p || typeof p !== 'object') return null;
+  const m = (v: any, per100: boolean) => (v && typeof v === 'object'
+    ? macrosFrom({ [`energy-kcal${per100 ? '_100g' : '_serving'}`]: v.kcal, [`proteins${per100 ? '_100g' : '_serving'}`]: v.protein_g,
+      [`carbohydrates${per100 ? '_100g' : '_serving'}`]: v.carbs_g, [`fat${per100 ? '_100g' : '_serving'}`]: v.fat_g }, per100 ? '_100g' : '_serving', per100)
+    : null);
+  const per100 = m(p.per100, true);
+  const perServing = m(p.perServing, false);
+  const name_ar = clean(p.name_ar);
+  const name_en = clean(p.name_en);
+  if ((!per100 && !perServing) || (!name_ar && !name_en)) return null;
+  const serving = numOf(p.servingSize);
+  const pkg = numOf(p.packageSize);
+  const url = typeof res.source_url === 'string' && /^https:\/\/\S+$/.test(res.source_url) ? res.source_url : null;
+  return {
+    code, name_ar, name_en, brand: clean(p.brand, 40), image: null,
+    unit: p.unit === 'ml' ? 'ml' : 'g',
+    per100, perServing,
+    servingSize: serving && serving > 0 && serving <= 2000 ? serving : null,
+    packageSize: pkg && pkg > 0 && pkg <= 10000 ? pkg : null,
+    source: 'ai',
+    confidence: ['high', 'medium', 'low'].includes(res.confidence) ? res.confidence : 'low',
+    sourceUrl: url,
+  };
+}
+
+/** اسم الموقع من الرابط (للعرض تحت المنتج) */
+export const siteName = (url?: string | null) => {
+  const m = url?.match(/^https:\/\/(?:www\.)?([^/?#]+)/i);
+  return m ? m[1].toLowerCase() : null;
+};
+
+/** أول صيغة صحيحة للرقم (UPC-E يتحول لـ UPC-A) عشان نرسلها للبحث */
+export const canonicalBarcode = (raw: string, type = '') => barcodeCandidates(raw, type).find(validGtin) ?? null;
 
 const scale = (m: Macros, f: number): Macros =>
   ({ kcal: Math.round(m.kcal * f), protein_g: r1(m.protein_g * f), carbs_g: r1(m.carbs_g * f), fat_g: r1(m.fat_g * f) });

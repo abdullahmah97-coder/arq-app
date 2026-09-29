@@ -1,4 +1,5 @@
-// ماسح باركود المنتجات: كاميرا بملء الشاشة مع إطار، فلاش، وكتابة الرقم يدوي لو الكاميرا ما قرته
+// ماسح باركود المنتجات: كاميرا مع إطار، فلاش، وكتابة الرقم يدوي لو الكاميرا ما قرته.
+// الخروج سهل: زر «إغلاق» واضح فوق وتحت (قريب من الإبهام)، وسحب الصفحة لتحت في الآيفون، وزر الرجوع في أندرويد.
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -12,15 +13,24 @@ import { brand, radius, space } from '@/theme';
 
 /** باركود المنتجات الغذائية فقط (مو QR) */
 const TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e'] as const;
-const FRAME_W = 280;
-const FRAME_H = 170;
+const FRAME_W = 290;
+const FRAME_H = 180;
 const DIM = 'rgba(0,0,0,0.55)';
+/**
+ * تقريب ٢× تقريباً: الكاميرا الرئيسية في آيفون برو (١٣ وأحدث) ما تركّز أقرب من ~٢٠ سم،
+ * فلو قرّبت الجوال من الباركود يطلع مغبّش وما ينقرا. مع التقريب تمسك الجوال أبعد والباركود واضح وكبير.
+ * (expo-camera في الآيفون: العامل = أقصى تقريب ^ القيمة، فـ 0.14 ≈ ٢× بأغلب الأجهزة)
+ */
+const ZOOM_2X = 0.14;
+/** أندرويد يحسب التقريب بطريقة ثانية (نسبة من أقصى تقريب، يوصل ١٠٠× بعض الأجهزة) وكاميراته تركّز من قريب، فنخليه ١× */
+const CAN_ZOOM = Platform.OS === 'ios';
 
 type Props = { visible: boolean; onClose: () => void; onScanned: (code: string, type: string) => void };
 
 export function BarcodeScanner({ visible, onClose, onScanned }: Props) {
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose} supportedOrientations={['portrait']}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={onClose}
+      supportedOrientations={['portrait']}>
       {/* المحتوى يتركّب من جديد كل مرة ينفتح (يرجع الفلاش والكتابة لوضعهم الأول) */}
       {visible ? <ScannerBody onClose={onClose} onScanned={onScanned} /> : <View style={{ flex: 1, backgroundColor: '#000' }} />}
     </Modal>
@@ -31,6 +41,7 @@ function ScannerBody({ onClose, onScanned }: Omit<Props, 'visible'>) {
   const { t } = useTranslation();
   const [perm, requestPerm] = useCameraPermissions();
   const [torch, setTorch] = useState(false);
+  const [zoomed, setZoomed] = useState(CAN_ZOOM);
   const [typing, setTyping] = useState(false);
   const [manual, setManual] = useState('');
   const [manualBad, setManualBad] = useState(false);
@@ -70,7 +81,7 @@ function ScannerBody({ onClose, onScanned }: Omit<Props, 'visible'>) {
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       {granted && !typing ? (
-        <CameraView style={StyleSheet.absoluteFill} facing="back" enableTorch={torch}
+        <CameraView style={StyleSheet.absoluteFill} facing="back" enableTorch={torch} zoom={CAN_ZOOM && zoomed ? ZOOM_2X : 0}
           barcodeScannerSettings={{ barcodeTypes: [...TYPES] }} onBarcodeScanned={locked ? undefined : onBarcode} />
       ) : null}
 
@@ -88,10 +99,24 @@ function ScannerBody({ onClose, onScanned }: Omit<Props, 'visible'>) {
       ) : null}
 
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: space.lg }}>
-          <RoundBtn icon="close" label={t('common.close')} onPress={onClose} />
+        {/* مقبض السحب: اسحب لتحت وتطلع (آيفون) */}
+        {Platform.OS === 'ios' ? <View style={{ alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.45)', marginTop: space.sm }} /> : null}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: space.lg, paddingVertical: space.md }}>
+          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('common.close')}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, paddingHorizontal: 16, borderRadius: 22,
+              backgroundColor: 'rgba(0,0,0,0.65)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', opacity: pressed ? 0.8 : 1 })}>
+            <Ionicons name="close" size={22} color="#fff" />
+            <T semibold color="#fff">{t('common.close')}</T>
+          </Pressable>
           {granted && !typing ? (
-            <RoundBtn icon={torch ? 'flash' : 'flash-outline'} label={t('meal.bcTorch')} active={torch} onPress={() => setTorch((v) => !v)} />
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              {CAN_ZOOM ? <Pressable onPress={() => setZoomed((v) => !v)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('meal.bcZoom')}
+                style={({ pressed }) => ({ minWidth: 44, height: 44, paddingHorizontal: 10, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.65)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', opacity: pressed ? 0.8 : 1 })}>
+                <T bold color="#fff" style={{ writingDirection: 'ltr' }}>{zoomed ? '2×' : '1×'}</T>
+              </Pressable> : null}
+              <RoundBtn icon={torch ? 'flash' : 'flash-outline'} label={t('meal.bcTorch')} active={torch} onPress={() => setTorch((v) => !v)} />
+            </View>
           ) : null}
         </View>
 
@@ -125,10 +150,19 @@ function ScannerBody({ onClose, onScanned }: Omit<Props, 'visible'>) {
             ) : null}
             {granted ? (
               <View style={{ alignItems: 'center', marginBottom: space.lg }}>
-                {locked ? <ActivityIndicator color={brand.cream} /> : <T semibold center color={brand.cream}>{t('meal.bcAim')}</T>}
+                {locked ? <ActivityIndicator color={brand.cream} /> : (
+                  <View style={{ gap: 4 }}>
+                    <T semibold center color={brand.cream}>{t('meal.bcAim')}</T>
+                    <T size="sm" center color="rgba(248,237,218,0.8)">{t('meal.bcDistance')}</T>
+                  </View>
+                )}
               </View>
             ) : null}
-            <Button title={t('meal.bcTypeInstead')} icon="keypad-outline" variant="secondary" onPress={() => setTyping(true)} />
+            {/* تحت قريب من الإبهام: اكتب الرقم أو اطلع */}
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              <Button style={{ flex: 1 }} title={t('meal.bcTypeShort')} icon="keypad-outline" variant="secondary" onPress={() => setTyping(true)} />
+              <Button style={{ flex: 1 }} title={t('common.close')} icon="close" variant="dark" onPress={onClose} />
+            </View>
           </View>
         )}
       </SafeAreaView>
@@ -139,7 +173,8 @@ function ScannerBody({ onClose, onScanned }: Omit<Props, 'visible'>) {
 function RoundBtn({ icon, label, onPress, active }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; active?: boolean }) {
   return (
     <Pressable onPress={onPress} hitSlop={10} accessibilityRole="button" accessibilityLabel={label}
-      style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: active ? brand.orange : 'rgba(255,255,255,0.18)' }}>
+      style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: active ? brand.orange : 'rgba(0,0,0,0.65)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' }}>
       <Ionicons name={icon} size={22} color="#fff" />
     </Pressable>
   );

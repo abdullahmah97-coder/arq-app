@@ -5,14 +5,14 @@ import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, View } from 'react-native';
 import { BarcodeScanner } from '@/components/nutrition/BarcodeScanner';
 import { Button, Card, Input, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
 import {
-  analyzeMeal, defaultPortion, logFood, logFoods, lookupBarcode, pickMealPhoto, portionMacros, portions, productName, scaleItem, slotForHour, totals,
-  type BarcodeProduct, type MealAnalysis, type MealPhoto, type MealSlot, type PortionKey,
+  aiBarcodeLookup, analyzeMeal, canonicalBarcode, defaultPortion, logFood, logFoods, lookupBarcode, pickMealPhoto, portionMacros, portions, productName,
+  scaleItem, siteName, slotForHour, totals, type AiLookupError, type BarcodeProduct, type MealAnalysis, type MealPhoto, type MealSlot, type PortionKey,
 } from '@/lib/nutrition';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
@@ -49,7 +49,11 @@ export default function MealPhotoScreen() {
   const [scanOpen, setScanOpen] = useState(false);
   const [code, setCode] = useState<{ data: string; type: string } | null>(null);
   const [product, setProduct] = useState<BarcodeProduct | null>(null);
-  const [lookupErr, setLookupErr] = useState<'network' | 'invalid_code' | null>(null);
+  const [lookupErr, setLookupErr] = useState<AiLookupError | 'invalid_code' | null>(null);
+  /** مرحلة البحث: قاعدة المنتجات المفتوحة ثم الذكاء الاصطناعي (ياخذ ثواني أكثر) */
+  const [stage, setStage] = useState<'db' | 'ai'>('db');
+  /** كم بحث بالذكاء الاصطناعي باقي اليوم (من الخادم) */
+  const [aiLeft, setAiLeft] = useState<number | null>(null);
   const [portionKey, setPortionKey] = useState<PortionKey>('serving');
   const [count, setCount] = useState(1);
   const [mode, setMode] = useState<'photo' | 'barcode'>('photo');
@@ -83,25 +87,45 @@ export default function MealPhotoScreen() {
     if (scan && !started.current) { started.current = true; setScanOpen(true); }
   }, [auto, scan]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** بعد المسح: ندوّر المنتج ونجهّز الكمية الافتراضية */
+  const showProduct = (p: BarcodeProduct) => {
+    const d = defaultPortion(portions(p));
+    if (!d) return false;
+    setProduct(p);
+    setPortionKey(d.key);
+    setCount(1);
+    setPhase('product');
+    return true;
+  };
+
+  /** بعد المسح: Open Food Facts أول، ولو ما لقيناه (أو ما عليه قيم) نبحث عنه بالذكاء الاصطناعي في الويب */
   const lookup = async (c: { data: string; type: string }) => {
     setMode('barcode');
     setCode(c);
     setPhoto(null);
+    setProduct(null);
     setLookupErr(null);
+    setStage('db');
     setPhase('lookup');
-    try {
-      const p = await lookupBarcode(c.data, c.type);
-      setProduct(p);
-      const d = p ? defaultPortion(portions(p)) : null;
-      if (!p || !d) { setPhase('unknown'); return; }
-      setPortionKey(d.key);
-      setCount(1);
-      setPhase('product');
-    } catch (e) {
-      setProduct(null);
-      setLookupErr(e instanceof Error && e.message === 'invalid_code' ? 'invalid_code' : 'network');
-      setPhase('unknown');
+    const canonical = canonicalBarcode(c.data, c.type);
+    if (!canonical) { setLookupErr('invalid_code'); setPhase('unknown'); return; }
+    let off: BarcodeProduct | null = null;
+    try { off = await lookupBarcode(c.data, c.type); } catch { /* القاعدة المفتوحة واقفة؟ نكمل بالذكاء الاصطناعي */ }
+    if (off && showProduct(off)) return;
+    setStage('ai');
+    const r = await aiBarcodeLookup(canonical, off ? productName(off, 'en') : null);
+    setAiLeft(r.remaining ?? null);
+    if (r.product && showProduct(r.product)) return;
+    setProduct(off);
+    setLookupErr(r.error ?? null);
+    setPhase('unknown');
+  };
+
+  /** قفل الماسح: لو جيت من زر الباركود مباشرة وما مسحت شي، نرجعك للصفحة اللي كنت فيها بدل ما تعلق هنا */
+  const closeScanner = () => {
+    setScanOpen(false);
+    if (scan && phase === 'pick') {
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
     }
   };
 
@@ -280,7 +304,8 @@ export default function MealPhotoScreen() {
         {phase === 'lookup' ? (
           <Card style={{ alignItems: 'center', gap: space.sm, paddingVertical: space.xl }}>
             <ActivityIndicator color={colors.primary} />
-            <T semibold>{t('meal.bcLooking')}</T>
+            <T semibold center>{t(stage === 'ai' ? 'meal.bcSearchingAi' : 'meal.bcLooking')}</T>
+            {stage === 'ai' ? <T size="xs" muted center>{t('meal.bcSearchingAiHint')}</T> : null}
             {code ? <T size="xs" muted style={{ writingDirection: 'ltr' }}>{code.data}</T> : null}
           </Card>
         ) : null}
@@ -335,7 +360,17 @@ export default function MealPhotoScreen() {
               <Button style={{ flex: 1 }} small title={t('meal.bcAnother')} icon="barcode-outline" variant="secondary" onPress={again} />
               <Button style={{ flex: 1 }} small title={t('meal.bcWrong')} icon="camera-outline" variant="ghost" onPress={photoLabel} />
             </Row>
-            <T size="xs" muted center>{t('meal.bcSource')}</T>
+            {product.source === 'ai' ? (
+              <View style={{ gap: 4, alignItems: 'center' }}>
+                <T size="xs" muted center>{t('meal.bcAiSource', { conf: t(`meal.conf_${product.confidence ?? 'low'}`) })}</T>
+                {aiLeft != null ? <T size="xs" muted center>{t('meal.bcAiLeft', { count: aiLeft })}</T> : null}
+                {siteName(product.sourceUrl) ? (
+                  <Pressable onPress={() => product.sourceUrl && void Linking.openURL(product.sourceUrl)} hitSlop={8} accessibilityRole="link">
+                    <T size="xs" semibold color={colors.primary} style={{ writingDirection: 'ltr' }}>{t('meal.bcSourceLink', { site: siteName(product.sourceUrl) })}</T>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : <T size="xs" muted center>{t('meal.bcSource')}</T>}
           </>
         ) : null}
 
@@ -344,7 +379,8 @@ export default function MealPhotoScreen() {
             <Row style={{ alignItems: 'flex-start' }}>
               <Ionicons name={lookupErr === 'network' ? 'cloud-offline-outline' : 'help-circle-outline'} size={22} color={colors.primary} />
               <T bold style={{ flex: 1 }}>
-                {t(lookupErr === 'network' ? 'errors.network' : lookupErr === 'invalid_code' ? 'meal.bcBadCode' : product ? 'meal.bcNoValues' : 'meal.bcNotFound')}
+                {t(lookupErr === 'network' ? 'errors.network' : lookupErr === 'invalid_code' ? 'meal.bcBadCode' : lookupErr === 'rate_limited' ? 'meal.bcAiLimit'
+                  : product ? 'meal.bcNoValues' : 'meal.bcNotFound')}
               </T>
             </Row>
             {product ? <T semibold>{productName(product, lng === 'ar' ? 'ar' : 'en')}</T> : null}
@@ -370,7 +406,7 @@ export default function MealPhotoScreen() {
           </Card>
         ) : null}
       </Screen>
-      <BarcodeScanner visible={scanOpen} onClose={() => setScanOpen(false)} onScanned={onScanned} />
+      <BarcodeScanner visible={scanOpen} onClose={closeScanner} onScanned={onScanned} />
     </KeyboardAvoidingView>
   );
 }
