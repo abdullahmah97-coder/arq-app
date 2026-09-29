@@ -169,7 +169,7 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
     mission: <>
           {/* مهمة اليوم */}
           <NSection title={t('health.mission')} action={plan ? t('home.openPlan') : undefined} onAction={() => router.push('/(tabs)/plan')} />
-          <Pressable onPress={() => router.push('/(tabs)/plan')} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS}>
+          <Pressable onPress={() => router.push(plan ? '/(tabs)/plan' : '/plan-new')} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS}>
             <ImageBackground source={adapted && !adapted.day.rest ? IMG.mission : IMG.rest} style={styles.mission} imageStyle={{ borderRadius: 22 }} contentFit="cover">
               <LinearGradient colors={['rgba(6,31,27,0.15)', 'rgba(6,31,27,0.92)']} style={[StyleSheet.absoluteFill, { borderRadius: 22 }]} />
               <OnDark style={{ flex: 1, justifyContent: 'flex-end', padding: space.lg, gap: 8 }}>
