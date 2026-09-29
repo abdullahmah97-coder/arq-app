@@ -61,7 +61,24 @@
     "signOut": "Sign out",
     "checkEmail": "We sent a confirmation link to your email. Confirm it, then sign in.",
     "usernameHint": "3–24 chars: letters, numbers, _ and .",
-    "passwordHint": "At least 8 characters"
+    "passwordHint": "At least 8 characters",
+    "forgot": "Forgot password?",
+    "forgotTitle": "Recover your account",
+    "forgotIntro": "Enter your account email and we'll send you a verification code. Type it here with a new password and you're back in.",
+    "sendCode": "Send code",
+    "codeSent": "We sent a verification code to {{email}}. If it doesn't arrive within a minute, check your spam folder.",
+    "code": "Verification code",
+    "newPassword": "New password",
+    "confirmPassword": "Repeat the new password",
+    "savePassword": "Save & sign in",
+    "resend": "Send a new code",
+    "resendIn": "New code available in {{s}}s",
+    "changeEmail": "Change email",
+    "passwordChanged": "Password changed ✅ You're signed in.",
+    "passwordNotSaved": "You're signed in ✅ but the new password wasn't saved. If you need it, recover it again after signing out.",
+    "backToSignIn": "Back to sign in",
+    "emailTakenHint": "This email already has an ARQ account. Sign in, or if you forgot the password we'll email you a code.",
+    "usernameTakenHint": "If this is your account, sign in or recover your password. If not, pick another username."
   },
   "onboarding": {
     "title": "Let's build your plan",
@@ -282,7 +299,11 @@
     "profileLoad": "We couldn't load your account",
     "notFoundTitle": "Page not found",
     "notFoundHint": "The link may be old or the page was removed.",
-    "userNotFound": "Account not found"
+    "userNotFound": "Account not found",
+    "badCode": "Wrong or expired code. Check it or request a new one.",
+    "tooSoon": "Wait a minute before requesting a new code.",
+    "passwordMismatch": "The passwords don't match",
+    "badEmail": "Check the email address"
   },
   "inbody": {
     "title": "InBody report",

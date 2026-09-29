@@ -1,11 +1,12 @@
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandGradient, Logo, SaduPattern } from '@/brand/Brand';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { Button, Input, T } from '@/components/ui';
+import { handOffEmail } from '@/lib/passwordReset';
 import { errorKey, supabase } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
 
@@ -44,7 +45,14 @@ export default function SignIn() {
         <View style={{ padding: space.lg, gap: space.lg, marginTop: -space.lg }}>
           <T muted center size="sm">{t('app.about')}</T>
           <Input label={t('auth.email')} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
-          <Input label={t('auth.password')} value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" />
+          <View style={{ gap: space.sm }}>
+            <Input label={t('auth.password')} value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" />
+            {/* استرجاع الحساب برمز على الإيميل */}
+            <Pressable onPress={() => { handOffEmail(email); router.push('/forgot-password'); }} hitSlop={10}
+              accessibilityRole="link" style={{ alignSelf: 'flex-end', paddingVertical: space.xs }}>
+              <T size="sm" semibold color={colors.primary}>{t('auth.forgot')}</T>
+            </Pressable>
+          </View>
           <Button title={t('auth.signIn')} onPress={submit} loading={busy} />
           <Link href="/sign-up" asChild>
             <Button title={`${t('auth.noAccount')} ${t('auth.signUp')}`} variant="ghost" />
