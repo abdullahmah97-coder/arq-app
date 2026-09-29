@@ -5,19 +5,21 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { ChevronBar } from '@/components/pulse/Rings';
+import { EditGoalButton } from '@/components/nutrition/CalorieGoal';
 import { NCard, NT, Num } from '@/components/pulse/widgets';
 import { useUser } from '@/lib/auth';
 import { LONG_PRESS_MS, useHomeLongPress } from '@/lib/homeLayout';
 import { useLocalized } from '@/lib/i18n';
 import {
-  KCAL_ALERT_CHOICES, kcalAlertAt, kcalAlertOn, loadCalorieAlertConfig, loadFoodDay, setKcalAlertAt, setKcalAlertOn, totals, type CalorieAlertConfig, type FoodEntry,
+  effectiveTargets, KCAL_ALERT_CHOICES, kcalAlertAt, kcalAlertOn, loadCalorieAlertConfig, loadFoodDay, setKcalAlertAt, setKcalAlertOn, totals,
+  type CalorieAlertConfig, type FoodEntry,
 } from '@/lib/nutrition';
 import { brand, night, pulse } from '@/theme';
 
 export function HomeNutrition() {
   const { t } = useTranslation();
   const { num } = useLocalized();
-  const { userId, plan } = useUser();
+  const { userId, plan, profile } = useUser();
   const longPress = useHomeLongPress();
   const [food, setFood] = useState<FoodEntry[]>([]);
   // زر تنبيه «باقي لك ٢٠٠ سعرة»: المستخدم يختار الرقم أو يطفيه (النص والرقم الافتراضي من لوحة إدارة التطبيق)
@@ -41,7 +43,7 @@ export function HomeNutrition() {
   };
 
   const sum = totals(food);
-  const tg = plan?.data.targets ?? null;
+  const tg = effectiveTargets(plan?.data.targets, profile?.kcal_goal);
   const goal = tg?.calories ?? null;
   const left = goal != null ? goal - sum.kcal : null;
   const macros = [
@@ -58,6 +60,10 @@ export function HomeNutrition() {
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
             <Num size={38}>{num(sum.kcal)}</Num>
             <NT size={12} faint style={{ marginBottom: 6 }}>{goal != null ? `/ ${num(goal)} ${t('common.kcal')}` : t('common.kcal')}</NT>
+            {/* تعديل هدف السعرات اليومي */}
+            <View style={{ marginBottom: 4 }}>
+              <EditGoalButton goal={goal} planCalories={tg?.planCalories ?? null} custom={!!tg?.custom} color={night.muted} />
+            </View>
           </View>
         </View>
         {left != null ? (

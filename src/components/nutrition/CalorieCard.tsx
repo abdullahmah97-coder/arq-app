@@ -3,12 +3,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
+import { EditGoalButton } from '@/components/nutrition/CalorieGoal';
 import { Button, Card, Row, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import { progress, totals, type FoodEntry, type MealSlot } from '@/lib/nutrition';
 import { colors, radius, space } from '@/theme';
 
-export interface CalorieTargets { calories: number; protein_g: number; carbs_g: number; fat_g: number }
+export interface CalorieTargets {
+  calories: number; protein_g: number | null; carbs_g: number | null; fat_g: number | null;
+  /** الهدف معدّل من المستخدم؟ وكم هدف الخطة (لزر «رجّع هدف الخطة») */
+  custom?: boolean; planCalories?: number | null;
+}
 
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'snack', 'dinner'];
 
@@ -21,7 +26,7 @@ function Bar({ value, color }: { value: number | null; color: string }) {
   );
 }
 
-function MacroBar({ label, eaten, target, color }: { label: string; eaten: number; target?: number; color: string }) {
+function MacroBar({ label, eaten, target, color }: { label: string; eaten: number; target?: number | null; color: string }) {
   const { t } = useTranslation();
   const { num } = useLocalized();
   return (
@@ -56,6 +61,8 @@ export function CalorieCard({ entries, targets, onDelete }: {
           <Row gap={6} style={{ alignItems: 'baseline' }}>
             <T size="xxl" bold style={{ color: colors.primary }}>{num(sum.kcal)}</T>
             <T size="sm" muted>{goal != null ? `/ ${num(goal)} ${t('common.kcal')}` : t('common.kcal')}</T>
+            {/* تعديل هدف السعرات اليومي */}
+            <EditGoalButton goal={goal} planCalories={targets?.planCalories ?? null} custom={!!targets?.custom} />
           </Row>
         </View>
         {left != null ? (

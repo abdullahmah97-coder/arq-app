@@ -15,7 +15,7 @@ import { startWorkout } from '@/lib/training';
 import { showRir } from '@/components/rir';
 import { useLocalized } from '@/lib/i18n';
 import { latestAppliedAnalysis } from '@/lib/inbody';
-import { deleteFood, estimateCarbsFat, loadFoodDay, logFood, type FoodEntry } from '@/lib/nutrition';
+import { deleteFood, effectiveTargets, estimateCarbsFat, loadFoodDay, logFood, type FoodEntry } from '@/lib/nutrition';
 import { generatePlan, savePlan } from '@/lib/plan';
 import type { PlanDay, PlanMeal, PlanMealDay, PlanTargets } from '@/lib/plan/types';
 import { errorKey, supabase } from '@/lib/supabase';
@@ -24,7 +24,7 @@ import { brand, colors, radius, space } from '@/theme';
 export default function PlanScreen() {
   const { t } = useTranslation();
   const { L } = useLocalized();
-  const { userId, plan, health, refreshPlan, refreshProfile } = useUser();
+  const { userId, plan, health, profile, refreshPlan, refreshProfile } = useUser();
   const zone = useHealth().scores?.zone ?? null;
   const [tab, setTab] = useState<'workouts' | 'meals'>('workouts');
   const [day, setDay] = useState(todayIndex());
@@ -210,7 +210,7 @@ export default function PlanScreen() {
           }).catch((e) => Alert.alert(t(errorKey(e))))} />
       ) : null}
       {tab === 'meals' && day === todayIndex() ? (
-        <CalorieCard entries={food} targets={{ calories: p.targets.calories, protein_g: p.targets.protein_g, carbs_g: p.targets.carbs_g, fat_g: p.targets.fat_g }} onDelete={removeFood} />
+        <CalorieCard entries={food} targets={effectiveTargets(p.targets, profile?.kcal_goal)} onDelete={removeFood} />
       ) : null}
       {tab === 'meals' ? (
         <SubscriptionMeals date={dateOfDay(day)} today={day === todayIndex()} food={food} onLogged={loadFood} />

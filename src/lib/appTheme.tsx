@@ -2,6 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext } from 'react';
 import { applyTheme, THEMES, type ThemeId } from '../theme';
+import { syncAppIcon } from './appIcon';
 
 const KEY = 'arq.theme';
 
@@ -18,6 +19,8 @@ export async function restoreTheme(): Promise<ThemeId> {
 export async function saveTheme(id: ThemeId) {
   applyTheme(id);
   try { await AsyncStorage.setItem(KEY, id); } catch {}
+  // أيقونة التطبيق بنفس اللون
+  void syncAppIcon(id);
 }
 
 export const ThemeCtx = createContext<{ theme: ThemeId; setTheme: (id: ThemeId) => void }>({ theme: 'palm', setTheme: () => {} });

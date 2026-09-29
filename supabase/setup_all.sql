@@ -1,6 +1,6 @@
 -- ARQ — إعداد قاعدة البيانات كاملة (مرة وحدة)
 -- الصق هذا الملف كله في Supabase > SQL Editor > New query ثم Run.
--- مولّد تلقائياً من supabase/migrations (48 ملف) — لا تعدّله يدوياً: npm run db:bundle
+-- مولّد تلقائياً من supabase/migrations (49 ملف) — لا تعدّله يدوياً: npm run db:bundle
 
 -- ===================== 20260926000000_init.sql =====================
 -- =====================================================================
@@ -8968,3 +8968,13 @@ alter table public.barcode_products enable row level security;
 drop policy if exists barcode_products_read on public.barcode_products;
 create policy barcode_products_read on public.barcode_products for select to authenticated using (true);
 revoke insert, update, delete on public.barcode_products from anon, authenticated;
+
+
+-- ===================== 20260929000720_kcal_goal.sql =====================
+-- =====================================================================
+-- هدف السعرات اليومي الشخصي: المستخدم يعدّله من مربع السعرات
+--   null = يمشي على هدف خطته. الكربوهيدرات والدهون تتعدّل بنفس النسبة والبروتين يبقى (بالتطبيق).
+-- =====================================================================
+alter table public.profiles add column if not exists kcal_goal integer
+  check (kcal_goal is null or kcal_goal between 800 and 6000);
+grant update (kcal_goal) on public.profiles to authenticated;

@@ -13,6 +13,7 @@ export * from './barcode';
 export * from './barcodeAi';
 export * from './calorieAlert';
 export * from './foods';
+export * from './goal';
 export * from './math';
 export * from './photo';
 

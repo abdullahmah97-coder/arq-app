@@ -7,7 +7,7 @@ import { DefaultTheme, Stack, ThemeProvider, useRootNavigationState } from 'expo
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { HeaderBack } from '@/components/HeaderBack';
 import { ScreenErrorBoundary } from '@/components/ScreenErrorBoundary';
@@ -19,6 +19,7 @@ import { restoreLocale } from '@/lib/i18n';
 import { usePushSetup } from '@/lib/push';
 import { colors, fontAssets, fonts, space, type ThemeId } from '@/theme';
 import { restoreTheme, saveTheme, ThemeCtx } from '@/lib/appTheme';
+import { syncAppIcon } from '@/lib/appIcon';
 
 /** الصفحات اللي تفتح كنافذة من تحت: زر إغلاق بدل سهم الرجوع */
 const MODAL_ROUTES = new Set([
@@ -179,6 +180,12 @@ export default function RootLayout() {
     // لو انقفل التطبيق بخطأ في التشغيل السابق نرسل تفاصيله الحين
     flushLastFatal();
   }, []);
+  // أيقونة التطبيق بلون التطبيق: نتأكد بعد ما يفتح (iOS ما يغيّرها إلا والتطبيق قدامك)، وكل ما يرجع للواجهة
+  useEffect(() => {
+    const t = setTimeout(() => void syncAppIcon(themeId), 2500);
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') void syncAppIcon(themeId); });
+    return () => { clearTimeout(t); sub.remove(); };
+  }, [themeId]);
   const themeCtx = useMemo(() => ({
     theme: themeId,
     setTheme: (id: ThemeId) => { saveTheme(id); setThemeId(id); },

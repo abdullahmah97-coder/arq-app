@@ -124,6 +124,43 @@
           "supportsBackgroundPlayback": false,
           "supportsPictureInPicture": false
         }
+      ],
+      [
+        "expo-alternate-app-icons",
+        [
+          {
+            "name": "Oasis",
+            "ios": "./assets/icons/icon-oasis.png",
+            "android": {
+              "foregroundImage": "./assets/icons/android-fg-oasis.png",
+              "backgroundColor": "#2F4B3C"
+            }
+          },
+          {
+            "name": "Dune",
+            "ios": "./assets/icons/icon-dune.png",
+            "android": {
+              "foregroundImage": "./assets/icons/android-fg-dune.png",
+              "backgroundColor": "#6E2A10"
+            }
+          },
+          {
+            "name": "Sand",
+            "ios": "./assets/icons/icon-sand.png",
+            "android": {
+              "foregroundImage": "./assets/icons/android-fg-sand.png",
+              "backgroundColor": "#F7DFBB"
+            }
+          },
+          {
+            "name": "Lavender",
+            "ios": "./assets/icons/icon-lavender.png",
+            "android": {
+              "foregroundImage": "./assets/icons/android-fg-lavender.png",
+              "backgroundColor": "#7B5BC4"
+            }
+          }
+        ]
       ]
     ],
     "experiments": {

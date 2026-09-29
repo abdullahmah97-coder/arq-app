@@ -1230,7 +1230,14 @@
     "kcalAlertOff": "Calorie alert off",
     "kcalAlertA11y": "Turn the calorie alert on or off",
     "kcalAlertPick": "Alert me when this many kcal are left:",
-    "kcalAlertStop": "Off"
+    "kcalAlertStop": "Off",
+    "editGoal": "Edit calorie goal",
+    "goalTitle": "Daily calorie goal",
+    "goalPlanHint": "Your plan suggests {{n}} kcal a day. You can set your own number.",
+    "goalNoPlanHint": "Set how many calories you want to eat a day.",
+    "goalMacrosNote": "Protein stays the same; carbs and fat adjust to your new goal.",
+    "goalReset": "Back to the plan goal ({{n}})",
+    "goalRange": "The goal must be between {{min}} and {{max}} kcal"
   },
   "notif": {
     "title": "Notifications",

@@ -32,6 +32,8 @@ export interface Profile {
   cover_url?: string | null;
   /** نوع الحساب يتحدد أول التسجيل: متدرب أو شريك (نادي، مدرب، متجر، مطعم، مركز) */
   account_type?: 'trainee' | 'club' | 'coach' | 'store' | 'restaurant' | 'center' | 'venue';
+  /** هدف السعرات اليومي اللي حطّه بنفسه (null = هدف الخطة) */
+  kcal_goal?: number | null;
 }
 
 export type PresenceVisibility = 'gym' | 'friends' | 'hidden';
