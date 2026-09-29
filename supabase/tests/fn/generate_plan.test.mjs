@@ -140,6 +140,16 @@ r = await call({ input, targets, save: true });
 ok(r.status === 500 && r.body.error === 'save_failed', 'save keeps failing → save_failed');
 db.failInsert = 0;
 
+// ---- وجبات بصيغة قريبة (qty/unit/name) تنقبل ----
+reply = { training: TRAINING, meals: { meals: MEALS.meals.map((m) => ({ ...m, items: m.items.map((it) => ({ name: { ar: it.ar, en: it.en }, qty: it.q, unit: it.u === 'pc' ? 'pieces' : it.u })) })) } };
+r = await call({ input, targets });
+ok(r.status === 200 && r.body.meals_source === 'ai', 'meal items with qty/unit/name keys are accepted');
+
+// ---- تمرين مكتوب باسمه بدل المعرّف ينقبل ----
+reply = { training: { ...TRAINING, days: [{ day: 0, focus: T('ص', 'P'), ex: [{ name: { en: 'Barbell Bench Press' }, sets: 3, reps: '8' }, { id: 'goblet squat', sets: 3, reps: '10' }] }, ...TRAINING.days.slice(1)] }, meals: MEALS };
+r = await call({ input, targets });
+ok(r.status === 200 && r.body.plan.days[0].exercises.map((e) => e.exercise_id).join() === 'bench_bb,goblet_squat', 'exercise given by English name or spaced id is matched', r.body.plan?.days[0].exercises.map((e) => e.exercise_id).join());
+
 // ---- المكتبة ----
 ok(mod.LIBRARY.length >= 150 && mod.LIBRARY.every((x) => x.length === 5 && x[3] && x[4]), 'library has every exercise with both names');
 ok(mod.libraryPrompt('home').split('\n').every((l) => !/\(.*; (bb|machine|cable)\)/.test(l)), 'home library has no barbell/machine/cable');

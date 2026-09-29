@@ -209,6 +209,9 @@ export const LIBRARY: [string, string, string, string, string][] = [
   // END LIBRARY
 ];
 const LIB = new Map(LIBRARY.map(([id, group, equip, ar, en]) => [id, { group, equip, name: t(ar, en) }]));
+const normName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+/** لو النموذج كتب اسم التمرين بدل معرّفه: نطابقه بالاسم الإنجليزي */
+const BY_EN = new Map(LIBRARY.map(([id, , , , en]) => [normName(en), id]));
 /** الأدوات المتوفرة في البيت */
 export const HOME_EQUIP = new Set(['body', 'db', 'kb', 'band', 'bar', 'rope']);
 const GROUP_TITLES: Record<string, string> = { legs: 'LEGS & GLUTES', chest: 'CHEST', back: 'BACK', shoulders: 'SHOULDERS', arms: 'ARMS', core: 'CORE', cardio: 'CARDIO & CONDITIONING' };
@@ -304,7 +307,11 @@ export function buildDays(raw: unknown, place: 'gym' | 'home'): PlanDay[] | null
       for (const e of list) {
         if (!e || typeof e !== 'object') continue;
         const x = e as Record<string, unknown>;
-        const id = String(x.id ?? x.exercise_id ?? '');
+        let id = String(x.id ?? x.exercise_id ?? '');
+        if (!LIB.has(id)) {
+          const nm = typeof x.name === 'string' ? x.name : (x.name as { en?: string } | undefined)?.en;
+          id = (nm && BY_EN.get(normName(nm))) || (BY_EN.get(normName(id.replace(/_/g, ' '))) ?? id);
+        }
         const lib = LIB.get(id);
         if (!lib || seen.has(id)) continue;
         if (place === 'home' && !HOME_EQUIP.has(lib.equip)) continue;
@@ -351,9 +358,12 @@ export function parseMealOptions(raw: unknown): MealOption[] | null {
     const items = (Array.isArray(o.items) ? o.items : []).flatMap((it) => {
       if (!it || typeof it !== 'object') return [];
       const x = it as Record<string, unknown>;
-      const nm = text(x, 50);
-      const q = typeof x.q === 'number' ? x.q : parseFloat(String(x.q ?? ''));
-      const u = x.u === 'ml' || x.u === 'pc' ? x.u : 'g';
+      // نقبل أشكال قريبة من المطلوب (qty/unit أو name داخلي) بدل ما نرمي الوجبة
+      const nm = text(x.name && typeof x.name === 'object' ? x.name : x, 50);
+      const rawQ = x.q ?? x.qty ?? x.quantity;
+      const q = typeof rawQ === 'number' ? rawQ : parseFloat(String(rawQ ?? ''));
+      const unit = String(x.u ?? x.unit ?? 'g').toLowerCase();
+      const u = unit === 'ml' ? 'ml' : unit === 'pc' || unit === 'pcs' || unit === 'piece' || unit === 'pieces' ? 'pc' : 'g';
       return nm && Number.isFinite(q) && q > 0 && q <= 2000 ? [{ ar: nm.ar, en: nm.en, q, u: u as 'g' | 'ml' | 'pc' }] : [];
     }).slice(0, 6);
     if (!name || kcal < 50 || !items.length) continue;
