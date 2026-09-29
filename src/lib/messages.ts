@@ -1,4 +1,5 @@
-// الرسائل الخاصة — فقط بين شخصين يتابعون بعض (مفروضة في القاعدة)
+// الرسائل الخاصة: بين الأصدقاء، أو اللي يتابعون بعض، أو المدرب ومتدربه (مفروضة في القاعدة)
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useEffect } from 'react';
 import { supabase } from './supabase';
 
@@ -7,16 +8,20 @@ export interface InboxRow {
   other_id: string; username: string; full_name: string | null; avatar_url: string | null; points: number; is_coach: boolean;
   last_body: string; last_at: string; last_from_me: boolean; unread: number; can_message: boolean;
 }
-export interface Contact { id: string; username: string; full_name: string | null; avatar_url: string | null; points: number; is_coach: boolean }
+export type ContactRelation = 'friend' | 'mutual' | 'coach';
+export interface Contact { id: string; username: string; full_name: string | null; avatar_url: string | null; points: number; is_coach: boolean; relation?: ContactRelation }
 
 export async function loadInbox(): Promise<InboxRow[]> {
   const { data } = await supabase.rpc('inbox');
   return ((data ?? []) as any[]).map((r) => ({ ...r, unread: Number(r.unread) }));
 }
 
+/** اللي تقدر تراسلهم: الأصدقاء أولاً (وقبل تحديث القاعدة نرجع للقائمة القديمة) */
 export async function loadContacts(): Promise<Contact[]> {
-  const { data } = await supabase.rpc('mutual_followers');
-  return (data ?? []) as Contact[];
+  const { data, error } = await supabase.rpc('message_contacts');
+  if (!error) return (data ?? []) as Contact[];
+  const old = await supabase.rpc('mutual_followers');
+  return (old.data ?? []) as Contact[];
 }
 
 export async function canMessage(me: string, other: string): Promise<boolean> {
@@ -45,12 +50,40 @@ export async function unreadCount(me: string): Promise<number> {
   return count ?? 0;
 }
 
-/** استقبال الرسائل الجديدة لحظياً (Realtime) — RLS تضمن أن كل واحد يستقبل رسائله فقط */
-export function useIncoming(me: string, onMessage: (m: Message) => void) {
-  useEffect(() => {
-    const ch = supabase.channel(`dm:${me}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `recipient=eq.${me}` }, (p) => onMessage(p.new as Message))
+/**
+ * استقبال الرسائل الجديدة لحظياً (Realtime). RLS تضمن إن كل واحد يستقبل رسائله بس.
+ * اشتراك واحد مشترك: صندوق الرسائل والمحادثة يكونون مفتوحين مع بعض، ولو كل واحد فتح قناة بنفس الاسم
+ * ترجع نفس القناة وتنقفل الصفحة بخطأ «cannot add postgres_changes callbacks after subscribe()».
+ */
+type Listener = (m: Message) => void;
+let live: { me: string; ch: RealtimeChannel; listeners: Set<Listener> } | null = null;
+let seq = 0;
+
+function retainIncoming(me: string, fn: Listener) {
+  if (live && live.me !== me) { supabase.removeChannel(live.ch); live = null; }
+  if (!live) {
+    const listeners = new Set<Listener>();
+    // اسم جديد لكل قناة: القناة القديمة ممكن تكون لسا تنقفل
+    const ch = supabase.channel(`dm:${me}:${++seq}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `recipient=eq.${me}` }, (p) => {
+        for (const l of listeners) { try { l(p.new as Message); } catch { /* مستمع واحد ما يوقف الباقي */ } }
+      })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    live = { me, ch, listeners };
+  }
+  live.listeners.add(fn);
+}
+
+function releaseIncoming(me: string, fn: Listener) {
+  if (!live || live.me !== me) return;
+  live.listeners.delete(fn);
+  if (!live.listeners.size) { supabase.removeChannel(live.ch); live = null; }
+}
+
+export function useIncoming(me: string, onMessage: Listener) {
+  useEffect(() => {
+    if (!me) return;
+    retainIncoming(me, onMessage);
+    return () => releaseIncoming(me, onMessage);
   }, [me, onMessage]);
 }

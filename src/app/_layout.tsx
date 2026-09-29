@@ -127,6 +127,7 @@ function RootNavigator() {
         <Stack.Screen name="clubs/chain-edit" options={{ title: t('clubs.editChain'), presentation: 'modal' }} />
         <Stack.Screen name="clubs/review" options={{ title: t('clubs.rate'), presentation: 'modal' }} />
         <Stack.Screen name="clubs/offer" options={{ title: t('clubs.addOffer'), presentation: 'modal' }} />
+        <Stack.Screen name="chat/new" options={{ title: t('chat.newMessage') }} />
         <Stack.Screen name="chat/[id]" options={{ title: '' }} />
         <Stack.Screen name="checkin/[id]" options={{ title: t('presence.comments') }} />
         <Stack.Screen name="checkin/index" options={{ title: t('checkin.title'), presentation: 'modal' }} />

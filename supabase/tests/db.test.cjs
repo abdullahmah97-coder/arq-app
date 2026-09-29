@@ -297,7 +297,11 @@ grant usage on schema public, auth, storage to authenticated;
   await expectErr('others cannot add products to my brand', () => as(B, `insert into brand_products (brand_id, name) values ($1, 'fake')`, [br.id]), /row-level security/);
   check('owner can edit brand details', (await as(A, `update brands set tagline = 'ملابس رياضية من الرياض' where id = $1 returning id`, [br.id])).length === 1);
 
-  // direct messages: mutual follow only
+  // direct messages: mutual follow (accepted friends can chat too — covered in chat_friends.test.cjs),
+  // so the A–B friendship is paused here and restored after
+  const pair = `least(requester, addressee) = least($1::uuid, $2::uuid) and greatest(requester, addressee) = greatest($1::uuid, $2::uuid)`;
+  await q(`alter table friendships disable trigger notify_friendship`);
+  await q(`update friendships set status = 'pending' where ${pair}`, [A, B]);
   await expectErr('no chat without mutual follow', () => as(A, `insert into messages (sender, recipient, body) values ($1, $2, 'هلا')`, [A, B]), /row-level security/);
   await as(B, `insert into follows (follower, followee) values ($1, $2)`, [B, A]);
   const msg = (await as(A, `insert into messages (sender, recipient, body) values ($1, $2, 'هلا سارة، نتمرن بكرة؟') returning id`, [A, B]))[0];
@@ -314,6 +318,8 @@ grant usage on schema public, auth, storage to authenticated;
   const ib2 = await as(A, 'select * from inbox()');
   check('old chat kept but locked', ib2.length === 1 && ib2[0].can_message === false);
   await as(A, `insert into follows (follower, followee) values ($1, $2)`, [A, B]);
+  await q(`update friendships set status = 'accepted' where ${pair}`, [A, B]);
+  await q(`alter table friendships enable trigger notify_friendship`);
 
   // owner panel: reports + brand review + coach verification (B is the owner)
   await expectErr('nobody can make themselves owner', () => as(C, `insert into app_admins (user_id) values ($1)`, [C]), /permission denied|row-level security/);
