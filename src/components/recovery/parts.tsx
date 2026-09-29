@@ -4,16 +4,17 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
+import { PromptModal } from '@/components/PromptModal';
 import { ExerciseThumb } from '@/components/exercise/ExercisePhotos';
 import { Row, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { todayIndex } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import {
-  callCenter, isPartner, openCenterInstagram, openCenterSite, stretchRoutine, whatsappCenter, type RecoveryCenter, type RoutineItem,
+  callCenter, isPartner, openCenterInstagram, openCenterSite, requestAppointment, stretchRoutine, takesAppointments, whatsappCenter, type RecoveryCenter, type RoutineItem,
 } from '@/lib/recovery';
-import { publicUrl } from '@/lib/supabase';
+import { errorKey, publicUrl } from '@/lib/supabase';
 import { loadHistory } from '@/lib/training';
 import { findExercise, MUSCLE_NAMES, musclesOf } from '@/three/catalog';
 import type { Muscle } from '@/three/rig';
@@ -78,7 +79,11 @@ const KIND_ICON: Record<RecoveryCenter['kind'], keyof typeof Ionicons.glyphMap> 
 export function CenterCard({ c }: { c: RecoveryCenter }) {
   const { t } = useTranslation();
   const { lng } = useLocalized();
+  const { userId } = useUser();
+  const [asking, setAsking] = useState(false);
   const partner = isPartner(c);
+  const canBook = takesAppointments(c) && c.owner !== userId;
+  const offerLive = !!c.offer_text && (!c.offer_ends || c.offer_ends >= new Date().toISOString().slice(0, 10));
   const name = lng === 'en' && c.name_en ? c.name_en : c.name;
   return (
     <View style={{ gap: space.sm, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: partner ? brand.orange : colors.border, padding: space.md }}>
@@ -106,12 +111,31 @@ export function CenterCard({ c }: { c: RecoveryCenter }) {
           ))}
         </View>
       ) : null}
+      {offerLive ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: brand.orange + '1A', borderRadius: radius.md, padding: 8 }}>
+          <Ionicons name="pricetag" size={15} color={brand.orange} />
+          <T size="xs" semibold style={{ flex: 1 }}>{c.offer_text}{c.offer_code ? ` · ${t('partners.code')}: ${c.offer_code}` : ''}</T>
+        </View>
+      ) : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        {canBook ? <Act icon="calendar-outline" label={t('partners.requestAppt')} onPress={() => setAsking(true)} /> : null}
         {c.whatsapp ? <Act icon="logo-whatsapp" label={t('recovery.whatsapp')} onPress={() => whatsappCenter(c, t('recovery.waText'))} /> : null}
         {c.phone ? <Act icon="call-outline" label={t('recovery.call')} onPress={() => callCenter(c)} /> : null}
         {c.website ? <Act icon="globe-outline" label={t('recovery.site')} onPress={() => openCenterSite(c)} /> : null}
         {c.instagram ? <Act icon="logo-instagram" label="Instagram" onPress={() => openCenterInstagram(c)} /> : null}
       </View>
+      <PromptModal visible={asking} title={t('partners.requestAppt')} message={t('partners.requestApptHint', { name })} onClose={() => setAsking(false)}
+        confirm={t('partners.sendRequest')}
+        fields={[{ key: 'pref', label: t('partners.preferredTime'), placeholder: t('partners.preferredPh') }, { key: 'note', label: t('partners.apptNote'), multiline: true, placeholder: t('partners.apptNotePh') }]}
+        onSubmit={async (v) => {
+          try {
+            await requestAppointment(c.id, v.pref, v.note);
+            setAsking(false);
+            Alert.alert(t('partners.apptSent'), t('partners.apptSentBody', { name }), [
+              { text: t('common.ok') }, { text: t('partners.myAppointments'), onPress: () => router.push('/recovery/appointments') },
+            ]);
+          } catch (e) { Alert.alert(t(errorKey(e))); }
+        }} />
     </View>
   );
 }

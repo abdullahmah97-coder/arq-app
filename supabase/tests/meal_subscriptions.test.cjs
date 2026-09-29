@@ -14,7 +14,7 @@ const { setup } = require('./_harness.cjs');
   await expectErr('consent is required', () => as(U.A, `select request_meal_subscription($1, array['lunch','dinner'], null, false)`, [rest.id]), /consent_required/);
   await expectErr('only restaurants take subscriptions', () => as(U.A, `select request_meal_subscription($1, array['lunch'], null, true)`, [wear.id]), /brand_not_approved/);
   const sub = (await as(U.A, `select request_meal_subscription($1, array['lunch','dinner'], 'حساسية مكسرات', true) as id`, [rest.id]))[0].id;
-  check('restaurant notified about the request', (await q(`select count(*)::int n from notifications where user_id = $1 and data->>'url' = '/store/manage'`, [U.D]))[0].n === 1);
+  check('restaurant notified about the request', (await q(`select count(*)::int n from notifications where user_id = $1 and data->>'key' like 'ms:%'`, [U.D]))[0].n === 1);
   await expectErr('no duplicate open request', () => as(U.A, `select request_meal_subscription($1, array['lunch'], null, true)`, [rest.id]), /request_pending/);
 
   const subs = await as(U.D, `select * from restaurant_subscribers($1)`, [rest.id]);

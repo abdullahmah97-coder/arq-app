@@ -1,20 +1,25 @@
 // أضف مركزك / عدّل مركزك: مراكز العلاج الطبيعي والاستشفاء (تنراجع من إدارة أرك قبل الظهور)
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
 import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { pickImage } from '@/lib/images';
+import { AdminBanner } from '@/components/partners/parts';
+import { goBackOrHome } from '@/lib/nav';
 import {
-  CENTER_CITIES, CENTER_KINDS, CENTER_SERVICES, loadMyCenter, saveCenter, type CenterKind, type CenterService, type RecoveryCenter,
+  CENTER_CITIES, CENTER_KINDS, CENTER_SERVICES, loadCenter, loadMyCenter, saveCenter, type CenterKind, type CenterService, type RecoveryCenter,
 } from '@/lib/recovery';
 import { errorKey, publicUrl, uploadImage } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 
 export default function JoinCenter() {
+  // ?id= المالك يعدّل أي مركز، ?new=1 المالك يضيف مركز من موقعه الرسمي
+  const { id: adminId, new: adminNew } = useLocalSearchParams<{ id?: string; new?: string }>();
+  const admin = !!adminId || adminNew === '1';
   const { t } = useTranslation();
   const { userId } = useUser();
   const [existing, setExisting] = useState<RecoveryCenter | null | undefined>(undefined);
@@ -31,18 +36,23 @@ export default function JoinCenter() {
   const [license, setLicense] = useState('');
   const [logo, setLogo] = useState<string | null>(null);
   const [agree, setAgree] = useState(false);
+  const [offerText, setOfferText] = useState('');
+  const [offerCode, setOfferCode] = useState('');
+  const [offerEnds, setOfferEnds] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    loadMyCenter(userId).then((c) => {
+    if (adminNew === '1') { setExisting(null); setAgree(true); return; }
+    (adminId ? loadCenter(String(adminId)) : loadMyCenter(userId)).then((c) => {
       setExisting(c);
       if (c) {
         setName(c.name); setNameEn(c.name_en ?? ''); setKind(c.kind); setCities(c.cities); setServices(c.services);
         setDescription(c.description ?? ''); setPhone(c.phone ?? ''); setWhatsapp(c.whatsapp ?? ''); setWebsite(c.website ?? '');
         setInstagram(c.instagram ?? ''); setLicense(c.license_no ?? ''); setLogo(c.logo_path); setAgree(true);
+        setOfferText(c.offer_text ?? ''); setOfferCode(c.offer_code ?? ''); setOfferEnds(c.offer_ends ?? '');
       }
     }).catch(() => setExisting(null));
-  }, [userId]);
+  }, [userId, adminId, adminNew]);
 
   if (existing === undefined) return <Loading />;
 
@@ -59,13 +69,17 @@ export default function JoinCenter() {
     if (name.trim().length < 2) return Alert.alert(t('recovery.err_name'));
     if (!cities.length) return Alert.alert(t('recovery.err_city'));
     if (!phone.trim() && !whatsapp.trim() && !website.trim()) return Alert.alert(t('recovery.err_contact'));
-    if (license.trim().length < 3) return Alert.alert(t('recovery.err_license'));
+    if (!admin && license.trim().length < 3) return Alert.alert(t('recovery.err_license'));
     if (!agree) return Alert.alert(t('store.err_agree'));
+    const ends = offerEnds.trim().replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+    if (ends && !/^\d{4}-\d{2}-\d{2}$/.test(ends)) return Alert.alert(t('errors.invalidNumber'));
     setBusy(true);
     try {
       await saveCenter(userId, {
         name, name_en: nameEn, kind, cities, services, description, phone, whatsapp, website, instagram, logo_path: logo, license_no: license,
-      }, existing?.id);
+        offer_text: offerText, offer_code: offerCode, offer_ends: ends || null,
+      }, existing?.id, adminNew === '1');
+      if (admin) { goBackOrHome(); return; }
       Alert.alert(existing && existing.status === 'approved' ? t('recovery.saved') : t('recovery.submitted'), existing?.status === 'approved' ? undefined : t('recovery.submittedBody'));
       router.back();
     } catch (e) {
@@ -83,7 +97,8 @@ export default function JoinCenter() {
   return (
     <Screen edges={['bottom']}>
       <Stack.Screen options={{ title: existing ? t('recovery.editCenter') : t('recovery.addCenter') }} />
-      {existing ? (
+      {admin ? <AdminBanner /> : null}
+      {admin && !existing ? null : existing ? (
         <Card style={{ gap: 4, borderColor: existing.status === 'rejected' ? colors.danger : existing.status === 'approved' ? colors.success : brand.amber }}>
           <T semibold>{t(`recovery.status_${existing.status}`)}</T>
           {existing.review_note && existing.status === 'rejected' ? <T size="sm">{t('coaching.reviewNote')}: {existing.review_note}</T> : null}
@@ -135,7 +150,18 @@ export default function JoinCenter() {
       <Input label={t('store.instagram')} value={instagram} onChangeText={setInstagram} autoCapitalize="none" placeholder="@center" />
       <Input label={t('recovery.license')} hint={t('recovery.licenseHint')} value={license} onChangeText={setLicense} maxLength={40} autoCapitalize="characters" />
 
-      {!existing ? (
+      {/* عرض لمستخدمي أرك (اختياري) */}
+      <Card style={{ gap: space.sm }}>
+        <T semibold>{t('partners.centerOffer')}</T>
+        <T size="xs" muted>{t('partners.centerOfferHint')}</T>
+        <Input value={offerText} onChangeText={setOfferText} maxLength={120} placeholder={t('partners.centerOfferPh')} />
+        <Row gap={space.sm}>
+          <View style={{ flex: 1 }}><Input label={t('partners.offerCode')} value={offerCode} onChangeText={setOfferCode} maxLength={30} autoCapitalize="characters" placeholder="ARQ" /></View>
+          <View style={{ flex: 1 }}><Input label={t('partners.offerEnds')} value={offerEnds} onChangeText={setOfferEnds} maxLength={10} placeholder="2026-12-31" /></View>
+        </Row>
+      </Card>
+
+      {!existing && !admin ? (
         <Pressable onPress={() => setAgree(!agree)} accessibilityRole="checkbox" accessibilityState={{ checked: agree }}>
           <Row style={{ alignItems: 'flex-start', backgroundColor: colors.card, borderRadius: radius.md, padding: space.sm }}>
             <Ionicons name={agree ? 'checkbox' : 'square-outline'} size={22} color={agree ? brand.orange : colors.muted} />

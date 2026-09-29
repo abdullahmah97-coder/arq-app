@@ -29,7 +29,11 @@ export interface RecoveryCenter {
   instagram: string | null;
   logo_path: string | null;
   license_no: string | null;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'suspended';
+  /** عرض لمستخدمي أرك (اختياري) */
+  offer_text?: string | null;
+  offer_code?: string | null;
+  offer_ends?: string | null;
   review_note: string | null;
   created_at: string;
 }
@@ -50,6 +54,11 @@ export async function loadMyCenter(me: string): Promise<RecoveryCenter | null> {
   return (data as RecoveryCenter) ?? null;
 }
 
+export async function loadCenter(id: string): Promise<RecoveryCenter | null> {
+  const { data } = await supabase.from('recovery_centers').select('*').eq('id', id).maybeSingle();
+  return (data as RecoveryCenter) ?? null;
+}
+
 export async function loadCenterRequests(): Promise<RecoveryCenter[]> {
   const { data } = await supabase.from('recovery_centers').select('*').eq('listed_by', 'owner').eq('status', 'pending')
     .order('created_at', { ascending: true }).limit(50);
@@ -61,7 +70,7 @@ export async function reviewCenter(id: string, decision: 'approved' | 'rejected'
   if (error) throw error;
 }
 
-export type CenterInput = Pick<RecoveryCenter, 'name' | 'name_en' | 'kind' | 'cities' | 'services' | 'description' | 'phone' | 'whatsapp' | 'website' | 'instagram' | 'logo_path' | 'license_no'>;
+export type CenterInput = Pick<RecoveryCenter, 'name' | 'name_en' | 'kind' | 'cities' | 'services' | 'description' | 'phone' | 'whatsapp' | 'website' | 'instagram' | 'logo_path' | 'license_no' | 'offer_text' | 'offer_code' | 'offer_ends'>;
 
 /** ينظف المدخلات: الروابط https، الجوال أرقام، الواتساب بصيغة دولية بدون + */
 export function normalizeCenter(c: CenterInput): CenterInput {
@@ -88,12 +97,17 @@ export function normalizeCenter(c: CenterInput): CenterInput {
     website: url(c.website),
     instagram: clean(c.instagram)?.replace(/^@/, '') ?? null,
     license_no: clean(c.license_no),
+    offer_text: clean(c.offer_text ?? null),
+    offer_code: clean(c.offer_code ?? null)?.toUpperCase().replace(/[^A-Z0-9_-]/g, '') || null,
+    offer_ends: clean(c.offer_ends ?? null),
   };
 }
 
-export async function saveCenter(me: string, input: CenterInput, id?: string) {
+/** asListing: المالك يضيف مركز من موقعه الرسمي بدون صاحب (يظهر مباشرة) */
+export async function saveCenter(me: string, input: CenterInput, id?: string, asListing = false) {
   const c = normalizeCenter(input);
-  const q = id ? supabase.from('recovery_centers').update(c).eq('id', id) : supabase.from('recovery_centers').insert({ ...c, owner: me });
+  const q = id ? supabase.from('recovery_centers').update(c).eq('id', id)
+    : supabase.from('recovery_centers').insert(asListing ? { ...c, owner: null, listed_by: 'arq', status: 'approved' } : { ...c, owner: me });
   const { data, error } = await q.select('id').single();
   if (error) throw error;
   return data.id as string;
@@ -157,3 +171,44 @@ export function stretchRoutine(worked: Muscle[], opts: { roll?: boolean; max?: n
 }
 
 export const ALL_ROUTINE_IDS = [...new Set([...Object.values(STRETCH).flat(), ...Object.values(ROLL)])] as string[];
+
+// ---------- مواعيد المراكز (الرابط الوحيد اللي يسمح للمركز يرسل تنبيه) ----------
+export type ApptStatus = 'requested' | 'confirmed' | 'declined' | 'cancelled' | 'done';
+export interface Appointment {
+  id: string; center_id: string; user_id: string; status: ApptStatus; preferred: string | null; note: string | null;
+  starts_at: string | null; center_note: string | null; created_at: string;
+  recovery_centers?: Pick<RecoveryCenter, 'id' | 'name' | 'name_en' | 'phone' | 'whatsapp' | 'logo_path' | 'kind'> | null;
+}
+export interface CenterAppointment extends Omit<Appointment, 'center_id' | 'recovery_centers'> { name: string; username: string; avatar_url: string | null }
+
+export async function requestAppointment(centerId: string, preferred: string, note: string) {
+  const { error } = await supabase.rpc('request_center_appointment', { p_center: centerId, p_preferred: preferred.trim() || null, p_note: note.trim() || null });
+  if (error) throw error;
+}
+export async function myAppointments(me: string): Promise<Appointment[]> {
+  const { data } = await supabase.from('center_appointments')
+    .select('*, recovery_centers(id, name, name_en, phone, whatsapp, logo_path, kind)').eq('user_id', me)
+    .order('created_at', { ascending: false }).limit(50);
+  return (data ?? []) as Appointment[];
+}
+export async function centerAppointments(centerId: string): Promise<CenterAppointment[]> {
+  const { data } = await supabase.rpc('center_appointment_list', { p_center: centerId });
+  return (data ?? []) as CenterAppointment[];
+}
+export async function respondAppointment(id: string, accept: boolean, startsAt?: Date | null, note?: string) {
+  const { error } = await supabase.rpc('respond_center_appointment', {
+    p_id: id, p_accept: accept, p_starts_at: startsAt ? startsAt.toISOString() : null, p_note: note?.trim() || null,
+  });
+  if (error) throw error;
+}
+export async function closeAppointment(id: string, status: 'cancelled' | 'done') {
+  const { error } = await supabase.rpc('close_center_appointment', { p_id: id, p_status: status });
+  if (error) throw error;
+}
+export async function sendCenterNotice(centerId: string, title: string, body: string): Promise<number> {
+  const { data, error } = await supabase.rpc('send_center_notice', { p_center: centerId, p_title: title.trim(), p_body: body.trim() });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+/** يقبل الموعد إذا المركز شريك (له صاحب ومعتمد) */
+export const takesAppointments = (c: RecoveryCenter) => !!c.owner && c.status === 'approved';

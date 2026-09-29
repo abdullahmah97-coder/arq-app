@@ -10,7 +10,7 @@ import { useUser } from '@/lib/auth';
 import { saveProduct } from '@/lib/brands';
 import { pickImage } from '@/lib/images';
 import { errorKey, publicUrl, supabase, uploadImage } from '@/lib/supabase';
-import { brand, colors, radius } from '@/theme';
+import { brand, colors, radius, space } from '@/theme';
 import { goBackOrHome } from '@/lib/nav';
 
 export default function ProductForm() {
@@ -26,6 +26,7 @@ export default function ProductForm() {
   const [busy, setBusy] = useState(false);
   const [restaurant, setRestaurant] = useState(false);
   const [m, setM] = useState({ kcal: '', p: '', c: '', f: '' });
+  const [stock, setStock] = useState('');
 
   useEffect(() => {
     supabase.from('brands').select('category').eq('id', brandId).maybeSingle().then(({ data }) => setRestaurant(data?.category === 'restaurant'));
@@ -38,6 +39,7 @@ export default function ProductForm() {
       setUrl(data.url ?? ''); setImage(data.image_path); setActive(data.active);
       const s = (v: number | null) => (v != null ? String(+v) : '');
       setM({ kcal: s(data.kcal), p: s(data.protein_g), c: s(data.carbs_g), f: s(data.fat_g) });
+      setStock(s(data.stock));
     });
   }, [id]);
 
@@ -57,11 +59,14 @@ export default function ProductForm() {
     if ([kcal, pg, cg, fg].some((x) => x != null && !(Number.isFinite(x) && x >= 0 && x <= 5000))) return Alert.alert(t('errors.invalidNumber'));
     // لو كتب الماكروز بدون السعرات نحسبها
     const kcalFinal = kcal ?? (pg != null || cg != null || fg != null ? Math.round((pg ?? 0) * 4 + (cg ?? 0) * 4 + (fg ?? 0) * 9) : null);
+    const st = toNum(stock);
+    if (st != null && !(Number.isFinite(st) && st >= 0 && st <= 100000)) return Alert.alert(t('errors.invalidNumber'));
     setBusy(true);
     try {
       await saveProduct(String(brandId), {
         name, description, price_sar: n, url: url || null, image_path: image, active,
         kcal: kcalFinal != null ? Math.round(kcalFinal) : null, protein_g: pg, carbs_g: cg, fat_g: fg,
+        stock: st != null ? Math.round(st) : null,
       }, id);
       goBackOrHome();
     } catch (e) {
@@ -82,7 +87,10 @@ export default function ProductForm() {
         )}
       </Pressable>
       <Input label={t('store.productName')} value={name} onChangeText={setName} maxLength={80} placeholder={t('store.productNamePh')} />
-      <Input label={t('store.price')} value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="129" />
+      <Row gap={space.sm}>
+        <View style={{ flex: 1 }}><Input label={t('store.price')} value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="129" /></View>
+        <View style={{ flex: 1 }}><Input label={t('store.stock')} hint={t('store.stockFieldHint')} value={stock} onChangeText={setStock} keyboardType="number-pad" placeholder="—" /></View>
+      </Row>
       <Input label={t('store.productDesc')} value={description} onChangeText={setDescription} maxLength={300} multiline style={{ minHeight: 70, textAlignVertical: 'top' }} />
       {restaurant ? (
         <View style={{ gap: 6, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 12 }}>

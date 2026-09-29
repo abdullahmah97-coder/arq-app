@@ -30,6 +30,8 @@ export interface Profile {
   /** خلفية الهيدر: لون من ألوان أرك ('auto' يتبع ثيم التطبيق) أو صورة في مجلد المستخدم */
   cover?: 'auto' | 'ember' | 'palm' | 'oasis' | 'dune' | 'lavender' | 'night' | 'gold';
   cover_url?: string | null;
+  /** نوع الحساب يتحدد أول التسجيل: متدرب أو شريك (نادي، مدرب، متجر، مطعم، مركز) */
+  account_type?: 'trainee' | 'club' | 'coach' | 'store' | 'restaurant' | 'center';
 }
 
 export type PresenceVisibility = 'gym' | 'friends' | 'hidden';

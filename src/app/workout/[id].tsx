@@ -11,6 +11,8 @@ import { SaduPattern } from '@/brand/Brand';
 import { NT, Num } from '@/components/pulse/widgets';
 import { useLocalized } from '@/lib/i18n';
 import { FriendsBest } from '@/components/workout/FriendsBest';
+import { SessionWatchCard } from '@/components/pulse/WatchWorkouts';
+import { exportWorkoutToHealth, sessionWatchStats, type SessionWatchStats } from '@/lib/health';
 import { compareSession, daysAgo, fmtSet, loadFriendsBest, loadHistory, loadSession, summarize, type FriendBest, type SessionCompare, type SessionData } from '@/lib/training';
 import { getExercise } from '@/three/catalog';
 import { brand, night, pulse, space } from '@/theme';
@@ -22,6 +24,7 @@ export default function WorkoutSummary() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [cmp, setCmp] = useState<SessionCompare | null>(null);
   const [friends, setFriends] = useState<Record<string, FriendBest[]>>({});
+  const [watch, setWatch] = useState<{ stats: SessionWatchStats | null; saved: boolean } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -30,6 +33,15 @@ export default function WorkoutSummary() {
       if (s) {
         setCmp(compareSession(s, h));
         loadFriendsBest([...new Set(s.sets.map((x) => x.exercise_id))]).then(setFriends).catch(() => {});
+        // الساعة: نبض وسعرات الجلسة، ونحفظها في Apple Health (الجلسات الجديدة بس، مرة وحدة)
+        const start = new Date(s.started_at);
+        const end = s.finished_at ? new Date(s.finished_at) : null;
+        if (end) {
+          const stats = await sessionWatchStats(start, end).catch(() => null);
+          const fresh = Date.now() - end.getTime() < 86_400_000;
+          const saved = fresh ? await exportWorkoutToHealth({ id: s.id, title: s.title || 'ARQ', start, end }, stats?.kcal ?? null).catch(() => false) : false;
+          setWatch({ stats, saved });
+        }
       }
     })();
   }, [id]);
@@ -77,6 +89,8 @@ export default function WorkoutSummary() {
               <Stat label={t('workout.duration')} value={cmp.totals.now.minutes != null ? String(cmp.totals.now.minutes) : '—'} unit={t('coach.min')}
                 delta={cmp.totals.prev?.minutes != null && cmp.totals.now.minutes != null ? <Delta v={cmp.totals.now.minutes - cmp.totals.prev.minutes} unit="" /> : null} />
             </View>
+
+            {watch ? <SessionWatchCard stats={watch.stats} saved={watch.saved} /> : null}
 
             {/* بعد التمرين: روتين الاستشفاء لنفس العضلات */}
             <Pressable onPress={() => router.push('/recovery')} accessibilityRole="button"

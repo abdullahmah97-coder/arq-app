@@ -210,5 +210,5 @@ export function parseRiyadh(s: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 export function fmtRiyadh(iso: string, lng: string) {
-  return new Date(iso).toLocaleString(lng === 'en' ? 'en-GB' : 'ar-SA-u-nu-latn', { timeZone: 'Asia/Riyadh', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleString(lng === 'en' ? 'en-GB' : 'ar-SA-u-ca-gregory-nu-latn', { timeZone: 'Asia/Riyadh', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 }

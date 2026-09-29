@@ -4,12 +4,16 @@ import {
   queryCategorySamples,
   queryQuantitySamples,
   queryStatisticsForQuantity,
+  queryWorkoutSamples,
   requestAuthorization,
+  saveWorkoutSample,
+  WorkoutActivityType,
 } from '@kingstinct/react-native-healthkit';
 import { Linking } from 'react-native';
 import { avg, dayRange, hrZoneMinutes, lastDays, sleepWindow, summarizeSleep, type SleepKind, type SleepSegment } from './aggregate';
-import type { HealthProvider } from './provider-types';
+import type { HealthProvider, SessionWatchStats } from './provider-types';
 import type { DailyHealth } from './types';
+import { hrStats, isWatch, toKcal, toMeters, toMinutes, workoutKind, type ExternalWorkout } from './workouts';
 
 const READ = [
   'HKQuantityTypeIdentifierStepCount',
@@ -25,6 +29,14 @@ const READ = [
   'HKQuantityTypeIdentifierAppleSleepingWristTemperature',
   'HKQuantityTypeIdentifierVO2Max',
 ] as const;
+
+// تمارين الساعة (قراءة) + حفظ جلسات أرك كتمارين (كتابة)
+const AUTH = {
+  toRead: [...READ, 'HKWorkoutTypeIdentifier'] as const,
+  toShare: ['HKWorkoutTypeIdentifier'] as const,
+};
+/** مفتاح نحطه على تمارين أرك في Health عشان ما نرجع نقراها كتمرين من الساعة */
+const ARQ_KEY = 'arq_session';
 
 // CategoryValueSleepAnalysis: 0 inBed, 1 asleepUnspecified, 2 awake, 3 core, 4 deep, 5 REM
 const SLEEP_KIND: Record<number, SleepKind> = { 0: 'in_bed', 1: 'asleep', 2: 'awake', 3: 'light', 4: 'deep', 5: 'rem' };
@@ -93,10 +105,10 @@ async function readDay(day: string, age: number): Promise<DailyHealth> {
 export const provider: HealthProvider = {
   id: 'apple_health',
   // لو زادت أنواع قراءة جديدة نرفع الرقم فنطلب الإذن مرة ثانية (iOS يسأل عن الجديد فقط)
-  readVersion: 2,
+  readVersion: 3,
   isAvailable: () => isHealthDataAvailableAsync(),
   // Apple لا تكشف هل مُنحت القراءة (للخصوصية)، فنعتبر الطلب ناجحاً ونعرض "لا بيانات" إن رُفض
-  requestAccess: () => requestAuthorization({ toRead: READ }),
+  requestAccess: () => requestAuthorization(AUTH),
   async readDays(n, age) {
     const out: DailyHealth[] = [];
     for (const d of lastDays(n)) out.push(await readDay(d, age));
@@ -105,4 +117,40 @@ export const provider: HealthProvider = {
     return out;
   },
   openSettings: () => { Linking.openURL('x-apple-health://').catch(() => Linking.openSettings()); },
+
+  async readWorkouts(days) {
+    const end = new Date();
+    const start = new Date(end.getTime() - days * 86_400_000);
+    const ws = await queryWorkoutSamples({ limit: 60, ascending: false, filter: { date: { startDate: start, endDate: end } } });
+    return ws
+      .filter((w) => !(w.metadata as Record<string, unknown> | undefined)?.[ARQ_KEY])
+      .map((w): ExternalWorkout => ({
+        id: w.uuid,
+        kind: workoutKind(Number(w.workoutActivityType)),
+        start: new Date(w.startDate).toISOString(),
+        end: new Date(w.endDate).toISOString(),
+        minutes: toMinutes(w.duration, w.startDate, w.endDate),
+        kcal: toKcal(w.totalEnergyBurned),
+        distance_m: toMeters(w.totalDistance),
+        source: w.sourceRevision?.source?.name ?? null,
+        from_watch: isWatch(w.device?.model, w.device?.name, w.sourceRevision?.productType),
+      }))
+      .filter((w) => w.minutes >= 1);
+  },
+
+  async sessionStats(start, end): Promise<SessionWatchStats | null> {
+    const [hr, kcal] = await Promise.all([
+      safe(queryQuantitySamples('HKQuantityTypeIdentifierHeartRate', { limit: 0, unit: 'count/min', filter: { date: { startDate: start, endDate: end } } })),
+      safe(sum('HKQuantityTypeIdentifierActiveEnergyBurned', 'kcal', start, end)),
+    ]);
+    const h = hrStats((hr ?? []).map((s) => s.quantity));
+    if (!h && kcal == null) return null;
+    return { avg_hr: h?.avg ?? null, max_hr: h?.max ?? null, kcal: kcal == null ? null : Math.round(kcal) };
+  },
+
+  async saveWorkout(w, kcal) {
+    await saveWorkoutSample(WorkoutActivityType.traditionalStrengthTraining, [], w.start, w.end,
+      kcal ? { energyBurned: kcal } : undefined, { [ARQ_KEY]: w.id, HKWorkoutBrandName: 'ARQ' });
+    return true;
+  },
 };

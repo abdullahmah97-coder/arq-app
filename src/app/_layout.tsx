@@ -139,6 +139,15 @@ function RootNavigator() {
         <Stack.Screen name="notifications/index" options={{ title: t('notif.title') }} />
         <Stack.Screen name="notifications/settings" options={{ title: t('notif.settings') }} />
         <Stack.Screen name="owner-nudges" options={{ title: t('nudge.title') }} />
+        <Stack.Screen name="owner-partners" options={{ title: t('partners.manageTitle') }} />
+        <Stack.Screen name="owner-ads" options={{ title: t('ads.ownerTitle') }} />
+        <Stack.Screen name="owner-ad" options={{ title: t('ads.new'), presentation: 'modal' }} />
+        <Stack.Screen name="partners" options={{ title: t('partners.hubName') }} />
+        <Stack.Screen name="clubs/join" options={{ title: t('partners.joinClubTitle'), presentation: 'modal' }} />
+        <Stack.Screen name="store/offer" options={{ title: t('partners.addOffer'), presentation: 'modal' }} />
+        <Stack.Screen name="store/import" options={{ title: t('partners.importTitle'), presentation: 'modal' }} />
+        <Stack.Screen name="recovery/manage" options={{ title: t('partners.centerDashboard') }} />
+        <Stack.Screen name="recovery/appointments" options={{ title: t('partners.myAppointments') }} />
       </Stack.Protected>
     </Stack>
   );

@@ -1,4 +1,4 @@
-// لوحة المالك (تظهر لمالك التطبيق فقط): تقارير المختبرين + طلبات المتاجر
+// لوحة المالك (تظهر لمالك التطبيق فقط): طلبات الموافقة لكل الشركاء، إدارة الشركاء، إعلان البداية، رسائل التحفيز، تقارير المختبرين والعروض
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, I18nManager, Linking, Modal, Pressable, TextInput, View } from 'react-native';
 import { Num } from '@/components/pulse/widgets';
 import { CoachVerifyQueue } from '@/components/coaching/CoachVerifyQueue';
+import { ClubRequestQueue } from '@/components/owner/ClubRequestQueue';
 import { CenterReviewQueue } from '@/components/recovery/CenterReviewQueue';
 import { BrandLogo } from '@/components/store/parts';
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
@@ -17,6 +18,7 @@ import {
 } from '@/lib/owner';
 import type { Brand } from '@/lib/brands';
 import { loadOffers, type Offer } from '@/lib/clubs';
+import { KIND_ICON, PARTNER_KINDS, partnerOverview, type Overview, type PartnerKind } from '@/lib/partners';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
 
@@ -25,19 +27,20 @@ const CAT_ICON = { bug: 'bug', idea: 'bulb', design: 'color-palette', other: 'ch
 export default function Owner() {
   const { t } = useTranslation();
   const [ok, setOk] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<'reports' | 'brands' | 'offers'>('reports');
+  const [tab, setTab] = useState<'reports' | 'offers'>('reports');
   const [offers, setOffers] = useState<Offer[]>([]);
   const [filter, setFilter] = useState<ReportStatus | 'all'>('new');
   const [reports, setReports] = useState<Report[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [ov, setOv] = useState<Partial<Record<PartnerKind, Overview>>>({});
   const [shot, setShot] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const admin = await isAdmin();
     setOk(admin);
     if (!admin) return;
-    const [r, b, o] = await Promise.all([loadReports(), loadBrandRequests(), loadOffers()]);
-    setReports(r); setBrands(b); setOffers(o);
+    const [r, b, o, v] = await Promise.all([loadReports(), loadBrandRequests(), loadOffers(), partnerOverview()]);
+    setReports(r); setBrands(b); setOffers(o); setOv(v);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -46,30 +49,57 @@ export default function Owner() {
 
   const count = (s: ReportStatus) => reports.filter((r) => r.status === s).length;
   const shown = reports.filter((r) => filter === 'all' || r.status === filter);
-  const pending = brands.filter((b) => b.status === 'pending');
-  const others = brands.filter((b) => b.status !== 'pending');
+  const pendingBrands = brands.filter((b) => b.status === 'pending');
+  const pendingAll = PARTNER_KINDS.reduce((n, k) => n + (ov[k]?.pending ?? 0), 0);
+  const liveAll = PARTNER_KINDS.reduce((n, k) => n + (ov[k]?.partners ?? 0), 0);
 
   return (
     <Screen edges={['bottom']}>
       <View style={{ flexDirection: 'row', gap: space.sm }}>
+        <Stat n={pendingAll} label={t('partners.pendingApprovals')} color={brand.orange} />
+        <Stat n={liveAll} label={t('partners.livePartners')} color={STATUS_COLOR.fixed} />
         <Stat n={count('new')} label={t('owner.newReports')} color={STATUS_COLOR.new} />
-        <Stat n={count('fixed')} label={t('owner.fixed')} color={STATUS_COLOR.fixed} />
-        <Stat n={pending.length} label={t('owner.pendingBrands')} color={brand.orange} />
       </View>
-      <Pressable onPress={() => router.push('/owner-nudges')} accessibilityRole="button"
-        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, backgroundColor: brand.deepGreen, borderRadius: radius.md, padding: space.md, opacity: pressed ? 0.85 : 1 })}>
-        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: brand.orange, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="flame" size={22} color={brand.cream} />
-        </View>
-        <View style={{ flex: 1, gap: 2 }}>
-          <T semibold color={brand.cream}>{t('nudge.button')}</T>
-          <T size="xs" color="rgba(248,237,218,0.75)">{t('nudge.buttonHint')}</T>
-        </View>
-        <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={brand.cream} />
-      </Pressable>
+
+      {/* طلبات الموافقة: ما يظهر أي شريك إلا بعد موافقتك */}
+      <T size="lg" bold>{t('partners.approvalsTitle')}{pendingAll ? ` (${pendingAll})` : ''}</T>
+      <ClubRequestQueue onChange={load} />
+      {pendingBrands.length ? (
+        <Card style={{ gap: space.md }}>
+          <T semibold>{t('partners.storeQueue', { count: pendingBrands.length })}</T>
+          {pendingBrands.map((b) => <BrandRequest key={b.id} b={b} onDone={load} />)}
+        </Card>
+      ) : null}
       <CoachVerifyQueue />
       <CenterReviewQueue />
-      <Segmented value={tab} onChange={setTab} options={[{ value: 'reports', label: `${t('owner.reports')} (${reports.length})` }, { value: 'brands', label: `${t('owner.brands')} (${pending.length})` }, { value: 'offers', label: `${t('owner.offers')} (${offers.length})` }]} />
+      {!pendingAll ? (
+        <Row style={{ backgroundColor: colors.card, borderRadius: radius.md, padding: space.md }}>
+          <Ionicons name="checkmark-done-circle" size={20} color={colors.success} />
+          <T size="sm" muted style={{ flex: 1 }}>{t('partners.noApprovals')}</T>
+        </Row>
+      ) : null}
+
+      {/* إدارة الشركاء */}
+      <T size="lg" bold>{t('partners.manageTitle')}</T>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+        {PARTNER_KINDS.map((k) => (
+          <Pressable key={k} onPress={() => router.push({ pathname: '/owner-partners', params: { kind: k } })} accessibilityRole="button"
+            style={({ pressed }) => ({ width: '48%', flexGrow: 1, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border,
+              padding: space.md, gap: 4, opacity: pressed ? 0.8 : 1 })}>
+            <Row>
+              <Ionicons name={KIND_ICON[k] as never} size={20} color={colors.primary} />
+              <T semibold style={{ flex: 1 }}>{t(`partners.kind_${k}`)}</T>
+              {ov[k]?.pending ? <View style={{ backgroundColor: brand.orange, borderRadius: 999, paddingHorizontal: 7 }}><T size="xs" bold color={brand.cream}>{ov[k]!.pending}</T></View> : null}
+            </Row>
+            <T size="xs" muted>{t('partners.kindCounts', { live: ov[k]?.live ?? 0, partners: ov[k]?.partners ?? 0, hidden: ov[k]?.hidden ?? 0 })}</T>
+          </Pressable>
+        ))}
+      </View>
+
+      <OwnerLink icon="megaphone" title={t('ads.ownerTitle')} sub={t('ads.ownerSub')} onPress={() => router.push('/owner-ads')} />
+      <OwnerLink icon="flame" title={t('nudge.button')} sub={t('nudge.buttonHint')} onPress={() => router.push('/owner-nudges')} />
+
+      <Segmented value={tab} onChange={setTab} options={[{ value: 'reports', label: `${t('owner.reports')} (${reports.length})` }, { value: 'offers', label: `${t('owner.offers')} (${offers.length})` }]} />
 
       {tab === 'offers' ? (
         <>
@@ -89,26 +119,12 @@ export default function Owner() {
             </Pressable>
           )) : <Empty icon="pricetags-outline" text={t('clubs.noOffers')} />}
         </>
-      ) : null}
-
-      {tab === 'offers' ? null : tab === 'reports' ? (
+      ) : (
         <>
           <Segmented<ReportStatus | 'all'> wrap value={filter} onChange={setFilter}
             options={[{ value: 'all', label: t('store.all') }, ...REPORT_STATUSES.map((s) => ({ value: s, label: `${t(`owner.st_${s}`)} ${count(s) || ''}`.trim() }))]} />
           {shown.length ? shown.map((r) => <ReportCard key={r.id} r={r} onShot={async (p) => setShot((await reportShotUrl(p)) ?? null)} onChanged={load} />)
             : <Empty icon="checkmark-done-outline" text={t('owner.noReports')} />}
-        </>
-      ) : (
-        <>
-          {pending.length ? pending.map((b) => <BrandRequest key={b.id} b={b} onDone={load} />) : <Empty icon="storefront-outline" text={t('owner.noBrandRequests')} />}
-          {others.length ? <T bold>{t('owner.reviewed')}</T> : null}
-          {others.map((b) => (
-            <Card key={b.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }} onPress={() => router.push({ pathname: '/store/[id]', params: { id: b.id } })}>
-              <BrandLogo b={b} size={40} />
-              <T semibold style={{ flex: 1 }}>{b.name}</T>
-              <T size="xs" semibold color={b.status === 'approved' ? STATUS_COLOR.fixed : colors.danger}>{t(`store.statusTitle_${b.status}`)}</T>
-            </Card>
-          ))}
         </>
       )}
 
@@ -118,6 +134,22 @@ export default function Owner() {
         </Pressable>
       </Modal>
     </Screen>
+  );
+}
+
+function OwnerLink({ icon, title, sub, onPress }: { icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button"
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, backgroundColor: brand.deepGreen, borderRadius: radius.md, padding: space.md, opacity: pressed ? 0.85 : 1 })}>
+      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: brand.orange, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name={icon} size={22} color={brand.cream} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <T semibold color={brand.cream}>{title}</T>
+        <T size="xs" color="rgba(248,237,218,0.75)">{sub}</T>
+      </View>
+      <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={brand.cream} />
+    </Pressable>
   );
 }
 

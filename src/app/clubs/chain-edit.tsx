@@ -8,6 +8,7 @@ import { ClubLogo } from '@/components/clubs/parts';
 import { Button, Input, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { saveChain, type Audience } from '@/lib/clubs';
+import { createChain } from '@/lib/partners';
 import { pickImage } from '@/lib/images';
 import { errorKey, supabase, uploadImage } from '@/lib/supabase';
 import { colors, space } from '@/theme';
@@ -27,6 +28,7 @@ export default function ChainEdit() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (!id) return; // بدون id: المالك يضيف سلسلة جديدة
     supabase.from('gym_chains').select('*').eq('id', id).single().then(({ data: c }) => {
       if (!c) return;
       setName(c.name); setNameEn(c.name_en ?? ''); setAudience(c.audience); setWebsite(c.website ?? ''); setInstagram(c.instagram ?? '');
@@ -45,7 +47,8 @@ export default function ChainEdit() {
     const web = website.trim() ? (/^https:\/\//i.test(website.trim()) ? website.trim() : `https://${website.trim().replace(/^http:\/\//i, '')}`) : null;
     setBusy(true);
     try {
-      await saveChain(String(id), { name: name.trim(), name_en: nameEn.trim() || null, audience, website: web, instagram: instagram.trim().replace(/^@/, '') || null, description: description.trim() || null, logo_path: logo });
+      const c = { name: name.trim(), name_en: nameEn.trim() || null, audience, website: web, instagram: instagram.trim().replace(/^@/, '') || null, description: description.trim() || null, logo_path: logo };
+      if (id) await saveChain(String(id), c); else await createChain(c);
       goBackOrHome();
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
   };

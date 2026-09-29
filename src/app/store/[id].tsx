@@ -4,10 +4,13 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Pressable, View } from 'react-native';
-import { BrandLogo, ProductTile, RedeemSoon } from '@/components/store/parts';
+import { BrandLogo, OfferCard, ProductTile, RedeemSoon } from '@/components/store/parts';
 import { Button, Card, Empty, Loading, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
-import { hasMacros, loadBrand, type Brand, type Product } from '@/lib/brands';
+import {
+  hasMacros, isFollowingStore, loadAnnouncements, loadBrand, loadBrandOffers, offerEvent, setFollowStore, type Announcement, type Brand, type BrandOffer, type Product,
+} from '@/lib/brands';
+import { timeAgo } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import { endSubscription, mySubscriptionWith, type MealSub } from '@/lib/mealSubs';
 import { logFood, slotForHour } from '@/lib/nutrition';
@@ -17,14 +20,27 @@ import { brand, colors, radius, space } from '@/theme';
 export default function BrandPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
-  const { num } = useLocalized();
+  const { num, lng } = useLocalized();
   const { userId, profile } = useUser();
   const [b, setB] = useState<Brand | null | undefined>(undefined);
   const [sub, setSub] = useState<MealSub | null>(null);
   const [logged, setLogged] = useState<Set<string>>(new Set());
+  const [offers, setOffers] = useState<BrandOffer[]>([]);
+  const [news, setNews] = useState<Announcement | null>(null);
+  const [following, setFollowing] = useState(false);
   useFocusEffect(useCallback(() => {
-    loadBrand(String(id)).then(setB).catch(() => setB(null));
+    loadBrand(String(id)).then((x) => {
+      setB(x);
+      if (!x) return;
+      loadBrandOffers(x.id).then((list) => {
+        const live = list.filter((o) => o.active && (!o.ends_on || o.ends_on >= new Date().toISOString().slice(0, 10)));
+        setOffers(live);
+        if (x.owner !== userId) live.forEach((o) => { offerEvent(o.id, 'view').catch(() => {}); });
+      }).catch(() => {});
+    }).catch(() => setB(null));
     mySubscriptionWith(String(id), userId).then(setSub).catch(() => {});
+    loadAnnouncements(String(id), 1).then((a) => setNews(a[0] ?? null)).catch(() => {});
+    isFollowingStore(String(id), userId).then(setFollowing).catch(() => {});
   }, [id, userId]));
   if (b === undefined) return <Loading />;
   if (!b) return <Screen><Empty text={t('store.notFound')} /></Screen>;
@@ -40,6 +56,9 @@ export default function BrandPage() {
       });
       setLogged((s) => new Set(s).add(p.id));
     } catch (e) { Alert.alert(t(errorKey(e))); }
+  };
+  const toggleFollow = async () => {
+    try { await setFollowStore(b.id, userId, !following); setFollowing(!following); } catch (e) { Alert.alert(t(errorKey(e))); }
   };
   const stop = () => sub && Alert.alert(t('subs.endTitle'), t('subs.endBody', { name: b.name }), [
     { text: t('common.cancel'), style: 'cancel' },
@@ -63,8 +82,38 @@ export default function BrandPage() {
       </View>
       {b.description ? <T style={{ lineHeight: 26 }}>{b.description}</T> : null}
 
-      {/* اشتراك الوجبات: يربط المطعم بجدولك الغذائي */}
-      {restaurant && !mine ? (
+      {!mine && b.owner ? (
+        <Pressable onPress={toggleFollow} accessibilityRole="switch" accessibilityState={{ checked: following }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1,
+            borderColor: following ? colors.success : colors.border, padding: space.md }}>
+          <Ionicons name={following ? 'notifications' : 'notifications-outline'} size={20} color={following ? colors.success : colors.primary} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <T semibold>{t(following ? 'partners.followingStore' : 'partners.followStore')}</T>
+            <T size="xs" muted>{t('partners.followStoreHint')}</T>
+          </View>
+        </Pressable>
+      ) : null}
+
+      {news ? (
+        <Card style={{ gap: 4 }}>
+          <Row gap={6}><Ionicons name="megaphone-outline" size={16} color={brand.orange} /><T semibold style={{ flex: 1 }}>{news.title}</T></Row>
+          <T size="sm" muted style={{ lineHeight: 21 }}>{news.body}</T>
+          <T size="xs" muted>{timeAgo(news.created_at, lng)}</T>
+        </Card>
+      ) : null}
+
+      {offers.length ? (
+        <View style={{ gap: space.sm }}>
+          <Row gap={6}>
+            <T size="lg" bold style={{ flex: 1 }}>{t('partners.storeOffers')}</T>
+            <View style={{ backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 8 }}><T size="xs" semibold>{t('ads.label')}</T></View>
+          </Row>
+          {offers.map((o) => <OfferCard key={o.id} o={o} siteUrl={b.website} mine={mine} />)}
+        </View>
+      ) : null}
+
+      {/* اشتراك الوجبات: يربط المطعم بجدولك الغذائي (للمطاعم الشريكة فقط) */}
+      {restaurant && !mine && b.owner ? (
         <Card style={{ gap: space.sm, borderColor: brand.orange, borderWidth: 1.5 }}>
           <Row gap={8}>
             <Ionicons name={sub?.status === 'active' ? 'checkmark-circle' : 'calendar-outline'} size={20} color={sub?.status === 'active' ? colors.success : brand.orange} />
@@ -89,7 +138,7 @@ export default function BrandPage() {
             <Card key={p.id} style={{ gap: 6 }}>
               <Row>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <T semibold>{p.name}</T>
+                  <T semibold>{p.name}{p.stock === 0 ? ` · ${t('store.soldOut')}` : ''}</T>
                   {hasMacros(p) ? (
                     <T size="xs" muted>{num(p.kcal ?? 0)} {t('common.kcal')} · {t('plan.protein')} {num(+(p.protein_g ?? 0))} · {t('plan.carbs')} {num(+(p.carbs_g ?? 0))} · {t('plan.fat')} {num(+(p.fat_g ?? 0))} {t('common.g')}</T>
                   ) : null}

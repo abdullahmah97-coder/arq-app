@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import { HomeShortcuts } from '@/components/Shortcuts';
 import { HomeRecovery } from '@/components/recovery/HomeRecovery';
 import { PushPrompt } from '@/components/PushPrompt';
 import { HomeArrange } from '@/components/pulse/HomeArrange';
+import { PartnerHome } from '@/components/partners/PartnerHome';
 import { DashboardList, MonitorCards, StrainRecoveryChart, StressCard } from '@/components/pulse/Insights';
 import { ChevronBar, MiniBars, Rings } from '@/components/pulse/Rings';
 import { MetricChip, NCard, NSection, NT, Num, OnDark, Pill, zoneColor } from '@/components/pulse/widgets';
@@ -28,6 +29,7 @@ import { adaptWorkout, useHealth } from '@/lib/health';
 import { HomeLongPress, LONG_PRESS_MS, useHomeLayout, type HomeSection } from '@/lib/homeLayout';
 import { useLocalized } from '@/lib/i18n';
 import { isBeta } from '@/lib/appInfo';
+import { kindOf, loadHomeMode, saveHomeMode, type HomeMode } from '@/lib/partners';
 import { getActiveWorkout, type ActiveWorkout } from '@/lib/training';
 import { publicUrl, supabase } from '@/lib/supabase';
 import type { LeaderboardRow } from '@/lib/types';
@@ -39,7 +41,23 @@ const IMG = {
   bottle: require('../../../assets/imagery/bottle.jpg'),
 };
 
+/** الرئيسية: للمتدرب «النبض». وللشريك لوحة التحكم أولاً، ويقدر يبدّل لوضع المتدرب */
 export default function Home() {
+  const { userId, profile } = useUser();
+  const partner = !!kindOf(profile.account_type);
+  const [mode, setMode] = useState<HomeMode | null>(null);
+  useEffect(() => {
+    if (!partner) { setMode('trainee'); return; }
+    loadHomeMode(userId).then(setMode);
+  }, [partner, userId]);
+  const switchTo = (m: HomeMode) => { saveHomeMode(userId, m); setMode(m); };
+  if (!mode) return <View style={{ flex: 1, backgroundColor: night.bg }} />;
+  return mode === 'partner' && partner
+    ? <PartnerHome onTraineeMode={() => switchTo('trainee')} />
+    : <TraineeHome onPartnerMode={partner ? () => switchTo('partner') : undefined} />;
+}
+
+function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
   const { t } = useTranslation();
   const { L, lng } = useLocalized();
   const { userId, profile, plan, refreshProfile } = useUser();
@@ -290,6 +308,13 @@ export default function Home() {
               </Pressable>
             </View>
           </View>
+
+          {onPartnerMode ? (
+            <Pressable onPress={onPartnerMode} accessibilityRole="button" style={({ pressed }) => [styles.arrange, { opacity: pressed ? 0.7 : 1, borderColor: brand.orange }]}>
+              <Ionicons name="briefcase-outline" size={15} color={brand.orange} />
+              <NT size={12} semibold color={brand.orange}>{t('partners.partnerMode')}</NT>
+            </Pressable>
+          ) : null}
 
           <PushPrompt />
 

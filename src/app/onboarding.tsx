@@ -6,6 +6,7 @@ import { GymPicker } from '@/components/GymPicker';
 import { Button, H, Input, OptionCard, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { pickImage, type PickedImage } from '@/lib/images';
+import { ACCOUNT_ICON, ACCOUNT_TYPES, type AccountType } from '@/lib/partners';
 import { generatePlan, savePlan } from '@/lib/plan';
 import { validateInput } from '@/lib/plan/rules';
 import type { PlanInput } from '@/lib/plan/types';
@@ -20,6 +21,9 @@ export default function Onboarding() {
   const { t } = useTranslation();
   const { userId, profile, health, refreshProfile, refreshPlan } = useUser();
 
+  // أول سؤال: نوع الحساب. المتدرب يكمل الأسئلة، والشريك تنفتح له لوحة الشريك وطلب الانضمام
+  const [acct, setAcct] = useState<AccountType | null>(null);
+  const [chosen, setChosen] = useState<AccountType>('trainee');
   const [step, setStep] = useState(0);
   const [gender, setGender] = useState<Gender>(health?.gender ?? 'male');
   const [birthYear, setBirthYear] = useState(health?.birth_year ? String(health.birth_year) : '');
@@ -84,13 +88,44 @@ export default function Onboarding() {
     }
   };
 
+  const choose = async () => {
+    if (chosen === 'trainee') { setAcct('trainee'); return; }
+    setBusy(true);
+    try {
+      const { error } = await supabase.from('profiles').update({ account_type: chosen, onboarded: true }).eq('id', userId);
+      if (error) throw error;
+      await refreshProfile(); // الحارس ينقله للرئيسية، ولوحة الشريك تطلب منه يكمل طلب الانضمام
+    } catch (e) {
+      Alert.alert(t(errorKey(e)));
+      setBusy(false);
+    }
+  };
+
   if (busy) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: space.lg, padding: space.xl }}>
         <Logo variant="mark" height={64} color={colors.primary} />
         <ActivityIndicator color={colors.text} />
-        <T size="lg" bold center>{t('onboarding.generating')}</T>
+        <T size="lg" bold center>{t(acct === null ? 'partners.preparing' : 'onboarding.generating')}</T>
       </View>
+    );
+  }
+
+  if (acct === null) {
+    return (
+      <Screen>
+        <View style={{ alignItems: 'center', gap: space.sm, marginTop: space.lg }}>
+          <Logo variant="mark" height={44} color={colors.primary} />
+          <H>{t('partners.whoAreYou')}</H>
+          <T muted center>{t('partners.whoAreYouSub')}</T>
+        </View>
+        {ACCOUNT_TYPES.map((a) => (
+          <OptionCard key={a} title={t(`partners.acct_${a}`)} subtitle={t(`partners.acctSub_${a}`)} icon={ACCOUNT_ICON[a] as never}
+            selected={chosen === a} onPress={() => setChosen(a)} />
+        ))}
+        {chosen !== 'trainee' ? <T size="xs" muted center style={{ lineHeight: 19 }}>{t('partners.partnerReviewNote')}</T> : null}
+        <Button title={t('common.next')} onPress={choose} />
+      </Screen>
     );
   }
 
@@ -161,7 +196,7 @@ export default function Onboarding() {
         )}
 
         <Row style={{ marginTop: space.lg }}>
-          {step > 0 ? <Button style={{ flex: 1 }} title={t('common.back')} variant="ghost" onPress={() => setStep(step - 1)} /> : null}
+          <Button style={{ flex: 1 }} title={t('common.back')} variant="ghost" onPress={() => (step > 0 ? setStep(step - 1) : setAcct(null))} />
           <Button
             style={{ flex: 2 }}
             title={step === TOTAL - 1 ? t('onboarding.finish') : step === 4 && !photo ? t('onboarding.skipPhoto') : t('common.next')}

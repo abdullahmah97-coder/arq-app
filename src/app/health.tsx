@@ -11,6 +11,7 @@ import { SaduPattern } from '@/brand/Brand';
 import { DashboardList, FitnessAgeCard, HealthMonitorCard, StrainRecoveryChart, StressCard } from '@/components/pulse/Insights';
 import { ChevronBar, MiniBars, Rings } from '@/components/pulse/Rings';
 import { NCard, NSection, NT, Num, Pill, zoneColor } from '@/components/pulse/widgets';
+import { WatchWorkoutsCard } from '@/components/pulse/WatchWorkouts';
 import { Avatar } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { addDays, isoDate, startOfWeek } from '@/lib/dates';
@@ -160,6 +161,9 @@ export default function HealthScreen() {
           </NCard>
 
           <StrainRecoveryChart />
+
+          {/* تمارين الساعة (Apple Watch) */}
+          {h.status === 'connected' ? <WatchWorkoutsCard /> : null}
 
           {/* النوم */}
           <NSection title={t('health.sleep')} />

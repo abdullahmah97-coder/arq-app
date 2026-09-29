@@ -35,7 +35,7 @@ if (Platform.OS !== 'web') {
 }
 
 /** رابط عام لملف في حاوية عامة (avatars / posts) */
-export function publicUrl(bucket: 'avatars' | 'posts' | 'brands' | 'exercises', path: string | null | undefined): string | undefined {
+export function publicUrl(bucket: 'avatars' | 'posts' | 'brands' | 'exercises' | 'ads', path: string | null | undefined): string | undefined {
   if (!path) return undefined;
   if (path.startsWith('http')) return path;
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
@@ -70,6 +70,7 @@ export const SERVER_CODES = new Set([
   'review_needs_visit', 'already_replied', 'not_a_client', 'not_enough_points', 'out_of_stock', 'reward_ended', 'reward_not_found', 'code_ended',
   'consent_required', 'scope_not_granted', 'link_not_found', 'already_linked', 'slot_full', 'no_sessions_left', 'package_expired',
   'payments_disabled', 'order_not_found', 'amount_mismatch', 'kind_not_available', 'not_a_coach', 'coach_pending_review', 'not_verified', 'brand_not_approved',
+  'note_required', 'status_locked',
 ]);
 
 /** يحوّل رسائل أخطاء الخادم إلى مفاتيح ترجمة */

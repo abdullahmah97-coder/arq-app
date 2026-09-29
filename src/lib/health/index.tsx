@@ -5,11 +5,15 @@ import { AppState, Platform } from 'react-native';
 import { useAuth } from '../auth';
 import { supabase } from '../supabase';
 import { provider } from './provider';
-import { demoDays } from './demo';
+import { demoDays, demoSessionStats, demoWorkouts } from './demo';
 import { DEFAULT_STEP_GOAL, scoreDay } from './score';
 import type { DailyHealth, DayScores, HealthSource } from './types';
+import type { SessionWatchStats, WorkoutExport } from './provider-types';
+import type { ExternalWorkout } from './workouts';
 
 export * from './types';
+export * from './workouts';
+export type { SessionWatchStats, WorkoutExport } from './provider-types';
 export { adaptWorkout, fmtDuration, DEFAULT_STEP_GOAL } from './score';
 
 type Status = 'loading' | 'disconnected' | 'connected' | 'unavailable';
@@ -38,6 +42,45 @@ interface HealthState {
 }
 
 const Ctx = createContext<HealthState | null>(null);
+
+// ---------- الساعة: تمارينها، أرقامها أثناء جلسة أرك، وحفظ الجلسة في Apple Health ----------
+/** المصدر المربوط الحين (أو null) */
+async function linkedSource(): Promise<HealthSource | null> {
+  const saved = (await AsyncStorage.getItem(KEY).catch(() => null)) as HealthSource | null;
+  return saved === 'demo' || saved === provider.id ? saved : null;
+}
+
+/** تمارين الساعة والتطبيقات الثانية لآخر n أيام (الأحدث أولاً) */
+export async function watchWorkouts(days = 14): Promise<ExternalWorkout[]> {
+  const src = await linkedSource();
+  if (!src) return [];
+  if (src === 'demo') return demoWorkouts();
+  return provider.readWorkouts ? provider.readWorkouts(days).catch(() => []) : [];
+}
+
+/** نبض وسعرات الساعة أثناء جلسة */
+export async function sessionWatchStats(start: Date, end: Date): Promise<SessionWatchStats | null> {
+  const src = await linkedSource();
+  if (!src) return null;
+  if (src === 'demo') return demoSessionStats();
+  return provider.sessionStats ? provider.sessionStats(start, end).catch(() => null) : null;
+}
+
+const EXPORTED_KEY = 'arq.health.exported';
+/** يحفظ جلسة أرك في Apple Health مرة وحدة (مع سعرات الساعة لو موجودة). يرجع true لو انحفظت الحين أو قبل */
+export async function exportWorkoutToHealth(w: WorkoutExport, kcal: number | null): Promise<boolean> {
+  const src = await linkedSource();
+  if (!src || src === 'demo' || !provider.saveWorkout) return false;
+  const done: string[] = JSON.parse((await AsyncStorage.getItem(EXPORTED_KEY).catch(() => null)) ?? '[]');
+  if (done.includes(w.id)) return true;
+  if (w.end.getTime() - w.start.getTime() < 60_000) return false;
+  const ok = await provider.saveWorkout(w, kcal).catch(() => false);
+  if (ok) await AsyncStorage.setItem(EXPORTED_KEY, JSON.stringify([w.id, ...done].slice(0, 50))).catch(() => {});
+  return ok;
+}
+
+/** هل الربط الحالي يدعم حفظ التمارين؟ (Apple Health فقط) */
+export const canExportWorkouts = () => !!provider.saveWorkout;
 
 function toRow(d: DailyHealth, s: DayScores) {
   return {

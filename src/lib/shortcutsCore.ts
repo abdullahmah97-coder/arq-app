@@ -26,6 +26,8 @@ export const SHORTCUTS = {
   devices: { icon: 'watch-outline', label: 'health.devices', to: '/devices' },
   profileEdit: { icon: 'create-outline', label: 'profile.edit', to: '/profile-edit' },
   learn: { icon: 'book-outline', label: 'profile.learn', to: '/learn/body-composition' },
+  appointments: { icon: 'calendar-clear-outline', label: 'partners.myAppointments', to: '/recovery/appointments' },
+  partners: { icon: 'briefcase-outline', label: 'partners.hubName', to: '/partners' },
 } as const;
 export type ShortcutId = keyof typeof SHORTCUTS;
 export const SHORTCUT_IDS = Object.keys(SHORTCUTS) as ShortcutId[];

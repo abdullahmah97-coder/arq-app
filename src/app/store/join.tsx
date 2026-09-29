@@ -1,18 +1,23 @@
 // أضف متجرك / عدّل متجرك: مطعم صحي، ملابس رياضية، مكملات أو معدات (يُراجع من فريق ARQ قبل الظهور)
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
 import { BrandLogo } from '@/components/store/parts';
 import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
-import { BRAND_CATEGORIES, loadMyBrand, saveBrand, type Brand, type BrandCategory } from '@/lib/brands';
+import { AdminBanner } from '@/components/partners/parts';
+import { BRAND_CATEGORIES, loadBrand, loadMyBrand, saveBrand, type Brand, type BrandCategory } from '@/lib/brands';
+import { goBackOrHome } from '@/lib/nav';
 import { pickImage } from '@/lib/images';
 import { errorKey, uploadImage } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
 
 export default function JoinStore() {
+  // ?id= المالك يعدّل أي متجر، ?new=1 المالك يضيف صفحة متجر بدون صاحب
+  const { id: adminId, new: adminNew } = useLocalSearchParams<{ id?: string; new?: string }>();
+  const admin = !!adminId || adminNew === '1';
   const { t } = useTranslation();
   const { userId } = useUser();
   const [existing, setExisting] = useState<Brand | null | undefined>(undefined);
@@ -28,14 +33,15 @@ export default function JoinStore() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    loadMyBrand(userId).then((b) => {
+    if (adminNew === '1') { setExisting(null); setAgree(true); return; }
+    (adminId ? loadBrand(String(adminId)) : loadMyBrand(userId)).then((b) => {
       setExisting(b);
       if (b) {
         setName(b.name); setTagline(b.tagline ?? ''); setDescription(b.description ?? ''); setCategory(b.category);
         setWebsite(b.website ?? ''); setInstagram(b.instagram ?? ''); setCity(b.city ?? ''); setLogo(b.logo_path); setAgree(true);
       }
     }).catch(() => setExisting(null));
-  }, [userId]);
+  }, [userId, adminId, adminNew]);
 
   if (existing === undefined) return <Loading />;
 
@@ -51,7 +57,8 @@ export default function JoinStore() {
     if (!agree) return Alert.alert(t('store.err_agree'));
     setBusy(true);
     try {
-      await saveBrand(userId, { name, tagline, description, category, website, instagram, city, logo_path: logo }, existing?.id);
+      await saveBrand(userId, { name, tagline, description, category, website, instagram, city, logo_path: logo }, existing?.id, adminNew === '1');
+      if (admin) { goBackOrHome(); return; }
       if (!existing) Alert.alert(t('store.submitted'), t('store.submittedBody'));
       router.dismissTo('/store/manage');
     } catch (e) {
@@ -61,7 +68,9 @@ export default function JoinStore() {
 
   return (
     <Screen edges={['bottom']}>
-      {!existing ? (
+      {admin ? <Stack.Screen options={{ title: adminNew === '1' ? t('partners.addStorePage') : t('store.editStore') }} /> : null}
+      {admin ? <AdminBanner /> : null}
+      {!existing && !admin ? (
         <Card style={{ gap: space.sm, backgroundColor: brand.deepGreen, borderColor: brand.deepGreen }}>
           <T bold color={brand.cream}>{t('store.joinTitle')}</T>
           {(['join1', 'join2', 'join3'] as const).map((k, i) => (
@@ -89,7 +98,7 @@ export default function JoinStore() {
       <Input label={t('store.website')} value={website} onChangeText={setWebsite} autoCapitalize="none" keyboardType="url" placeholder="yourbrand.sa" />
       <Input label={t('store.instagram')} value={instagram} onChangeText={setInstagram} autoCapitalize="none" placeholder="@yourbrand" />
 
-      {!existing ? (
+      {!existing && !admin ? (
         <Pressable onPress={() => setAgree(!agree)} accessibilityRole="checkbox" accessibilityState={{ checked: agree }}>
           <Row style={{ alignItems: 'flex-start' }}>
             <Ionicons name={agree ? 'checkbox' : 'square-outline'} size={22} color={agree ? brand.orange : colors.muted} />
@@ -98,7 +107,7 @@ export default function JoinStore() {
         </Pressable>
       ) : null}
 
-      <Button title={existing ? t('store.save') : t('store.submit')} icon={existing ? 'checkmark' : 'paper-plane-outline'} loading={busy} onPress={submit} />
+      <Button title={existing || admin ? t('store.save') : t('store.submit')} icon={existing || admin ? 'checkmark' : 'paper-plane-outline'} loading={busy} onPress={submit} />
     </Screen>
   );
 }

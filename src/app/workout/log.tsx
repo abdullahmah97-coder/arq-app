@@ -20,6 +20,7 @@ import {
 import { getExercise } from '@/three/catalog';
 import { brand, fonts, night, pulse, space } from '@/theme';
 import { goBackOrHome } from '@/lib/nav';
+import { cancelRestAlert, scheduleRestAlert } from '@/lib/restAlert';
 
 interface Draft { weight: string; reps: string }
 
@@ -47,6 +48,8 @@ export default function WorkoutLog() {
   useEffect(() => { if (exKey) loadFriendsBest(exKey.split(',')).then(setFriends).catch(() => {}); }, [exKey]);
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
   useEffect(() => { if (rest && now >= rest.until) setRest(null); }, [now, rest]);
+  // تنبيه نهاية الراحة للجوال والساعة (لو الجوال مقفل)؛ يتلغى لو تخطيت أو طلعت من التمرين
+  useEffect(() => () => { cancelRestAlert(); }, []);
 
   const update = (next: ActiveWorkout) => { setW(next); saveActiveWorkout(next); };
 
@@ -78,6 +81,7 @@ export default function WorkoutLog() {
   const toggle = async (ex: string, i: number, target: string, restSec: number) => {
     const isDone = w.done.some((s) => s.exercise_id === ex && s.set_index === i);
     if (isDone) {
+      cancelRestAlert(); setRest(null);
       update({ ...w, done: w.done.filter((s) => !(s.exercise_id === ex && s.set_index === i)) });
       unlogSet(w.session_id, ex, i).catch(() => {});
       return;
@@ -87,6 +91,11 @@ export default function WorkoutLog() {
     if (!entry.reps) return;
     update({ ...w, done: [...w.done, entry] });
     setRest({ until: Date.now() + restSec * 1000, total: restSec });
+    const ex0 = w.exercises.find((e) => e.exercise_id === ex);
+    const g0 = getExercise(ex);
+    const nextSet = i + 2;
+    scheduleRestAlert(restSec, t('watch.restDone'),
+      ex0 && nextSet <= ex0.sets + (extra[ex] ?? 0) ? t('watch.restNext', { n: nextSet, name: g0 ? L(g0.name) : ex }) : t('watch.restNextExercise'));
     try { await logSet(userId, w.session_id, entry); } catch { /* يبقى محفوظ محلياً ويُعاد عند الإنهاء */ }
   };
 
@@ -98,6 +107,7 @@ export default function WorkoutLog() {
       ]);
     }
     setBusy(true);
+    cancelRestAlert(); setRest(null);
     // إعادة إرسال أي مجموعة ما وصلت (بدون إنترنت أثناء التمرين)
     for (const s of w.done) { try { await logSet(userId, w.session_id, s); } catch {} }
     const { points } = await finishWorkout(w);
@@ -244,8 +254,8 @@ export default function WorkoutLog() {
             <NT size={13} semibold color={brand.deepGreen}>{t('workout.rest')}</NT>
             <Num size={22} color={brand.deepGreen}>{mmss(Math.max(0, (rest.until - now) / 1000))}</Num>
             <View style={{ flex: 1 }} />
-            <Pressable onPress={() => setRest({ until: rest.until + 15000, total: rest.total + 15 })} hitSlop={8}><NT size={13} bold color={brand.deepGreen}>+15</NT></Pressable>
-            <Pressable onPress={() => setRest(null)} hitSlop={8}><NT size={13} bold color={brand.deepGreen}>{t('workout.skip')}</NT></Pressable>
+            <Pressable onPress={() => { setRest({ until: rest.until + 15000, total: rest.total + 15 }); scheduleRestAlert((rest.until + 15000 - Date.now()) / 1000, t('watch.restDone'), t('watch.restNextExercise')); }} hitSlop={8}><NT size={13} bold color={brand.deepGreen}>+15</NT></Pressable>
+            <Pressable onPress={() => { setRest(null); cancelRestAlert(); }} hitSlop={8}><NT size={13} bold color={brand.deepGreen}>{t('workout.skip')}</NT></Pressable>
           </View>
         ) : null}
       </FullSafeView>

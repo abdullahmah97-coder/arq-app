@@ -11,6 +11,12 @@ import { Button, Card, Row, T, type IconName } from '@/components/ui';
 import { useHealth } from '@/lib/health';
 import { brand, colors, space, TAB_BAR_SPACE } from '@/theme';
 
+// مع ساعة أبل: وش يشتغل بدون تطبيق ساعة منفصل
+const WATCH: [IconName, string][] = [
+  ['hourglass-outline', 'watch.feat_rest'], ['chatbubble-ellipses-outline', 'watch.feat_reply'],
+  ['walk-outline', 'watch.feat_workouts'], ['heart-outline', 'watch.feat_session'], ['notifications-outline', 'watch.feat_quiet'],
+];
+
 const READS: [IconName, string][] = [
   ['footsteps', 'health.steps'], ['moon', 'health.sleep'], ['heart', 'health.rhr'], ['pulse', 'health.hrv'], ['flame', 'health.kcal'],
 ];
@@ -69,6 +75,19 @@ export default function Devices() {
           ) : (
             <Button title={t('health.connect')} icon="link" onPress={connect} loading={busy} disabled={h.status === 'unavailable'} />
           )}
+        </Card>
+      ) : null}
+
+      {!android ? (
+        <Card style={{ gap: space.sm }}>
+          <Row><Ionicons name="watch" size={18} color={brand.orange} /><T bold>{t('watch.featuresTitle')}</T></Row>
+          {WATCH.map(([icon, key]) => (
+            <Row key={key} gap={10} style={{ alignItems: 'flex-start' }}>
+              <Ionicons name={icon} size={16} color={brand.green} style={{ marginTop: 3 }} />
+              <T size="sm" style={{ flex: 1, lineHeight: 21 }}>{t(key)}</T>
+            </Row>
+          ))}
+          <T size="xs" muted style={{ lineHeight: 19 }}>{t('watch.featuresNote')}</T>
         </Card>
       ) : null}
 

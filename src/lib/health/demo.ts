@@ -1,6 +1,7 @@
 // بيانات تجريبية واقعية (للمعاينة ولمن لا يملك ساعة بعد)
 import { lastDays } from './aggregate';
 import type { DailyHealth } from './types';
+import type { ExternalWorkout } from './workouts';
 
 /** مولّد عشوائي ثابت (نفس النتائج في كل تشغيل) */
 function rng(seed: number) {
@@ -54,3 +55,16 @@ function demoHr(day: string, r: () => number) {
   return out;
 }
 
+
+// تمارين تجريبية كأنها من Apple Watch (للمعاينة فقط)
+const ago = (d: number, h: number) => new Date(Date.now() - d * 86_400_000 - h * 3_600_000);
+const demoWorkout = (id: string, kind: ExternalWorkout['kind'], d: number, h: number, minutes: number, kcal: number, distance_m: number | null): ExternalWorkout =>
+  ({ id, kind, start: ago(d, h).toISOString(), end: new Date(ago(d, h).getTime() + minutes * 60_000).toISOString(), minutes, kcal, distance_m, source: 'Workout', from_watch: true });
+
+export const demoWorkouts = (): ExternalWorkout[] => [
+  demoWorkout('d1', 'running', 0, 3, 32, 348, 5400),
+  demoWorkout('d2', 'walking', 1, 10, 45, 190, 3900),
+  demoWorkout('d3', 'hiit', 3, 2, 22, 260, null),
+  demoWorkout('d4', 'cycling', 5, 4, 50, 420, 18200),
+];
+export const demoSessionStats = () => ({ avg_hr: 128, max_hr: 164, kcal: 312 });
