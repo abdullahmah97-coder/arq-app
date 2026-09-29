@@ -2310,7 +2310,7 @@
     "hide": "Hide section",
     "moveUp": "Move up",
     "moveDown": "Move down",
-    "open": "Arrange home",
+    "open": "Customize home",
     "openHint": "or long-press any section",
     "s_rings": "Recovery, strain & sleep",
     "s_monitors": "Health & stress monitor",
@@ -2324,7 +2324,17 @@
     "s_store": "Stores, events & booking",
     "s_rules": "How points work",
     "s_recovery": "Recovery",
-    "s_shortcuts": "My shortcuts"
+    "s_shortcuts": "My shortcuts",
+    "customize": "Customize home",
+    "customizeHint": "Pick a style for the rings, then arrange or hide sections.",
+    "ringStyle": "Ring style",
+    "sections": "Sections",
+    "style_rings": "Rings",
+    "style_gauge": "Gauge",
+    "style_segments": "Segments",
+    "style_diamond": "Diamond",
+    "style_hexagon": "Hexagon",
+    "style_bars": "Bars"
   },
   "recovery": {
     "title": "Recovery",

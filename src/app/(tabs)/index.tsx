@@ -31,6 +31,7 @@ import { adaptWorkout, useHealth } from '@/lib/health';
 import { HomeLongPress, LONG_PRESS_MS, useHomeLayout, type HomeSection } from '@/lib/homeLayout';
 import { useLocalized } from '@/lib/i18n';
 import { isBeta } from '@/lib/appInfo';
+import { useRingStyle } from '@/lib/ringStyle';
 import { kindOf, loadHomeMode, saveHomeMode, type HomeMode } from '@/lib/partners';
 import { getActiveWorkout, type ActiveWorkout } from '@/lib/training';
 import { publicUrl, supabase } from '@/lib/supabase';
@@ -69,6 +70,7 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
   const [refreshing, setRefreshing] = useState(false);
   const weekdays = t('weekdaysShort', { returnObjects: true }) as string[];
   const { layout, save, ready } = useHomeLayout(userId);
+  const ringStyle = useRingStyle(userId);
   const [arranging, setArranging] = useState(false);
   const openArrange = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -111,10 +113,11 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
               size={264}
               stroke={15}
               gap={9}
+              variant={ringStyle.style}
               rings={[
-                { value: (s?.recovery ?? 0) / 100, color: zc, color2: zone === 'green' ? brand.amber : zc },
-                { value: (s?.strain ?? 0) / 21, color: brand.orange, color2: brand.amber },
-                { value: sleepMin != null && s ? sleepMin / Math.max(1, s.sleep_need_min) : 0, color: pulse.sleep, color2: night.statusBar === 'dark' ? brand.green : brand.cream },
+                { value: (s?.recovery ?? 0) / 100, color: zc, color2: zone === 'green' ? brand.amber : zc, icon: 'pulse' },
+                { value: (s?.strain ?? 0) / 21, color: brand.orange, color2: brand.amber, icon: 'flame' },
+                { value: sleepMin != null && s ? sleepMin / Math.max(1, s.sleep_need_min) : 0, color: pulse.sleep, color2: night.statusBar === 'dark' ? brand.green : brand.cream, icon: 'moon' },
               ]}
             >
               {connected && s?.recovery != null ? (
@@ -310,6 +313,11 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
               </View>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              {/* تخصيص الرئيسية: شكل الحلقات وترتيب الأقسام */}
+              <Pressable onPress={openArrange} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('homeLayout.customize')}
+                style={({ pressed }) => ({ padding: 4, opacity: pressed ? 0.6 : 1 })}>
+                <Ionicons name="settings-outline" size={22} color={night.text} />
+              </Pressable>
               <NotificationBell color={night.text} ring={night.bg2} />
               <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.avatarRing} accessibilityLabel={t('profile.title')}>
                 <Avatar uri={publicUrl('avatars', profile.avatar_url)} name={profile.full_name ?? profile.username} size={38} />
@@ -355,7 +363,10 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
           </View>
         </ScrollView>
       </SafeAreaView>
-      {arranging ? <HomeArrange visible layout={layout} onSave={save} onClose={() => setArranging(false)} /> : null}
+      {arranging ? (
+        <HomeArrange visible layout={layout} onSave={save} onClose={() => setArranging(false)}
+          ringStyle={ringStyle.style} onRingStyle={ringStyle.save} />
+      ) : null}
     </View>
     </HomeLongPress.Provider>
   );

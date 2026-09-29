@@ -6,20 +6,23 @@ import { Component, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Animated, Modal, PanResponder, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NT } from '@/components/pulse/widgets';
+import { Rings } from '@/components/pulse/Rings';
+import { NT, Num } from '@/components/pulse/widgets';
 import { DEFAULT_LAYOUT, SECTION_META, type HomeLayout, type HomeSection } from '@/lib/homeLayout';
+import { RING_STYLE_META, RING_STYLES, type RingStyle } from '@/lib/ringStyle';
 import type { IconName } from '@/components/ui';
-import { brand, night, space } from '@/theme';
+import { brand, night, pulse, space } from '@/theme';
 
 const ROW_H = 54;
 const GAP = 8;
 const STEP = ROW_H + GAP;
 
-/** قائمة ترتيب عامة (أقسام الرئيسية، الاختصارات…): سحب بعد ضغط مطول + إخفاء/إظهار + رجوع للترتيب الأصلي */
-export function ArrangeSheet<K extends string>({ title, hint, order: initialOrder, hidden: initialHidden, defaults, meta, onSave, onClose }: {
+/** قائمة ترتيب عامة (أقسام الرئيسية، الاختصارات…): سحب بعد ضغط مطول + إخفاء/إظهار + رجوع للترتيب الأصلي.
+ *  top: محتوى إضافي فوق القائمة (مثل اختيار شكل الحلقات في تخصيص الرئيسية) */
+export function ArrangeSheet<K extends string>({ title, hint, order: initialOrder, hidden: initialHidden, defaults, meta, onSave, onClose, top }: {
   title: string; hint: string; order: K[]; hidden: K[]; defaults: readonly K[];
   meta: (k: K) => { icon: string; label: string };
-  onSave: (l: { order: K[]; hidden: K[] }) => void; onClose: () => void;
+  onSave: (l: { order: K[]; hidden: K[] }) => void; onClose: () => void; top?: ReactNode;
 }) {
   const { t } = useTranslation();
   const [order, setOrder] = useState<K[]>(initialOrder);
@@ -48,6 +51,7 @@ export function ArrangeSheet<K extends string>({ title, hint, order: initialOrde
             <NT size={12} muted>{hint}</NT>
           </View>
           <ScrollView scrollEnabled={!dragging} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}>
+            {top}
             <SortableList
               data={order}
               onDragState={setDragging}
@@ -86,12 +90,61 @@ export function ArrangeSheet<K extends string>({ title, hint, order: initialOrde
   );
 }
 
-/** ترتيب أقسام الرئيسية */
-export function HomeArrange({ layout, onSave, onClose }: { visible?: boolean; layout: HomeLayout; onSave: (l: HomeLayout) => void; onClose: () => void }) {
+/** تخصيص الرئيسية: شكل الحلقات فوق، وتحته ترتيب الأقسام وإخفاؤها */
+export function HomeArrange({ layout, onSave, onClose, ringStyle, onRingStyle }: {
+  visible?: boolean; layout: HomeLayout; onSave: (l: HomeLayout) => void; onClose: () => void;
+  ringStyle?: RingStyle; onRingStyle?: (s: RingStyle) => void;
+}) {
   const { t } = useTranslation();
+  const picker = ringStyle && onRingStyle ? (
+    <View style={{ gap: space.sm, marginBottom: space.lg }}>
+      <NT size={14} bold>{t('homeLayout.ringStyle')}</NT>
+      <RingStylePicker value={ringStyle} onChange={onRingStyle} />
+      <NT size={14} bold style={{ marginTop: space.md }}>{t('homeLayout.sections')}</NT>
+      <NT size={12} muted>{t('homeLayout.hint')}</NT>
+    </View>
+  ) : null;
   return (
-    <ArrangeSheet<HomeSection> title={t('homeLayout.title')} hint={t('homeLayout.hint')} order={layout.order} hidden={layout.hidden}
+    <ArrangeSheet<HomeSection> title={t(picker ? 'homeLayout.customize' : 'homeLayout.title')} hint={t(picker ? 'homeLayout.customizeHint' : 'homeLayout.hint')}
+      order={layout.order} hidden={layout.hidden} top={picker}
       defaults={DEFAULT_LAYOUT.order} meta={(k) => ({ icon: SECTION_META[k].icon, label: t(SECTION_META[k].label) })} onSave={onSave} onClose={onClose} />
+  );
+}
+
+/** معاينة حية صغيرة لكل شكل: تضغط عليه وينطبق على طول */
+const SAMPLE = [0.76, 0.62, 0.88];
+export function RingStylePicker({ value, onChange }: { value: RingStyle; onChange: (s: RingStyle) => void }) {
+  const { t } = useTranslation();
+  const sample = [
+    { value: SAMPLE[0], color: pulse.green, color2: brand.amber, icon: 'pulse' as const },
+    { value: SAMPLE[1], color: brand.orange, color2: brand.amber, icon: 'flame' as const },
+    { value: SAMPLE[2], color: pulse.sleep, color2: night.statusBar === 'dark' ? brand.green : brand.cream, icon: 'moon' as const },
+  ];
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 2 }}>
+      {RING_STYLES.map((s) => {
+        const on = s === value;
+        return (
+          <Pressable key={s} onPress={() => { Haptics.selectionAsync().catch(() => {}); onChange(s); }}
+            accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={t(RING_STYLE_META[s].label)}
+            style={({ pressed }) => ({
+              width: 108, alignItems: 'center', gap: 8, paddingVertical: 12, borderRadius: 18,
+              backgroundColor: on ? night.cardStrong : night.card, borderWidth: on ? 2 : 1, borderColor: on ? brand.amber : night.line,
+              opacity: pressed ? 0.8 : 1,
+            })}>
+            <Rings rings={sample} size={78} stroke={6} gap={3.5} variant={s} animate={false}>
+              <Num size={s === 'bars' ? 20 : 17} color={night.text}>76</Num>
+            </Rings>
+            <NT size={12} semibold color={on ? brand.amber : night.text} numberOfLines={1}>{t(RING_STYLE_META[s].label)}</NT>
+            {on ? (
+              <View style={{ position: 'absolute', top: 6, end: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: brand.amber, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="checkmark" size={14} color={brand.deepGreen} />
+              </View>
+            ) : null}
+          </Pressable>
+        );
+      })}
+    </ScrollView>
   );
 }
 
