@@ -8,7 +8,7 @@ import { Button, Card, Empty, Input, Loading, Row, Screen, Segmented, T } from '
 import { useUser } from '@/lib/auth';
 import {
   claimMembership, loadMyFeedback, loadMyMemberships, loadMyRequests, myReferral, requestChange, sendGymFeedback, STATE_COLOR, type MyMembership,
-} from '@/lib/gymops';
+ daysLeftText } from '@/lib/gymops';
 import { useLocalized } from '@/lib/i18n';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
@@ -117,7 +117,7 @@ function MembershipCard({ m, lng, compact, pending, open, onOpen, userId, onDone
             <View style={{ width: `${pct * 100}%`, height: '100%', backgroundColor: m.days_left <= 7 ? brand.orange : brand.deepGreen }} />
           </View>
           <Row style={{ justifyContent: 'space-between' }}>
-            <T size="sm" semibold color={m.days_left <= 7 ? brand.orange : colors.text}>{t('gymops.daysLeft', { count: m.days_left })}</T>
+            <T size="sm" semibold color={m.days_left <= 7 ? brand.orange : colors.text}>{daysLeftText(t, m.days_left)}</T>
             <T size="xs" muted>{t('gymops.endsOn', { date: m.ends_on })}</T>
           </Row>
           {m.state === 'frozen' && m.frozen_until ? <T size="xs" color="#5B8DEF">{t('gymops.frozenUntil', { date: m.frozen_until })}</T> : null}

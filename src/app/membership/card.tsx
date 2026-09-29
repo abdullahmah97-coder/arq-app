@@ -8,7 +8,7 @@ import { QrCode } from '@/components/gymops/QrCode';
 import { WalletButton } from '@/components/gymops/WalletButton';
 import { Avatar, Button, Empty, Loading, Screen, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { entryLink, loadMyMemberships, newEntryToken, type MyMembership } from '@/lib/gymops';
+import { entryLink, loadMyMemberships, newEntryToken, type MyMembership, daysLeftText } from '@/lib/gymops';
 import { useLocalized } from '@/lib/i18n';
 import { errorKey, publicUrl } from '@/lib/supabase';
 import { brand, radius, space } from '@/theme';
@@ -64,7 +64,7 @@ export default function EntryCard() {
         <View style={{ width: '70%', height: 4, borderRadius: 2, backgroundColor: 'rgba(248,237,218,0.25)', overflow: 'hidden' }}>
           <View style={{ width: `${(left / REFRESH_MS) * 100}%`, height: '100%', backgroundColor: brand.amber }} />
         </View>
-        {mem ? <T size="sm" semibold color={brand.cream}>{t('gymops.daysLeft', { count: mem.days_left })}</T> : null}
+        {mem ? <T size="sm" semibold color={brand.cream}>{daysLeftText(t, mem.days_left)}</T> : null}
       </BrandGradient>
       <T size="sm" muted center>{t('gymops.cardHint')}</T>
       <WalletButton />

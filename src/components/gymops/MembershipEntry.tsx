@@ -5,7 +5,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { T } from '@/components/ui';
-import { loadMyMemberships, loadStaffGyms, type MyMembership, type StaffGym } from '@/lib/gymops';
+import { loadMyMemberships, loadStaffGyms, type MyMembership, type StaffGym, daysLeftText } from '@/lib/gymops';
 import { useLocalized } from '@/lib/i18n';
 import { brand, colors, radius, space } from '@/theme';
 
@@ -28,7 +28,7 @@ export function MembershipEntry() {
         </View>
         <View style={{ flex: 1 }}>
           <T semibold>{t('gymops.myMembership')}</T>
-          <T size="xs" muted numberOfLines={1}>{m ? `${name} · ${t('gymops.daysLeft', { count: m.days_left })}` : t('gymops.entryHint')}</T>
+          <T size="xs" muted numberOfLines={1}>{m ? `${name} · ${daysLeftText(t, m.days_left)}` : t('gymops.entryHint')}</T>
         </View>
         {m ? (
           <Pressable onPress={() => router.push('/membership/card')} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('gymops.showCard')}

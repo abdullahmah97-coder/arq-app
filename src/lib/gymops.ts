@@ -22,6 +22,10 @@ export type MemberFilter = 'all' | 'expiring' | 'expired' | 'inactive' | 'pendin
 
 const ok = <T>(r: { data: T | null; error: any }): T => { if (r.error) throw r.error; return r.data as T; };
 
+/** «باقي ٥ أيام» أو «آخر يوم»، وللمنتهي «انتهى قبل ٢٠ يوم» بدل «باقي -20 يوم» */
+export const daysLeftText = (t: (key: string, opts?: Record<string, unknown>) => string, n: number) =>
+  n < 0 ? t('gymops.endedAgo', { count: -n }) : t('gymops.daysLeft', { count: n });
+
 // ---------- العضو ----------
 export async function loadMyMemberships(): Promise<MyMembership[]> {
   const { data, error } = await supabase.rpc('my_memberships');

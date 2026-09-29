@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, Share, View } from 'react-native';
 import { Avatar, Button, Card, Empty, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
-import { isGymStaff, loadGymMembers, nudgeInactive, STATE_COLOR, type GymMember, type MemberFilter } from '@/lib/gymops';
+import { isGymStaff, loadGymMembers, nudgeInactive, STATE_COLOR, type GymMember, type MemberFilter, daysLeftText } from '@/lib/gymops';
 import { errorKey, publicUrl } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
 
@@ -62,7 +62,7 @@ export default function Members() {
               <View style={{ backgroundColor: STATE_COLOR[m.state], borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
                 <T size="xs" semibold color="#fff">{t(`gymops.state_${m.state}`)}</T>
               </View>
-              <T size="xs" semibold color={m.days_left <= 7 ? brand.orange : colors.muted}>{t('gymops.daysLeft', { count: m.days_left })}</T>
+              <T size="xs" semibold color={m.days_left <= 7 ? brand.orange : colors.muted}>{daysLeftText(t, m.days_left)}</T>
             </View>
           </Card>
         </Pressable>

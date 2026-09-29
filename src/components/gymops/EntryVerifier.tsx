@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, TextInput, View } from 'react-native';
 import { Avatar, Button, Card, Empty, Loading, Row, T } from '@/components/ui';
-import { loadStaffGyms, rememberEntryGym, savedEntryGym, verifyEntry, type EntryResult, type StaffGym } from '@/lib/gymops';
+import { loadStaffGyms, rememberEntryGym, savedEntryGym, verifyEntry, type EntryResult, type StaffGym, daysLeftText } from '@/lib/gymops';
 import { useLocalized } from '@/lib/i18n';
 import { errorKey, publicUrl } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
@@ -113,7 +113,7 @@ function ResultPanel({ r, onNext }: { r: EntryResult; onNext: () => void }) {
             <T size="lg" bold>{r.member_name}</T>
             {r.username ? <T size="xs" muted>@{r.username}</T> : null}
             {r.plan_name ? <T size="sm">{r.plan_name}</T> : null}
-            {r.days_left != null ? <T size="sm" semibold color={r.days_left <= 7 ? brand.orange : colors.text}>{t('gymops.daysLeft', { count: r.days_left })} · {r.ends_on}</T> : null}
+            {r.days_left != null ? <T size="sm" semibold color={r.days_left <= 7 ? brand.orange : colors.text}>{daysLeftText(t, r.days_left)} · {r.ends_on}</T> : null}
           </View>
         </Card>
       ) : null}
