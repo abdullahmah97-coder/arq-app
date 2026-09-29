@@ -61,7 +61,8 @@ export const CURATED_PHOTOS: Record<string, string[]> = Object.fromEntries(
 );
 
 /** تمارين أرك الأساسية اللي ما تطابق اسمها تلقائياً مع المصدر: نربطها يدوياً بصور نفس الحركة
- * (كل مجلد في الحاوية فيه صورتين). اللي ما لها صورة مطابقة (مثل البيربي وجلسة الحائط) تبقى بالمجسّم */
+ * (كل مجلد في الحاوية فيه صورتين). اللي ما لها صورة مطابقة (مثل البيربي وجلسة الحائط) تبقى بالمجسّم.
+ * «!» قبل الاسم: صور المصدر معكوسة (النهاية أول)، فنقلبها عشان تطلع «بداية الحركة» صح */
 const MANUAL_PHOTOS: Record<string, string> = {
   split_squat: 'Split_Squats',
   walking_lunge: 'Dumbbell_Lunges',
@@ -71,10 +72,10 @@ const MANUAL_PHOTOS: Record<string, string> = {
   single_leg_rdl: 'Kettlebell_One-Legged_Deadlift',
   hip_thrust_db: 'Barbell_Hip_Thrust',
   kb_swing: 'One-Arm_Kettlebell_Swings',
-  pec_deck: 'Butterfly',
+  pec_deck: '!Butterfly',
   reverse_pec_deck: 'Reverse_Machine_Flyes',
   db_pullover: 'Bent-Arm_Dumbbell_Pullover',
-  lateral_raise_cable: 'Standing_Low-Pulley_Deltoid_Raise',
+  lateral_raise_cable: '!Standing_Low-Pulley_Deltoid_Raise',
   rear_delt_raise: 'Seated_Bent-Over_Rear_Delt_Raise',
   front_raise: 'Front_Dumbbell_Raise',
   barbell_shrug: 'Barbell_Shrug',
@@ -83,4 +84,7 @@ const MANUAL_PHOTOS: Record<string, string> = {
   hanging_knee_raise: 'Hanging_Leg_Raise',
   lying_leg_raise: 'Flat_Bench_Lying_Leg_Raise',
 };
-for (const [id, fid] of Object.entries(MANUAL_PHOTOS)) CURATED_PHOTOS[id] ??= photoPaths(fid, 2);
+for (const [id, spec] of Object.entries(MANUAL_PHOTOS)) {
+  const paths = photoPaths(spec.replace(/^!/, ''), 2);
+  CURATED_PHOTOS[id] ??= spec.startsWith('!') ? paths.reverse() : paths;
+}
