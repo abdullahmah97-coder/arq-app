@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { Button, H, Input, Row, Screen, T } from '@/components/ui';
 import { currentLocale } from '@/lib/i18n';
+import { handOffEmail } from '@/lib/passwordReset';
 import { errorKey, supabase } from '@/lib/supabase';
 import type { Gender } from '@/lib/types';
 import { Logo } from '@/brand/Brand';
@@ -19,6 +20,13 @@ export default function SignUp() {
   const [gender, setGender] = useState<Gender | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /** عنده حساب من قبل: نوديه لتسجيل الدخول أو لاسترجاع كلمة المرور */
+  const alreadyHave = (title: string, body: string) => Alert.alert(title, body, [
+    { text: t('auth.forgot'), onPress: () => { handOffEmail(email); router.replace('/forgot-password'); } },
+    { text: t('auth.signIn'), onPress: () => router.back() },
+    { text: t('common.cancel'), style: 'cancel' },
+  ]);
+
   const submit = async () => {
     const u = username.trim().toLowerCase();
     if (!fullName || !u || !email || !password || !gender) return Alert.alert(t('errors.required'));
@@ -27,7 +35,7 @@ export default function SignUp() {
 
     setBusy(true);
     const { data: taken } = await supabase.from('profiles').select('id').eq('username', u).maybeSingle();
-    if (taken) { setBusy(false); return Alert.alert(t('errors.usernameTaken')); }
+    if (taken) { setBusy(false); return alreadyHave(t('errors.usernameTaken'), t('auth.usernameTakenHint')); }
 
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -35,7 +43,12 @@ export default function SignUp() {
       options: { data: { username: u, full_name: fullName.trim(), gender, locale: currentLocale() } },
     });
     setBusy(false);
-    if (error) return Alert.alert(t(errorKey(error)));
+    if (error) {
+      const key = errorKey(error);
+      return key === 'errors.emailTaken' ? alreadyHave(t(key), t('auth.emailTakenHint')) : Alert.alert(t(key));
+    }
+    // الإيميل مسجّل من قبل: Supabase يرد «نجاح» بحساب وهمي بدون هويات عشان ما يكشف الحسابات، فنكشفه هنا
+    if (data.user && (data.user.identities?.length ?? 0) === 0) return alreadyHave(t('errors.emailTaken'), t('auth.emailTakenHint'));
     if (!data.session) {
       Alert.alert(t('auth.checkEmail'));
       router.back();

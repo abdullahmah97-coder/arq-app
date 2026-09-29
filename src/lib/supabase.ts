@@ -84,6 +84,12 @@ export function errorKey(e: unknown): string {
   if (msg.includes('already_checked_in')) return 'errors.alreadyCheckedIn';
   if (msg.includes('Invalid login credentials')) return 'errors.invalidLogin';
   if (msg.includes('User already registered')) return 'errors.emailTaken';
+  // أخطاء الدخول والاسترجاع (Supabase Auth يرجع رمز الخطأ في code)
+  const authCode = String((e as any)?.code ?? '');
+  if (authCode === 'otp_expired' || msg.includes('Token has expired or is invalid')) return 'errors.badCode';
+  if (authCode.startsWith('over_') || msg.includes('only request this after') || /email rate limit/i.test(msg)) return 'errors.tooSoon';
+  if (authCode === 'weak_password' || msg.includes('Password should')) return 'errors.shortPassword';
+  if (authCode === 'email_address_invalid' || msg.includes('validate email address')) return 'errors.badEmail';
   if (msg.includes('duplicate key') && msg.includes('username')) return 'errors.usernameTaken';
   if (msg.includes('duplicate key')) return 'errors.duplicate';
   if (msg.includes('Network request failed') || msg.includes('Failed to fetch')) return 'errors.network';

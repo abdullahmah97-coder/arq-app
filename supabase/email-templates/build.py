@@ -48,8 +48,8 @@ def features():
 
 def code_box(token):
     return f"""<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto">
-  <tr><td align="center" style="background:{CREAM};border:2px dashed {AMBER};border-radius:16px;padding:18px 34px">
-    <div dir="ltr" style="font-family:'SF Mono',Menlo,Consolas,'Courier New',monospace;font-size:34px;font-weight:700;letter-spacing:10px;color:{DEEP};line-height:1.1">{token}</div>
+  <tr><td align="center" style="background:{CREAM};border:2px dashed {AMBER};border-radius:16px;padding:16px 20px">
+    <div dir="ltr" style="font-family:'SF Mono',Menlo,Consolas,'Courier New',monospace;font-size:32px;font-weight:700;letter-spacing:5px;color:{DEEP};line-height:1.1;white-space:nowrap">{token}</div>
   </td></tr>
 </table>"""
 
@@ -172,13 +172,13 @@ T = {
     note='إذا ما طلبت هذا التغيير، تجاهل الإيميل وحسابك يبقى على حاله.',
     en_title='Confirm your new email', en_body='Confirm {{ .NewEmail }} as the new email for your ARQ account.', en_action=en_link('Confirm new email')),
   'reset-password': dict(
-    subject='غيّر كلمة المرور في أرك 🔑 | Reset your ARQ password',
-    preheader='غيّر كلمة مرورك بخطوة وحدة',
-    badge='reset', eyebrow='كلمة المرور', title='نسيت كلمة المرور؟', title_plain='إعادة تعيين كلمة المرور في أرك',
-    body='ولا يهمك، تصير. اضغط الزر وحط كلمة مرور جديدة لحسابك في أرك.',
-    action_html=button(URL, 'غيّر كلمة المرور'), fallback=fallback(URL),
-    note='إذا ما طلبت هذا، تجاهل الإيميل وكلمة مرورك ما تتغير.',
-    en_title='Reset your password', en_body='Tap the link to set a new password for your ARQ account.', en_action=en_link('Reset password')),
+    subject='رمز استرجاع حسابك في أرك 🔑 | Your ARQ password reset code',
+    preheader='رمز التحقق لتغيير كلمة المرور في أرك',
+    badge='reset', eyebrow='كلمة المرور', title='نسيت كلمة المرور؟', title_plain='رمز استرجاع حسابك في أرك',
+    body='ولا يهمك، تصير. اكتب هذا الرمز في التطبيق بصفحة «نسيت كلمة المرور؟» مع كلمة مرور جديدة، وتدخل حسابك على طول:',
+    action_html=code_box('{{ .Token }}'),
+    note='الرمز يشتغل مرة وحدة وينتهي بعد ساعة. لا تعطيه لأي أحد، حتى لو قال إنه من أرك.<br>إذا ما طلبت هذا، تجاهل الإيميل وكلمة مرورك ما تتغير.',
+    en_title='Reset your password', en_body='Enter this code in the ARQ app under “Forgot password?” together with a new password: <b style="color:' + DEEP + ';letter-spacing:2px">{{ .Token }}</b>', en_action='<span style="font-family:' + EN + ';font-size:12px;color:' + MUTED + '">The code works once and expires in 1 hour. Never share it with anyone. Didn’t ask for it? Ignore this email.</span>'),
   'reauthentication': dict(
     subject='رمز التحقق من أرك | Your ARQ verification code',
     preheader='رمز التحقق حقك من أرك',
