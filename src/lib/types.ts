@@ -31,7 +31,7 @@ export interface Profile {
   cover?: 'auto' | 'ember' | 'palm' | 'oasis' | 'dune' | 'lavender' | 'night' | 'gold';
   cover_url?: string | null;
   /** نوع الحساب يتحدد أول التسجيل: متدرب أو شريك (نادي، مدرب، متجر، مطعم، مركز) */
-  account_type?: 'trainee' | 'club' | 'coach' | 'store' | 'restaurant' | 'center';
+  account_type?: 'trainee' | 'club' | 'coach' | 'store' | 'restaurant' | 'center' | 'venue';
 }
 
 export type PresenceVisibility = 'gym' | 'friends' | 'hidden';

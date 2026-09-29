@@ -9,6 +9,7 @@ import { Num } from '@/components/pulse/widgets';
 import { CoachVerifyQueue } from '@/components/coaching/CoachVerifyQueue';
 import { ClubRequestQueue } from '@/components/owner/ClubRequestQueue';
 import { CenterReviewQueue } from '@/components/recovery/CenterReviewQueue';
+import { VenueReviewQueue } from '@/components/bookings/VenueReviewQueue';
 import { BrandLogo } from '@/components/store/parts';
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { timeAgo } from '@/lib/dates';
@@ -104,6 +105,7 @@ export default function Owner() {
       ) : null}
       <CoachVerifyQueue />
       <CenterReviewQueue />
+      <VenueReviewQueue onChange={load} />
       {!pendingAll ? (
         <Row style={{ backgroundColor: colors.card, borderRadius: radius.md, padding: space.md }}>
           <Ionicons name="checkmark-done-circle" size={20} color={colors.success} />

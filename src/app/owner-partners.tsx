@@ -97,6 +97,9 @@ export default function OwnerPartners() {
       if (!r.owner_id) items.push({ icon: 'link-outline', label: t('partners.linkOwner'), onPress: () => assign(r) });
     } else if (kind === 'coach') {
       items.push({ icon: 'eye-outline', label: t('partners.openPage'), onPress: () => router.push({ pathname: '/coaches/[id]', params: { id: r.id } }) });
+    } else if (kind === 'venue') {
+      items.push({ icon: 'eye-outline', label: t('partners.openPage'), onPress: () => router.push({ pathname: '/book/[id]', params: { id: r.id } }) });
+      if (!r.owner_id) items.push({ icon: 'link-outline', label: t('partners.linkOwner'), onPress: () => assign(r) });
     } else {
       items.push({ icon: 'speedometer-outline', label: t('partners.openDashboardFor'), onPress: () => router.push({ pathname: '/recovery/manage', params: { id: r.id } }) });
       items.push({ icon: 'create-outline', label: t('partners.editPage'), onPress: () => router.push({ pathname: '/recovery/join', params: { id: r.id } }) });
@@ -121,7 +124,7 @@ export default function OwnerPartners() {
       <Segmented<PartnerKind> wrap value={kind} onChange={(k) => { setKind(k); setGroup('all'); }} options={PARTNER_KINDS.map((k) => ({ value: k, label: t(`partners.kind_${k}`) }))} />
       <Row gap={space.sm}>
         <View style={{ flex: 1 }}><Input value={q} onChangeText={setQ} placeholder={t('partners.searchPh')} /></View>
-        <Button icon="add" title={t(`partners.add_${kind}`)} onPress={add} />
+        {kind !== 'venue' ? <Button icon="add" title={t(`partners.add_${kind}`)} onPress={add} /> : null}
       </Row>
       <Segmented<StatusGroup | 'all'> wrap value={group} onChange={setGroup} options={[
         { value: 'all', label: `${t('store.all')} ${rows?.length ?? ''}`.trim() },
@@ -159,6 +162,8 @@ function PartnerRowCard({ r, kind, onPress }: { r: PartnerRow; kind: PartnerKind
   const meta = kind === 'club' ? t('partners.clubMeta', { b: r.meta.branches ?? 0, m: r.meta.managers ?? 0, o: r.meta.offers ?? 0 })
     : kind === 'store' ? [t(`store.cat_${r.meta.category}`), r.meta.city, t('partners.productsN', { n: r.meta.products ?? 0 })].filter(Boolean).join(' · ')
     : kind === 'coach' ? [r.meta.city, t('partners.clientsN', { n: r.meta.clients ?? 0 })].filter(Boolean).join(' · ')
+    : kind === 'venue' ? [((r.meta.sports ?? []) as string[]).map((x) => t(`book.sport_${x}`)).join('، '), r.meta.city,
+        r.listed_by === 'owner' ? t('venue.metaCounts', { c: r.meta.courts ?? 0, k: r.meta.classes ?? 0, b: r.meta.upcoming ?? 0 }) : t('book.onTheirSite')].filter(Boolean).join(' · ')
     : [t(`recovery.kind_${r.meta.kind}`), (r.meta.cities ?? []).slice(0, 2).join('، ')].filter(Boolean).join(' · ');
   const statusLabel = r.status === 'listed' ? t('partners.st_listed') : r.status === 'approved' && r.partner ? t('partners.st_partner')
     : r.status === 'approved' ? t('partners.st_live') : t(`partners.st_${r.status === 'suspended' ? 'hidden' : r.status}`);

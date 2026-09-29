@@ -16,6 +16,7 @@ const JOIN: Record<PartnerKind, { icon: Icon; route: string }> = {
   store: { icon: 'storefront-outline', route: '/store/join' },
   coach: { icon: 'person-outline', route: '/coaching/profile' },
   center: { icon: 'medkit-outline', route: '/recovery/join' },
+  venue: { icon: 'tennisball-outline', route: '/venues/join' },
 };
 
 export function PartnerHub({ compact }: { compact?: boolean }) {
@@ -27,9 +28,9 @@ export function PartnerHub({ compact }: { compact?: boolean }) {
 
   const chosen = kindOf(profile.account_type as AccountType | undefined);
   const has: Record<PartnerKind, boolean> = {
-    club: !!(s.chains.length || s.gyms.length || s.clubRequest), store: !!s.store, coach: !!s.coach, center: !!s.center,
+    club: !!(s.chains.length || s.gyms.length || s.clubRequest), store: !!s.store, coach: !!s.coach, center: !!s.center, venue: !!s.venue,
   };
-  const toJoin = (['club', 'store', 'coach', 'center'] as PartnerKind[]).filter((k) => !has[k])
+  const toJoin = (['club', 'store', 'coach', 'center', 'venue'] as PartnerKind[]).filter((k) => !has[k])
     .sort((a, b) => Number(b === chosen) - Number(a === chosen));
 
   return (
@@ -99,11 +100,21 @@ export function PartnerHub({ compact }: { compact?: boolean }) {
         </Card>
       ) : null}
 
+      {/* الملعب أو الاستوديو */}
+      {s.venue ? (
+        <Card style={{ gap: 2 }}>
+          <Head icon="tennisball" title={t('venue.dashboard')} />
+          <Row style={{ paddingTop: 6 }}><T bold style={{ flex: 1 }}>{s.venue.name}</T><StatusPill status={s.venue.status} label={t(`venue.st_${s.venue.status}`)} /></Row>
+          <DashLink icon="calendar-outline" title={t('partners.openDashboard')} sub={t('venue.dashSub')} onPress={() => router.push('/venues/manage')} />
+          {!compact ? <DashLink icon="create-outline" title={t('venue.editTitle')} onPress={() => router.push('/venues/join')} /> : null}
+        </Card>
+      ) : null}
+
       {/* الانضمام لباقي الفئات */}
       {toJoin.length ? (
         <Card style={{ gap: 2 }}>
           <T bold>{t(chosen && !has[chosen] ? 'partners.completeJoin' : 'partners.joinAs')}</T>
-          {toJoin.slice(0, compact ? 1 : 4).map((k) => (
+          {toJoin.slice(0, compact ? 1 : 5).map((k) => (
             <DashLink key={k} icon={JOIN[k].icon} title={t(`partners.join_${k}`)} sub={t(`partners.joinSub_${k}`)}
               onPress={() => router.push(JOIN[k].route as never)} />
           ))}

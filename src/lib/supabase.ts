@@ -71,12 +71,14 @@ export const SERVER_CODES = new Set([
   'consent_required', 'scope_not_granted', 'link_not_found', 'already_linked', 'slot_full', 'no_sessions_left', 'package_expired',
   'payments_disabled', 'order_not_found', 'amount_mismatch', 'kind_not_available', 'not_a_coach', 'coach_pending_review', 'not_verified', 'brand_not_approved',
   'note_required', 'status_locked',
+  'too_late', 'bad_slot', 'slot_taken', 'class_full', 'venue_unavailable', 'too_many_bookings', 'too_early', 'bad_sport',
 ]);
 
 /** يحوّل رسائل أخطاء الخادم إلى مفاتيح ترجمة */
 export function errorKey(e: unknown): string {
   const msg = String((e as any)?.message ?? e ?? '');
-  if (msg.includes('too_far')) return 'errors.tooFar';
+  // too_far:123 = بعيد عن النادي (تسجيل الحضور)، أما too_far_ahead فهو موعد حجز بعيد
+  if (/too_far(?!_ahead)/.test(msg)) return 'errors.tooFar';
   if (msg.includes('already_checked_in')) return 'errors.alreadyCheckedIn';
   if (msg.includes('Invalid login credentials')) return 'errors.invalidLogin';
   if (msg.includes('User already registered')) return 'errors.emailTaken';

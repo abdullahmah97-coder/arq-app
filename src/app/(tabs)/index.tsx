@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Logo, SaduPattern } from '@/brand/Brand';
 import { CheckInCard } from '@/components/CheckInCard';
 import { HomeClubOffers } from '@/components/clubs/HomeClubOffers';
+import { HomeBookingTile } from '@/components/bookings/HomeBookingTile';
 import { HomeEventsTile } from '@/components/events/HomeEventsTile';
 import { NotificationBell } from '@/components/NotificationBell';
 import { HomeNutrition } from '@/components/nutrition/HomeNutrition';
@@ -248,7 +249,8 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
     checkin: <CheckInCard onChange={loadRank} />,
     clubs: <HomeClubOffers />,
     store: <>
-          {/* مربعين جنب بعض: المتاجر، والبطولات والفعاليات المحلية */}
+          {/* مربعين جنب بعض: المتاجر، والبطولات والفعاليات المحلية، وتحتها حجز الملاعب والحصص */}
+          <View style={{ gap: 10 }}>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Pressable style={({ pressed }) => [styles.store, pressed && { opacity: 0.9 }]} onPress={() => router.push('/store')} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS} accessibilityRole="button" accessibilityLabel={t('store.title')}>
               <Image source={IMG.bottle} style={styles.storeImg} contentFit="cover" />
@@ -262,6 +264,8 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
               </View>
             </Pressable>
             <HomeEventsTile style={{ flex: 1 }} />
+          </View>
+          <HomeBookingTile />
           </View>
           </>,
     rules: <>

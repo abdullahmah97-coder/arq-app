@@ -1,19 +1,20 @@
 // الشركاء: نوع الحساب، بوابة الشركاء، طلبات انضمام الأندية، ولوحة تحكم المالك بكل الشركاء (مفروضة في القاعدة)
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadMyVenue, type Venue } from './bookings';
 import { loadMyBrand, type Brand } from './brands';
 import { loadMyCoachProfile, type CoachProfile } from './coaching';
 import { loadStaffGyms, type StaffGym } from './gymops';
 import { loadMyCenter, type RecoveryCenter } from './recovery';
 import { supabase } from './supabase';
 
-export type PartnerKind = 'club' | 'store' | 'coach' | 'center';
-export const PARTNER_KINDS: PartnerKind[] = ['club', 'store', 'coach', 'center'];
-export type AccountType = 'trainee' | 'club' | 'coach' | 'store' | 'restaurant' | 'center';
-export const ACCOUNT_TYPES: AccountType[] = ['trainee', 'club', 'coach', 'restaurant', 'store', 'center'];
+export type PartnerKind = 'club' | 'store' | 'coach' | 'center' | 'venue';
+export const PARTNER_KINDS: PartnerKind[] = ['club', 'store', 'coach', 'center', 'venue'];
+export type AccountType = 'trainee' | 'club' | 'coach' | 'store' | 'restaurant' | 'center' | 'venue';
+export const ACCOUNT_TYPES: AccountType[] = ['trainee', 'club', 'coach', 'restaurant', 'store', 'center', 'venue'];
 export const ACCOUNT_ICON: Record<AccountType, string> = {
-  trainee: 'barbell-outline', club: 'business-outline', coach: 'person-outline', restaurant: 'restaurant-outline', store: 'storefront-outline', center: 'medkit-outline',
+  trainee: 'barbell-outline', club: 'business-outline', coach: 'person-outline', restaurant: 'restaurant-outline', store: 'storefront-outline', center: 'medkit-outline', venue: 'tennisball-outline',
 };
-export const KIND_ICON: Record<PartnerKind, string> = { club: 'business-outline', store: 'storefront-outline', coach: 'person-outline', center: 'medkit-outline' };
+export const KIND_ICON: Record<PartnerKind, string> = { club: 'business-outline', store: 'storefront-outline', coach: 'person-outline', center: 'medkit-outline', venue: 'tennisball-outline' };
 
 /** فئة الشريك من نوع الحساب (المطعم متجر) */
 export const kindOf = (a: AccountType | null | undefined): PartnerKind | null =>
@@ -79,23 +80,25 @@ export interface PartnerState {
   store: Brand | null;
   coach: CoachProfile | null;
   center: RecoveryCenter | null;
+  venue: Venue | null;
 }
 
 export async function loadPartnerState(me: string): Promise<PartnerState> {
-  const [cm, gyms, clubRequest, store, coach, center] = await Promise.all([
+  const [cm, gyms, clubRequest, store, coach, center, venue] = await Promise.all([
     supabase.from('chain_managers').select('gym_chains(id, name, name_en, partner, active)').eq('user_id', me),
     loadStaffGyms().catch(() => [] as StaffGym[]),
     myClubRequest(me).catch(() => null),
     loadMyBrand(me).catch(() => null),
     loadMyCoachProfile(me).catch(() => null),
     loadMyCenter(me).catch(() => null),
+    loadMyVenue(me).catch(() => null),
   ]);
   const chains = ((cm.data ?? []) as any[]).map((r) => r.gym_chains).filter(Boolean) as ManagedChain[];
-  return { chains, gyms: gyms.filter((g) => g.role === 'manager'), clubRequest, store, coach, center };
+  return { chains, gyms: gyms.filter((g) => g.role === 'manager'), clubRequest, store, coach, center, venue };
 }
 
 /** هل الحساب شريك فعلي (عنده صفحة أو إدارة) */
-export const hasPartnerAccess = (s: PartnerState) => !!(s.chains.length || s.gyms.length || s.store || s.coach || s.center);
+export const hasPartnerAccess = (s: PartnerState) => !!(s.chains.length || s.gyms.length || s.store || s.coach || s.center || s.venue);
 
 // ---------- لوحة المالك ----------
 export type RowStatus = 'pending' | 'approved' | 'rejected' | 'suspended' | 'listed';
