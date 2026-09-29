@@ -24,7 +24,7 @@ import { restoreTheme, saveTheme, ThemeCtx } from '@/lib/appTheme';
 const MODAL_ROUTES = new Set([
   'post/new', 'challenge/new', 'feedback', 'program/new', 'tip/new',
   'clubs/chain-edit', 'clubs/review', 'clubs/offer', 'store/join', 'store/product', 'food/add', 'food/photo', 'exercise/[id]',
-  'checkin/index',
+  'checkin/index', 'owner-event',
 ]);
 
 const navTheme = () => ({
@@ -150,6 +150,10 @@ function RootNavigator() {
         <Stack.Screen name="store/import" options={{ title: t('partners.importTitle'), presentation: 'modal' }} />
         <Stack.Screen name="recovery/manage" options={{ title: t('partners.centerDashboard') }} />
         <Stack.Screen name="recovery/appointments" options={{ title: t('partners.myAppointments') }} />
+        <Stack.Screen name="events/index" options={{ title: t('events.title') }} />
+        <Stack.Screen name="events/[id]" options={{ title: '' }} />
+        <Stack.Screen name="owner-events" options={{ title: t('events.title') }} />
+        <Stack.Screen name="owner-event" options={{ title: t('events.new'), presentation: 'modal' }} />
       </Stack.Protected>
     </Stack>
   );

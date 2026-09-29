@@ -16,14 +16,14 @@ import {
 import { listPartners, statusGroup, type PartnerRow } from '@/lib/partners';
 import { brand, colors, radius, space } from '@/theme';
 
-const QUICK_LINKS = ['/store', '/clubs', '/coaches', '/recovery', '/partners'] as const;
+const QUICK_LINKS = ['/store', '/events', '/clubs', '/coaches', '/recovery', '/partners'] as const;
 const PARTNER_TARGETS: AdPartnerTarget[] = ['store', 'club', 'coach', 'center'];
 const isPartner = (t: AdTarget): t is AdPartnerTarget => (PARTNER_TARGETS as string[]).includes(t);
 const TARGET_ICON: Record<AdTarget, keyof typeof Ionicons.glyphMap> = {
   none: 'remove-circle-outline', store: 'storefront-outline', club: 'business-outline', coach: 'person-outline', center: 'medkit-outline', page: 'apps-outline', url: 'link-outline',
 };
 const QUICK_LABEL: Record<(typeof QUICK_LINKS)[number], string> = {
-  '/store': 'store.title', '/clubs': 'clubs.title', '/coaches': 'coaching.directory', '/recovery': 'recovery.title', '/partners': 'partners.hubName',
+  '/store': 'store.title', '/events': 'events.title', '/clubs': 'clubs.title', '/coaches': 'coaching.directory', '/recovery': 'recovery.title', '/partners': 'partners.hubName',
 };
 
 export default function OwnerAdEdit() {

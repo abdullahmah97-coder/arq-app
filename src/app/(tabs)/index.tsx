@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Logo, SaduPattern } from '@/brand/Brand';
 import { CheckInCard } from '@/components/CheckInCard';
 import { HomeClubOffers } from '@/components/clubs/HomeClubOffers';
+import { HomeEventsTile } from '@/components/events/HomeEventsTile';
 import { NotificationBell } from '@/components/NotificationBell';
 import { HomeNutrition } from '@/components/nutrition/HomeNutrition';
 import { HomeShortcuts } from '@/components/Shortcuts';
@@ -247,18 +248,21 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
     checkin: <CheckInCard onChange={loadRank} />,
     clubs: <HomeClubOffers />,
     store: <>
-          {/* متجر الشركاء: أضف متجرك + استبدال النقاط (قريباً) */}
-          <Pressable style={styles.store} onPress={() => router.push('/store')} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS} accessibilityRole="button" accessibilityLabel={t('store.title')}>
-            <Image source={IMG.bottle} style={styles.storeImg} contentFit="cover" />
-            <View style={{ flex: 1, gap: 4, padding: space.md }}>
-              <NT size={16} bold color={brand.deepGreen}>{t('store.homeTitle')}</NT>
-              <NT size={12} color={brand.green}>{t('store.homeBody')}</NT>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <Pill color={brand.cream} bg={brand.orange}>{t('store.soon')}</Pill>
-                <NT size={11} color={brand.green} numberOfLines={1} style={{ flexShrink: 1 }}>{t('store.redeemShort')}</NT>
+          {/* مربعين جنب بعض: المتاجر، والبطولات والفعاليات المحلية */}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Pressable style={({ pressed }) => [styles.store, pressed && { opacity: 0.9 }]} onPress={() => router.push('/store')} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS} accessibilityRole="button" accessibilityLabel={t('store.title')}>
+              <Image source={IMG.bottle} style={styles.storeImg} contentFit="cover" />
+              <View style={styles.storeBody}>
+                <NT size={15} bold color={brand.deepGreen} numberOfLines={2} style={{ lineHeight: 22 }}>{t('store.homeTitle')}</NT>
+                <NT size={11} color={brand.green} numberOfLines={2} style={{ lineHeight: 17 }}>{t('store.homeShort')}</NT>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="gift-outline" size={12} color={brand.orange} />
+                  <NT size={10} semibold color={brand.orange} numberOfLines={1} style={{ flexShrink: 1 }}>{t('store.redeemSoon')}</NT>
+                </View>
               </View>
-            </View>
-          </Pressable>
+            </Pressable>
+            <HomeEventsTile style={{ flex: 1 }} />
+          </View>
           </>,
     rules: <>
           <NCard onPress={() => setShowRules((x) => !x)}>
@@ -361,7 +365,8 @@ const styles = StyleSheet.create({
   avatarRing: { padding: 2, borderRadius: 24, borderWidth: 1.5, borderColor: brand.orange },
   cta: { backgroundColor: brand.amber, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7, alignSelf: 'center' },
   mission: { height: 250, borderRadius: 22, overflow: 'hidden' },
-  store: { flexDirection: 'row', alignItems: 'center', backgroundColor: brand.cream, borderRadius: 20, overflow: 'hidden' },
-  storeImg: { width: 108, height: 116 },
+  store: { flex: 1, height: 212, backgroundColor: brand.cream, borderRadius: 20, overflow: 'hidden' },
+  storeImg: { width: '100%', height: 112 },
+  storeBody: { flex: 1, justifyContent: 'flex-end', gap: 3, paddingHorizontal: 12, paddingBottom: 12 },
   arrange: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: night.line },
 });

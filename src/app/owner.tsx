@@ -20,6 +20,7 @@ import type { Brand } from '@/lib/brands';
 import { loadOffers, type Offer } from '@/lib/clubs';
 import { listLaunchAds, type LaunchAdRow } from '@/lib/launchAds';
 import { adState } from '@/lib/launchAdsCore';
+import { listAllEvents, nextHighlight, upcomingEvents, type LocalEvent } from '@/lib/localEvents';
 import { KIND_ICON, PARTNER_KINDS, partnerOverview, type Overview, type PartnerKind } from '@/lib/partners';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
@@ -28,6 +29,7 @@ const CAT_ICON = { bug: 'bug', idea: 'bulb', design: 'color-palette', other: 'ch
 
 export default function Owner() {
   const { t } = useTranslation();
+  const { lng } = useLocalized();
   const [ok, setOk] = useState<boolean | null>(null);
   const [tab, setTab] = useState<'reports' | 'offers'>('reports');
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -37,17 +39,18 @@ export default function Owner() {
   const [ov, setOv] = useState<Partial<Record<PartnerKind, Overview>>>({});
   const [shot, setShot] = useState<string | null>(null);
   const [ads, setAds] = useState<LaunchAdRow[]>([]);
+  const [events, setEvents] = useState<LocalEvent[]>([]);
 
   const load = useCallback(async () => {
     const admin = await isAdmin();
     setOk(admin);
     if (!admin) return;
     // كل جزء يتحمّل لحاله: لو تعطّل واحد تبقى باقي اللوحة شغالة
-    const [r, b, o, v, a] = await Promise.all([
+    const [r, b, o, v, a, ev] = await Promise.all([
       loadReports().catch(() => [] as Report[]), loadBrandRequests().catch(() => [] as Brand[]), loadOffers().catch(() => [] as Offer[]),
-      partnerOverview().catch(() => ({})), listLaunchAds().catch(() => [] as LaunchAdRow[]),
+      partnerOverview().catch(() => ({})), listLaunchAds().catch(() => [] as LaunchAdRow[]), listAllEvents().catch(() => [] as LocalEvent[]),
     ]);
-    setReports(r); setBrands(b); setOffers(o); setOv(v); setAds(a);
+    setReports(r); setBrands(b); setOffers(o); setOv(v); setAds(a); setEvents(ev);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -60,6 +63,8 @@ export default function Owner() {
   const pendingAll = PARTNER_KINDS.reduce((n, k) => n + (ov[k]?.pending ?? 0), 0);
   const liveAll = PARTNER_KINDS.reduce((n, k) => n + (ov[k]?.partners ?? 0), 0);
   const liveAd = ads.filter((a) => adState(a) === 'live').sort((a, b) => b.priority - a.priority || b.created_at.localeCompare(a.created_at))[0];
+  const shownEvents = upcomingEvents(events);
+  const homeEvent = nextHighlight(events);
 
   return (
     <Screen edges={['bottom']}>
@@ -76,6 +81,11 @@ export default function Owner() {
       </View>
       <OwnerLink icon="megaphone" title={t('ads.ownerTitle')} sub={liveAd ? t('owner.adLive', { title: liveAd.title }) : t('owner.adNone')} onPress={() => router.push('/owner-ads')} />
       <OwnerLink icon="flame" title={t('nudge.button')} sub={t('nudge.buttonHint')} onPress={() => router.push('/owner-nudges')} />
+      <OwnerLink icon="trophy" title={t('events.title')}
+        sub={!shownEvents.length ? t('events.adminSubNone') : homeEvent
+          ? t('events.adminSub', { count: shownEvents.length, name: lng === 'en' && homeEvent.title_en ? homeEvent.title_en : homeEvent.title })
+          : t('events.adminSubCount', { count: shownEvents.length })}
+        onPress={() => router.push('/owner-events')} />
 
       {/* طلبات الموافقة: ما يظهر أي شريك إلا بعد موافقتك */}
       <T size="lg" bold>{t('partners.approvalsTitle')}{pendingAll ? ` (${pendingAll})` : ''}</T>
