@@ -37,7 +37,7 @@ export function useSleepSettings(userId: string) {
 }
 
 export interface SleepTexts {
-  wakeTitle: string; wakeBody: string; bedTitle: string; bedBody: string; stop: string; snooze: string;
+  wakeTitle: string; wakeBody: string; bedTitle: string; bedBody: string; stop: string; open: string;
 }
 /** alarmkit = منبّه حقيقي، notification = إشعار بصوت، denied = الإشعارات/المنبّهات مقفلة، off = مطفي */
 export type WakeMode = 'alarmkit' | 'notification' | 'denied' | 'off';
@@ -78,7 +78,7 @@ export async function applySleepSchedule(s: SleepSettings, needMin: number, text
     if (alarmSupported() && auth === 'authorized') {
       const ok = await scheduleAlarm({
         id: WAKE_ALARM_ID, hour, minute, weekdays: s.days.map((d) => d + 1),
-        title: text.wakeTitle, stopLabel: text.stop, snoozeLabel: text.snooze, snoozeMinutes: 9, tint: '#F1551D',
+        title: text.wakeTitle, stopLabel: text.stop, openLabel: text.open, tint: '#F1551D',
       });
       if (ok) result.wake = 'alarmkit';
     }

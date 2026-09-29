@@ -3252,7 +3252,7 @@
     "stepHint": "Long-press + or − to move by half an hour",
     "days": "Alarm days",
     "alarm": "Ringing alarm",
-    "alarmReal": "A real alarm like the Clock app: rings even on silent, with a 9-minute snooze.",
+    "alarmReal": "A real alarm like the Clock app: rings even on silent, and opens ARQ on your day from the alarm screen.",
     "alarmNotif": "A notification with sound at wake time. The real alarm needs iOS 26.",
     "remind": "Remind me at bedtime",
     "remindSub": "You'll get a reminder at {{at}} to be in bed by {{bed}}.",
@@ -3272,6 +3272,6 @@
     "bedTitle": "Bedtime is close 🌙",
     "bedBody": "Go to bed at {{at}} to get your sleep and wake up fresh.",
     "stop": "Stop",
-    "snooze": "Snooze"
+    "openApp": "Open ARQ"
   }
 }

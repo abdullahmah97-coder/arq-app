@@ -115,7 +115,7 @@ function useSleepTexts(bedMin: number): SleepTexts {
     bedTitle: t('sleep.bedTitle'),
     bedBody: t('sleep.bedBody', { at: clockLabel(bedMin, lng) }),
     stop: t('sleep.stop'),
-    snooze: t('sleep.snooze'),
+    open: t('sleep.openApp'),
   }), [t, lng, bedMin]);
 }
 

@@ -20,8 +20,7 @@ struct ArqAlarmOptions: Record {
   @Field var fireAtMs: Double = 0
   @Field var title: String = "ARQ"
   @Field var stopLabel: String = "Stop"
-  @Field var snoozeLabel: String = "Snooze"
-  @Field var snoozeMinutes: Int = 9
+  @Field var openLabel: String = "Open ARQ"
   @Field var tint: String = "#F1551D"
 }
 
@@ -80,40 +79,34 @@ public class ArqAlarmModule: Module {
           schedule = Alarm.Schedule.relative(Alarm.Schedule.Relative(time: time, repeats: recurrence))
         }
 
+        // زر «إيقاف» وزر «افتح أرك» (يفتح التطبيق على يومك). ما نستخدم الغفوة بالعدّ التنازلي
+        // لأنها تحتاج نشاط مباشر (Live Activity) في إضافة ويدجت، وبدونها ممكن ما ترجع ترن
         let stopButton = AlarmButton(
           text: LocalizedStringResource(stringLiteral: options.stopLabel),
           textColor: Color.white,
           systemImageName: "stop.circle"
         )
-        let snoozeButton = AlarmButton(
-          text: LocalizedStringResource(stringLiteral: options.snoozeLabel),
+        let openButton = AlarmButton(
+          text: LocalizedStringResource(stringLiteral: options.openLabel),
           textColor: Color.white,
-          systemImageName: "zzz"
+          systemImageName: "sun.max"
         )
         let alert = AlarmPresentation.Alert(
           title: LocalizedStringResource(stringLiteral: options.title),
           stopButton: stopButton,
-          secondaryButton: snoozeButton,
-          secondaryButtonBehavior: .countdown
+          secondaryButton: openButton,
+          secondaryButtonBehavior: .custom
         )
         let attributes = AlarmAttributes<ArqAlarmMetadata>(
           presentation: AlarmPresentation(alert: alert),
           metadata: ArqAlarmMetadata(),
           tintColor: ArqAlarmModule.color(options.tint)
         )
-        // الغفوة: يرن مرة ثانية بعد عدد الدقائق
-        let snooze = Alarm.CountdownDuration(
-          preAlert: nil,
-          postAlert: TimeInterval(max(1, min(30, options.snoozeMinutes)) * 60)
-        )
-        let stopIntent: any LiveActivityIntent = ArqAlarmStopIntent()
-        let secondaryIntent: (any LiveActivityIntent)? = nil
-        let configuration = AlarmManager.AlarmConfiguration<ArqAlarmMetadata>(
-          countdownDuration: snooze,
+        let configuration = AlarmManager.AlarmConfiguration.alarm(
           schedule: schedule,
           attributes: attributes,
-          stopIntent: stopIntent,
-          secondaryIntent: secondaryIntent,
+          stopIntent: nil,
+          secondaryIntent: ArqAlarmOpenIntent(),
           sound: .default
         )
         _ = try await AlarmManager.shared.schedule(id: uuid, configuration: configuration)
@@ -190,11 +183,11 @@ public class ArqAlarmModule: Module {
 @available(iOS 26.0, *)
 struct ArqAlarmMetadata: AlarmMetadata {}
 
-/// زر «إيقاف»: النظام يوقف المنبّه بنفسه، وهذا بس يبلّغنا (ما يفتح التطبيق)
+/// زر «افتح أرك» على شاشة المنبّه: يوقف المنبّه ويفتح التطبيق
 @available(iOS 26.0, *)
-struct ArqAlarmStopIntent: LiveActivityIntent {
-  static var title: LocalizedStringResource = "Stop ARQ alarm"
-  static var openAppWhenRun: Bool = false
+struct ArqAlarmOpenIntent: LiveActivityIntent {
+  static var title: LocalizedStringResource = "Open ARQ"
+  static var openAppWhenRun: Bool = true
   static var isDiscoverable: Bool = false
 
   init() {}

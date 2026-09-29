@@ -15,8 +15,8 @@ export interface AlarmOptions {
   fireAtMs?: number;
   title: string;
   stopLabel: string;
-  snoozeLabel: string;
-  snoozeMinutes?: number;
+  /** زر ثاني على شاشة المنبّه يفتح التطبيق */
+  openLabel: string;
   tint?: string;
 }
 
