@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PulseTabBar } from '@/components/pulse/TabBar';
 import { ScreenErrorBoundary } from '@/components/ScreenErrorBoundary';
 import { LaunchAdGate } from '@/components/ads/LaunchAd';
+import { UpdateBanner } from '@/components/UpdateBanner';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -20,7 +21,9 @@ export default function TabsLayout() {
       <Tabs.Screen name="compete" options={{ title: t('compete.title') }} />
       <Tabs.Screen name="profile" options={{ title: t('profile.title') }} />
     </Tabs>
-    {/* إعلان البداية: يظهر مرة بعد فتح التطبيق حسب إعدادات المالك */}
+    {/* تحديث فوري جاهز: زر «حدّث الحين» بدل إعادة فتح التطبيق مرتين */}
+    <UpdateBanner />
+    {/* إعلان البداية: يظهر مرة بعد فتح التطبيق حسب إعدادات إدارة التطبيق */}
     <LaunchAdGate />
     </>
   );

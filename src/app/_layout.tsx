@@ -70,6 +70,8 @@ function RootNavigator() {
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.bg },
         headerBackButtonDisplayMode: 'minimal',
+        // الصفحات اللي تحط عنوانها بنفسها بعد التحميل ما يطلع فيها اسم المسار (مثل coaches/[id])
+        title: '',
         // زر رجوع خاص يشتغل دائماً (بدل الأصلي)، وزر إغلاق للنوافذ
         headerLeft: () => <HeaderBack close={MODAL_ROUTES.has(route.name)} />,
         gestureEnabled: true,
