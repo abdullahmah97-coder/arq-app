@@ -1,17 +1,23 @@
 // التنبيهات (الجرس): جديد / سابقاً — كل تنبيه يودّيك للمكان المناسب لما تضغطه
+// وتقدر تحذف تنبيه (⋯ أو ضغطة مطوّلة) أو تعلّمه مقروء، ومن فوق: تعليم الكل كمقروء أو حذف الكل
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, IconButton, T } from '@/components/ui';
+import { showActions } from '@/lib/actionSheet';
+import { useUser } from '@/lib/auth';
 import { timeAgo } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import { openHref } from '@/lib/nav';
-import { loadNotifications, markNotificationsRead, notifHref, setUnreadBadge, type NotifKind, type NotifRow } from '@/lib/notifications';
+import {
+  deleteAllNotifications, deleteNotifications, loadNotifications, markNotificationsRead, notifHref, setUnreadBadge, type NotifKind, type NotifRow,
+} from '@/lib/notifications';
+import { clearFeedNotifications } from '@/lib/push';
 import { RANKS } from '@/lib/ranks';
-import { publicUrl } from '@/lib/supabase';
+import { errorKey, publicUrl } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -41,6 +47,7 @@ type Item = { type: 'label'; key: string; text: string } | { type: 'row'; key: s
 export default function Notifications() {
   const { t } = useTranslation();
   const { lng } = useLocalized();
+  const { userId } = useUser();
   const [rows, setRows] = useState<NotifRow[] | null>(null);
   const [unreadIds, setUnreadIds] = useState<Set<number>>(new Set());
   const [more, setMore] = useState(true);
@@ -57,6 +64,7 @@ export default function Notifications() {
       setUnreadIds(new Set(r.filter((x) => !x.read_at).map((x) => x.id)));
       if (r.some((x) => !x.read_at)) await markNotificationsRead(r[0].id);
       setUnreadBadge(0);
+      void clearFeedNotifications();
     } catch {
       setRows((cur) => cur ?? []);
     }
@@ -76,6 +84,53 @@ export default function Notifications() {
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
+  const dropFresh = (ids: number[]) => setUnreadIds((cur) => {
+    const next = new Set(cur);
+    ids.forEach((id) => next.delete(id));
+    return next;
+  });
+
+  /** حذف تنبيه (يختفي على طول، ولو فشل الحذف يرجع) */
+  const remove = async (ids: number[]) => {
+    const before = rows;
+    setRows((cur) => (cur ?? []).filter((x) => !ids.includes(x.id)));
+    dropFresh(ids);
+    try { await deleteNotifications(ids); } catch (e) { setRows(before); Alert.alert(t(errorKey(e))); }
+  };
+
+  const markAllRead = async () => {
+    setUnreadIds(new Set());
+    setUnreadBadge(0);
+    try { await markNotificationsRead(); } catch { /* الصفحة أصلاً تعلّمها مقروءة لما تنفتح */ }
+    void clearFeedNotifications();
+  };
+
+  const removeAll = () => Alert.alert(t('notif.deleteAllTitle'), t('notif.deleteAllBody'), [
+    { text: t('common.cancel'), style: 'cancel' },
+    {
+      text: t('notif.deleteAll'), style: 'destructive', onPress: async () => {
+        if (!userId) return;
+        const before = rows;
+        setRows([]); setUnreadIds(new Set()); setMore(false);
+        try {
+          await deleteAllNotifications(userId);
+          setUnreadBadge(0);
+          void clearFeedNotifications();
+        } catch (e) { setRows(before); setMore(true); Alert.alert(t(errorKey(e))); }
+      },
+    },
+  ]);
+
+  const openMenu = () => showActions(undefined, [
+    { label: t('notif.markAllRead'), onPress: () => void markAllRead() },
+    { label: t('notif.deleteAll'), onPress: removeAll, destructive: true },
+  ], t('common.cancel'));
+
+  const itemMenu = (n: NotifRow, fresh: boolean) => showActions(undefined, [
+    ...(fresh ? [{ label: t('notif.markRead'), onPress: () => dropFresh([n.id]) }] : []),
+    { label: t('notif.delete'), onPress: () => void remove([n.id]), destructive: true },
+  ], t('common.cancel'));
+
   const items: Item[] = [];
   const fresh = (rows ?? []).filter((n) => unreadIds.has(n.id));
   const old = (rows ?? []).filter((n) => !unreadIds.has(n.id));
@@ -91,7 +146,12 @@ export default function Notifications() {
   return (
     <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.bg }}>
       <Stack.Screen options={{
-        headerRight: () => <IconButton icon="settings-outline" onPress={() => router.push('/notifications/settings')} />,
+        headerRight: () => (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+            {rows?.length ? <IconButton icon="ellipsis-horizontal-circle-outline" onPress={openMenu} /> : null}
+            <IconButton icon="settings-outline" onPress={() => router.push('/notifications/settings')} />
+          </View>
+        ),
       }} />
       {rows === null ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.primary} /></View>
@@ -105,7 +165,7 @@ export default function Notifications() {
           onEndReachedThreshold={0.4}
           renderItem={({ item }) => item.type === 'label'
             ? <T size="sm" bold muted style={{ marginTop: space.sm }}>{item.text}</T>
-            : <NotifItem n={item.n} fresh={item.fresh} lng={lng} />}
+            : <NotifItem n={item.n} fresh={item.fresh} lng={lng} onMore={() => itemMenu(item.n, item.fresh)} />}
           ListEmptyComponent={
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md, paddingHorizontal: space.xl }}>
               <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' }}>
@@ -138,7 +198,8 @@ function useNotifText() {
   };
 }
 
-function NotifItem({ n, fresh, lng }: { n: NotifRow; fresh: boolean; lng: 'ar' | 'en' }) {
+function NotifItem({ n, fresh, lng, onMore }: { n: NotifRow; fresh: boolean; lng: 'ar' | 'en'; onMore: () => void }) {
+  const { t } = useTranslation();
   const text = useNotifText();
   const { parts, name } = text(n);
   const k = KIND_ICON[n.kind] ?? { icon: 'notifications' as IconName, color: colors.primary };
@@ -147,6 +208,8 @@ function NotifItem({ n, fresh, lng }: { n: NotifRow; fresh: boolean; lng: 'ar' |
   return (
     <Pressable
       onPress={() => { if (href) openHref(href); }}
+      onLongPress={onMore}
+      delayLongPress={350}
       accessibilityRole="button"
       style={({ pressed }) => ({
         flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: 16,
@@ -191,6 +254,11 @@ function NotifItem({ n, fresh, lng }: { n: NotifRow; fresh: boolean; lng: 'ar' |
         <T size="xs" muted>{timeAgo(n.created_at, lng)}</T>
       </View>
       {fresh ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} /> : null}
+      {/* خيارات التنبيه: مقروء / حذف */}
+      <Pressable onPress={onMore} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('notif.options')}
+        style={({ pressed }) => ({ padding: 4, opacity: pressed ? 0.5 : 1 })}>
+        <Ionicons name="ellipsis-vertical" size={18} color={colors.muted} />
+      </Pressable>
     </Pressable>
   );
 }

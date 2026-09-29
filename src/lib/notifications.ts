@@ -42,6 +42,19 @@ export async function markNotificationsRead(upto?: number) {
   await supabase.rpc('mark_notifications_read', { p_upto: upto ?? null });
 }
 
+/** يحذف تنبيهات معيّنة (القاعدة تسمح لكل واحد يحذف تنبيهاته هو بس) */
+export async function deleteNotifications(ids: number[]): Promise<void> {
+  if (!ids.length) return;
+  const { error } = await supabase.from('notifications').delete().in('id', ids);
+  if (error) throw error;
+}
+
+/** يمسح كل تنبيهاتي */
+export async function deleteAllNotifications(userId: string): Promise<void> {
+  const { error } = await supabase.from('notifications').delete().eq('user_id', userId);
+  if (error) throw error;
+}
+
 export async function loadNotifyPrefs(userId: string): Promise<NotifyPrefs> {
   const { data } = await supabase.from('profiles').select('notify_prefs').eq('id', userId).maybeSingle();
   return { ...DEFAULT_PREFS, ...((data?.notify_prefs as Partial<NotifyPrefs>) ?? {}) };

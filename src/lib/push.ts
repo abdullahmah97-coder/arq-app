@@ -176,6 +176,18 @@ export async function clearChatNotifications(other: string) {
   syncAppBadge();
 }
 
+/** يشيل إشعارات الجوال (غير الرسائل) من شاشة القفل ومركز الإشعارات بعد ما قريتها في التطبيق */
+export async function clearFeedNotifications() {
+  if (Platform.OS === 'web') return;
+  try {
+    const shown = await Notifications.getPresentedNotificationsAsync();
+    await Promise.all(shown
+      .filter((n) => !String((n.request.content.data as { url?: unknown } | undefined)?.url ?? '').startsWith('/chat/'))
+      .map((n) => Notifications.dismissNotificationAsync(n.request.identifier).catch(() => {})));
+  } catch { /* غير مهم */ }
+  syncAppBadge();
+}
+
 /** رقم أيقونة التطبيق = التنبيهات غير المقروءة + الرسائل غير المقروءة */
 async function syncAppBadge() {
   try {

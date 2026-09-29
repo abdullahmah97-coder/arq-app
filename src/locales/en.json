@@ -1278,7 +1278,14 @@
     "askTitle": "Get notified?",
     "askBody": "We'll let you know when someone messages you, follows you, invites you to a challenge, or your gym posts an offer. You can change this anytime.",
     "askYes": "Turn on",
-    "askLater": "Later"
+    "askLater": "Later",
+    "options": "Notification options",
+    "markAllRead": "Mark all as read",
+    "markRead": "Mark as read",
+    "delete": "Delete notification",
+    "deleteAll": "Delete all notifications",
+    "deleteAllTitle": "Delete all notifications?",
+    "deleteAllBody": "They'll be removed from here for good. Messages and friends aren't affected."
   },
   "nudge": {
     "title": "Motivation notifications",
