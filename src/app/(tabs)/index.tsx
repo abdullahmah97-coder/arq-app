@@ -45,12 +45,12 @@ const IMG = {
 export default function Home() {
   const { userId, profile } = useUser();
   const partner = !!kindOf(profile.account_type);
-  const [mode, setMode] = useState<HomeMode | null>(null);
+  const [saved, setSaved] = useState<HomeMode | null>(null);
   useEffect(() => {
-    if (!partner) { setMode('trainee'); return; }
-    loadHomeMode(userId).then(setMode);
+    if (partner) loadHomeMode(userId).then(setSaved);
   }, [partner, userId]);
-  const switchTo = (m: HomeMode) => { saveHomeMode(userId, m); setMode(m); };
+  const mode: HomeMode | null = partner ? saved : 'trainee';
+  const switchTo = (m: HomeMode) => { saveHomeMode(userId, m); setSaved(m); };
   if (!mode) return <View style={{ flex: 1, backgroundColor: night.bg }} />;
   return mode === 'partner' && partner
     ? <PartnerHome onTraineeMode={() => switchTo('trainee')} />

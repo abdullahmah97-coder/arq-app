@@ -22,7 +22,7 @@ export default function JoinCenter() {
   const admin = !!adminId || adminNew === '1';
   const { t } = useTranslation();
   const { userId } = useUser();
-  const [existing, setExisting] = useState<RecoveryCenter | null | undefined>(undefined);
+  const [existing, setExisting] = useState<RecoveryCenter | null | undefined>(adminNew === '1' ? null : undefined);
   const [name, setName] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [kind, setKind] = useState<CenterKind>('physio');
@@ -35,14 +35,14 @@ export default function JoinCenter() {
   const [instagram, setInstagram] = useState('');
   const [license, setLicense] = useState('');
   const [logo, setLogo] = useState<string | null>(null);
-  const [agree, setAgree] = useState(false);
+  const [agree, setAgree] = useState(adminNew === '1');
   const [offerText, setOfferText] = useState('');
   const [offerCode, setOfferCode] = useState('');
   const [offerEnds, setOfferEnds] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (adminNew === '1') { setExisting(null); setAgree(true); return; }
+    if (adminNew === '1') return;
     (adminId ? loadCenter(String(adminId)) : loadMyCenter(userId)).then((c) => {
       setExisting(c);
       if (c) {

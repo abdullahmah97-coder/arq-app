@@ -72,7 +72,7 @@ export default function OwnerAdEdit() {
   }, [id]);
 
   useEffect(() => {
-    if (!isPartner(target)) { setResults(null); return; }
+    if (!isPartner(target)) return;
     let dead = false;
     const h = setTimeout(() => {
       listPartners(target, q).then((rows) => { if (!dead) setResults(rows.filter((r) => statusGroup(r.status) === 'live').slice(0, 8)); })
@@ -82,7 +82,7 @@ export default function OwnerAdEdit() {
   }, [target, q]);
 
   const chooseTarget = (tg: AdTarget) => {
-    setTarget(tg); setPicked(null); setQ('');
+    setTarget(tg); setPicked(null); setQ(''); setResults(null);
     if (tg === 'none') { setLink(''); setCta(''); }
     else if (tg === 'url') setLink((l) => (l.startsWith('https://') ? l : 'https://'));
     else if (tg === 'page') setLink((l) => (QUICK_LINKS.includes(l as never) ? l : '/store'));

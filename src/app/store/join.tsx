@@ -20,7 +20,7 @@ export default function JoinStore() {
   const admin = !!adminId || adminNew === '1';
   const { t } = useTranslation();
   const { userId } = useUser();
-  const [existing, setExisting] = useState<Brand | null | undefined>(undefined);
+  const [existing, setExisting] = useState<Brand | null | undefined>(adminNew === '1' ? null : undefined);
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [description, setDescription] = useState('');
@@ -29,11 +29,11 @@ export default function JoinStore() {
   const [instagram, setInstagram] = useState('');
   const [city, setCity] = useState('');
   const [logo, setLogo] = useState<string | null>(null);
-  const [agree, setAgree] = useState(false);
+  const [agree, setAgree] = useState(adminNew === '1');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (adminNew === '1') { setExisting(null); setAgree(true); return; }
+    if (adminNew === '1') return;
     (adminId ? loadBrand(String(adminId)) : loadMyBrand(userId)).then((b) => {
       setExisting(b);
       if (b) {
