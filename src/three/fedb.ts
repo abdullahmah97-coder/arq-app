@@ -59,3 +59,28 @@ export const FEDB_EXERCISES: LibExercise[] = data.items.map((r) => ({
 export const CURATED_PHOTOS: Record<string, string[]> = Object.fromEntries(
   Object.entries(data.curatedPhotos).map(([id, [fid, n]]) => [id, photoPaths(fid, n)]),
 );
+
+/** تمارين أرك الأساسية اللي ما تطابق اسمها تلقائياً مع المصدر: نربطها يدوياً بصور نفس الحركة
+ * (كل مجلد في الحاوية فيه صورتين). اللي ما لها صورة مطابقة (مثل البيربي وجلسة الحائط) تبقى بالمجسّم */
+const MANUAL_PHOTOS: Record<string, string> = {
+  split_squat: 'Split_Squats',
+  walking_lunge: 'Dumbbell_Lunges',
+  bulgarian_split_squat: 'Split_Squat_with_Dumbbells',
+  reverse_lunge: 'Dumbbell_Rear_Lunge',
+  rdl_db: 'Stiff-Legged_Dumbbell_Deadlift',
+  single_leg_rdl: 'Kettlebell_One-Legged_Deadlift',
+  hip_thrust_db: 'Barbell_Hip_Thrust',
+  kb_swing: 'One-Arm_Kettlebell_Swings',
+  pec_deck: 'Butterfly',
+  reverse_pec_deck: 'Reverse_Machine_Flyes',
+  db_pullover: 'Bent-Arm_Dumbbell_Pullover',
+  lateral_raise_cable: 'Standing_Low-Pulley_Deltoid_Raise',
+  rear_delt_raise: 'Seated_Bent-Over_Rear_Delt_Raise',
+  front_raise: 'Front_Dumbbell_Raise',
+  barbell_shrug: 'Barbell_Shrug',
+  cable_curl: 'Standing_Biceps_Cable_Curl',
+  preacher_curl: 'Preacher_Curl',
+  hanging_knee_raise: 'Hanging_Leg_Raise',
+  lying_leg_raise: 'Flat_Bench_Lying_Leg_Raise',
+};
+for (const [id, fid] of Object.entries(MANUAL_PHOTOS)) CURATED_PHOTOS[id] ??= photoPaths(fid, 2);
