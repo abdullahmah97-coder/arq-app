@@ -905,7 +905,7 @@
   "chat": {
     "title": "Messages",
     "rule": "Message your friends",
-    "ruleLong": "You can message friends once they accept your friend request, anyone you follow each other with, and your coach. Messages are private between you.",
+    "ruleLong": "You can message friends once they accept your friend request (and your coach, if you have one). Following alone doesn’t open a chat. Messages are private between you.",
     "startWith": "Start a chat",
     "conversations": "Conversations",
     "empty": "No conversations yet. Tap “New message” and pick a friend.",
@@ -939,7 +939,11 @@
     "pendingOut": "Your friend request is waiting for {{name}}. Once they accept, you can message.",
     "acceptRequest": "Accept friend request and start",
     "today": "Today",
-    "yesterday": "Yesterday"
+    "yesterday": "Yesterday",
+    "photo": "📷 Photo",
+    "attachPhoto": "Send a photo",
+    "fromLibrary": "Photo library",
+    "fromCamera": "Camera"
   },
   "owner": {
     "title": "App management",

@@ -125,7 +125,7 @@ export default function Messages() {
                 <T semibold numberOfLines={1} style={{ flexShrink: 1 }}>{r.full_name || r.username}</T>
                 <RankBadge points={r.points} coach={r.is_coach} small />
               </Row>
-              <T size="sm" muted={!r.unread} semibold={!!r.unread} numberOfLines={1}>{r.last_from_me ? `${t('chat.you')}: ` : ''}{r.last_body}</T>
+              <T size="sm" muted={!r.unread} semibold={!!r.unread} numberOfLines={1}>{r.last_from_me ? `${t('chat.you')}: ` : ''}{r.last_body === '📷' ? t('chat.photo') : r.last_body}</T>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 4 }}>
               <T size="xs" muted>{timeAgo(r.last_at, lng)}</T>

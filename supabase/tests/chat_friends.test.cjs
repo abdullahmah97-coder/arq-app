@@ -1,4 +1,4 @@
-// المراسلة للأصدقاء: بعد قبول طلب الصداقة تنفتح المحادثة، مع بقاء المتابعة المتبادلة والمدرب ومتدربه
+// المراسلة للأصدقاء بس: بعد قبول طلب الصداقة تنفتح المحادثة (والمدرب ومتدربه) — المتابعة ما تفتحها
 const { setup } = require('./_harness.cjs');
 
 (async () => {
@@ -18,11 +18,12 @@ const { setup } = require('./_harness.cjs');
   const m2 = await send(U.B, U.A, 'هلا والله');
   check('friends send and reply', m1.length === 1 && m2.length === 1);
 
-  // المتابعة المتبادلة تبقى تفتح المحادثة
+  // المتابعة ما تفتح المحادثة، حتى لو من الطرفين
   await as(U.A, `insert into follows (follower, followee) values ($1, $2)`, [U.A, U.C]);
   check('one-way follow is not enough', (await can(U.A, U.C)) === false);
   await as(U.C, `insert into follows (follower, followee) values ($1, $2)`, [U.C, U.A]);
-  check('mutual follow still opens chat', (await can(U.A, U.C)) === true);
+  check('following each other is not enough either', (await can(U.A, U.C)) === false);
+  await expectErr('sending to someone you only follow is refused', () => send(U.A, U.C, 'هلا خالد'), /row-level security/);
 
   // المدرب ومتدربه
   await q(`insert into coach_links (coach_id, client_id, status, requested_by) values ($1, $2, 'active', 'coach')`, [U.D, U.A]);
@@ -31,11 +32,13 @@ const { setup } = require('./_harness.cjs');
   // قائمة «رسالة جديدة»
   const contacts = await as(U.A, `select id, relation from message_contacts()`);
   const rel = Object.fromEntries(contacts.map((c) => [c.id, c.relation]));
-  check('contacts: friend, mutual and coach with their relation', rel[U.B] === 'friend' && rel[U.C] === 'mutual' && rel[U.D] === 'coach' && contacts.length === 3, JSON.stringify(rel));
+  check('contacts: friends and coach only (not people you just follow)', rel[U.B] === 'friend' && rel[U.D] === 'coach' && !rel[U.C] && contacts.length === 2, JSON.stringify(rel));
   await as(U.A, `insert into friendships (requester, addressee) values ($1, $2)`, [U.A, U.C]);
+  check('a pending request does not open the chat', (await can(U.A, U.C)) === false);
   await as(U.C, `update friendships set status = 'accepted' where requester = $1 and addressee = $2`, [U.A, U.C]);
+  check('once accepted, the chat opens', (await can(U.A, U.C)) === true);
   const rel2 = Object.fromEntries((await as(U.A, `select id, relation from message_contacts()`)).map((c) => [c.id, c.relation]));
-  check('friend wins over mutual follow (no duplicates)', rel2[U.C] === 'friend' && Object.keys(rel2).length === 3, JSON.stringify(rel2));
+  check('the new friend shows up once (no duplicates)', rel2[U.C] === 'friend' && Object.keys(rel2).length === 3, JSON.stringify(rel2));
   const old = await as(U.A, `select id from mutual_followers()`);
   check('old app list includes friends too', old.length === 3 && old.some((r) => r.id === U.B));
   const none = await as(U.E, `select id from message_contacts()`);

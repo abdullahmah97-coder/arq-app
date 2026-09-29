@@ -1,7 +1,7 @@
 // حذف الحساب نهائياً: الملفات أولاً ثم الحساب (البيانات تنحذف تلقائياً بالتسلسل)
 import { supabase } from './supabase';
 
-const BUCKETS = ['avatars', 'posts', 'body', 'inbody'] as const;
+const BUCKETS = ['avatars', 'posts', 'body', 'inbody', 'chat'] as const;
 
 export async function removeFolder(bucket: string, prefix: string) {
   const { data } = await supabase.storage.from(bucket).list(prefix, { limit: 1000 });

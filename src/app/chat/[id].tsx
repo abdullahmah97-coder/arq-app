@@ -1,16 +1,19 @@
-// محادثة خاصة: مفتوحة بين الأصدقاء، أو اللي يتابعون بعض، أو المدرب ومتدربه.
-// لو مقفلة: زر طلب الصداقة (أو قبوله) بدل ما يعلق المستخدم.
+// محادثة خاصة: مفتوحة بين الأصدقاء (بعد قبول طلب الصداقة) أو المدرب ومتدربه — المتابعة ما تفتحها.
+// لو مقفلة: زر طلب الصداقة (أو قبوله) بدل ما يعلق المستخدم. وفيها إرسال صور.
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useHeaderHeight } from 'expo-router/react-navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar, Button, Row, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { acceptRequest, relationTo, sendRequest, type Relation } from '@/lib/friends';
 import { useLocalized } from '@/lib/i18n';
-import { canMessage, loadThread, markRead, sendMessage, useIncoming, type Message } from '@/lib/messages';
+import { pickImage } from '@/lib/images';
+import { canMessage, chatPhotoUrls, loadThread, markRead, sendMessage, uploadChatPhoto, useIncoming, type Message } from '@/lib/messages';
 import { clearChatNotifications, setOpenChat } from '@/lib/push';
 import { errorKey, publicUrl, supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
@@ -19,12 +22,22 @@ import { brand, colors, fonts, radius, space } from '@/theme';
 /** يوم الرسالة بتوقيت الجوال (للفواصل بين الأيام) */
 const dayKey = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
 
+/** مقاس الصورة في الفقاعة: عرض ثابت والارتفاع حسب نسبة الصورة (بحدود) */
+function photoSize(w?: number | null, h?: number | null) {
+  const W = 230;
+  const ratio = w && h ? h / w : 1.25;
+  return { width: W, height: Math.round(Math.min(320, Math.max(150, W * ratio))) };
+}
+
+type Pending = { id: string; uri: string; w?: number; h?: number };
+
 export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const other = String(id);
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const { userId } = useUser();
+  const headerHeight = useHeaderHeight();
   const [p, setP] = useState<Profile | null>(null);
   const [msgs, setMsgs] = useState<Message[]>([]);
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -32,6 +45,9 @@ export default function Chat() {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [relBusy, setRelBusy] = useState(false);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState<Pending[]>([]);
+  const [viewer, setViewer] = useState<string | null>(null);
   const list = useRef<FlatList<Message>>(null);
 
   const load = useCallback(async () => {
@@ -58,6 +74,15 @@ export default function Chat() {
     markRead(userId, other).then(() => clearChatNotifications(other));
   }, [userId, other]));
 
+  // روابط الصور الخاصة (مؤقتة) للي ما عندنا رابطها
+  useEffect(() => {
+    const missing = [...new Set(msgs.map((m) => m.media_path).filter((x): x is string => !!x && !urls[x]))];
+    if (!missing.length) return;
+    let alive = true;
+    chatPhotoUrls(missing).then((u) => { if (alive && Object.keys(u).length) setUrls((cur) => ({ ...cur, ...u })); }).catch(() => {});
+    return () => { alive = false; };
+  }, [msgs, urls]);
+
   const send = async () => {
     const body = text.trim();
     if (!body) return;
@@ -70,6 +95,28 @@ export default function Chat() {
       load();
     } finally { setBusy(false); }
   };
+
+  const sendPhoto = async (source: 'library' | 'camera') => {
+    const img = await pickImage(source);
+    if (!img) return;
+    const tmp: Pending = { id: `tmp-${Date.now()}`, uri: img.uri, w: img.width, h: img.height };
+    setPending((x) => [...x, tmp]);
+    try {
+      const path = await uploadChatPhoto(userId, other, img.uri, img.mimeType);
+      const m = await sendMessage(userId, other, '', { path, width: img.width, height: img.height });
+      setUrls((u) => ({ ...u, [path]: img.uri })); // صورتك تبان من الجوال على طول
+      setMsgs((x) => [...x, m]);
+    } catch (e) {
+      Alert.alert(t(errorKey(e)));
+    } finally {
+      setPending((x) => x.filter((y) => y.id !== tmp.id));
+    }
+  };
+  const attach = () => Alert.alert(t('chat.attachPhoto'), undefined, [
+    { text: t('chat.fromLibrary'), onPress: () => sendPhoto('library') },
+    { text: t('chat.fromCamera'), onPress: () => sendPhoto('camera') },
+    { text: t('common.cancel'), style: 'cancel' },
+  ]);
 
   const friendAction = async (fn: () => PromiseLike<{ error: any }>, sent?: boolean) => {
     setRelBusy(true);
@@ -93,6 +140,22 @@ export default function Chat() {
     try { return new Date(iso).toLocaleDateString(lng === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-US', { day: 'numeric', month: 'long' }); }
     catch { return iso.slice(0, 10); }
   };
+  const toEnd = () => list.current?.scrollToEnd({ animated: false });
+
+  const photo = (uri: string | undefined, w?: number | null, h?: number | null, uploading?: boolean) => {
+    const size = photoSize(w, h);
+    return (
+      <Pressable onPress={() => uri && !uploading && setViewer(uri)} accessibilityRole="imagebutton" accessibilityLabel={t('chat.photo')}
+        style={{ borderRadius: 18, overflow: 'hidden', backgroundColor: colors.cardAlt, ...size }}>
+        {uri ? <Image source={{ uri }} style={size} contentFit="cover" transition={150} /> : null}
+        {uploading || !uri ? (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: uploading ? 'rgba(10,51,45,0.35)' : 'transparent' }}>
+            <ActivityIndicator color={uploading ? brand.cream : colors.muted} />
+          </View>
+        ) : null}
+      </Pressable>
+    );
+  };
 
   return (
     <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -102,14 +165,23 @@ export default function Chat() {
           <T semibold numberOfLines={1}>{name}</T>
         </Pressable>
       ) }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      {/* الإزاحة = ارتفاع الشريط العلوي، عشان خانة الكتابة تطلع فوق الكيبورد بالضبط */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={headerHeight}>
         <FlatList ref={list} data={msgs} keyExtractor={(m) => m.id}
           contentContainerStyle={{ padding: space.lg, gap: 6, flexGrow: 1, justifyContent: 'flex-end' }}
-          onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
-          ListEmptyComponent={allowed ? (
+          onContentSizeChange={toEnd}
+          onLayout={toEnd}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          ListEmptyComponent={allowed && !pending.length ? (
             <View style={{ alignItems: 'center', gap: space.sm, marginBottom: space.xl }}>
               <Avatar size={64} uri={publicUrl('avatars', p?.avatar_url)} name={name} />
               <T muted center>{t('chat.sayHi', { name })}</T>
+            </View>
+          ) : null}
+          ListFooterComponent={pending.length ? (
+            <View style={{ gap: 6, alignItems: 'flex-end', marginTop: 6 }}>
+              {pending.map((x) => <View key={x.id}>{photo(x.uri, x.w, x.h, true)}</View>)}
             </View>
           ) : null}
           renderItem={({ item: m, index }) => {
@@ -123,13 +195,16 @@ export default function Chat() {
                     <T size="xs" muted>{dayLabel(m.created_at)}</T>
                   </View>
                 ) : null}
-                <View style={{ alignItems: mine ? 'flex-end' : 'flex-start' }}>
-                  <View style={{ maxWidth: '80%', backgroundColor: mine ? brand.deepGreen : colors.card, borderWidth: mine ? 0 : 1, borderColor: colors.border,
-                    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, borderBottomEndRadius: mine && last ? 4 : 18, borderBottomStartRadius: !mine && last ? 4 : 18 }}>
-                    <T color={mine ? brand.cream : colors.text} style={{ lineHeight: 23 }}>{m.body}</T>
-                  </View>
+                <View style={{ alignItems: mine ? 'flex-end' : 'flex-start', gap: 4 }}>
+                  {m.media_path ? photo(urls[m.media_path], m.media_w, m.media_h) : null}
+                  {m.body ? (
+                    <View style={{ maxWidth: '80%', backgroundColor: mine ? brand.deepGreen : colors.card, borderWidth: mine ? 0 : 1, borderColor: colors.border,
+                      paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, borderBottomEndRadius: mine && last ? 4 : 18, borderBottomStartRadius: !mine && last ? 4 : 18 }}>
+                      <T color={mine ? brand.cream : colors.text} style={{ lineHeight: 23 }}>{m.body}</T>
+                    </View>
+                  ) : null}
                   {last ? (
-                    <Row gap={4} style={{ marginTop: 2, paddingHorizontal: 6 }}>
+                    <Row gap={4} style={{ paddingHorizontal: 6 }}>
                       <T size="xs" muted style={{ fontSize: 10 }}>{time(m.created_at)}</T>
                       {mine ? <Ionicons name={m.read_at ? 'checkmark-done' : 'checkmark'} size={12} color={m.read_at ? brand.orange : colors.muted} /> : null}
                     </Row>
@@ -151,9 +226,13 @@ export default function Chat() {
             ) : null}
           </View>
         ) : (
-          <Row style={{ padding: space.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card }}>
+          <Row gap={8} style={{ padding: space.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card }}>
+            <Pressable onPress={attach} disabled={!allowed} hitSlop={6} accessibilityRole="button" accessibilityLabel={t('chat.attachPhoto')}
+              style={({ pressed }) => ({ width: 42, height: 42, borderRadius: 21, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', opacity: !allowed ? 0.4 : pressed ? 0.7 : 1 })}>
+              <Ionicons name="image-outline" size={21} color={colors.primary} />
+            </Pressable>
             <TextInput value={text} onChangeText={setText} placeholder={t('chat.placeholder')} placeholderTextColor={colors.muted} maxLength={1000} multiline
-              editable={allowed !== null}
+              editable={allowed !== null} onFocus={() => setTimeout(toEnd, 250)}
               style={{ flex: 1, minWidth: 0, minHeight: 42, maxHeight: 120, borderRadius: radius.lg, backgroundColor: colors.cardAlt, paddingHorizontal: 16, paddingVertical: 10, color: colors.text, fontFamily: fonts.regular, textAlign: 'auto' }} />
             <Pressable onPress={send} disabled={busy || !text.trim() || !allowed} accessibilityLabel={t('presence.send')}
               style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: brand.orange, alignItems: 'center', justifyContent: 'center', opacity: busy || !text.trim() ? 0.5 : 1 }}>
@@ -162,6 +241,19 @@ export default function Chat() {
           </Row>
         )}
       </KeyboardAvoidingView>
+
+      {/* عرض الصورة كاملة */}
+      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
+        <Pressable onPress={() => setViewer(null)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center' }}>
+          {viewer ? <Image source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} contentFit="contain" /> : null}
+          <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, right: 0, left: 0 }}>
+            <Pressable onPress={() => setViewer(null)} hitSlop={12} accessibilityLabel={t('common.close')}
+              style={{ alignSelf: 'flex-end', margin: space.lg, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </Pressable>
+          </SafeAreaView>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

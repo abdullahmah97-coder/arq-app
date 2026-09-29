@@ -297,13 +297,14 @@ grant usage on schema public, auth, storage to authenticated;
   await expectErr('others cannot add products to my brand', () => as(B, `insert into brand_products (brand_id, name) values ($1, 'fake')`, [br.id]), /row-level security/);
   check('owner can edit brand details', (await as(A, `update brands set tagline = 'ملابس رياضية من الرياض' where id = $1 returning id`, [br.id])).length === 1);
 
-  // direct messages: mutual follow (accepted friends can chat too — covered in chat_friends.test.cjs),
-  // so the A–B friendship is paused here and restored after
+  // direct messages: only accepted friends (and coach & client) — following each other is not enough
+  // (more cases in chat_friends.test.cjs / chat_media.test.cjs); the A–B friendship is paused and restored here
   const pair = `least(requester, addressee) = least($1::uuid, $2::uuid) and greatest(requester, addressee) = greatest($1::uuid, $2::uuid)`;
   await q(`alter table friendships disable trigger notify_friendship`);
   await q(`update friendships set status = 'pending' where ${pair}`, [A, B]);
-  await expectErr('no chat without mutual follow', () => as(A, `insert into messages (sender, recipient, body) values ($1, $2, 'هلا')`, [A, B]), /row-level security/);
-  await as(B, `insert into follows (follower, followee) values ($1, $2)`, [B, A]);
+  await as(B, `insert into follows (follower, followee) values ($1, $2) on conflict do nothing`, [B, A]);
+  await expectErr('following each other does not open a chat', () => as(A, `insert into messages (sender, recipient, body) values ($1, $2, 'هلا')`, [A, B]), /row-level security/);
+  await q(`update friendships set status = 'accepted' where ${pair}`, [A, B]);
   const msg = (await as(A, `insert into messages (sender, recipient, body) values ($1, $2, 'هلا سارة، نتمرن بكرة؟') returning id`, [A, B]))[0];
   const ib = await as(B, 'select * from inbox()');
   check('inbox shows conversation with unread', ib.length === 1 && ib[0].username === 'ahmed' && Number(ib[0].unread) === 1 && ib[0].can_message === true, JSON.stringify(ib.map(r => [r.username, Number(r.unread)])));
@@ -312,12 +313,11 @@ grant usage on schema public, auth, storage to authenticated;
   check('recipient marks read', (await as(B, 'update messages set read_at = now() where id = $1 returning id', [msg.id])).length === 1);
   await expectErr('recipient cannot edit text', () => as(B, `update messages set body = 'تعديل' where id = $1`, [msg.id]), /read_only_message/);
   check('sender cannot mark read', (await as(A, 'update messages set read_at = now() where id = $1 returning id', [msg.id])).length === 0);
-  check('mutual followers list', (await as(A, 'select username from mutual_followers()')).map(r => r.username).join() === 'sara');
-  await as(A, `delete from follows where follower = $1 and followee = $2`, [A, B]);
-  await expectErr('unfollow stops new messages', () => as(B, `insert into messages (sender, recipient, body) values ($1, $2, 'رد')`, [B, A]), /row-level security/);
+  check('contacts list (old app name) shows the friend', (await as(A, 'select username from mutual_followers()')).map(r => r.username).join() === 'sara');
+  await q(`update friendships set status = 'pending' where ${pair}`, [A, B]);
+  await expectErr('unfriending stops new messages', () => as(B, `insert into messages (sender, recipient, body) values ($1, $2, 'رد')`, [B, A]), /row-level security/);
   const ib2 = await as(A, 'select * from inbox()');
   check('old chat kept but locked', ib2.length === 1 && ib2[0].can_message === false);
-  await as(A, `insert into follows (follower, followee) values ($1, $2)`, [A, B]);
   await q(`update friendships set status = 'accepted' where ${pair}`, [A, B]);
   await q(`alter table friendships enable trigger notify_friendship`);
 

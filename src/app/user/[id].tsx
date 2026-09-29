@@ -1,5 +1,5 @@
 // حساب مستخدم آخر: متابعة، صداقة، ورتبته وبرامجه ونصائحه
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
@@ -42,7 +42,8 @@ export default function UserProfile() {
     setRel(r); setFollowing(f); setMutual(m);
   }, [id, userId]);
 
-  useEffect(() => { load(); }, [load]);
+  // عند الرجوع للصفحة (مثلاً بعد قبول طلب الصداقة) تتحدث الأزرار
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   if (p === undefined) return <Loading />;
   if (!p) return <Screen><Empty icon="person-outline" text={t('errors.userNotFound')} /></Screen>;

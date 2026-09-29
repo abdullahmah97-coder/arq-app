@@ -26,7 +26,7 @@ export interface AdminUserStats { total: number; trainees: number; partners: num
 export const PAGE_SIZE = 50;
 
 /** ملفات الحساب اللي تنحذف معه (نفس مجلدات حذف الحساب من التطبيق + لقطات الملاحظات) */
-const USER_BUCKETS = ['avatars', 'posts', 'body', 'inbody', 'feedback'] as const;
+const USER_BUCKETS = ['avatars', 'posts', 'body', 'inbody', 'feedback', 'chat'] as const;
 
 export async function adminUserStats(): Promise<AdminUserStats> {
   const { data, error } = await supabase.rpc('admin_user_stats');
