@@ -1,4 +1,4 @@
-import { adState, isoToRiyadhDate, markSeen, riyadhDateToIso, riyadhDay, shouldShowAd, validAdLink } from '../src/lib/launchAdsCore.ts';
+import { adState, isoToRiyadhDate, markSeen, parseTarget, targetLink, riyadhDateToIso, riyadhDay, shouldShowAd, validAdLink } from '../src/lib/launchAdsCore.ts';
 
 let failed = 0;
 const ok = (c: boolean, label: string) => { console.log(c ? 'ok  ' : 'FAIL', label); if (!c) { failed++; process.exitCode = 1; } };
@@ -29,4 +29,12 @@ ok(adState({ active: true, starts_at: '2026-09-20T00:00:00Z', ends_at: '2026-09-
 
 ok(validAdLink('/store') && validAdLink('/clubs/chain/abc?x=1') && validAdLink('https://arq.app/x') && validAdLink(''), 'good links');
 ok(!validAdLink('javascript:alert(1)') && !validAdLink('http://x.com') && !validAdLink('store'), 'bad links');
+
+const id = '3f1c2a9e-8b7d-4c21-9a0e-1234567890ab';
+for (const k of ['store', 'club', 'coach', 'center'] as const) {
+  const l = targetLink(k, id);
+  const back = parseTarget(l);
+  ok(back.target === k && back.id === id && validAdLink(l), `button link round trip: ${k} → ${l}`);
+}
+ok(parseTarget('/clubs').target === 'page' && parseTarget('https://x.com/a').target === 'url' && parseTarget('').target === 'none' && parseTarget('/store/not-an-id').target === 'page', 'other button kinds');
 if (!failed) console.log('all launch ad checks passed');

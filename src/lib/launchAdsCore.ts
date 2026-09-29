@@ -2,7 +2,9 @@
 
 export type AdFrequency = 'every_open' | 'daily' | 'once';
 export type AdAudience = 'all' | 'men' | 'women';
-export type AdKind = 'ad' | 'occasion';
+export type AdKind = 'ad' | 'awareness' | 'occasion';
+/** التسويقي عليه «إعلان»، والتوعوي والمناسبات بدونها ولها قسم لحالها في اللوحة */
+export const isMarketing = (k: AdKind) => k === 'ad';
 
 /** اللي ينحفظ في الجهاز لكل إعلان: آخر يوم ظهر فيه ونسخته (تتغير لو المالك عدّل الإعلان) */
 export interface SeenEntry { day: string; version: string }
@@ -59,3 +61,29 @@ export function adState(a: { active: boolean; starts_at: string | null; ends_at:
 
 /** الرابط: داخل التطبيق يبدأ بـ / أو رابط https */
 export const validAdLink = (s: string) => !s.trim() || /^\/[\w\-/?=&.%[\]]*$/.test(s.trim()) || /^https:\/\/[^\s]+$/.test(s.trim());
+
+/** وين يودّي زر الإعلان: صفحة شريك معيّن، قسم في التطبيق، أو رابط خارجي */
+export type AdTarget = 'none' | 'store' | 'club' | 'coach' | 'center' | 'page' | 'url';
+export type AdPartnerTarget = 'store' | 'club' | 'coach' | 'center';
+export const AD_TARGETS: AdTarget[] = ['none', 'store', 'club', 'coach', 'center', 'page', 'url'];
+
+export function targetLink(kind: AdPartnerTarget, id: string): string {
+  if (kind === 'store') return `/store/${id}`;
+  if (kind === 'club') return `/clubs/chain/${id}`;
+  if (kind === 'coach') return `/coaches/${id}`;
+  return `/recovery/centers?focus=${id}`;
+}
+
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+/** عكس targetLink: نعرف نوع الزر من الرابط المحفوظ (للتعديل) */
+export function parseTarget(link: string | null | undefined): { target: AdTarget; id: string | null } {
+  const l = (link ?? '').trim();
+  if (!l) return { target: 'none', id: null };
+  if (/^https:\/\//.test(l)) return { target: 'url', id: null };
+  const m = (re: string) => l.match(new RegExp(`^${re}(${UUID})$`, 'i'))?.[1] ?? null;
+  const store = m('/store/'); if (store) return { target: 'store', id: store };
+  const club = m('/clubs/chain/'); if (club) return { target: 'club', id: club };
+  const coach = m('/coaches/'); if (coach) return { target: 'coach', id: coach };
+  const center = m('/recovery/centers\\?focus='); if (center) return { target: 'center', id: center };
+  return { target: 'page', id: null };
+}

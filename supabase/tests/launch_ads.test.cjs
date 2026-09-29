@@ -15,6 +15,10 @@ const { setup } = require('./_harness.cjs');
   await expectErr('link must be in-app or https', () => as(U.E, `insert into launch_ads (title, media_path, link) values ('bad', 'x.jpg', 'javascript:alert(1)')`), /check constraint/);
   await expectErr('non-admin cannot edit', async () => { const r = await as(U.A, `update launch_ads set active = false where id = $1 returning 1`, [a1]); if (!r.length) throw new Error('row-level security: 0 rows'); }, /row-level security/);
 
+  const [{ id: aw }] = await as(U.E, `insert into launch_ads (kind, title, media_path, active) values ('awareness', 'اشرب ماء', 'ads/w.jpg', false) returning id`);
+  check('awareness messages are a kind of their own', !!aw);
+  await expectErr('unknown kind rejected', () => as(U.E, `insert into launch_ads (kind, title, media_path) values ('promo', 'x', 'x.jpg')`), /check constraint/);
+
   // جمهور ومدة وأولوية
   const [{ id: a2 }] = await as(U.E, `insert into launch_ads (kind, title, media_path, media_type, audience, priority) values ('occasion', 'اليوم الوطني', 'ads/2.gif', 'gif', 'women', 10) returning id`);
   check('higher priority ad wins for its audience', (await cur(U.B))?.id === a2);

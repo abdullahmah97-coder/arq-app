@@ -1,6 +1,6 @@
 // دليل مراكز العلاج الطبيعي والاستشفاء: فلتر المدينة والنوع، والشركاء أولاً، و«أضف مركزك»
 import { Ionicons } from '@expo/vector-icons';
-import { router, Stack, useFocusEffect } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { I18nManager, Pressable, ScrollView, View } from 'react-native';
@@ -13,6 +13,8 @@ import { brand, colors, radius, space } from '@/theme';
 export default function Centers() {
   const { t } = useTranslation();
   const { userId } = useUser();
+  // ?focus=<id>: جاي من إعلان أو رابط لمركز معيّن → نعرضه أول
+  const { focus } = useLocalSearchParams<{ focus?: string }>();
   const [list, setList] = useState<RecoveryCenter[] | null>(null);
   const [mine, setMine] = useState<RecoveryCenter | null>(null);
   const [city, setCity] = useState<string | null>(null);
@@ -27,7 +29,8 @@ export default function Centers() {
     for (const c of list ?? []) for (const x of c.cities) n.set(x, (n.get(x) ?? 0) + 1);
     return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
   }, [list]);
-  const shown = (list ?? []).filter((c) => (!city || c.cities.includes(city)) && (!kind || c.kind === kind));
+  const shown = (list ?? []).filter((c) => (!city || c.cities.includes(city)) && (!kind || c.kind === kind))
+    .sort((a, b) => Number(b.id === focus) - Number(a.id === focus));
 
   return (
     <Screen edges={['bottom']}>

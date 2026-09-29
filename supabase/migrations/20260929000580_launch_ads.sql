@@ -1,11 +1,12 @@
 -- إعلان البداية: صفحة تظهر أول ما يفتح التطبيق (صورة أو GIF) مع زر إغلاق وتخطي.
 -- المالك يتحكم فيها من لوحته: يضيف، يوقف، يحدد المدة والجمهور وعدد مرات الظهور.
--- نوعين: 'ad' إعلان تسويقي (يظهر عليه «إعلان») و 'occasion' تهنئة بمناسبة (اليوم الوطني مثلاً).
+-- ثلاث أنواع: 'ad' إعلان تسويقي (يظهر عليه «إعلان»)، 'awareness' رسالة توعوية، و 'occasion' تهنئة بمناسبة (اليوم الوطني مثلاً).
+-- التوعوي والمناسبات بدون كلمة «إعلان»، ومفصولة عن التسويقي في لوحة المالك.
 -- الفيديو يجي لاحقاً مع نسخة جديدة من المتجر (يحتاج مكتبة أصلية).
 
 create table if not exists public.launch_ads (
   id          uuid primary key default gen_random_uuid(),
-  kind        text not null default 'ad' check (kind in ('ad','occasion')),
+  kind        text not null default 'ad' check (kind in ('ad','awareness','occasion')),
   title       text not null check (char_length(btrim(title)) between 2 and 80),
   media_path  text not null check (char_length(media_path) <= 200),
   media_type  text not null default 'image' check (media_type in ('image','gif')),

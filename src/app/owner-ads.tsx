@@ -6,9 +6,9 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Switch, View } from 'react-native';
 import { LaunchAdView } from '@/components/ads/LaunchAd';
-import { Button, Card, Empty, Loading, Row, Screen, T } from '@/components/ui';
+import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { adMediaUrl, deleteLaunchAd, launchAdStats, listLaunchAds, setLaunchAdActive, type AdStats, type LaunchAdRow } from '@/lib/launchAds';
-import { adState, type AdState } from '@/lib/launchAdsCore';
+import { adState, isMarketing, parseTarget, type AdState } from '@/lib/launchAdsCore';
 import { useLocalized } from '@/lib/i18n';
 import { isAdmin } from '@/lib/owner';
 import { brand, colors, radius, space } from '@/theme';
@@ -24,6 +24,8 @@ export default function OwnerAds() {
   const [rows, setRows] = useState<LaunchAdRow[] | null>(null);
   const [stats, setStats] = useState<Record<string, AdStats>>({});
   const [preview, setPreview] = useState<LaunchAdRow | null>(null);
+  // قسمين منفصلين: تسويقي (عليه «إعلان») وتوعوي ومناسبات
+  const [tab, setTab] = useState<'marketing' | 'awareness'>('marketing');
 
   const load = useCallback(async () => {
     const admin = await isAdmin();
@@ -38,6 +40,14 @@ export default function OwnerAds() {
   if (!ok) return <Screen><Empty icon="lock-closed-outline" text={t('owner.noAccess')} /></Screen>;
 
   // اللي يظهر الحين للجميع: أعلى أولوية ثم الأحدث بين الفعّالة
+  // «زر شوف النادي ← صفحة نادي» بدل الرابط الخام
+  const buttonLine = (r: LaunchAdRow) => {
+    const tg = parseTarget(r.link);
+    const where = tg.target === 'url' ? (r.link ?? '').replace(/^https:\/\//, '').split('/')[0]
+      : tg.target === 'page' ? r.link ?? '' : t(`ads.tg_${tg.target}`);
+    return t('ads.buttonLine', { cta: r.cta || t('ads.defaultCta'), where });
+  };
+  const shownRows = (rows ?? []).filter((r) => (tab === 'marketing') === isMarketing(r.kind));
   const winner = (rows ?? []).filter((r) => adState(r) === 'live' && r.audience === 'all')
     .sort((a, b) => b.priority - a.priority || b.created_at.localeCompare(a.created_at))[0]?.id;
 
@@ -64,9 +74,15 @@ export default function OwnerAds() {
         <T size="lg" bold color={brand.cream}>{t('ads.introTitle')}</T>
         <T size="sm" color={brand.sand} style={{ lineHeight: 22 }}>{t('ads.introBody')}</T>
       </View>
-      <Button icon="add" title={t('ads.new')} onPress={() => router.push('/owner-ad')} />
+      <Segmented<'marketing' | 'awareness'> value={tab} onChange={setTab} options={[
+        { value: 'marketing', label: `${t('ads.tab_marketing')} ${(rows ?? []).filter((r) => isMarketing(r.kind)).length || ''}`.trim() },
+        { value: 'awareness', label: `${t('ads.tab_awareness')} ${(rows ?? []).filter((r) => !isMarketing(r.kind)).length || ''}`.trim() },
+      ]} />
+      <T size="xs" muted style={{ lineHeight: 19 }}>{t(`ads.tabHint_${tab}`)}</T>
+      <Button icon="add" title={t(tab === 'marketing' ? 'ads.newMarketing' : 'ads.newAwareness')}
+        onPress={() => router.push({ pathname: '/owner-ad', params: { kind: tab === 'marketing' ? 'ad' : 'awareness' } })} />
 
-      {!rows ? <Loading /> : !rows.length ? <Empty icon="image-outline" text={t('ads.none')} /> : rows.map((r) => {
+      {!rows ? <Loading /> : !shownRows.length ? <Empty icon="image-outline" text={t(`ads.none_${tab}`)} /> : shownRows.map((r) => {
         const st = adState(r);
         const s = stats[r.id];
         const dates = [r.starts_at ? t('ads.from', { d: fmt(r.starts_at) }) : null, r.ends_at ? t('ads.to', { d: fmt(r.ends_at, true) }) : null].filter(Boolean).join(' ');
@@ -87,7 +103,7 @@ export default function OwnerAds() {
                   <T size="xs" muted>{t(`ads.kind_${r.kind}`)} · {r.media_type === 'gif' ? 'GIF' : t('ads.image')} · {t(`ads.aud_${r.audience}`)} · {t(`ads.freq_${r.frequency}`)}</T>
                 </Row>
                 {dates ? <T size="xs" muted>{dates}</T> : null}
-                {r.link ? <T size="xs" muted numberOfLines={1}>{t('ads.linkTo', { link: r.link })}</T> : null}
+                {r.link ? <T size="xs" muted numberOfLines={1}>{buttonLine(r)}</T> : null}
                 <T size="xs" semibold color={colors.primary}>{t('ads.statsLine', { views: s?.views ?? 0, reach: s?.reach ?? 0, clicks: s?.clicks ?? 0, closes: s?.closes ?? 0 })}</T>
               </View>
             </Row>

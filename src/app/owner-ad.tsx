@@ -9,23 +9,32 @@ import { Alert, Pressable, Switch, View } from 'react-native';
 import { LaunchAdView } from '@/components/ads/LaunchAd';
 import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { AD_MAX_BYTES, adMediaUrl, deleteLaunchAd, loadLaunchAd, saveLaunchAd, uploadAdMedia, type AdMediaType } from '@/lib/launchAds';
-import { isoToRiyadhDate, riyadhDateToIso, validAdLink, type AdAudience, type AdFrequency, type AdKind } from '@/lib/launchAdsCore';
+import {
+  AD_TARGETS, isoToRiyadhDate, parseTarget, riyadhDateToIso, targetLink, validAdLink,
+  type AdAudience, type AdFrequency, type AdKind, type AdPartnerTarget, type AdTarget,
+} from '@/lib/launchAdsCore';
+import { listPartners, statusGroup, type PartnerRow } from '@/lib/partners';
 import { brand, colors, radius, space } from '@/theme';
 
 const QUICK_LINKS = ['/store', '/clubs', '/coaches', '/recovery', '/partners'] as const;
+const PARTNER_TARGETS: AdPartnerTarget[] = ['store', 'club', 'coach', 'center'];
+const isPartner = (t: AdTarget): t is AdPartnerTarget => (PARTNER_TARGETS as string[]).includes(t);
+const TARGET_ICON: Record<AdTarget, keyof typeof Ionicons.glyphMap> = {
+  none: 'remove-circle-outline', store: 'storefront-outline', club: 'business-outline', coach: 'person-outline', center: 'medkit-outline', page: 'apps-outline', url: 'link-outline',
+};
 const QUICK_LABEL: Record<(typeof QUICK_LINKS)[number], string> = {
   '/store': 'store.title', '/clubs': 'clubs.title', '/coaches': 'coaching.directory', '/recovery': 'recovery.title', '/partners': 'partners.hubName',
 };
 
 export default function OwnerAdEdit() {
   const { t } = useTranslation();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, kind: kindParam } = useLocalSearchParams<{ id?: string; kind?: AdKind }>();
   const [loading, setLoading] = useState(!!id);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);
 
   const [title, setTitle] = useState('');
-  const [kind, setKind] = useState<AdKind>('ad');
+  const [kind, setKind] = useState<AdKind>(kindParam === 'awareness' || kindParam === 'occasion' ? kindParam : 'ad');
   const [media, setMedia] = useState<{ path: string; type: AdMediaType } | null>(null);
   const [link, setLink] = useState('');
   const [cta, setCta] = useState('');
@@ -35,6 +44,11 @@ export default function OwnerAdEdit() {
   const [frequency, setFrequency] = useState<AdFrequency>('daily');
   const [autoClose, setAutoClose] = useState(6);
   const [pinned, setPinned] = useState(false);
+  // زر الإعلان: نوع الوجهة + الصفحة المختارة
+  const [target, setTarget] = useState<AdTarget>('none');
+  const [picked, setPicked] = useState<{ id: string; name: string } | null>(null);
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<PartnerRow[] | null>(null);
   const [active, setActive] = useState(true);
 
   useEffect(() => {
@@ -45,9 +59,42 @@ export default function OwnerAdEdit() {
         setLink(a.link ?? ''); setCta(a.cta ?? ''); setAudience(a.audience);
         setStarts(isoToRiyadhDate(a.starts_at)); setEnds(isoToRiyadhDate(a.ends_at, true));
         setFrequency(a.frequency); setAutoClose(a.auto_close); setPinned(a.priority > 0); setActive(a.active);
+        const pt = parseTarget(a.link);
+        setTarget(pt.target);
+        if (pt.id && isPartner(pt.target)) {
+          listPartners(pt.target).then((rows) => {
+            const r = rows.find((x) => x.id === pt.id);
+            if (r) setPicked({ id: r.id, name: r.name });
+          }).catch(() => {});
+        }
       }
     }).finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!isPartner(target)) { setResults(null); return; }
+    let dead = false;
+    const h = setTimeout(() => {
+      listPartners(target, q).then((rows) => { if (!dead) setResults(rows.filter((r) => statusGroup(r.status) === 'live').slice(0, 8)); })
+        .catch(() => { if (!dead) setResults([]); });
+    }, 250);
+    return () => { dead = true; clearTimeout(h); };
+  }, [target, q]);
+
+  const chooseTarget = (tg: AdTarget) => {
+    setTarget(tg); setPicked(null); setQ('');
+    if (tg === 'none') { setLink(''); setCta(''); }
+    else if (tg === 'url') setLink((l) => (l.startsWith('https://') ? l : 'https://'));
+    else if (tg === 'page') setLink((l) => (QUICK_LINKS.includes(l as never) ? l : '/store'));
+    else setLink('');
+  };
+  const choosePartner = (r: PartnerRow) => {
+    if (!isPartner(target)) return;
+    setPicked({ id: r.id, name: r.name });
+    setLink(targetLink(target, r.id));
+    const key = target === 'store' && r.meta?.category === 'restaurant' ? 'restaurant' : target;
+    setCta((c) => c.trim() || t(`ads.cta_${key}`));
+  };
 
   const pick = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -68,7 +115,8 @@ export default function OwnerAdEdit() {
   const draft = () => {
     if (!media) { Alert.alert(t('ads.err_media')); return null; }
     if (title.trim().length < 2) { Alert.alert(t('ads.err_title')); return null; }
-    if (!validAdLink(link)) { Alert.alert(t('ads.err_link')); return null; }
+    if (isPartner(target) && !picked) { Alert.alert(t('ads.err_target')); return null; }
+    if (!validAdLink(link) || (target === 'url' && link.trim() === 'https://')) { Alert.alert(t('ads.err_link')); return null; }
     const s = riyadhDateToIso(starts); const e = riyadhDateToIso(ends, true);
     if (s === undefined || e === undefined) { Alert.alert(t('ads.err_date')); return null; }
     if (s && e && e <= s) { Alert.alert(t('ads.err_range')); return null; }
@@ -122,20 +170,62 @@ export default function OwnerAdEdit() {
       <Card style={{ gap: space.sm }}>
         <Input label={t('ads.titleLabel')} hint={t('ads.titleHint')} value={title} onChangeText={setTitle} maxLength={80} placeholder={t('ads.titlePh')} />
         <T size="sm" semibold>{t('ads.kind')}</T>
-        <Segmented<AdKind> value={kind} onChange={setKind} options={[{ value: 'ad', label: t('ads.kind_ad') }, { value: 'occasion', label: t('ads.kind_occasion') }]} />
+        <Segmented<AdKind> value={kind} onChange={setKind} options={(['ad', 'awareness', 'occasion'] as const).map((k) => ({ value: k, label: t(`ads.kind_${k}`) }))} />
         <T size="xs" muted style={{ lineHeight: 18 }}>{t(`ads.kindHint_${kind}`)}</T>
       </Card>
 
+      {/* زر الإعلان: يودّي لصفحة نادي أو متجر أو مدرب أو مركز، أو قسم، أو رابط */}
       <Card style={{ gap: space.sm }}>
-        <Input label={t('ads.link')} hint={t('ads.linkHint')} value={link} onChangeText={setLink} autoCapitalize="none" autoCorrect={false} placeholder="/store" />
+        <T semibold>{t('ads.button')}</T>
+        <T size="xs" muted style={{ lineHeight: 18 }}>{t('ads.buttonHint')}</T>
         <Row gap={6} style={{ flexWrap: 'wrap' }}>
-          {QUICK_LINKS.map((l) => (
-            <Pressable key={l} onPress={() => setLink(l)} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: link === l ? brand.orange : colors.cardAlt }}>
-              <T size="xs" semibold color={link === l ? '#fff' : colors.text}>{t(QUICK_LABEL[l])}</T>
+          {AD_TARGETS.map((tg) => (
+            <Pressable key={tg} onPress={() => chooseTarget(tg)} accessibilityRole="button" accessibilityState={{ selected: target === tg }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: target === tg ? brand.deepGreen : colors.cardAlt }}>
+              <Ionicons name={TARGET_ICON[tg]} size={14} color={target === tg ? brand.cream : colors.text} />
+              <T size="xs" semibold color={target === tg ? brand.cream : colors.text}>{t(`ads.tg_${tg}`)}</T>
             </Pressable>
           ))}
         </Row>
-        {link.trim() ? <Input label={t('ads.cta')} value={cta} onChangeText={setCta} maxLength={30} placeholder={t('ads.defaultCta')} /> : null}
+
+        {isPartner(target) ? (
+          <View style={{ gap: 6 }}>
+            {picked ? (
+              <Row style={{ backgroundColor: 'rgba(241,85,29,0.1)', borderRadius: radius.md, padding: 10 }}>
+                <Ionicons name="checkmark-circle" size={18} color={brand.orange} />
+                <T size="sm" semibold style={{ flex: 1 }}>{t('ads.goesTo', { name: picked.name })}</T>
+                <Pressable onPress={() => { setPicked(null); setLink(''); }} hitSlop={8}><T size="xs" semibold color={brand.orange}>{t('ads.changeTarget')}</T></Pressable>
+              </Row>
+            ) : (
+              <>
+                <Input value={q} onChangeText={setQ} placeholder={t('ads.searchTarget')} autoCorrect={false} />
+                {results === null ? <Loading /> : results.length ? results.map((r) => (
+                  <Pressable key={r.id} onPress={() => choosePartner(r)} accessibilityRole="button"
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+                    <Ionicons name={TARGET_ICON[target]} size={18} color={brand.orange} />
+                    <View style={{ flex: 1 }}>
+                      <T size="sm" semibold numberOfLines={1}>{r.name}</T>
+                      {r.subtitle ? <T size="xs" muted numberOfLines={1}>{r.subtitle}</T> : null}
+                    </View>
+                    {r.partner ? <T size="xs" semibold color={brand.orange}>{t('partners.st_partner')}</T> : null}
+                  </Pressable>
+                )) : <T size="xs" muted>{t('ads.noTargets')}</T>}
+              </>
+            )}
+          </View>
+        ) : null}
+
+        {target === 'page' ? (
+          <Row gap={6} style={{ flexWrap: 'wrap' }}>
+            {QUICK_LINKS.map((l) => (
+              <Pressable key={l} onPress={() => setLink(l)} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: link === l ? brand.orange : colors.cardAlt }}>
+                <T size="xs" semibold color={link === l ? '#fff' : colors.text}>{t(QUICK_LABEL[l])}</T>
+              </Pressable>
+            ))}
+          </Row>
+        ) : null}
+        {target === 'url' ? <Input label={t('ads.link')} hint={t('ads.linkHint')} value={link} onChangeText={setLink} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://" /> : null}
+        {target !== 'none' ? <Input label={t('ads.cta')} value={cta} onChangeText={setCta} maxLength={30} placeholder={t('ads.defaultCta')} /> : null}
       </Card>
 
       <Card style={{ gap: space.sm }}>
