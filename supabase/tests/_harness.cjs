@@ -16,7 +16,8 @@ const U = {
 const stubs = `
 create role anon; create role authenticated; create role service_role;
 create schema auth;
-create table auth.users (id uuid primary key, raw_user_meta_data jsonb default '{}'::jsonb);
+create table auth.users (id uuid primary key, raw_user_meta_data jsonb default '{}'::jsonb,
+  email text, email_confirmed_at timestamptz, last_sign_in_at timestamptz);
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.sub', true), '')::uuid $$;
 create schema storage;

@@ -23,6 +23,7 @@ import { listLaunchAds, type LaunchAdRow } from '@/lib/launchAds';
 import { adState } from '@/lib/launchAdsCore';
 import { listAllEvents, nextHighlight, upcomingEvents, type LocalEvent } from '@/lib/localEvents';
 import { loadCalorieAlertConfig, type CalorieAlertConfig } from '@/lib/nutrition';
+import { adminUserStats, type AdminUserStats } from '@/lib/adminUsers';
 import { KIND_ICON, PARTNER_KINDS, partnerOverview, type Overview, type PartnerKind } from '@/lib/partners';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
@@ -43,6 +44,7 @@ export default function Owner() {
   const [ads, setAds] = useState<LaunchAdRow[]>([]);
   const [events, setEvents] = useState<LocalEvent[]>([]);
   const [kcal, setKcal] = useState<CalorieAlertConfig | null>(null);
+  const [users, setUsers] = useState<AdminUserStats | null>(null);
 
   const load = useCallback(async () => {
     const admin = await isAdmin();
@@ -50,6 +52,7 @@ export default function Owner() {
     if (!admin) return;
     // كل جزء يتحمّل لحاله: لو تعطّل واحد تبقى باقي اللوحة شغالة
     loadCalorieAlertConfig(true).then(setKcal).catch(() => {});
+    adminUserStats().then(setUsers).catch(() => {});
     const [r, b, o, v, a, ev] = await Promise.all([
       loadReports().catch(() => [] as Report[]), loadBrandRequests().catch(() => [] as Brand[]), loadOffers().catch(() => [] as Offer[]),
       partnerOverview().catch(() => ({})), listLaunchAds().catch(() => [] as LaunchAdRow[]), listAllEvents().catch(() => [] as LocalEvent[]),
@@ -93,6 +96,11 @@ export default function Owner() {
       <OwnerLink icon="nutrition" title={t('kcalAlert.title')}
         sub={kcal && !kcal.enabled ? t('kcalAlert.ownerSubOff') : t('kcalAlert.ownerSubOn', { n: kcal?.threshold ?? 200 })}
         onPress={() => router.push('/owner-calorie-alert')} />
+
+      {/* المتدربين: العدد والإيميلات والتعديل والحذف */}
+      <OwnerLink icon="people" title={t('adminUsers.title')}
+        sub={users ? `${t('adminUsers.ownerSub', { count: users.trainees })} · ${t('adminUsers.ownerSubNew', { n: users.new7d })}` : t('adminUsers.searchPh')}
+        onPress={() => router.push('/owner-users')} />
 
       {/* طلبات الموافقة: ما يظهر أي شريك إلا بعد موافقتك */}
       <T size="lg" bold>{t('partners.approvalsTitle')}{pendingAll ? ` (${pendingAll})` : ''}</T>

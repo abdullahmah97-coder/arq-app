@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 
 const BUCKETS = ['avatars', 'posts', 'body', 'inbody'] as const;
 
-async function removeFolder(bucket: string, prefix: string) {
+export async function removeFolder(bucket: string, prefix: string) {
   const { data } = await supabase.storage.from(bucket).list(prefix, { limit: 1000 });
   if (!data?.length) return;
   const files = data.filter((f) => f.id).map((f) => `${prefix}/${f.name}`);
