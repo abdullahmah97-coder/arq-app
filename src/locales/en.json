@@ -899,7 +899,8 @@
     "hereNow_other": "{{count}} people at the gym right now",
     "checkInToSee_one": "{{count}} person at the gym now · check in to see who",
     "checkInToSee_other": "{{count}} people at the gym now · check in to see who",
-    "nobody": "Nobody checked in right now — be the first"
+    "nobody": "Nobody checked in right now — be the first",
+    "clubPage": "Club page: services, offers, reviews"
   },
   "chat": {
     "title": "Messages",
@@ -1721,6 +1722,7 @@
     "quietSuggestion": "Going at {{hour}} would be quieter than your usual time",
     "peakNote": "Average people present per hour over the last 8 weeks, from ARQ check-ins. No names.",
     "peakNotEnough": "Not enough check-ins for this gym yet. The more people check in, the more accurate this gets.",
+    "peakProgress": "{{n}} of {{min}} check-ins needed in the last 8 weeks",
     "facet_clean": "Cleanliness",
     "facet_equipment": "Equipment",
     "facet_crowd": "Crowding",

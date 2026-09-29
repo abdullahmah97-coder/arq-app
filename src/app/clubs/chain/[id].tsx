@@ -1,4 +1,4 @@
-// صفحة السلسلة (مثل وقت اللياقة، بيور جيم…): الشعار والإعجاب، الخدمات، التقييم والتعليقات مع الإعجاب بها،
+// صفحة السلسلة (مثل وقت اللياقة، بيور جيم…): الشعار والإعجاب، الخدمات، أوقات الذروة لكل فرع، التقييم والتعليقات مع الإعجاب بها،
 // والعروض والأسعار مع مصادرها، والفروع
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -12,9 +12,11 @@ import { ClubLogo, ClubRow, OfferCard, Stars } from '@/components/clubs/parts';
 import { gymName } from '@/components/GymPicker';
 import { Num } from '@/components/pulse/widgets';
 import { FacetBars } from '@/components/trust/FacetBars';
+import { PeakTimes } from '@/components/trust/PeakTimes';
 import { ReviewCard } from '@/components/trust/ReviewCard';
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { canManageChain, loadChainBranches, loadChains, loadOffers, ratingBars, type Chain, type Club, type Offer } from '@/lib/clubs';
+import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
 import { loadChainReviewsFull, summarizeReviews, type FullReview } from '@/lib/trust';
 import { brand, colors, radius, space } from '@/theme';
@@ -35,6 +37,8 @@ export default function ChainPage() {
   const [manage, setManage] = useState(false);
   const [tab, setTab] = useState<Tab>('offers');
   const [pick, setPick] = useState<Pick | null>(null);
+  const [peakGym, setPeakGym] = useState<string | null>(null);
+  const { profile } = useUser();
 
   const loadReviews = useCallback(() => { loadChainReviewsFull(String(id)).then(setReviews).catch(() => {}); }, [id]);
   useFocusEffect(useCallback(() => {
@@ -52,6 +56,13 @@ export default function ChainPage() {
   const { avg, facets } = summarizeReviews(reviews);
   const bars = ratingBars(reviews);
   const mine = reviews.find((r) => r.is_me);
+  // الذروة لكل فرع: نبدأ بفرعي لو هو من السلسلة، وإلا أول فرع
+  const peakId = peakGym ?? branches.find((b) => b.id === profile.gym_id)?.id ?? branches[0]?.id ?? null;
+  const branchLabels = branches.map((b) => {
+    const area = b.district || b.city;
+    const clash = area && branches.filter((x) => (x.district || x.city) === area).length > 1;
+    return { id: b.id, label: area && !clash ? area : gymName(b, lng) };
+  });
 
   const goBranch = (why: Pick, b: Club) => {
     setPick(null);
@@ -101,6 +112,9 @@ export default function ChainPage() {
 
       {/* الخدمات */}
       <ChainServicesCard chainId={chain.id} manage={manage} onHelp={branches.length ? () => choose('services') : undefined} />
+
+      {/* أوقات الذروة: لكل فرع */}
+      {peakId ? <PeakTimes gymId={peakId} branches={branchLabels} onBranch={setPeakGym} /> : null}
 
       {/* التقييم وآخر التعليقات */}
       <Card style={{ gap: space.md }}>

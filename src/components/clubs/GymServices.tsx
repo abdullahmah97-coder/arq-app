@@ -154,7 +154,8 @@ export function ChainServicesCard({ chainId, manage, onHelp }: { chainId: string
             <View key={s.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border }}>
               <ServiceIcon icon={s.icon} size={16} color={brand.orange} />
               <T size="xs" semibold>{serviceName(s, lng)}</T>
-              <T size="xs" muted>{s.branches && s.branches_yes && s.branches_yes < s.branches ? t('services.inSomeBranches', { yes: s.branches_yes, count: s.branches }) : t('services.allBranches')}</T>
+              <T size="xs" muted>{s.chain_default && s.note ? s.note
+                : s.branches && s.branches_yes && s.branches_yes < s.branches ? t('services.inSomeBranches', { yes: s.branches_yes, count: s.branches }) : t('services.allBranches')}</T>
             </View>
           ))}
         </View>

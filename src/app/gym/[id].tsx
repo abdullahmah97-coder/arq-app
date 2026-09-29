@@ -1,14 +1,16 @@
-// في النادي (مثل Swarm): مين موجود الآن ومين حضر اليوم، مع «كفو» وتعليقات، وإعداد الخصوصية
+// في النادي (مثل Swarm): مين موجود الآن ومين حضر اليوم، مع «كفو» وتعليقات، وأوقات الذروة والخدمات، وإعداد الخصوصية
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Alert, I18nManager, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
+import { GymServices } from '@/components/clubs/GymServices';
 import { gymName } from '@/components/GymPicker';
 import { Num } from '@/components/pulse/widgets';
 import { RankBadge } from '@/components/social/RankBadge';
+import { PeakTimes } from '@/components/trust/PeakTimes';
 import { Avatar, Card, Empty, Row, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { durationLabel } from '@/lib/dates';
@@ -65,7 +67,15 @@ export default function GymPresence() {
             <View><Num size={30} color={brand.amber}>{earlier.length}</Num><T size="xs" color={brand.sand}>{t('presence.earlierLabel')}</T></View>
           </View>
           <T size="sm" color={brand.cream} style={{ lineHeight: 22 }}>{iAmHere ? t('presence.youAreHere') : t('presence.notHere')}</T>
+          <Pressable onPress={() => router.push({ pathname: '/clubs/[id]', params: { id: String(id) } })} accessibilityRole="link" hitSlop={6}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
+            <T size="xs" semibold color={brand.amber}>{t('presence.clubPage')}</T>
+            <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={13} color={brand.amber} />
+          </Pressable>
         </BrandGradient>
+
+        {/* أوقات الذروة: متى يكون النادي زحمة */}
+        <PeakTimes gymId={String(id)} />
 
         <T size="lg" bold>{t('presence.now')}</T>
         {rows === null ? null : now.length ? now.map((r) => <PersonRow key={r.check_in_id} r={r} onFive={five} />)
@@ -78,6 +88,9 @@ export default function GymPresence() {
             {earlier.map((r) => <PersonRow key={r.check_in_id} r={r} onFive={five} />)}
           </>
         ) : null}
+
+        {/* خدمات الفرع */}
+        <GymServices gymId={String(id)} />
 
         <Card style={{ gap: space.sm }}>
           <Row gap={6}><Ionicons name="eye-outline" size={18} color={colors.primary} /><T bold>{t('presence.whoSeesMe')}</T></Row>

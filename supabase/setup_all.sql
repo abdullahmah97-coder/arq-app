@@ -1,6 +1,6 @@
 -- ARQ — إعداد قاعدة البيانات كاملة (مرة وحدة)
 -- الصق هذا الملف كله في Supabase > SQL Editor > New query ثم Run.
--- مولّد تلقائياً من supabase/migrations (41 ملف) — لا تعدّله يدوياً: npm run db:bundle
+-- مولّد تلقائياً من supabase/migrations (42 ملف) — لا تعدّله يدوياً: npm run db:bundle
 
 -- ===================== 20260926000000_init.sql =====================
 -- =====================================================================
@@ -8206,3 +8206,108 @@ begin
 end $$;
 revoke all on function public.admin_assign_partner(text, uuid, text) from public, anon;
 grant execute on function public.admin_assign_partner(text, uuid, text) to authenticated;
+
+
+-- ===================== 20260929000650_chain_amenities_public.sql =====================
+-- خدمات السلاسل من مصادرها الرسمية (مواقع السلاسل، تطبيقها الرسمي، أو تقرير الشركة الأم)
+-- «حسب الفرع» لما المصدر يقول إنها في بعض الفروع. ما نغيّر أي شي عدّله مدير السلسلة (on conflict do nothing).
+-- المصادر (سبتمبر 2026):
+--   وقت اللياقة بفئاتها: leejam.com.sa (من نحن + التقرير السنوي 2023) وتطبيق Fitness Time الرسمي
+--   أوبتيمو: optimo.com.sa/why-optimo و/locations · بي فت: bfit.com.sa (why-b-fit, personal-training, co-working)
+--   جولدز جيم: ggarabia.com (personal training, Les Mills, locate a gym)
+--   بودي ماسترز / بودي موشنز: صفحات الكلاسات والتدريب الشخصي وفلاتر «أقرب نادي»
+--   نيويو: nuyu-ksa.com · بيور جيم: ksa.puregymarabia.com (about-our-gyms, fitness-classes, personal-training)
+--   جيم نيشن: gymnation.com/en-sa (FAQ, facilities, صفحات الفروع) · فتنس فيرست: ksa.fitnessfirstme.com وصفحات أنديتها
+--   سناب فتنس: snapfitness.com/sa_en/gyms/al-jubail · اللياقة الذكية: smartfitness.com.sa (الأسئلة الشائعة، نبذة عنا)
+
+insert into public.chain_amenities (chain_id, amenity, available, note, source)
+select c.id, v.amenity, true, v.note, 'public_info'
+from (values
+  ('fitness-time-xpress', 'open_24h',          'فروع الرجال'),
+  ('fitness-time-ladies', 'pool',              null::text),
+  ('fitness-time-ladies', 'jacuzzi_hot',       null),
+  ('fitness-time-ladies', 'jacuzzi_cold',      'أحواض غطس'),
+  ('fitness-time-ladies', 'group_classes',     'حسب الفرع'),
+  ('fitness-time-ladies', 'personal_training', 'حسب الفرع'),
+  ('fitness-time',        'group_classes',     null),
+  ('fitness-time',        'personal_training', null),
+  ('fitness-time',        'jacuzzi_cold',      'أحواض غطس'),
+  ('fitness-time-plus',   'group_classes',     null),
+  ('fitness-time-plus',   'personal_training', null),
+  ('fitness-time-plus',   'jacuzzi_cold',      'أحواض غطس، حسب الفرع'),
+  ('fitness-time-pro',    'group_classes',     null),
+  ('fitness-time-pro',    'personal_training', null),
+  ('fitness-time-pro',    'jacuzzi_cold',      'أحواض غطس، حسب الفرع'),
+  ('optimo',              'pool',              null),
+  ('optimo',              'sauna',             null),
+  ('optimo',              'steam',             null),
+  ('optimo',              'showers',           null),
+  ('optimo',              'trainers',          null),
+  ('optimo',              'personal_training', null),
+  ('optimo',              'group_classes',     null),
+  ('optimo',              'drinks_bar',        null),
+  ('optimo',              'women_section',     'فرع نسائي'),
+  ('bfit',                'personal_training', null),
+  ('bfit',                'jacuzzi_hot',       null),
+  ('bfit',                'sauna',             null),
+  ('bfit',                'lockers',           null),
+  ('bfit',                'drinks_bar',        null),
+  ('bfit',                'wifi',              'في مساحة العمل'),
+  ('golds-gym',           'group_classes',     null),
+  ('golds-gym',           'personal_training', 'حسب الفرع'),
+  ('golds-gym',           'women_section',     'فروع نسائية'),
+  ('body-masters',        'group_classes',     null),
+  ('body-masters',        'personal_training', null),
+  ('body-masters',        'open_24h',          'حسب الفرع'),
+  ('body-masters',        'pool',              'حسب الفرع'),
+  ('body-masters',        'sauna',             'حسب الفرع'),
+  ('body-masters',        'steam',             'حسب الفرع'),
+  ('body-masters',        'lockers',           'حسب الفرع'),
+  ('body-masters',        'drinks_bar',        'حسب الفرع'),
+  ('body-motions',        'group_classes',     null),
+  ('body-motions',        'personal_training', null),
+  ('body-motions',        'lockers',           'حسب الفرع'),
+  ('body-motions',        'drinks_bar',        'حسب الفرع'),
+  ('nuyu',                'trainers',          null),
+  ('nuyu',                'personal_training', null),
+  ('nuyu',                'group_classes',     null),
+  ('puregym',             'group_classes',     null),
+  ('puregym',             'personal_training', null),
+  ('puregym',             'showers',           null),
+  ('puregym',             'lockers',           'مجانية، تجيب قفلك'),
+  ('puregym',             'parking',           'مجانية'),
+  ('puregym',             'wifi',              null),
+  ('puregym',             'women_section',     'فروع نسائية'),
+  ('puregym',             'accessible',        'دورات مياه مهيأة'),
+  ('gymnation',           'personal_training', 'جلسة مجانية عند الاشتراك'),
+  ('gymnation',           'showers',           null),
+  ('gymnation',           'lockers',           null),
+  ('gymnation',           'parking',           null),
+  ('gymnation',           'wifi',              null),
+  ('gymnation',           'women_section',     'أقسام نسائية'),
+  ('gymnation',           'jacuzzi_cold',      'حمامات ثلج، حسب الفرع'),
+  ('gymnation',           'drinks_bar',        'حسب الفرع'),
+  ('fitness-first',       'group_classes',     null),
+  ('fitness-first',       'personal_training', null),
+  ('fitness-first',       'pool',              'حسب الفرع'),
+  ('fitness-first',       'steam',             'حسب الفرع'),
+  ('fitness-first',       'open_24h',          'حسب الفرع'),
+  ('fitness-first',       'lockers',           'حسب الفرع'),
+  ('fitness-first',       'wifi',              'حسب الفرع'),
+  ('fitness-first',       'drinks_bar',        'حسب الفرع'),
+  ('snap-fitness',        'group_classes',     null),
+  ('snap-fitness',        'personal_training', null),
+  ('snap-fitness',        'showers',           null),
+  ('snap-fitness',        'parking',           null),
+  ('smart-fitness',       'pool',              null),
+  ('smart-fitness',       'sauna',             null),
+  ('smart-fitness',       'jacuzzi_hot',       null),
+  ('smart-fitness',       'steam',             null),
+  ('smart-fitness',       'parking',           null),
+  ('smart-fitness',       'trainers',          null),
+  ('smart-fitness',       'group_classes',     null),
+  ('smart-fitness',       'women_section',     'فروع نسائية')
+) as v(slug, amenity, note)
+join public.gym_chains c on c.slug = v.slug
+join public.amenities a on a.key = v.amenity
+on conflict (chain_id, amenity) do nothing;
