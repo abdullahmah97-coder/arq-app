@@ -1,14 +1,16 @@
-// الرسائل الخاصة: بين الأصدقاء، أو اللي يتابعون بعض، أو المدرب ومتدربه (مفروضة في القاعدة)
+// الرسائل الخاصة: بين الأصدقاء (بعد قبول طلب الصداقة) أو المدرب ومتدربه — مفروضة في القاعدة. وفيها صور وفيديو.
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useEffect } from 'react';
 import { supabase } from './supabase';
 
 export interface Message {
   id: string; sender: string; recipient: string; body: string; created_at: string; read_at: string | null;
-  /** صورة الرسالة (حاوية chat الخاصة): <المرسل>/<المستلم>/<ملف> */
+  /** صورة أو فيديو الرسالة (حاوية chat الخاصة): <المرسل>/<المستلم>/<ملف> */
   media_path?: string | null; media_type?: 'image' | 'video' | null; media_w?: number | null; media_h?: number | null;
+  /** مدة الفيديو بالثواني */
+  media_dur?: number | null;
 }
-export interface ChatPhoto { path: string; width?: number; height?: number }
+export interface ChatMedia { path: string; type: 'image' | 'video'; width?: number; height?: number; duration?: number }
 export interface InboxRow {
   other_id: string; username: string; full_name: string | null; avatar_url: string | null; points: number; is_coach: boolean;
   last_body: string; last_at: string; last_from_me: boolean; unread: number; can_message: boolean;
@@ -41,20 +43,22 @@ export async function loadThread(me: string, other: string, limit = 200): Promis
   return ((data ?? []) as Message[]).reverse();
 }
 
-export async function sendMessage(me: string, other: string, body: string, photo?: ChatPhoto): Promise<Message> {
+export async function sendMessage(me: string, other: string, body: string, media?: ChatMedia): Promise<Message> {
   const row: Record<string, string | number | null> = { sender: me, recipient: other, body: body.trim() };
-  if (photo) {
-    row.media_path = photo.path; row.media_type = 'image';
-    row.media_w = photo.width ? Math.round(photo.width) : null; row.media_h = photo.height ? Math.round(photo.height) : null;
+  if (media) {
+    row.media_path = media.path; row.media_type = media.type;
+    row.media_w = media.width ? Math.round(media.width) : null; row.media_h = media.height ? Math.round(media.height) : null;
+    if (media.type === 'video' && media.duration != null) row.media_dur = Math.round(media.duration * 10) / 10;
   }
   const { data, error } = await supabase.from('messages').insert(row).select('*').single();
   if (error) throw error;
   return data as Message;
 }
 
-/** رفع صورة للمحادثة: مجلد المرسل ثم المستلم (الحاوية خاصة، يشوفها الطرفين بس) */
-export async function uploadChatPhoto(me: string, other: string, uri: string, mimeType = 'image/jpeg'): Promise<string> {
-  const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : mimeType.includes('hei') ? 'heic' : 'jpg';
+/** رفع صورة أو فيديو للمحادثة: مجلد المرسل ثم المستلم (الحاوية خاصة، يشوفها الطرفين بس) */
+export async function uploadChatMedia(me: string, other: string, uri: string, mimeType = 'image/jpeg'): Promise<string> {
+  const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : mimeType.includes('hei') ? 'heic'
+    : mimeType.includes('quicktime') ? 'mov' : mimeType.startsWith('video/') ? 'mp4' : 'jpg';
   const path = `${me}/${other}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const body = await (await fetch(uri)).arrayBuffer();
   const { error } = await supabase.storage.from('chat').upload(path, body, { contentType: mimeType, upsert: false });
@@ -62,8 +66,8 @@ export async function uploadChatPhoto(me: string, other: string, uri: string, mi
   return path;
 }
 
-/** روابط مؤقتة (ساعة) لصور المحادثة */
-export async function chatPhotoUrls(paths: string[]): Promise<Record<string, string>> {
+/** روابط مؤقتة (ساعة) لصور وفيديوهات المحادثة */
+export async function chatMediaUrls(paths: string[]): Promise<Record<string, string>> {
   if (!paths.length) return {};
   const { data } = await supabase.storage.from('chat').createSignedUrls(paths, 60 * 60);
   const out: Record<string, string> = {};

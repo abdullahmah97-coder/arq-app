@@ -942,10 +942,12 @@
     "yesterday": "Yesterday",
     "photo": "📷 Photo",
     "attachPhoto": "Send a photo",
-    "fromLibrary": "Photo library",
-    "fromCamera": "Camera",
+    "fromLibrary": "Photos & videos",
+    "fromCamera": "Camera (photo or video)",
     "video": "🎥 Video",
-    "videoNeedsUpdate": "You got a video 🎥 Update the app from TestFlight to watch it."
+    "videoNeedsUpdate": "You got a video 🎥 Update the app from TestFlight to watch it.",
+    "attachMedia": "Send a photo or video",
+    "tooBig": "That file is too big. The limit is 50 MB, and videos up to 1 minute."
   },
   "owner": {
     "title": "App management",

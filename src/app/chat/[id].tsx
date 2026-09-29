@@ -1,5 +1,5 @@
 // محادثة خاصة: مفتوحة بين الأصدقاء (بعد قبول طلب الصداقة) أو المدرب ومتدربه — المتابعة ما تفتحها.
-// لو مقفلة: زر طلب الصداقة (أو قبوله) بدل ما يعلق المستخدم. وفيها إرسال صور.
+// لو مقفلة: زر طلب الصداقة (أو قبوله) بدل ما يعلق المستخدم. وفيها إرسال صور وفيديو (دقيقة كحد أقصى).
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -8,12 +8,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { VideoBubble, VideoViewer } from '@/components/chat/ChatVideo';
 import { Avatar, Button, Row, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { acceptRequest, relationTo, sendRequest, type Relation } from '@/lib/friends';
 import { useLocalized } from '@/lib/i18n';
-import { pickImage } from '@/lib/images';
-import { canMessage, chatPhotoUrls, loadThread, markRead, sendMessage, uploadChatPhoto, useIncoming, type Message } from '@/lib/messages';
+import { pickMedia } from '@/lib/images';
+import { canMessage, chatMediaUrls, loadThread, markRead, sendMessage, uploadChatMedia, useIncoming, type Message } from '@/lib/messages';
 import { clearChatNotifications, setOpenChat } from '@/lib/push';
 import { errorKey, publicUrl, supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
@@ -29,7 +30,10 @@ function photoSize(w?: number | null, h?: number | null) {
   return { width: W, height: Math.round(Math.min(320, Math.max(150, W * ratio))) };
 }
 
-type Pending = { id: string; uri: string; w?: number; h?: number };
+type Pending = { id: string; uri: string; type: 'image' | 'video'; w?: number; h?: number; dur?: number };
+
+/** حد حجم الملف (حاوية chat) */
+const MAX_BYTES = 50 * 1024 * 1024;
 
 export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,6 +52,7 @@ export default function Chat() {
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<Pending[]>([]);
   const [viewer, setViewer] = useState<string | null>(null);
+  const [video, setVideo] = useState<string | null>(null);
   const list = useRef<FlatList<Message>>(null);
 
   const load = useCallback(async () => {
@@ -74,12 +79,12 @@ export default function Chat() {
     markRead(userId, other).then(() => clearChatNotifications(other));
   }, [userId, other]));
 
-  // روابط الصور الخاصة (مؤقتة) للي ما عندنا رابطها
+  // روابط الصور والفيديو الخاصة (مؤقتة) للي ما عندنا رابطها
   useEffect(() => {
-    const missing = [...new Set(msgs.filter((m) => m.media_type !== 'video').map((m) => m.media_path).filter((x): x is string => !!x && !urls[x]))];
+    const missing = [...new Set(msgs.map((m) => m.media_path).filter((x): x is string => !!x && !urls[x]))];
     if (!missing.length) return;
     let alive = true;
-    chatPhotoUrls(missing).then((u) => { if (alive && Object.keys(u).length) setUrls((cur) => ({ ...cur, ...u })); }).catch(() => {});
+    chatMediaUrls(missing).then((u) => { if (alive && Object.keys(u).length) setUrls((cur) => ({ ...cur, ...u })); }).catch(() => {});
     return () => { alive = false; };
   }, [msgs, urls]);
 
@@ -96,15 +101,16 @@ export default function Chat() {
     } finally { setBusy(false); }
   };
 
-  const sendPhoto = async (source: 'library' | 'camera') => {
-    const img = await pickImage(source);
-    if (!img) return;
-    const tmp: Pending = { id: `tmp-${Date.now()}`, uri: img.uri, w: img.width, h: img.height };
+  const sendMedia = async (source: 'library' | 'camera') => {
+    const it = await pickMedia(source);
+    if (!it) return;
+    if (it.fileSize && it.fileSize > MAX_BYTES) { Alert.alert(t('chat.tooBig')); return; }
+    const tmp: Pending = { id: `tmp-${Date.now()}`, uri: it.uri, type: it.type, w: it.width, h: it.height, dur: it.duration };
     setPending((x) => [...x, tmp]);
     try {
-      const path = await uploadChatPhoto(userId, other, img.uri, img.mimeType);
-      const m = await sendMessage(userId, other, '', { path, width: img.width, height: img.height });
-      setUrls((u) => ({ ...u, [path]: img.uri })); // صورتك تبان من الجوال على طول
+      const path = await uploadChatMedia(userId, other, it.uri, it.mimeType);
+      const m = await sendMessage(userId, other, '', { path, type: it.type, width: it.width, height: it.height, duration: it.duration });
+      setUrls((u) => ({ ...u, [path]: it.uri })); // اللي أرسلته يبان من الجوال على طول
       setMsgs((x) => [...x, m]);
     } catch (e) {
       Alert.alert(t(errorKey(e)));
@@ -112,9 +118,9 @@ export default function Chat() {
       setPending((x) => x.filter((y) => y.id !== tmp.id));
     }
   };
-  const attach = () => Alert.alert(t('chat.attachPhoto'), undefined, [
-    { text: t('chat.fromLibrary'), onPress: () => sendPhoto('library') },
-    { text: t('chat.fromCamera'), onPress: () => sendPhoto('camera') },
+  const attach = () => Alert.alert(t('chat.attachMedia'), undefined, [
+    { text: t('chat.fromLibrary'), onPress: () => sendMedia('library') },
+    { text: t('chat.fromCamera'), onPress: () => sendMedia('camera') },
     { text: t('common.cancel'), style: 'cancel' },
   ]);
 
@@ -181,7 +187,9 @@ export default function Chat() {
           ) : null}
           ListFooterComponent={pending.length ? (
             <View style={{ gap: 6, alignItems: 'flex-end', marginTop: 6 }}>
-              {pending.map((x) => <View key={x.id}>{photo(x.uri, x.w, x.h, true)}</View>)}
+              {pending.map((x) => <View key={x.id}>{x.type === 'video'
+                ? <VideoBubble uploading width={x.w} height={x.h} duration={x.dur} />
+                : photo(x.uri, x.w, x.h, true)}</View>)}
             </View>
           ) : null}
           renderItem={({ item: m, index }) => {
@@ -197,11 +205,8 @@ export default function Chat() {
                 ) : null}
                 <View style={{ alignItems: mine ? 'flex-end' : 'flex-start', gap: 4 }}>
                   {m.media_path && m.media_type === 'video' ? (
-                    // فيديو من نسخة أحدث: هالنسخة ما فيها مشغّل فيديو
-                    <View style={{ width: 230, borderRadius: 18, backgroundColor: brand.deepGreen, padding: space.md, gap: 6, flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="videocam" size={22} color={brand.amber} />
-                      <T size="sm" color={brand.cream} style={{ flex: 1, lineHeight: 20 }}>{t('chat.videoNeedsUpdate')}</T>
-                    </View>
+                    <VideoBubble uri={urls[m.media_path]} width={m.media_w} height={m.media_h} duration={m.media_dur}
+                      onOpen={() => setVideo(urls[m.media_path!] ?? null)} />
                   ) : m.media_path ? photo(urls[m.media_path], m.media_w, m.media_h) : null}
                   {m.body ? (
                     <View style={{ maxWidth: '80%', backgroundColor: mine ? brand.deepGreen : colors.card, borderWidth: mine ? 0 : 1, borderColor: colors.border,
@@ -233,7 +238,7 @@ export default function Chat() {
           </View>
         ) : (
           <Row gap={8} style={{ padding: space.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card }}>
-            <Pressable onPress={attach} disabled={!allowed} hitSlop={6} accessibilityRole="button" accessibilityLabel={t('chat.attachPhoto')}
+            <Pressable onPress={attach} disabled={!allowed} hitSlop={6} accessibilityRole="button" accessibilityLabel={t('chat.attachMedia')}
               style={({ pressed }) => ({ width: 42, height: 42, borderRadius: 21, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', opacity: !allowed ? 0.4 : pressed ? 0.7 : 1 })}>
               <Ionicons name="image-outline" size={21} color={colors.primary} />
             </Pressable>
@@ -247,6 +252,8 @@ export default function Chat() {
           </Row>
         )}
       </KeyboardAvoidingView>
+
+      <VideoViewer uri={video} onClose={() => setVideo(null)} />
 
       {/* عرض الصورة كاملة */}
       <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>

@@ -65,8 +65,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "لرفع صور التقدم والمنشورات. To upload progress photos and posts.",
-          "cameraPermission": "لتصوير الجسم والمنشورات. To take body and post photos."
+          "photosPermission": "لرفع صور التقدم والمنشورات، وإرسال الصور والفيديو في المحادثة. To upload progress photos and posts, and send photos and videos in chat.",
+          "cameraPermission": "لتصوير الجسم والمنشورات، والصور والفيديو في المحادثة. To take body and post photos, and photos and videos for chat.",
+          "microphonePermission": "لتسجيل الصوت مع الفيديو اللي ترسله في المحادثة. To record sound with videos you send in chat."
         }
       ],
       [
@@ -106,6 +107,13 @@
           "icon": "./assets/notification-icon.png",
           "color": "#F1551D",
           "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": false,
+          "supportsPictureInPicture": false
         }
       ]
     ],

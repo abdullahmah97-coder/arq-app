@@ -1002,10 +1002,12 @@
     "yesterday": "أمس",
     "photo": "📷 صورة",
     "attachPhoto": "أرسل صورة",
-    "fromLibrary": "من الصور",
-    "fromCamera": "الكاميرا",
+    "fromLibrary": "من الصور والفيديو",
+    "fromCamera": "الكاميرا (صورة أو فيديو)",
     "video": "🎥 فيديو",
-    "videoNeedsUpdate": "وصلك فيديو 🎥 حدّث التطبيق من TestFlight عشان تشوفه."
+    "videoNeedsUpdate": "وصلك فيديو 🎥 حدّث التطبيق من TestFlight عشان تشوفه.",
+    "attachMedia": "أرسل صورة أو فيديو",
+    "tooBig": "الملف كبير. الحد ٥٠ ميقا، والفيديو لين دقيقة."
   },
   "owner": {
     "title": "لوحة إدارة التطبيق",
