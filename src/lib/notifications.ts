@@ -110,10 +110,13 @@ export async function refreshUnreadBadge() {
 
 // اشتراك لحظي واحد مشترك بين كل الأجراس (الرئيسية والمجتمع مفتوحين مع بعض في التبويبات)
 let live: { userId: string; users: number; ch: ReturnType<typeof supabase.channel> } | null = null;
+let liveSeq = 0;
 function retainLive(userId: string) {
   if (live && live.userId !== userId) { supabase.removeChannel(live.ch); live = null; }
   if (!live) {
-    const ch = supabase.channel(`notif:${userId}`)
+    // اسم جديد لكل قناة: لو القديمة لسا تنقفل، نفس الاسم يرجع نفس القناة وتطيح الصفحة بخطأ
+    // «cannot add postgres_changes callbacks after subscribe()» (صار في المحادثات قبل)
+    const ch = supabase.channel(`notif:${userId}:${++liveSeq}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => refreshUnreadBadge())
       .subscribe();
     live = { userId, users: 0, ch };
