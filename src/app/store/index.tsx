@@ -12,6 +12,8 @@ import { useUser } from '@/lib/auth';
 import { BRAND_CATEGORIES, FEATURED_CATEGORIES, loadBrands, loadMyBrand, type Brand, type BrandCategory } from '@/lib/brands';
 import { brand, colors, radius, space } from '@/theme';
 
+const CAT_ICON: Partial<Record<BrandCategory, keyof typeof Ionicons.glyphMap>> = { restaurant: 'restaurant', apparel: 'shirt', supplements: 'flask', equipment: 'barbell' };
+
 export default function Store() {
   const { t } = useTranslation();
   const { userId, profile } = useUser();
@@ -52,23 +54,23 @@ export default function Store() {
         </Row>
       </Pressable>
 
-      {/* الأقسام الرئيسية: المطاعم الصحية والملابس الرياضية */}
-      <Row gap={space.sm} style={{ alignItems: 'stretch' }}>
+      {/* الأقسام الرئيسية دايماً ظاهرة: مطاعم صحية، ملابس رياضية، مكملات غذائية، معدات رياضية */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
         {FEATURED_CATEGORIES.map((c) => {
           const on = cat === c;
           return (
             <Pressable key={c} onPress={() => setCat(on ? 'all' : c)} accessibilityRole="button" accessibilityState={{ selected: on }}
-              style={({ pressed }) => ({ flex: 1, gap: 6, borderRadius: radius.lg, padding: space.md, borderWidth: 1.5, opacity: pressed ? 0.85 : 1,
+              style={({ pressed }) => ({ width: '48%', flexGrow: 1, gap: 6, borderRadius: radius.lg, padding: space.md, borderWidth: 1.5, opacity: pressed ? 0.85 : 1,
                 backgroundColor: on ? brand.deepGreen : colors.card, borderColor: on ? brand.deepGreen : colors.border })}>
               <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: brand.orange, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name={c === 'restaurant' ? 'restaurant' : 'shirt'} size={20} color={brand.cream} />
+                <Ionicons name={CAT_ICON[c] ?? 'storefront'} size={20} color={brand.cream} />
               </View>
               <T bold color={on ? brand.cream : colors.text}>{t(`store.cat_${c}`)}</T>
               <T size="xs" color={on ? brand.sand : colors.muted}>{t(`store.featured_${c}`)}</T>
             </Pressable>
           );
         })}
-      </Row>
+      </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
         <Segmented<BrandCategory | 'all'> wrap value={cat} onChange={setCat}

@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 export type BrandCategory = 'restaurant' | 'apparel' | 'supplements' | 'equipment' | 'accessories' | 'nutrition' | 'other';
 export const BRAND_CATEGORIES: BrandCategory[] = ['restaurant', 'apparel', 'supplements', 'equipment', 'accessories', 'nutrition', 'other'];
 /** الأقسام الرئيسية اللي تظهر كبطاقات كبيرة في المتاجر */
-export const FEATURED_CATEGORIES: BrandCategory[] = ['restaurant', 'apparel'];
+export const FEATURED_CATEGORIES: BrandCategory[] = ['restaurant', 'apparel', 'supplements', 'equipment'];
 export type BrandStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
 export interface Brand {
