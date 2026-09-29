@@ -9,18 +9,63 @@ export interface FullReview {
   user_id: string; username: string; full_name: string | null; avatar_url: string | null; points: number; rating: number; body: string | null;
   updated_at: string; visited: boolean; is_me: boolean; reply: string | null; reply_at: string | null; can_reply: boolean;
   facets: Partial<Record<Facet, number>>;
+  /** الإعجابات بالتعليق، وهل أعجبني */
+  likes: number; liked: boolean;
+  /** في صفحة السلسلة: الفرع اللي انكتب عنه التعليق */
+  gym_id?: string; gym_name?: string | null; gym_name_en?: string | null;
 }
 export interface Facets { clean: number | null; equipment: number | null; crowd: number | null; coaches: number | null; staff: number | null; rated: number; verified_share: number | null }
 
 const n = (v: unknown) => (v == null ? null : Number(v));
 
+const toReview = (r: any): FullReview => ({
+  ...r, rating: Number(r.rating), likes: Number(r.likes ?? 0), liked: !!r.liked,
+  facets: Object.fromEntries(FACETS.map((f) => [f, r[`f_${f}`] ?? undefined]).filter(([, v]) => v != null)),
+});
 export async function loadReviewsFull(gymId: string): Promise<FullReview[]> {
   const { data, error } = await supabase.rpc('gym_reviews_full', { p_gym: gymId });
   if (error) return [];
-  return ((data ?? []) as any[]).map((r) => ({
-    ...r, rating: Number(r.rating),
-    facets: Object.fromEntries(FACETS.map((f) => [f, r[`f_${f}`] ?? undefined]).filter(([, v]) => v != null)),
-  }));
+  return ((data ?? []) as any[]).map(toReview);
+}
+/** تعليقات كل فروع السلسلة (مع اسم الفرع) */
+export async function loadChainReviewsFull(chainId: string): Promise<FullReview[]> {
+  const { data, error } = await supabase.rpc('chain_reviews_full', { p_chain: chainId });
+  if (error) return [];
+  return ((data ?? []) as any[]).map(toReview);
+}
+/** ملخص التقييم من قائمة التعليقات: المتوسط، التفاصيل، ونسبة الزوار الموثّقين */
+export function summarizeReviews(rows: FullReview[]): { avg: number; facets: Facets | null } {
+  if (!rows.length) return { avg: 0, facets: null };
+  const avg = rows.reduce((a, r) => a + r.rating, 0) / rows.length;
+  const f = (k: Facet) => {
+    const v = rows.map((r) => r.facets[k]).filter((x): x is number => x != null);
+    return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10 : null;
+  };
+  const rated = rows.filter((r) => FACETS.some((k) => r.facets[k] != null)).length;
+  return { avg, facets: { clean: f('clean'), equipment: f('equipment'), crowd: f('crowd'), coaches: f('coaches'), staff: f('staff'), rated,
+    verified_share: rows.filter((r) => r.visited).length / rows.length } };
+}
+export async function toggleReviewLike(gymId: string, reviewer: string): Promise<{ likes: number; liked: boolean }> {
+  const { data, error } = await supabase.rpc('toggle_review_like', { p_gym: gymId, p_reviewer: reviewer });
+  if (error) throw error;
+  const r = ((data ?? []) as any[])[0];
+  return { likes: Number(r?.likes ?? 0), liked: !!r?.liked };
+}
+
+// ---------- الإعجاب بالنادي (فرع أو سلسلة) ----------
+export type ClubRef = { gymId: string } | { chainId: string };
+const refArgs = (c: ClubRef) => ('gymId' in c ? { p_gym: c.gymId, p_chain: null } : { p_gym: null, p_chain: c.chainId });
+export async function clubLikeState(c: ClubRef): Promise<{ likes: number; liked: boolean }> {
+  const { data, error } = await supabase.rpc('club_like_state', refArgs(c));
+  if (error) return { likes: 0, liked: false };
+  const r = ((data ?? []) as any[])[0];
+  return { likes: Number(r?.likes ?? 0), liked: !!r?.liked };
+}
+export async function toggleClubLike(c: ClubRef): Promise<{ likes: number; liked: boolean }> {
+  const { data, error } = await supabase.rpc('toggle_club_like', refArgs(c));
+  if (error) throw error;
+  const r = ((data ?? []) as any[])[0];
+  return { likes: Number(r?.likes ?? 0), liked: !!r?.liked };
 }
 export async function loadFacets(gymId: string): Promise<Facets | null> {
   const { data } = await supabase.rpc('gym_review_facets', { p_gym: gymId });

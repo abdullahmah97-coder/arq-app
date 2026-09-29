@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
+import { ReviewLike } from '@/components/clubs/ClubLike';
 import { Stars } from '@/components/clubs/parts';
 import { RankBadge } from '@/components/social/RankBadge';
 import { Avatar, Button, Card, Input, Row, T } from '@/components/ui';
@@ -13,7 +14,9 @@ import { errorKey, publicUrl } from '@/lib/supabase';
 import { FACETS, flagReview, replyToReview, type FullReview } from '@/lib/trust';
 import { brand, colors, radius, space } from '@/theme';
 
-export function ReviewCard({ r, gymId, onChanged }: { r: FullReview; gymId: string; onChanged: () => void }) {
+/** showGym: في صفحة السلسلة نوضح الفرع اللي انكتب عنه التعليق */
+export function ReviewCard({ r, gymId: pageGym, onChanged, showGym }: { r: FullReview; gymId: string; onChanged: () => void; showGym?: boolean }) {
+  const gymId = r.gym_id ?? pageGym;
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const [replying, setReplying] = useState(false);
@@ -53,6 +56,12 @@ export function ReviewCard({ r, gymId, onChanged }: { r: FullReview; gymId: stri
         </View>
         {!r.is_me ? <Pressable onPress={flag} hitSlop={10} accessibilityLabel={t('trust.flagTitle')}><Ionicons name="flag-outline" size={15} color={colors.muted} /></Pressable> : null}
       </Row>
+      {showGym && r.gym_name ? (
+        <Pressable onPress={() => router.push({ pathname: '/clubs/[id]', params: { id: gymId } })} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="location-outline" size={12} color={colors.primary} />
+          <T size="xs" semibold color={colors.primary} numberOfLines={1}>{lng === 'en' && r.gym_name_en ? r.gym_name_en : r.gym_name}</T>
+        </Pressable>
+      ) : null}
       {r.body ? <T style={{ lineHeight: 24 }}>{r.body}</T> : null}
       {facets.length ? (
         <Row gap={10} style={{ flexWrap: 'wrap' }}>
@@ -79,6 +88,7 @@ export function ReviewCard({ r, gymId, onChanged }: { r: FullReview; gymId: stri
           <Pressable onPress={() => setReplying(true)} hitSlop={6}><T size="xs" semibold color={colors.primary}>{r.reply ? t('trust.editReply') : t('trust.replyAsGym')}</T></Pressable>
         )
       ) : null}
+      <ReviewLike key={`${r.likes}-${r.liked}`} gymId={gymId} reviewer={r.user_id} likes={r.likes} liked={r.liked} own={r.is_me} />
     </Card>
   );
 }

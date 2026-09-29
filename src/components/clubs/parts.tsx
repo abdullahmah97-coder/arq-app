@@ -72,7 +72,8 @@ export function SourceTag({ o, dark }: { o: Pick<Offer, 'confidence' | 'seen_on'
 }
 
 /** بطاقة عرض: السعر، الخصم، السعر الشهري المكافئ، التقييم، المصدر، والمدة المتبقية */
-export function OfferCard({ o, rating, dark, width }: { o: Offer; rating?: { rating: number | null; reviews: number } | null; dark?: boolean; width?: number }) {
+/** onPress: يغيّر وش يصير عند الضغط (مثلاً في صفحة السلسلة نفسها ما نفتحها مرة ثانية) */
+export function OfferCard({ o, rating, dark, width, onPress }: { o: Offer; rating?: { rating: number | null; reviews: number } | null; dark?: boolean; width?: number; onPress?: () => void }) {
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const ch = o.gym_chains; const g = o.gyms;
@@ -85,7 +86,7 @@ export function OfferCard({ o, rating, dark, width }: { o: Offer; rating?: { rat
   const sub = [t(`clubs.aud_${(ch ?? g)?.audience ?? 'mixed'}`), g?.district || g?.city].filter(Boolean).join(' · ');
   const go = () => (o.chain_id ? router.push({ pathname: '/clubs/chain/[id]', params: { id: o.chain_id } }) : router.push({ pathname: '/clubs/[id]', params: { id: o.gym_id! } }));
   return (
-    <Pressable onPress={go} onLongPress={longPress} delayLongPress={LONG_PRESS_MS} accessibilityRole="button"
+    <Pressable onPress={onPress ?? go} onLongPress={longPress} delayLongPress={LONG_PRESS_MS} accessibilityRole="button"
       style={({ pressed }) => ({
         width, gap: 10, padding: space.md, borderRadius: 20, opacity: pressed ? 0.85 : 1,
         backgroundColor: dark ? night.card : colors.card, borderWidth: 1, borderColor: dark ? night.line : colors.border,

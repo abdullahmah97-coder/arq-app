@@ -129,14 +129,15 @@ function VoteBtn({ active, icon, label, count, onPress }: { active: boolean; ico
 }
 
 /** ملخص خدمات السلسلة: كل خدمة متوفرة وفي كم فرع */
-export function ChainServicesCard({ chainId, manage }: { chainId: string; manage?: boolean }) {
+/** onHelp: يفتح فرع يقدر العضو يأكد فيه الخدمات (التأكيد يكون لكل فرع) */
+export function ChainServicesCard({ chainId, manage, onHelp }: { chainId: string; manage?: boolean; onHelp?: () => void }) {
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const [items, setItems] = useState<ChainService[] | null>(null);
   useEffect(() => { loadChainServices(chainId).then(setItems).catch(() => setItems([])); }, [chainId]);
   if (!items) return null;
   const shown = items.filter((s) => s.key !== 'other' && (s.branches_yes > 0 || s.chain_default === true));
-  if (!shown.length && !manage) return null;
+  const missing = items.filter((s) => s.key !== 'other' && s.chain_default == null && s.branches_known === 0).length;
   return (
     <Card style={{ gap: space.md }}>
       <Row style={{ justifyContent: 'space-between' }}>
@@ -157,8 +158,13 @@ export function ChainServicesCard({ chainId, manage }: { chainId: string; manage
             </View>
           ))}
         </View>
-      ) : <T size="sm" muted>{t('services.none')}</T>}
+      ) : <T size="sm" muted>{t('services.chainNone')}</T>}
       <T size="xs" muted>{t('services.chainVaries')}</T>
+      {onHelp && missing ? (
+        <Pressable onPress={onHelp} accessibilityRole="button" hitSlop={6}>
+          <T size="sm" semibold color={colors.primary}>{t('services.helpChainCta')}</T>
+        </Pressable>
+      ) : null}
     </Card>
   );
 }

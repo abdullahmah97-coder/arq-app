@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Linking, Platform, Pressable, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { GymServices } from '@/components/clubs/GymServices';
+import { ClubLikeButton } from '@/components/clubs/ClubLike';
 import { ClubLogo, OfferCard, Stars } from '@/components/clubs/parts';
 import { GymCoaches } from '@/components/coaching/GymCoaches';
 import { gymName } from '@/components/GymPicker';
@@ -77,6 +78,7 @@ export default function ClubPage() {
           </Pressable>
         ) : null}
         <Row gap={space.sm} style={{ marginTop: space.sm, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <ClubLikeButton target={{ gymId: club.id }} />
           <HeroBtn icon="navigate" label={t('clubs.directions')} onPress={() => Linking.openURL(mapsUrl)} />
           <HeroBtn icon="people" label={t('clubs.whoIsHere')} onPress={() => router.push({ pathname: '/gym/[id]', params: { id: club.id } })} />
           <HeroBtn icon={inCompare ? 'checkmark-done' : 'git-compare-outline'} label={inCompare ? t('trust.inCompare') : t('trust.compare')}
@@ -98,6 +100,7 @@ export default function ClubPage() {
 
       {/* التقييم */}
       <Card style={{ gap: space.md }}>
+        <T size="lg" bold>{t('clubs.ratingTitle')}</T>
         <View style={{ flexDirection: 'row', gap: space.lg, alignItems: 'center' }}>
           <View style={{ alignItems: 'center', gap: 4, width: 96 }}>
             <Num size={40} color={colors.text}>{reviews.length ? avg.toFixed(1) : '—'}</Num>
@@ -141,7 +144,7 @@ export default function ClubPage() {
 
       {/* التعليقات */}
       <Row style={{ justifyContent: 'space-between' }}>
-        <T size="lg" bold>{t('clubs.reviews')}</T>
+        <T size="lg" bold>{t('clubs.commentsTitle')}</T>
         <Button small variant={mine ? 'secondary' : 'primary'} icon={mine ? 'create-outline' : 'star-outline'} title={mine ? t('clubs.editReview') : t('clubs.rate')}
           onPress={() => router.push({ pathname: '/clubs/review', params: { gym: club.id, name: gymName(club, lng) } })} />
       </Row>
