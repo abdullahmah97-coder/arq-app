@@ -943,7 +943,9 @@
     "photo": "📷 Photo",
     "attachPhoto": "Send a photo",
     "fromLibrary": "Photo library",
-    "fromCamera": "Camera"
+    "fromCamera": "Camera",
+    "video": "🎥 Video",
+    "videoNeedsUpdate": "You got a video 🎥 Update the app from TestFlight to watch it."
   },
   "owner": {
     "title": "App management",

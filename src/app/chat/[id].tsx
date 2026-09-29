@@ -76,7 +76,7 @@ export default function Chat() {
 
   // روابط الصور الخاصة (مؤقتة) للي ما عندنا رابطها
   useEffect(() => {
-    const missing = [...new Set(msgs.map((m) => m.media_path).filter((x): x is string => !!x && !urls[x]))];
+    const missing = [...new Set(msgs.filter((m) => m.media_type !== 'video').map((m) => m.media_path).filter((x): x is string => !!x && !urls[x]))];
     if (!missing.length) return;
     let alive = true;
     chatPhotoUrls(missing).then((u) => { if (alive && Object.keys(u).length) setUrls((cur) => ({ ...cur, ...u })); }).catch(() => {});
@@ -196,7 +196,13 @@ export default function Chat() {
                   </View>
                 ) : null}
                 <View style={{ alignItems: mine ? 'flex-end' : 'flex-start', gap: 4 }}>
-                  {m.media_path ? photo(urls[m.media_path], m.media_w, m.media_h) : null}
+                  {m.media_path && m.media_type === 'video' ? (
+                    // فيديو من نسخة أحدث: هالنسخة ما فيها مشغّل فيديو
+                    <View style={{ width: 230, borderRadius: 18, backgroundColor: brand.deepGreen, padding: space.md, gap: 6, flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="videocam" size={22} color={brand.amber} />
+                      <T size="sm" color={brand.cream} style={{ flex: 1, lineHeight: 20 }}>{t('chat.videoNeedsUpdate')}</T>
+                    </View>
+                  ) : m.media_path ? photo(urls[m.media_path], m.media_w, m.media_h) : null}
                   {m.body ? (
                     <View style={{ maxWidth: '80%', backgroundColor: mine ? brand.deepGreen : colors.card, borderWidth: mine ? 0 : 1, borderColor: colors.border,
                       paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, borderBottomEndRadius: mine && last ? 4 : 18, borderBottomStartRadius: !mine && last ? 4 : 18 }}>

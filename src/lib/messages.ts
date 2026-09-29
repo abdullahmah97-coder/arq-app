@@ -6,7 +6,7 @@ import { supabase } from './supabase';
 export interface Message {
   id: string; sender: string; recipient: string; body: string; created_at: string; read_at: string | null;
   /** صورة الرسالة (حاوية chat الخاصة): <المرسل>/<المستلم>/<ملف> */
-  media_path?: string | null; media_type?: 'image' | null; media_w?: number | null; media_h?: number | null;
+  media_path?: string | null; media_type?: 'image' | 'video' | null; media_w?: number | null; media_h?: number | null;
 }
 export interface ChatPhoto { path: string; width?: number; height?: number }
 export interface InboxRow {
