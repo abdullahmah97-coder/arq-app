@@ -14,7 +14,8 @@ import { brand, colors, space, TAB_BAR_SPACE } from '@/theme';
 // مع ساعة أبل: وش يشتغل بدون تطبيق ساعة منفصل
 const WATCH: [IconName, string][] = [
   ['hourglass-outline', 'watch.feat_rest'], ['chatbubble-ellipses-outline', 'watch.feat_reply'],
-  ['walk-outline', 'watch.feat_workouts'], ['heart-outline', 'watch.feat_session'], ['notifications-outline', 'watch.feat_quiet'],
+  ['walk-outline', 'watch.feat_workouts'], ['heart-outline', 'watch.feat_session'], ['calendar-outline', 'watch.feat_bookings'],
+  ['nutrition-outline', 'watch.feat_kcal'], ['notifications-outline', 'watch.feat_quiet'],
 ];
 
 const READS: [IconName, string][] = [

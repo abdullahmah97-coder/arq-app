@@ -9,7 +9,9 @@ import { NCard, NT, Num } from '@/components/pulse/widgets';
 import { useUser } from '@/lib/auth';
 import { LONG_PRESS_MS, useHomeLongPress } from '@/lib/homeLayout';
 import { useLocalized } from '@/lib/i18n';
-import { kcalAlertOn, loadCalorieAlertConfig, loadFoodDay, setKcalAlertOn, totals, type CalorieAlertConfig, type FoodEntry } from '@/lib/nutrition';
+import {
+  KCAL_ALERT_CHOICES, kcalAlertAt, kcalAlertOn, loadCalorieAlertConfig, loadFoodDay, setKcalAlertAt, setKcalAlertOn, totals, type CalorieAlertConfig, type FoodEntry,
+} from '@/lib/nutrition';
 import { brand, night, pulse } from '@/theme';
 
 export function HomeNutrition() {
@@ -18,15 +20,25 @@ export function HomeNutrition() {
   const { userId, plan } = useUser();
   const longPress = useHomeLongPress();
   const [food, setFood] = useState<FoodEntry[]>([]);
-  // زر تنبيه «باقي لك ٢٠٠ سعرة» (الرقم والنص من لوحة إدارة التطبيق)
+  // زر تنبيه «باقي لك ٢٠٠ سعرة»: المستخدم يختار الرقم أو يطفيه (النص والرقم الافتراضي من لوحة إدارة التطبيق)
   const [cfg, setCfg] = useState<CalorieAlertConfig | null>(null);
   const [alertOn, setAlertOn] = useState(true);
+  const [alertAt, setAlertAt] = useState<number | null>(null);
+  const [picking, setPicking] = useState(false);
   useFocusEffect(useCallback(() => {
     loadFoodDay(userId).then(setFood).catch(() => {});
     loadCalorieAlertConfig().then(setCfg).catch(() => {});
     kcalAlertOn().then(setAlertOn);
+    kcalAlertAt().then(setAlertAt);
   }, [userId]));
-  const toggleAlert = () => { const v = !alertOn; setAlertOn(v); setKcalAlertOn(v); };
+  const threshold = alertAt ?? cfg?.threshold ?? 200;
+  const choices = [...new Set([...KCAL_ALERT_CHOICES, threshold])].sort((a, b) => a - b);
+  const choose = (n: number | null) => {
+    setPicking(false);
+    if (n == null) { setAlertOn(false); setKcalAlertOn(false); return; }
+    setAlertAt(n); setKcalAlertAt(n);
+    if (!alertOn) { setAlertOn(true); setKcalAlertOn(true); }
+  };
 
   const sum = totals(food);
   const tg = plan?.data.targets ?? null;
@@ -68,15 +80,39 @@ export function HomeNutrition() {
         ))}
       </View>
       {cfg?.enabled && goal ? (
-        <Pressable onPress={toggleAlert} onLongPress={longPress} delayLongPress={LONG_PRESS_MS}
-          accessibilityRole="switch" accessibilityState={{ checked: alertOn }} accessibilityLabel={t('food.kcalAlertA11y')}
-          style={({ pressed }) => ({
-            flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
-            borderWidth: 1, borderColor: alertOn ? brand.amber : night.line, backgroundColor: alertOn ? 'rgba(254,169,79,0.12)' : 'transparent', opacity: pressed ? 0.8 : 1,
-          })}>
-          <Ionicons name={alertOn ? 'notifications' : 'notifications-off-outline'} size={15} color={alertOn ? brand.amber : night.muted} />
-          <NT size={12} semibold color={alertOn ? brand.amber : night.muted}>{alertOn ? t('food.kcalAlertOn', { n: num(cfg.threshold) }) : t('food.kcalAlertOff')}</NT>
-        </Pressable>
+        <View style={{ gap: 8 }}>
+          <Pressable onPress={() => setPicking((x) => !x)} onLongPress={longPress} delayLongPress={LONG_PRESS_MS}
+            accessibilityRole="button" accessibilityState={{ expanded: picking }} accessibilityLabel={t('food.kcalAlertA11y')}
+            style={({ pressed }) => ({
+              flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+              borderWidth: 1, borderColor: alertOn ? brand.amber : night.line, backgroundColor: alertOn ? 'rgba(254,169,79,0.12)' : 'transparent', opacity: pressed ? 0.8 : 1,
+            })}>
+            <Ionicons name={alertOn ? 'notifications' : 'notifications-off-outline'} size={15} color={alertOn ? brand.amber : night.muted} />
+            <NT size={12} semibold color={alertOn ? brand.amber : night.muted}>{alertOn ? t('food.kcalAlertOn', { n: num(threshold) }) : t('food.kcalAlertOff')}</NT>
+            <Ionicons name={picking ? 'chevron-up' : 'chevron-down'} size={13} color={alertOn ? brand.amber : night.muted} />
+          </Pressable>
+          {picking ? (
+            <View style={{ gap: 6 }}>
+              <NT size={11} muted>{t('food.kcalAlertPick')}</NT>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {choices.map((n) => {
+                  const on = alertOn && n === threshold;
+                  return (
+                    <Pressable key={n} onPress={() => choose(n)} accessibilityRole="button" accessibilityState={{ selected: on }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: on ? brand.amber : night.cardStrong, borderWidth: 1, borderColor: on ? brand.amber : night.line }}>
+                      <NT size={12} semibold color={on ? brand.deepGreen : night.text}>{num(n)}</NT>
+                    </Pressable>
+                  );
+                })}
+                <Pressable onPress={() => choose(null)} accessibilityRole="button" accessibilityState={{ selected: !alertOn }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: !alertOn ? night.text : 'transparent', borderWidth: 1, borderColor: night.line }}>
+                  <Ionicons name="notifications-off-outline" size={12} color={!alertOn ? night.bg : night.muted} />
+                  <NT size={12} semibold color={!alertOn ? night.bg : night.muted}>{t('food.kcalAlertStop')}</NT>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+        </View>
       ) : null}
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Pressable onPress={() => router.push({ pathname: '/food/photo', params: { auto: 'camera' } })} onLongPress={longPress} delayLongPress={LONG_PRESS_MS}

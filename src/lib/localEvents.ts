@@ -58,7 +58,7 @@ export async function toggleReminder(e: LocalEvent, text: { title: string; body:
   if (!p.granted && p.canAskAgain) p = await Notifications.requestPermissionsAsync();
   if (!p.granted && p.ios?.status !== Notifications.IosAuthorizationStatus.PROVISIONAL) return 'denied';
   const nid = await Notifications.scheduleNotificationAsync({
-    content: { title: text.title, body: text.body, sound: 'default', data: { kind: 'event', url: `/events/${e.id}` } },
+    content: { title: text.title, body: text.body, sound: 'default', interruptionLevel: 'active', data: { kind: 'event', url: `/events/${e.id}` } },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at, channelId: 'default' },
   });
   m[e.id] = nid;

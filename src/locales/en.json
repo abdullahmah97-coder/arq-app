@@ -1175,7 +1175,9 @@
     "cat_fast": "Fast food",
     "kcalAlertOn": "Alerts you at {{n}} kcal left",
     "kcalAlertOff": "Calorie alert off",
-    "kcalAlertA11y": "Turn the calorie alert on or off"
+    "kcalAlertA11y": "Turn the calorie alert on or off",
+    "kcalAlertPick": "Alert me when this many kcal are left:",
+    "kcalAlertStop": "Off"
   },
   "notif": {
     "title": "Notifications",
@@ -2710,7 +2712,7 @@
     "feat_workouts": "Workouts from your watch (runs, walks, rides…) show on the Health page",
     "feat_session": "Your heart rate and calories during an ARQ workout, saved to Apple Health",
     "feat_quiet": "Likes arrive quietly without tapping your wrist; what matters comes through right away",
-    "featuresNote": "Notifications reach your watch when your phone is locked. A full watch app is coming in a future release.",
+    "featuresNote": "Notifications reach your watch when your phone is locked. In the iPhone Watch app → Notifications → ARQ, keep “Mirror iPhone alerts” on. A full watch app is coming in a later version.",
     "workoutsTitle": "Your watch workouts",
     "workoutsEmpty": "Record a workout in the Workout app on your watch (run, walk, ride…) and it shows up here.",
     "weekCount": "This week",
@@ -2744,7 +2746,9 @@
     "kind_racket": "Racket sports",
     "kind_combat": "Boxing & combat",
     "kind_cooldown": "Cooldown",
-    "kind_other": "Workout"
+    "kind_other": "Workout",
+    "feat_bookings": "Court and class booking confirmations and the one-hour reminder reach your watch",
+    "feat_kcal": "The «kcal left» alert and event reminders reach your watch"
   },
   "events": {
     "title": "Tournaments & events",
@@ -2847,11 +2851,11 @@
   },
   "kcalAlert": {
     "title": "Calorie alert",
-    "intro": "When a user logs food and has this many calories or fewer left for the day, they get one alert that day. Users can switch it off from the calories card.",
+    "intro": "When a user logs food and has their chosen number of calories or fewer left for the day, they get one alert that day. Here you set the text and the default number; users can change the number or switch the alert off from the calories card.",
     "enabled": "Alert on",
     "enabledHint": "When off, nobody gets it",
-    "threshold": "Alert at (kcal left)",
-    "thresholdHint": "50 to 500. Default 200",
+    "threshold": "Default number (kcal left)",
+    "thresholdHint": "50 to 500. Each user can change it for themselves from the calories card",
     "textAr": "Arabic text",
     "textEn": "English text (optional)",
     "titleLabel": "Title",
@@ -2861,7 +2865,7 @@
     "reset": "Restore the default text",
     "err_threshold": "The number must be between 50 and 500",
     "err_text": "Enter the Arabic title and message",
-    "ownerSubOn": "Alerts at {{n}} kcal left · edit the text",
+    "ownerSubOn": "Default {{n}} kcal left · edit the text",
     "ownerSubOff": "Off for all users"
   },
   "book": {

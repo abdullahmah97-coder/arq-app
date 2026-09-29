@@ -5,7 +5,7 @@ import { Alert, Platform } from 'react-native';
 import { isoDate } from '../dates';
 import i18n from '../i18n';
 import { supabase } from '../supabase';
-import { alertTexts, calorieGoal, caloriesLeftAlert, DEFAULT_KCAL_ALERT, parseAlertConfig, type CalorieAlertConfig } from './calorieAlert';
+import { alertTexts, calorieGoal, caloriesLeftAlert, DEFAULT_KCAL_ALERT, KCAL_ALERT_MAX, KCAL_ALERT_MIN, parseAlertConfig, type CalorieAlertConfig } from './calorieAlert';
 import type { Food } from './foods';
 import { scaleFood, totals, type Macros, type MealSlot } from './math';
 
@@ -93,6 +93,16 @@ export async function setKcalAlertOn(on: boolean): Promise<void> {
   }
 }
 
+// المستخدم يختار متى ينبّهه (كم سعرة باقية). بدون اختيار = رقم لوحة الإدارة
+const ALERT_AT_KEY = 'arq.kcalAlertAt.v1';
+export async function kcalAlertAt(): Promise<number | null> {
+  const v = Number(await AsyncStorage.getItem(ALERT_AT_KEY).catch(() => null));
+  return Number.isFinite(v) && v >= KCAL_ALERT_MIN && v <= KCAL_ALERT_MAX ? Math.round(v) : null;
+}
+export async function setKcalAlertAt(n: number): Promise<void> {
+  await AsyncStorage.setItem(ALERT_AT_KEY, String(Math.round(n))).catch(() => {});
+}
+
 // نص التنبيه والرقم من لوحة إدارة التطبيق (نحتفظ فيها ١٠ دقايق)
 let cfgCache: { at: number; cfg: CalorieAlertConfig } | null = null;
 export async function loadCalorieAlertConfig(fresh = false): Promise<CalorieAlertConfig> {
@@ -117,14 +127,14 @@ async function afterFoodLogged(userId: string, day: Date) {
     if (!cfg.enabled) return;
     const saved = JSON.parse((await AsyncStorage.getItem(ALERT_KEY)) ?? 'null') as { u: string; d: string } | null;
     const eaten = totals(await loadFoodDay(userId, day)).kcal;
-    const left = caloriesLeftAlert(eaten, goal, saved?.u === userId ? saved.d : null, today, cfg.threshold);
+    const left = caloriesLeftAlert(eaten, goal, saved?.u === userId ? saved.d : null, today, (await kcalAlertAt()) ?? cfg.threshold);
     if (left == null) return;
     await AsyncStorage.setItem(ALERT_KEY, JSON.stringify({ u: userId, d: today }));
     const { title, body } = alertTexts(cfg, i18n.language, { n: left, eaten, goal });
     if (Platform.OS !== 'web') {
       const p = await Notifications.getPermissionsAsync();
       if (p.granted || p.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
-        await Notifications.scheduleNotificationAsync({ content: { title, body, sound: 'default', data: { kind: 'kcal', url: '/(tabs)/plan' } }, trigger: null });
+        await Notifications.scheduleNotificationAsync({ content: { title, body, sound: 'default', interruptionLevel: 'active', data: { kind: 'kcal', url: '/(tabs)/plan' } }, trigger: null });
         return;
       }
     }

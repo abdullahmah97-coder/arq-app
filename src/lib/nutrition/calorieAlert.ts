@@ -17,6 +17,10 @@ export const DEFAULT_KCAL_ALERT: CalorieAlertConfig = {
 };
 /** للتوافق مع الاختبارات القديمة */
 export const KCAL_ALERT_AT = DEFAULT_KCAL_ALERT.threshold;
+/** حدود الرقم (للإدارة وللمستخدم) والخيارات اللي تطلع للمستخدم في مربع السعرات */
+export const KCAL_ALERT_MIN = 50;
+export const KCAL_ALERT_MAX = 500;
+export const KCAL_ALERT_CHOICES = [100, 150, 200, 300, 400, 500];
 
 /** يرجع المتبقي لو لازم ننبّه الحين، وإلا null */
 export function caloriesLeftAlert(eaten: number, goal: number | null | undefined, lastAlertDay: string | null, today: string, threshold = KCAL_ALERT_AT): number | null {
