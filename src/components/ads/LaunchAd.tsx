@@ -1,11 +1,10 @@
-// إعلان البداية: صفحة كاملة أول ما يفتح التطبيق (صورة أو GIF) مع زر تخطي وعدّاد، و«إعلان» على الإعلانات التسويقية
+// إعلان البداية: بطاقة فوق التطبيق أول ما يفتح (صورة أو GIF) مع زر تخطي وعدّاد، و«إعلان» على الإعلانات التسويقية
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Linking, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Button, T } from '@/components/ui';
 import { adMediaUrl, launchAdEvent, launchAdToShow, markAdShown, type LaunchAd } from '@/lib/launchAds';
 import { brand } from '@/theme';
@@ -49,7 +48,8 @@ function Gate() {
 /** العرض نفسه. preview: معاينة المالك (بدون تسجيل أرقام) */
 export function LaunchAdView({ ad, onClose, preview }: { ad: Pick<LaunchAd, 'id' | 'kind' | 'title' | 'media_path' | 'link' | 'cta' | 'auto_close'> & Partial<LaunchAd>; onClose: () => void; preview?: boolean }) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
+  const win = useWindowDimensions();
+  const [ratio, setRatio] = useState(0.8);
   const [left, setLeft] = useState(ad.auto_close);
   const done = useRef(false);
 
@@ -82,40 +82,44 @@ export function LaunchAdView({ ad, onClose, preview }: { ad: Pick<LaunchAd, 'id'
     else Linking.openURL(ad.link).catch(() => {});
   };
 
+  // بطاقة في نص الشاشة والتطبيق باين وراها معتّم. المقاس يتبع نسبة الصورة (بين 9:16 و 5:4) بحد أقصى ٦٥٪ من طول الشاشة
+  const cardW = Math.min(win.width - 56, 360);
+  const r = Math.min(1.25, Math.max(0.5625, ratio));
+  const imgH = Math.min(cardW / r, win.height * 0.65 - (ad.link ? 72 : 0));
+
   return (
-    <Modal visible transparent={false} animationType="fade" statusBarTranslucent onRequestClose={() => close('close')}>
-      <View style={styles.root}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={ad.link ? open : undefined} disabled={!ad.link}
-          accessibilityRole={ad.link ? 'link' : 'image'} accessibilityLabel={ad.title}>
-          <Image source={{ uri: adMediaUrl(ad.media_path) }} style={StyleSheet.absoluteFill} contentFit="contain" autoplay transition={150} />
-        </Pressable>
-
-        <View style={[styles.top, { top: insets.top + 10 }]} pointerEvents="box-none">
-          {ad.kind === 'ad' ? (
-            <View style={styles.label}><T size="xs" semibold color="#fff">{t('ads.label')}</T></View>
-          ) : <View />}
-          <Pressable onPress={() => close('close')} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('ads.skip')} style={styles.skip}>
-            <T size="sm" semibold color="#fff">{ad.auto_close && left > 0 ? t('ads.skipIn', { n: left }) : t('ads.skip')}</T>
-            <Ionicons name="close" size={18} color="#fff" />
+    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={() => close('close')}>
+      <Pressable style={styles.backdrop} onPress={() => close('close')} accessibilityRole="button" accessibilityLabel={t('ads.skip')}>
+        {preview ? <View style={styles.previewTag}><T size="xs" semibold color={brand.deepGreen}>{t('ads.previewTag')}</T></View> : null}
+        {/* الضغط داخل البطاقة ما يقفلها */}
+        <Pressable onPress={() => {}} style={[styles.card, { width: cardW }]}>
+          <Pressable onPress={ad.link ? open : undefined} disabled={!ad.link} accessibilityRole={ad.link ? 'link' : 'image'} accessibilityLabel={ad.title}>
+            <Image source={{ uri: adMediaUrl(ad.media_path) }} style={{ width: cardW, height: imgH }} contentFit="cover" autoplay transition={150}
+              onLoad={(e) => { const w = e.source?.width, h = e.source?.height; if (w && h) setRatio(w / h); }} />
           </Pressable>
-        </View>
-
-        {ad.link ? (
-          <View style={[styles.bottom, { bottom: insets.bottom + 20 }]}>
-            <Button icon={ad.link.startsWith('/') ? 'sparkles-outline' : 'open-outline'} title={ad.cta || t('ads.defaultCta')} onPress={open} />
+          <View style={styles.top} pointerEvents="box-none">
+            {ad.kind === 'ad' ? <View style={styles.label}><T size="xs" semibold color="#fff">{t('ads.label')}</T></View> : <View />}
+            <Pressable onPress={() => close('close')} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('ads.skip')} style={styles.skip}>
+              <T size="xs" semibold color="#fff">{ad.auto_close && left > 0 ? t('ads.skipIn', { n: left }) : t('ads.skip')}</T>
+              <Ionicons name="close" size={16} color="#fff" />
+            </Pressable>
           </View>
-        ) : null}
-        {preview ? <View style={[styles.previewTag, { bottom: insets.bottom + (ad.link ? 86 : 20) }]}><T size="xs" semibold color={brand.deepGreen}>{t('ads.previewTag')}</T></View> : null}
-      </View>
+          {ad.link ? (
+            <View style={{ padding: 12 }}>
+              <Button small icon={ad.link.startsWith('/') ? 'sparkles-outline' : 'open-outline'} title={ad.cta || t('ads.defaultCta')} onPress={open} />
+            </View>
+          ) : null}
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000' },
-  top: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  label: { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  skip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  bottom: { position: 'absolute', left: 24, right: 24 },
-  previewTag: { position: 'absolute', alignSelf: 'center', backgroundColor: brand.amber, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(6,24,21,0.62)', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  card: { borderRadius: 24, overflow: 'hidden', backgroundColor: brand.deepGreen, shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
+  top: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  label: { backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
+  skip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  previewTag: { backgroundColor: brand.amber, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
 });
