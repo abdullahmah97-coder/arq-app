@@ -3,8 +3,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image, ImageBackground } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,7 +13,10 @@ import { Logo, SaduPattern } from '@/brand/Brand';
 import { CheckInCard } from '@/components/CheckInCard';
 import { HomeClubOffers } from '@/components/clubs/HomeClubOffers';
 import { NotificationBell } from '@/components/NotificationBell';
+import { HomeNutrition } from '@/components/nutrition/HomeNutrition';
+import { HomeRecovery } from '@/components/recovery/HomeRecovery';
 import { PushPrompt } from '@/components/PushPrompt';
+import { HomeArrange } from '@/components/pulse/HomeArrange';
 import { DashboardList, MonitorCards, StrainRecoveryChart, StressCard } from '@/components/pulse/Insights';
 import { ChevronBar, MiniBars, Rings } from '@/components/pulse/Rings';
 import { MetricChip, NCard, NSection, NT, Num, OnDark, Pill, zoneColor } from '@/components/pulse/widgets';
@@ -20,6 +24,7 @@ import { Avatar } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { startOfWeek, todayIndex } from '@/lib/dates';
 import { adaptWorkout, useHealth } from '@/lib/health';
+import { HomeLongPress, LONG_PRESS_MS, useHomeLayout, type HomeSection } from '@/lib/homeLayout';
 import { useLocalized } from '@/lib/i18n';
 import { isBeta } from '@/lib/appInfo';
 import { getActiveWorkout, type ActiveWorkout } from '@/lib/training';
@@ -42,6 +47,12 @@ export default function Home() {
   const [showRules, setShowRules] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const weekdays = t('weekdaysShort', { returnObjects: true }) as string[];
+  const { layout, save, ready } = useHomeLayout(userId);
+  const [arranging, setArranging] = useState(false);
+  const openArrange = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setArranging(true);
+  };
 
   const loadRank = useCallback(async () => {
     const { data } = await supabase.rpc('leaderboard', { p_scope: 'friends', p_since: startOfWeek().toISOString(), p_limit: 200 });
@@ -70,44 +81,11 @@ export default function Home() {
   const firstName = profile.full_name?.split(' ')[0] || profile.username;
   const dateStr = new Date().toLocaleDateString(lng === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  return (
-    <View style={{ flex: 1, backgroundColor: night.bg }}>
-      <StatusBar style={night.statusBar} />
-      <LinearGradient colors={[night.bg2, night.bg]} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.6 }} />
-      <View style={styles.pattern}><SaduPattern variant="peaks" opacity={0.05} color={brand.amber} /></View>
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.lg, paddingBottom: TAB_BAR_SPACE }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={night.accent} />}
-        >
-          {/* الترويسة */}
-          <View style={styles.header}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Logo variant="mark" height={22} color={brand.orange} />
-              <View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <NT size={17} bold>{t('home.hello', { name: firstName })}</NT>
-                  {isBeta ? (
-                    <Pressable onPress={() => router.push({ pathname: '/feedback', params: { screen: 'home' } })} style={styles.beta}>
-                      <NT size={10} bold color={brand.deepGreen}>{t('beta.badge')}</NT>
-                    </Pressable>
-                  ) : null}
-                </View>
-                <NT size={11} faint>{dateStr}</NT>
-              </View>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <NotificationBell color={night.text} ring={night.bg2} />
-              <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.avatarRing} accessibilityLabel={t('profile.title')}>
-                <Avatar uri={publicUrl('avatars', profile.avatar_url)} name={profile.full_name ?? profile.username} size={38} />
-              </Pressable>
-            </View>
-          </View>
-
-          <PushPrompt />
-
+  // أقسام الرئيسية: المستخدم يرتّبها ويخفيها بالضغط المطول (src/lib/homeLayout.ts)
+  const blocks: Record<HomeSection, ReactNode> = {
+    rings: <>
           {/* الحلقات */}
-          <Pressable onPress={() => router.push(connected ? '/health' : '/devices')} style={{ alignItems: 'center', marginTop: space.sm }}>
+          <Pressable onPress={() => router.push(connected ? '/health' : '/devices')} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS} style={{ alignItems: 'center', marginTop: space.sm }}>
             <Rings
               size={264}
               stroke={15}
@@ -159,24 +137,12 @@ export default function Home() {
           {connected && s ? (
             <NT size={12} muted center>{t('health.target', { a: s.strain_target[0], b: s.strain_target[1] })} · {h.syncing ? t('health.syncing') : t(`health.source_${h.source}`)}</NT>
           ) : null}
-
-          {/* مراقبة الصحة + مراقبة التوتر (من الساعة) */}
-          <MonitorCards />
-
-          {active ? (
-            <Pressable onPress={() => router.push('/workout/log')} style={styles.resume}>
-              <Ionicons name="barbell" size={20} color={brand.deepGreen} />
-              <View style={{ flex: 1 }}>
-                <NT size={13} bold color={brand.deepGreen}>{t('workout.resume')}</NT>
-                <NT size={11} color={brand.green} numberOfLines={1}>{active.title} · {t('workout.setsDone', { done: active.done.length, total: active.exercises.reduce((a, e) => a + e.sets, 0) })}</NT>
-              </View>
-              <Ionicons name={lng === 'ar' ? 'chevron-back' : 'chevron-forward'} size={18} color={brand.deepGreen} />
-            </Pressable>
-          ) : null}
-
+          </>,
+    monitors: <MonitorCards />,
+    mission: <>
           {/* مهمة اليوم */}
           <NSection title={t('health.mission')} action={plan ? t('home.openPlan') : undefined} onAction={() => router.push('/(tabs)/plan')} />
-          <Pressable onPress={() => router.push('/(tabs)/plan')}>
+          <Pressable onPress={() => router.push('/(tabs)/plan')} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS}>
             <ImageBackground source={adapted && !adapted.day.rest ? IMG.mission : IMG.rest} style={styles.mission} imageStyle={{ borderRadius: 22 }} contentFit="cover">
               <LinearGradient colors={['rgba(6,31,27,0.15)', 'rgba(6,31,27,0.92)']} style={[StyleSheet.absoluteFill, { borderRadius: 22 }]} />
               <OnDark style={{ flex: 1, justifyContent: 'flex-end', padding: space.lg, gap: 8 }}>
@@ -206,7 +172,10 @@ export default function Home() {
               </OnDark>
             </ImageBackground>
           </Pressable>
-
+          </>,
+    nutrition: <HomeNutrition />,
+    recovery: <HomeRecovery />,
+    dashboard: <>
           {/* لوحتي: التوتر اليوم، الإجهاد والجاهزية أسبوعياً، ومؤشراتك مقابل معدلك */}
           {connected ? (
             <>
@@ -216,7 +185,8 @@ export default function Home() {
               <DashboardList limit={6} />
             </>
           ) : null}
-
+          </>,
+    steps: <>
           {/* الخطوات */}
           <NCard onPress={() => router.push(connected ? '/health' : '/devices')}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -237,7 +207,8 @@ export default function Home() {
             ) : null}
             <NT size={11} faint>{t('health.stepsPoints')}</NT>
           </NCard>
-
+          </>,
+    stats: <>
           {/* النقاط والسلسلة والترتيب */}
           <View style={{ flexDirection: 'row', gap: 10 }}>
             {[
@@ -252,14 +223,12 @@ export default function Home() {
               </NCard>
             ))}
           </View>
-
-          <CheckInCard onChange={loadRank} />
-
-          {/* عروض النوادي: الأسعار والعروض والتقييمات */}
-          <HomeClubOffers />
-
+          </>,
+    checkin: <CheckInCard onChange={loadRank} />,
+    clubs: <HomeClubOffers />,
+    store: <>
           {/* متجر الشركاء: أضف متجرك + استبدال النقاط (قريباً) */}
-          <Pressable style={styles.store} onPress={() => router.push('/store')} accessibilityRole="button" accessibilityLabel={t('store.title')}>
+          <Pressable style={styles.store} onPress={() => router.push('/store')} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS} accessibilityRole="button" accessibilityLabel={t('store.title')}>
             <Image source={IMG.bottle} style={styles.storeImg} contentFit="cover" />
             <View style={{ flex: 1, gap: 4, padding: space.md }}>
               <NT size={16} bold color={brand.deepGreen}>{t('store.homeTitle')}</NT>
@@ -270,7 +239,8 @@ export default function Home() {
               </View>
             </View>
           </Pressable>
-
+          </>,
+    rules: <>
           <NCard onPress={() => setShowRules((x) => !x)}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -281,6 +251,68 @@ export default function Home() {
             </View>
             {showRules ? <NT muted style={{ lineHeight: 24 }}>{t('home.rules')}</NT> : null}
           </NCard>
+          </>,
+  };
+
+  return (
+    <HomeLongPress.Provider value={openArrange}>
+    <View style={{ flex: 1, backgroundColor: night.bg }}>
+      <StatusBar style={night.statusBar} />
+      <LinearGradient colors={[night.bg2, night.bg]} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.6 }} />
+      <View style={styles.pattern}><SaduPattern variant="peaks" opacity={0.05} color={brand.amber} /></View>
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.lg, paddingBottom: TAB_BAR_SPACE }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={night.accent} />}
+        >
+          {/* الترويسة */}
+          <View style={styles.header}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Logo variant="mark" height={22} color={brand.orange} />
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <NT size={17} bold>{t('home.hello', { name: firstName })}</NT>
+                  {isBeta ? (
+                    <Pressable onPress={() => router.push({ pathname: '/feedback', params: { screen: 'home' } })} style={styles.beta}>
+                      <NT size={10} bold color={brand.deepGreen}>{t('beta.badge')}</NT>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <NT size={11} faint>{dateStr}</NT>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <NotificationBell color={night.text} ring={night.bg2} />
+              <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.avatarRing} accessibilityLabel={t('profile.title')}>
+                <Avatar uri={publicUrl('avatars', profile.avatar_url)} name={profile.full_name ?? profile.username} size={38} />
+              </Pressable>
+            </View>
+          </View>
+
+          <PushPrompt />
+
+          {active ? (
+            <Pressable onPress={() => router.push('/workout/log')} style={styles.resume}>
+              <Ionicons name="barbell" size={20} color={brand.deepGreen} />
+              <View style={{ flex: 1 }}>
+                <NT size={13} bold color={brand.deepGreen}>{t('workout.resume')}</NT>
+                <NT size={11} color={brand.green} numberOfLines={1}>{active.title} · {t('workout.setsDone', { done: active.done.length, total: active.exercises.reduce((a, e) => a + e.sets, 0) })}</NT>
+              </View>
+              <Ionicons name={lng === 'ar' ? 'chevron-back' : 'chevron-forward'} size={18} color={brand.deepGreen} />
+            </Pressable>
+          ) : null}
+
+          {ready ? layout.order.filter((k) => !layout.hidden.includes(k)).map((k) => (
+            <Pressable key={k} accessible={false} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS} style={{ gap: space.lg }}>
+              {blocks[k]}
+            </Pressable>
+          )) : null}
+
+          <Pressable onPress={openArrange} accessibilityRole="button" style={({ pressed }) => [styles.arrange, { opacity: pressed ? 0.7 : 1 }]}>
+            <Ionicons name="options-outline" size={15} color={night.accent} />
+            <NT size={12} semibold color={night.accent}>{t('homeLayout.open')}</NT>
+            <NT size={11} faint>· {t('homeLayout.openHint')}</NT>
+          </Pressable>
 
           <View style={{ alignItems: 'center', gap: 6, marginTop: space.md, opacity: 0.5 }}>
             <Logo variant="lockup" height={14} color={brand.sand} />
@@ -288,7 +320,9 @@ export default function Home() {
           </View>
         </ScrollView>
       </SafeAreaView>
+      {arranging ? <HomeArrange visible layout={layout} onSave={save} onClose={() => setArranging(false)} /> : null}
     </View>
+    </HomeLongPress.Provider>
   );
 }
 
@@ -302,4 +336,5 @@ const styles = StyleSheet.create({
   mission: { height: 250, borderRadius: 22, overflow: 'hidden' },
   store: { flexDirection: 'row', alignItems: 'center', backgroundColor: brand.cream, borderRadius: 20, overflow: 'hidden' },
   storeImg: { width: 108, height: 116 },
+  arrange: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: night.line },
 });

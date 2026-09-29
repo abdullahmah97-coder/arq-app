@@ -12,6 +12,7 @@ import {
   type DashRow, type MonitorItem, type MonitorKey, type StressLevel, type StressPoint,
 } from '@/lib/health/insights';
 import { useLocalized } from '@/lib/i18n';
+import { LONG_PRESS_MS, useHomeLongPress } from '@/lib/homeLayout';
 import { brand, fonts, night, pulse } from '@/theme';
 import { NCard, NT, Num, zoneColor } from './widgets';
 
@@ -433,9 +434,10 @@ export function FitnessAgeCard() {
 /** زر «كل المؤشرات» */
 export function MoreInsights() {
   const { t } = useTranslation();
+  const longPress = useHomeLongPress();
   const { lng } = useLocalized();
   return (
-    <Pressable onPress={() => router.push('/health')} style={({ pressed }) => ({ flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: 4, padding: 6, opacity: pressed ? 0.6 : 1 })}>
+    <Pressable onPress={() => router.push('/health')} onLongPress={longPress} delayLongPress={LONG_PRESS_MS} style={({ pressed }) => ({ flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: 4, padding: 6, opacity: pressed ? 0.6 : 1 })}>
       <NT size={12} semibold color={night.accent}>{t('insight.allMetrics')}</NT>
       <Ionicons name={lng === 'ar' ? 'chevron-back' : 'chevron-forward'} size={14} color={night.accent} />
     </Pressable>

@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, I18nManager, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { FullSafeView } from '@/components/FullSafeView';
 import { SaduPattern } from '@/brand/Brand';
 import { NT, Num } from '@/components/pulse/widgets';
@@ -77,6 +77,18 @@ export default function WorkoutSummary() {
               <Stat label={t('workout.duration')} value={cmp.totals.now.minutes != null ? String(cmp.totals.now.minutes) : '—'} unit={t('coach.min')}
                 delta={cmp.totals.prev?.minutes != null && cmp.totals.now.minutes != null ? <Delta v={cmp.totals.now.minutes - cmp.totals.prev.minutes} unit="" /> : null} />
             </View>
+
+            {/* بعد التمرين: روتين الاستشفاء لنفس العضلات */}
+            <Pressable onPress={() => router.push('/recovery')} accessibilityRole="button"
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: night.card, borderRadius: 18,
+                borderWidth: 1, borderColor: night.line, padding: 14, opacity: pressed ? 0.85 : 1 })}>
+              <Ionicons name="leaf" size={20} color={brand.amber} />
+              <View style={{ flex: 1 }}>
+                <NT size={14} bold>{t('recovery.afterWorkout')}</NT>
+                <NT size={11} muted>{t('recovery.afterWorkoutHint')}</NT>
+              </View>
+              <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={night.muted} />
+            </Pressable>
 
             {/* المقارنة */}
             <View style={{ gap: 4 }}>

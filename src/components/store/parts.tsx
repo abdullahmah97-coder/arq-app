@@ -27,10 +27,13 @@ export function ProductTile({ p, width, fallbackUrl, onPress }: { p: Product; wi
     <Pressable onPress={onPress ?? (link ? () => Linking.openURL(link) : undefined)} accessibilityRole={link || onPress ? 'link' : undefined}
       style={{ width, gap: 6 }}>
       <View style={{ aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' }}>
-        {uri ? <Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : <Ionicons name="shirt-outline" size={34} color={colors.muted} />}
+        {uri ? <Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : <Ionicons name={p.kcal ? 'restaurant-outline' : 'shirt-outline'} size={34} color={colors.muted} />}
         {!p.active ? <View style={{ position: 'absolute', top: 8, start: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 999, paddingHorizontal: 8 }}><Ionicons name="eye-off" size={12} color="#fff" /></View> : null}
       </View>
       <T size="sm" semibold numberOfLines={2}>{p.name}</T>
+      {p.kcal != null && p.kcal > 0 ? (
+        <T size="xs" muted>{p.kcal} {lng === 'ar' ? 'سعرة' : 'kcal'}{p.protein_g != null ? ` · ${lng === 'ar' ? 'بروتين' : 'P'} ${+p.protein_g}${lng === 'ar' ? 'جم' : 'g'}` : ''}</T>
+      ) : null}
       {p.price_sar != null ? <T size="sm" bold color={brand.orange}>{fmtPrice(p.price_sar, lng)}</T> : null}
     </Pressable>
   );

@@ -5,9 +5,10 @@ import { Alert, I18nManager, Pressable, ScrollView, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { AteButton, CalorieCard } from '@/components/nutrition/CalorieCard';
+import { SubscriptionMeals } from '@/components/nutrition/SubscriptionMeals';
 import { Button, Card, Empty, H, Row, Screen, SectionTitle, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
-import { todayIndex } from '@/lib/dates';
+import { startOfWeek, todayIndex } from '@/lib/dates';
 import { adaptWorkout, useHealth } from '@/lib/health';
 import { ALL_EXERCISES, findExercise } from '@/three/catalog';
 import { startWorkout } from '@/lib/training';
@@ -211,6 +212,9 @@ export default function PlanScreen() {
       {tab === 'meals' && day === todayIndex() ? (
         <CalorieCard entries={food} targets={{ calories: p.targets.calories, protein_g: p.targets.protein_g, carbs_g: p.targets.carbs_g, fat_g: p.targets.fat_g }} onDelete={removeFood} />
       ) : null}
+      {tab === 'meals' ? (
+        <SubscriptionMeals date={dateOfDay(day)} today={day === todayIndex()} food={food} onLogged={loadFood} />
+      ) : null}
       {tab === 'meals' && meals ? (
         <MealsDay d={meals} today={day === todayIndex()} logged={new Set(food.filter((f) => f.source === 'plan').map((f) => f.name))}
           onAte={(m) => ateMeal(m, p.targets)} />
@@ -320,19 +324,32 @@ function MealsDay({ d, today, logged, onAte }: { d: PlanMealDay; today: boolean;
   );
 }
 
-/** مدخل مكتبة التمارين (كل التمارين بالصور والشرح) */
+/** مدخل مكتبة التمارين والاستشفاء */
 function LibraryLink() {
   const { t } = useTranslation();
-  return (
-    <Pressable onPress={() => router.push('/exercises')}>
+  const row = (icon: 'library-outline' | 'leaf-outline', title: string, sub: string, to: '/exercises' | '/recovery') => (
+    <Pressable key={to} onPress={() => router.push(to)}>
       <Row style={{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: space.md }}>
-        <Ionicons name="library-outline" size={20} color={colors.primary} />
+        <Ionicons name={icon} size={20} color={colors.primary} />
         <View style={{ flex: 1 }}>
-          <T semibold>{t('library.title')}</T>
-          <T size="xs" muted numberOfLines={1}>{t('library.intro', { count: ALL_EXERCISES.length })}</T>
+          <T semibold>{title}</T>
+          <T size="xs" muted numberOfLines={1}>{sub}</T>
         </View>
         <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.muted} />
       </Row>
     </Pressable>
   );
+  return (
+    <>
+      {row('library-outline', t('library.title'), t('library.intro', { count: ALL_EXERCISES.length }), '/exercises')}
+      {row('leaf-outline', t('recovery.title'), t('recovery.planLink'), '/recovery')}
+    </>
+  );
+}
+
+/** تاريخ يوم الأسبوع (٠ = الأحد) في الأسبوع الحالي */
+function dateOfDay(day: number) {
+  const d = startOfWeek();
+  d.setDate(d.getDate() + day);
+  return d;
 }

@@ -6,6 +6,7 @@ import { scaleFood, type Macros, type MealSlot } from './math';
 
 export * from './foods';
 export * from './math';
+export * from './photo';
 
 export interface FoodEntry extends Macros {
   id: string;
@@ -14,7 +15,7 @@ export interface FoodEntry extends Macros {
   name: string;
   food_id: string | null;
   servings: number;
-  source: 'db' | 'custom' | 'plan' | 'barcode' | 'photo';
+  source: 'db' | 'custom' | 'plan' | 'barcode' | 'photo' | 'store';
   created_at: string;
 }
 
@@ -38,6 +39,16 @@ export async function logFood(userId: string, e: {
     servings: e.servings ?? 1, kcal: Math.round(e.kcal), protein_g: e.protein_g, carbs_g: e.carbs_g, fat_g: e.fat_g,
     source: e.source ?? 'db',
   });
+  if (error) throw error;
+}
+
+/** تسجيل عدة أصناف دفعة وحدة (مثل أصناف صورة الوجبة) */
+export async function logFoods(userId: string, items: ({ slot: MealSlot; name: string; source: FoodEntry['source'] } & Macros)[], day = new Date()): Promise<void> {
+  if (!items.length) return;
+  const { error } = await supabase.from('food_logs').insert(items.map((e) => ({
+    user_id: userId, eaten_on: isoDate(day), slot: e.slot, name: e.name.slice(0, 80), food_id: null, servings: 1,
+    kcal: Math.round(e.kcal), protein_g: e.protein_g, carbs_g: e.carbs_g, fat_g: e.fat_g, source: e.source,
+  })));
   if (error) throw error;
 }
 

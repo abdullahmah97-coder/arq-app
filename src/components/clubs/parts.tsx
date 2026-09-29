@@ -9,6 +9,7 @@ import { Num } from '@/components/pulse/widgets';
 import { T } from '@/components/ui';
 import { daysLeft, discountPct, fullPrice, isStale, monthly, type Chain, type Club, type Offer } from '@/lib/clubs';
 import { useLocalized } from '@/lib/i18n';
+import { LONG_PRESS_MS, useHomeLongPress } from '@/lib/homeLayout';
 import { publicUrl } from '@/lib/supabase';
 import { brand, colors, fonts, night, radius, space } from '@/theme';
 
@@ -77,13 +78,14 @@ export function OfferCard({ o, rating, dark, width }: { o: Offer; rating?: { rat
   const ch = o.gym_chains; const g = o.gyms;
   const off = discountPct(o);
   const left = daysLeft(o);
+  const longPress = useHomeLongPress();
   const ink = dark ? night.text : colors.text;
   const muted = dark ? night.muted : colors.muted;
   const title = ch ? (lng === 'en' && ch.name_en ? ch.name_en : ch.name) : g ? gymName(g, lng) : '';
   const sub = [t(`clubs.aud_${(ch ?? g)?.audience ?? 'mixed'}`), g?.district || g?.city].filter(Boolean).join(' · ');
   const go = () => (o.chain_id ? router.push({ pathname: '/clubs/chain/[id]', params: { id: o.chain_id } }) : router.push({ pathname: '/clubs/[id]', params: { id: o.gym_id! } }));
   return (
-    <Pressable onPress={go} accessibilityRole="button"
+    <Pressable onPress={go} onLongPress={longPress} delayLongPress={LONG_PRESS_MS} accessibilityRole="button"
       style={({ pressed }) => ({
         width, gap: 10, padding: space.md, borderRadius: 20, opacity: pressed ? 0.85 : 1,
         backgroundColor: dark ? night.card : colors.card, borderWidth: 1, borderColor: dark ? night.line : colors.border,

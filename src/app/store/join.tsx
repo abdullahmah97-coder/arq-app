@@ -1,4 +1,4 @@
-// أضف متجرك / عدّل متجرك: بيانات البراند (يُراجع من فريق ARQ قبل الظهور)
+// أضف متجرك / عدّل متجرك: مطعم صحي، ملابس رياضية، مكملات أو معدات (يُراجع من فريق ARQ قبل الظهور)
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -19,9 +19,10 @@ export default function JoinStore() {
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState<BrandCategory>('apparel');
+  const [category, setCategory] = useState<BrandCategory>('restaurant');
   const [website, setWebsite] = useState('');
   const [instagram, setInstagram] = useState('');
+  const [city, setCity] = useState('');
   const [logo, setLogo] = useState<string | null>(null);
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -31,7 +32,7 @@ export default function JoinStore() {
       setExisting(b);
       if (b) {
         setName(b.name); setTagline(b.tagline ?? ''); setDescription(b.description ?? ''); setCategory(b.category);
-        setWebsite(b.website ?? ''); setInstagram(b.instagram ?? ''); setLogo(b.logo_path); setAgree(true);
+        setWebsite(b.website ?? ''); setInstagram(b.instagram ?? ''); setCity(b.city ?? ''); setLogo(b.logo_path); setAgree(true);
       }
     }).catch(() => setExisting(null));
   }, [userId]);
@@ -50,7 +51,7 @@ export default function JoinStore() {
     if (!agree) return Alert.alert(t('store.err_agree'));
     setBusy(true);
     try {
-      await saveBrand(userId, { name, tagline, description, category, website, instagram, logo_path: logo }, existing?.id);
+      await saveBrand(userId, { name, tagline, description, category, website, instagram, city, logo_path: logo }, existing?.id);
       if (!existing) Alert.alert(t('store.submitted'), t('store.submittedBody'));
       router.dismissTo('/store/manage');
     } catch (e) {
@@ -83,6 +84,7 @@ export default function JoinStore() {
         <T size="sm" semibold>{t('store.category')}</T>
         <Segmented<BrandCategory> wrap value={category} onChange={setCategory} options={BRAND_CATEGORIES.map((c) => ({ value: c, label: t(`store.cat_${c}`) }))} />
       </View>
+      {category === 'restaurant' ? <Input label={t('store.city')} value={city} onChangeText={setCity} maxLength={40} placeholder={t('store.cityPh')} /> : null}
       <Input label={t('store.description')} value={description} onChangeText={setDescription} maxLength={600} multiline style={{ minHeight: 90, textAlignVertical: 'top' }} placeholder={t('store.descriptionPh')} />
       <Input label={t('store.website')} value={website} onChangeText={setWebsite} autoCapitalize="none" keyboardType="url" placeholder="yourbrand.sa" />
       <Input label={t('store.instagram')} value={instagram} onChangeText={setInstagram} autoCapitalize="none" placeholder="@yourbrand" />

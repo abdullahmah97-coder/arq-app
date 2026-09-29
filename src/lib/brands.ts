@@ -1,8 +1,10 @@
-// «أضف متجرك»: متاجر البراندات الرياضية ومنتجاتها (تظهر للجميع بعد موافقة الإدارة)
+// المتاجر: مطاعم صحية، ملابس رياضية، مكملات ومعدات، ومنتجاتها (تظهر للجميع بعد موافقة الإدارة)
 import { supabase } from './supabase';
 
-export type BrandCategory = 'apparel' | 'supplements' | 'equipment' | 'accessories' | 'nutrition' | 'other';
-export const BRAND_CATEGORIES: BrandCategory[] = ['apparel', 'supplements', 'equipment', 'accessories', 'nutrition', 'other'];
+export type BrandCategory = 'restaurant' | 'apparel' | 'supplements' | 'equipment' | 'accessories' | 'nutrition' | 'other';
+export const BRAND_CATEGORIES: BrandCategory[] = ['restaurant', 'apparel', 'supplements', 'equipment', 'accessories', 'nutrition', 'other'];
+/** الأقسام الرئيسية اللي تظهر كبطاقات كبيرة في المتاجر */
+export const FEATURED_CATEGORIES: BrandCategory[] = ['restaurant', 'apparel'];
 export type BrandStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Brand {
@@ -15,6 +17,7 @@ export interface Brand {
   logo_path: string | null;
   website: string | null;
   instagram: string | null;
+  city?: string | null;
   status: BrandStatus;
   review_note: string | null;
   created_at: string;
@@ -31,9 +34,14 @@ export interface Product {
   url: string | null;
   active: boolean;
   created_at: string;
+  /** للمطاعم: سعرات وماكروز الطبق */
+  kcal?: number | null;
+  protein_g?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
 }
 
-const PSEL = 'id, brand_id, name, description, price_sar, image_path, url, active, created_at';
+const PSEL = 'id, brand_id, name, description, price_sar, image_path, url, active, created_at, kcal, protein_g, carbs_g, fat_g';
 
 export async function loadBrands(): Promise<Brand[]> {
   const { data } = await supabase.from('brands').select(`*, brand_products(${PSEL})`)
@@ -51,7 +59,7 @@ export async function loadMyBrand(me: string): Promise<Brand | null> {
   return (data as Brand) ?? null;
 }
 
-export type BrandInput = Pick<Brand, 'name' | 'tagline' | 'description' | 'category' | 'logo_path' | 'website' | 'instagram'>;
+export type BrandInput = Pick<Brand, 'name' | 'tagline' | 'description' | 'category' | 'logo_path' | 'website' | 'instagram' | 'city'>;
 
 /** ينظف الروابط: يضيف https:// ويشيل @ من انستقرام */
 export function normalizeBrand(b: BrandInput): BrandInput {
@@ -68,6 +76,7 @@ export function normalizeBrand(b: BrandInput): BrandInput {
     description: clean(b.description),
     website: url(b.website),
     instagram: clean(b.instagram)?.replace(/^@/, '') ?? null,
+    city: b.category === 'restaurant' ? clean(b.city ?? null) : null,
   };
 }
 
@@ -79,7 +88,7 @@ export async function saveBrand(me: string, input: BrandInput, id?: string) {
   return data.id as string;
 }
 
-export type ProductInput = Pick<Product, 'name' | 'description' | 'price_sar' | 'image_path' | 'url' | 'active'>;
+export type ProductInput = Pick<Product, 'name' | 'description' | 'price_sar' | 'image_path' | 'url' | 'active' | 'kcal' | 'protein_g' | 'carbs_g' | 'fat_g'>;
 
 export async function saveProduct(brandId: string, input: ProductInput, id?: string) {
   const url = (input.url ?? '').trim();
@@ -92,3 +101,6 @@ export const deleteProduct = (id: string) => supabase.from('brand_products').del
 
 export const fmtPrice = (n: number | null, lng: 'ar' | 'en') =>
   n == null ? '' : lng === 'ar' ? `${+n} ر.س` : `SAR ${+n}`;
+
+/** طبق فيه سعرات؟ (يظهر عليه «أكلتها» ويدخل جدول الاشتراك) */
+export const hasMacros = (p: Pick<Product, 'kcal'>) => p.kcal != null && p.kcal > 0;

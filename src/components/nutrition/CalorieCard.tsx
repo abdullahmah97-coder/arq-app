@@ -103,7 +103,10 @@ export function CalorieCard({ entries, targets, onDelete }: {
         <T size="sm" muted>{t('food.empty')}</T>
       )}
 
-      <Button title={t('food.add')} icon="add-circle-outline" onPress={() => router.push('/food/add')} />
+      <Row gap={space.sm}>
+        <Button style={{ flex: 1 }} title={t('meal.snap')} icon="camera" onPress={() => router.push({ pathname: '/food/photo', params: { auto: 'camera' } })} />
+        <Button style={{ flex: 1 }} title={t('food.add')} icon="add-circle-outline" variant="secondary" onPress={() => router.push('/food/add')} />
+      </Row>
       <T size="xs" muted center>{t('food.approx')}</T>
     </Card>
   );

@@ -7,11 +7,13 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { NCard, NSection, NT } from '@/components/pulse/widgets';
 import { loadChains, loadClubs, loadOffers, type Chain, type Club, type Offer } from '@/lib/clubs';
 import { useLocalized } from '@/lib/i18n';
+import { LONG_PRESS_MS, useHomeLongPress } from '@/lib/homeLayout';
 import { night, space } from '@/theme';
 import { ClubLogo, OfferCard, STAR } from './parts';
 
 export function HomeClubOffers() {
   const { t } = useTranslation();
+  const longPress = useHomeLongPress();
   const { lng } = useLocalized();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [chains, setChains] = useState<Chain[]>([]);
@@ -46,7 +48,7 @@ export function HomeClubOffers() {
         <NCard style={{ gap: 4, paddingVertical: space.md }} onPress={() => router.push({ pathname: '/clubs', params: { tab: 'chains' } })}>
           <NT size={13} semibold muted>{byRating ? t('clubs.topRated') : t('clubs.cheapest')}</NT>
           {list.map((c, i) => (
-            <Pressable key={c.id} onPress={() => router.push({ pathname: '/clubs/chain/[id]', params: { id: c.id } })}
+            <Pressable key={c.id} onPress={() => router.push({ pathname: '/clubs/chain/[id]', params: { id: c.id } })} onLongPress={longPress} delayLongPress={LONG_PRESS_MS}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
               <NT size={13} bold color={night.accent} style={{ width: 14 }}>{i + 1}</NT>
               <ClubLogo c={{ name: c.name_en || c.name, logo_path: c.logo_path }} size={30} />

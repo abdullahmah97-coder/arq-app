@@ -1,9 +1,9 @@
 // إضافة أكل: ابحث في قاعدة الأطعمة أو سجّل أكل مخصص — تنحسب السعرات والبروتين والكربوهيدرات والدهون
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, I18nManager, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { Button, Card, Input, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
@@ -12,7 +12,7 @@ import {
   servingsFromGrams, slotForHour, type Food, type FoodCategory, type MealSlot,
 } from '@/lib/nutrition';
 import { errorKey } from '@/lib/supabase';
-import { colors, radius, space } from '@/theme';
+import { brand, colors, radius, space } from '@/theme';
 
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'snack', 'dinner'];
 const num0 = (s: string) => { const n = parseFloat(s.replace(',', '.')); return Number.isFinite(n) ? n : 0; };
@@ -121,6 +121,18 @@ export default function AddFood() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Stack.Screen options={{ title: t('food.addFood') }} />
       <Screen edges={['bottom']}>
+        <Pressable onPress={() => router.push('/food/photo')} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+          <Row style={{ backgroundColor: brand.deepGreen, borderRadius: radius.lg, padding: space.md }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: brand.orange, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="camera" size={20} color={brand.cream} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <T semibold color={brand.cream}>{t('meal.snap')}</T>
+              <T size="xs" color={brand.sand}>{t('meal.snapHint')}</T>
+            </View>
+            <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={brand.cream} />
+          </Row>
+        </Pressable>
         <Segmented value={slot} onChange={setSlot} options={SLOTS.map((s) => ({ value: s, label: t(`plan.slot_${s}`) }))} />
 
         {added.n ? (

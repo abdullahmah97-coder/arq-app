@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, I18nManager, Pressable, View } from 'react-native';
 import { useUser } from '@/lib/auth';
+import { LONG_PRESS_MS, useHomeLongPress } from '@/lib/homeLayout';
 import { durationLabel } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import { isHere, loadPresence, type PresenceRow } from '@/lib/presence';
@@ -96,6 +97,7 @@ export function CheckInCard({ onChange }: { onChange?: () => void }) {
 
 /** شريط «الموجودين الآن» تحت تسجيل الحضور — يفتح قائمة النادي */
 function PresenceStrip({ gymId, here, data }: { gymId: string; here: boolean; data: { rows: PresenceRow[]; presentNow: number } }) {
+  const longPress = useHomeLongPress();
   const { t } = useTranslation();
   const others = data.rows.filter((r) => !r.is_me);
   const now = others.filter(isHere);
@@ -105,7 +107,7 @@ function PresenceStrip({ gymId, here, data }: { gymId: string; here: boolean; da
     ? t('presence.nobody')
     : here || others.length ? t('presence.hereNow', { count }) : t('presence.checkInToSee', { count });
   return (
-    <Pressable onPress={() => router.push({ pathname: '/gym/[id]', params: { id: gymId } })} accessibilityRole="button"
+    <Pressable onPress={() => router.push({ pathname: '/gym/[id]', params: { id: gymId } })} onLongPress={longPress} delayLongPress={LONG_PRESS_MS} accessibilityRole="button"
       style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space.md }}>
       {faces.length ? (
         <View style={{ flexDirection: 'row' }}>

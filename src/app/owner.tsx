@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, I18nManager, Linking, Modal, Pressable, TextInput, View } from 'react-native';
 import { Num } from '@/components/pulse/widgets';
 import { CoachVerifyQueue } from '@/components/coaching/CoachVerifyQueue';
+import { CenterReviewQueue } from '@/components/recovery/CenterReviewQueue';
 import { BrandLogo } from '@/components/store/parts';
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { timeAgo } from '@/lib/dates';
@@ -67,6 +68,7 @@ export default function Owner() {
         <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={brand.cream} />
       </Pressable>
       <CoachVerifyQueue />
+      <CenterReviewQueue />
       <Segmented value={tab} onChange={setTab} options={[{ value: 'reports', label: `${t('owner.reports')} (${reports.length})` }, { value: 'brands', label: `${t('owner.brands')} (${pending.length})` }, { value: 'offers', label: `${t('owner.offers')} (${offers.length})` }]} />
 
       {tab === 'offers' ? (

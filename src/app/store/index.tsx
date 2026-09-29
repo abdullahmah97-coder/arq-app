@@ -1,4 +1,4 @@
-// متجر الشركاء: براندات رياضية تعرض منتجاتها + «أضف متجرك» + استبدال النقاط (قريباً)
+// المتاجر: مطاعم صحية (بسعرات الأطباق واشتراك الوجبات)، ملابس رياضية، مكملات ومعدات + «أضف متجرك» + استبدال النقاط (قريباً)
 import { Ionicons } from '@expo/vector-icons';
 import { ImageBackground } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,7 +9,7 @@ import { I18nManager, Pressable, ScrollView, StyleSheet, View } from 'react-nati
 import { BrandLogo, ProductTile, RedeemSoon } from '@/components/store/parts';
 import { Card, Empty, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
-import { BRAND_CATEGORIES, loadBrands, loadMyBrand, type Brand, type BrandCategory } from '@/lib/brands';
+import { BRAND_CATEGORIES, FEATURED_CATEGORIES, loadBrands, loadMyBrand, type Brand, type BrandCategory } from '@/lib/brands';
 import { brand, colors, radius, space } from '@/theme';
 
 export default function Store() {
@@ -24,7 +24,9 @@ export default function Store() {
   }, [userId]));
 
   const list = (brands ?? []).filter((b) => cat === 'all' || b.category === cat);
-  const cats = BRAND_CATEGORIES.filter((c) => (brands ?? []).some((b) => b.category === c));
+  const count = (c: BrandCategory) => (brands ?? []).filter((b) => b.category === c).length;
+  // الأقسام الرئيسية دايماً ظاهرة، والباقي إذا فيه متاجر
+  const cats = BRAND_CATEGORIES.filter((c) => FEATURED_CATEGORIES.includes(c) || count(c) > 0);
 
   return (
     <Screen edges={['bottom']}>
@@ -50,14 +52,28 @@ export default function Store() {
         </Row>
       </Pressable>
 
-      <RedeemSoon points={profile.points} />
+      {/* الأقسام الرئيسية: المطاعم الصحية والملابس الرياضية */}
+      <Row gap={space.sm} style={{ alignItems: 'stretch' }}>
+        {FEATURED_CATEGORIES.map((c) => {
+          const on = cat === c;
+          return (
+            <Pressable key={c} onPress={() => setCat(on ? 'all' : c)} accessibilityRole="button" accessibilityState={{ selected: on }}
+              style={({ pressed }) => ({ flex: 1, gap: 6, borderRadius: radius.lg, padding: space.md, borderWidth: 1.5, opacity: pressed ? 0.85 : 1,
+                backgroundColor: on ? brand.deepGreen : colors.card, borderColor: on ? brand.deepGreen : colors.border })}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: brand.orange, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name={c === 'restaurant' ? 'restaurant' : 'shirt'} size={20} color={brand.cream} />
+              </View>
+              <T bold color={on ? brand.cream : colors.text}>{t(`store.cat_${c}`)}</T>
+              <T size="xs" color={on ? brand.sand : colors.muted}>{t(`store.featured_${c}`)}</T>
+            </Pressable>
+          );
+        })}
+      </Row>
 
-      {cats.length > 1 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-          <Segmented<BrandCategory | 'all'> wrap value={cat} onChange={setCat}
-            options={[{ value: 'all', label: t('store.all') }, ...cats.map((c) => ({ value: c, label: t(`store.cat_${c}`) }))]} />
-        </ScrollView>
-      ) : null}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+        <Segmented<BrandCategory | 'all'> wrap value={cat} onChange={setCat}
+          options={[{ value: 'all', label: t('store.all') }, ...cats.map((c) => ({ value: c, label: t(`store.cat_${c}`) }))]} />
+      </ScrollView>
 
       {brands === null ? null : list.length ? list.map((b) => {
         const products = (b.brand_products ?? []).filter((p) => p.active);
@@ -67,7 +83,7 @@ export default function Store() {
               <BrandLogo b={b} />
               <View style={{ flex: 1, gap: 2 }}>
                 <T bold size="lg">{b.name}</T>
-                <T size="xs" muted numberOfLines={2}>{b.tagline || t(`store.cat_${b.category}`)}</T>
+                <T size="xs" muted numberOfLines={2}>{[t(`store.cat_${b.category}`), b.city].filter(Boolean).join(' · ')}{b.tagline ? ` — ${b.tagline}` : ''}</T>
               </View>
               <T size="xs" muted>{t('store.productsN', { n: products.length, count: products.length })}</T>
             </Row>
@@ -78,7 +94,8 @@ export default function Store() {
             ) : null}
           </Card>
         );
-      }) : <Empty icon="storefront-outline" text={t('store.empty')} />}
+      }) : <Empty icon={cat === 'restaurant' ? 'restaurant-outline' : 'storefront-outline'} text={t(cat === 'all' ? 'store.empty' : `store.emptyCat_${cat === 'restaurant' ? 'restaurant' : 'other'}`)} />}
+      <RedeemSoon points={profile.points} />
     </Screen>
   );
 }
