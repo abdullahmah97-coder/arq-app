@@ -1,4 +1,4 @@
-// لوحة المالك (تظهر لمالك التطبيق فقط): طلبات الموافقة لكل الشركاء، إدارة الشركاء، إعلان البداية، رسائل التحفيز، تقارير المختبرين والعروض
+// لوحة إدارة التطبيق (للإدارة فقط): الإعلانات والإشعارات أول شي، ثم طلبات الموافقة وإدارة الشركاء، ثم تقارير المختبرين والعروض
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
@@ -18,6 +18,8 @@ import {
 } from '@/lib/owner';
 import type { Brand } from '@/lib/brands';
 import { loadOffers, type Offer } from '@/lib/clubs';
+import { listLaunchAds, type LaunchAdRow } from '@/lib/launchAds';
+import { adState } from '@/lib/launchAdsCore';
 import { KIND_ICON, PARTNER_KINDS, partnerOverview, type Overview, type PartnerKind } from '@/lib/partners';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
@@ -34,13 +36,18 @@ export default function Owner() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [ov, setOv] = useState<Partial<Record<PartnerKind, Overview>>>({});
   const [shot, setShot] = useState<string | null>(null);
+  const [ads, setAds] = useState<LaunchAdRow[]>([]);
 
   const load = useCallback(async () => {
     const admin = await isAdmin();
     setOk(admin);
     if (!admin) return;
-    const [r, b, o, v] = await Promise.all([loadReports(), loadBrandRequests(), loadOffers(), partnerOverview()]);
-    setReports(r); setBrands(b); setOffers(o); setOv(v);
+    // كل جزء يتحمّل لحاله: لو تعطّل واحد تبقى باقي اللوحة شغالة
+    const [r, b, o, v, a] = await Promise.all([
+      loadReports().catch(() => [] as Report[]), loadBrandRequests().catch(() => [] as Brand[]), loadOffers().catch(() => [] as Offer[]),
+      partnerOverview().catch(() => ({})), listLaunchAds().catch(() => [] as LaunchAdRow[]),
+    ]);
+    setReports(r); setBrands(b); setOffers(o); setOv(v); setAds(a);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -52,6 +59,7 @@ export default function Owner() {
   const pendingBrands = brands.filter((b) => b.status === 'pending');
   const pendingAll = PARTNER_KINDS.reduce((n, k) => n + (ov[k]?.pending ?? 0), 0);
   const liveAll = PARTNER_KINDS.reduce((n, k) => n + (ov[k]?.partners ?? 0), 0);
+  const liveAd = ads.filter((a) => adState(a) === 'live').sort((a, b) => b.priority - a.priority || b.created_at.localeCompare(a.created_at))[0];
 
   return (
     <Screen edges={['bottom']}>
@@ -60,6 +68,14 @@ export default function Owner() {
         <Stat n={liveAll} label={t('partners.livePartners')} color={STATUS_COLOR.fixed} />
         <Stat n={count('new')} label={t('owner.newReports')} color={STATUS_COLOR.new} />
       </View>
+
+      {/* الإعلانات والإشعارات أول شي في اللوحة */}
+      <View style={{ gap: 2 }}>
+        <T size="lg" bold>{t('owner.adsSection')}</T>
+        <T size="xs" muted>{t('owner.adsSectionHint')}</T>
+      </View>
+      <OwnerLink icon="megaphone" title={t('ads.ownerTitle')} sub={liveAd ? t('owner.adLive', { title: liveAd.title }) : t('owner.adNone')} onPress={() => router.push('/owner-ads')} />
+      <OwnerLink icon="flame" title={t('nudge.button')} sub={t('nudge.buttonHint')} onPress={() => router.push('/owner-nudges')} />
 
       {/* طلبات الموافقة: ما يظهر أي شريك إلا بعد موافقتك */}
       <T size="lg" bold>{t('partners.approvalsTitle')}{pendingAll ? ` (${pendingAll})` : ''}</T>
@@ -96,9 +112,7 @@ export default function Owner() {
         ))}
       </View>
 
-      <OwnerLink icon="megaphone" title={t('ads.ownerTitle')} sub={t('ads.ownerSub')} onPress={() => router.push('/owner-ads')} />
-      <OwnerLink icon="flame" title={t('nudge.button')} sub={t('nudge.buttonHint')} onPress={() => router.push('/owner-nudges')} />
-
+      <T size="lg" bold>{t('owner.reportsSection')}</T>
       <Segmented value={tab} onChange={setTab} options={[{ value: 'reports', label: `${t('owner.reports')} (${reports.length})` }, { value: 'offers', label: `${t('owner.offers')} (${offers.length})` }]} />
 
       {tab === 'offers' ? (
