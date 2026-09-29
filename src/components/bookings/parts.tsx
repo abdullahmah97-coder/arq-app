@@ -74,10 +74,12 @@ export function VenueCard({ v, onPress }: { v: Venue; onPress: () => void }) {
           ))}
           {v.audience && v.audience !== 'mixed' ? <View style={styles.chip}><T size="xs" semibold>{t(`book.aud_${v.audience}`)}</T></View> : null}
         </View>
-        <View style={[styles.badge, inApp ? { backgroundColor: brand.orange } : null]}>
-          <Ionicons name={inApp ? 'flash' : 'open-outline'} size={11} color={inApp ? brand.cream : colors.text} />
-          <T size="xs" semibold color={inApp ? brand.cream : colors.text}>{inApp ? t('book.inApp') : t('book.onTheirSite')}</T>
-        </View>
+        {v.status === 'approved' ? (
+          <View style={[styles.badge, inApp ? { backgroundColor: brand.orange } : null]}>
+            <Ionicons name={inApp ? 'flash' : 'open-outline'} size={11} color={inApp ? brand.cream : colors.text} />
+            <T size="xs" semibold color={inApp ? brand.cream : colors.text}>{inApp ? t('book.inApp') : t('book.onTheirSite')}</T>
+          </View>
+        ) : null}
       </View>
       <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.muted} />
     </Pressable>
