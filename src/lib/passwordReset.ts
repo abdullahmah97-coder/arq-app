@@ -1,5 +1,6 @@
 // استرجاع الحساب: رمز يوصل على الإيميل، وبعده كلمة مرور جديدة.
 // نستخدم رمز بدل رابط: الرابط يفتح المتصفح مو التطبيق، والرمز ينكتب في التطبيق نفسه.
+import { onlyDigits } from './digits';
 import { supabase } from './supabase';
 
 /** الإيميل المكتوب في صفحة الدخول أو التسجيل: نعبّيه في صفحة الاسترجاع بدل ما نحطه في الرابط */
@@ -21,7 +22,7 @@ export async function sendRecoveryCode(email: string): Promise<void> {
  * saved=false: دخل حسابه بس الخادم رفض الكلمة الجديدة (نادر).
  */
 export async function resetPasswordWithCode(email: string, code: string, password: string): Promise<{ saved: boolean; error?: unknown }> {
-  const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.replace(/\D/g, ''), type: 'recovery' });
+  const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: onlyDigits(code), type: 'recovery' });
   if (error) throw error;
   const { error: saveError } = await supabase.auth.updateUser({ password });
   // «نفس كلمة المرور القديمة» = ما فيه شي يتغير، وهي اللي بيدخل فيها

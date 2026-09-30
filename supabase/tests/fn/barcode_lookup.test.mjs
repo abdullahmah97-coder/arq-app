@@ -43,7 +43,21 @@ ok(calls[0].body.tools[0].type === 'web_search_20250305' && calls[0].body.tools[
 ok(calls[0].body.messages[0].content.includes(GOOD) && calls[0].body.messages[0].content.includes('"Laban b"'), 'prompt has the code and the cleaned hint');
 ok(r.body.product.unit === 'ml' && r.body.product.per100.kcal === 60 && r.body.product.servingSize === 180 && r.body.product.packageSize === 180, 'normalized values');
 ok(r.body.source_url === 'https://www.example.sa/laban-180' && r.body.confidence === 'high' && r.body.remaining === 29, 'source, confidence and remaining');
-ok(state.upserts.length === 1 && state.upserts[0].found === true, 'saved to the shared cache');
+ok(state.upserts.length === 0, 'a result steered by a name hint from the phone is not shared with everyone');
+
+// بدون اسم من الجوال وبثقة عالية: ينحفظ للكل
+script = [answer(PRODUCT)];
+r = await call({ code: GOOD });
+ok(r.body.found && r.body.cached === false && state.upserts.length === 1 && state.upserts[0].found === true, 'high-confidence result without a hint is saved to the shared cache');
+
+// ثقة متوسطة: ترجع لصاحب الطلب بس
+script = [answer({ ...PRODUCT, confidence: 'medium' })];
+r = await call({ code: '6281000000014' });
+ok(r.body.found && r.body.confidence === 'medium' && state.upserts.length === 1 && !state.cache.has('6281000000014'), 'medium-confidence results are not shared');
+// «ما لقاه» بعد اسم من الجوال: ما ينحفظ (عشان محد يخفي منتج عن الباقين)
+script = [answer({ found: false })];
+r = await call({ code: '6281000000021', hint: 'fake' });
+ok(r.body.found === false && !state.cache.has('6281000000021'), '«not found» after a hint is not cached');
 
 // نفس الباركود مرة ثانية: من الذاكرة بدون ذكاء اصطناعي ولا خصم
 const before = calls.length, rpcBefore = state.rpcCalls;

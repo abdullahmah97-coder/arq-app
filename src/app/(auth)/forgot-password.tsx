@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { Logo } from '@/brand/Brand';
 import { Button, H, Input, Row, Screen, T } from '@/components/ui';
+import { onlyDigits } from '@/lib/digits';
 import { looksLikeEmail, resetPasswordWithCode, sendRecoveryCode, takeHandedEmail } from '@/lib/passwordReset';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
@@ -91,7 +92,7 @@ export default function ForgotPassword() {
                 </Pressable>
               </View>
             </Row>
-            <Input label={t('auth.code')} value={code} onChangeText={(v) => setCode(v.replace(/[^\d]/g, '').slice(0, 10))}
+            <Input label={t('auth.code')} value={code} onChangeText={(v) => setCode(onlyDigits(v).slice(0, 10))}
               keyboardType="number-pad" textContentType="oneTimeCode" autoComplete="one-time-code" maxLength={10} placeholder="••••••••"
               style={{ textAlign: 'center', fontSize: 22, letterSpacing: 6, writingDirection: 'ltr' }} />
             <Input label={t('auth.newPassword')} hint={t('auth.passwordHint')} value={password} onChangeText={setPassword}

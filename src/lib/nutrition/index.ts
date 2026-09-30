@@ -121,7 +121,14 @@ export async function saveCalorieAlertConfig(c: CalorieAlertConfig): Promise<voi
   cfgCache = { at: Date.now(), cfg: c };
 }
 
-async function afterFoodLogged(userId: string, day: Date) {
+// الفحص يمشي واحد ورا الثاني: لو سجّلت أكلتين بسرعة ما يطلع نفس التنبيه مرتين
+let alertChain: Promise<void> = Promise.resolve();
+function afterFoodLogged(userId: string, day: Date): Promise<void> {
+  alertChain = alertChain.then(() => checkCalorieAlert(userId, day), () => checkCalorieAlert(userId, day));
+  return alertChain;
+}
+
+async function checkCalorieAlert(userId: string, day: Date) {
   try {
     const today = isoDate(new Date());
     const goal = calorieGoal();

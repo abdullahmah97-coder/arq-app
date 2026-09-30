@@ -2,6 +2,7 @@
 import { Linking } from 'react-native';
 import type { Muscle } from '../three/rig';
 import { getExercise, type ExerciseGuide } from '../three/catalog';
+import { toLatinDigits } from './digits';
 import { supabase } from './supabase';
 
 export type CenterKind = 'physio' | 'recovery' | 'sports_medicine' | 'hospital';
@@ -79,7 +80,7 @@ export function normalizeCenter(c: CenterInput): CenterInput {
     const v = clean(u);
     return v ? (/^https:\/\//i.test(v) ? v : `https://${v.replace(/^http:\/\//i, '')}`) : null;
   };
-  const digits = (s: string | null) => (s ?? '').replace(/[^\d+]/g, '');
+  const digits = (s: string | null) => toLatinDigits(s ?? '').replace(/[^\d+]/g, '');
   const wa = (s: string | null) => {
     let d = digits(s).replace(/^\+/, '').replace(/^00/, '');
     if (!d) return null;

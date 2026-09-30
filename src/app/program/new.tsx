@@ -10,6 +10,7 @@ import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
 import { canPublish, RANKS, validateProgram, type UserProgramDay } from '@/lib/ranks';
 import { publishProgram } from '@/lib/social';
+import { toLatinDigits } from '@/lib/digits';
 import { errorKey } from '@/lib/supabase';
 import type { Level } from '@/lib/types';
 import { getExercise } from '@/three/catalog';
@@ -85,7 +86,7 @@ export default function NewProgram() {
                   <Stepper label={t('social.sets')} value={e.sets} onChange={(v) => setEx(i, j, { sets: v })} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <T size="xs" muted>{t('social.reps')}</T>
-                    <TextInput value={e.reps} onChangeText={(v) => setEx(i, j, { reps: v.replace(/[^\d-]/g, '').slice(0, 5) })} keyboardType="numbers-and-punctuation"
+                    <TextInput value={e.reps} onChangeText={(v) => setEx(i, j, { reps: toLatinDigits(v).replace(/[^\d-]/g, '').slice(0, 5) })} keyboardType="numbers-and-punctuation"
                       style={{ height: 38, borderRadius: 10, backgroundColor: colors.cardAlt, color: colors.text, textAlign: 'center', fontFamily: fonts.semibold, fontSize: 16 }} />
                   </View>
                 </Row>

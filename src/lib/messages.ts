@@ -66,6 +66,11 @@ export async function uploadChatMedia(me: string, other: string, uri: string, mi
   return path;
 }
 
+/** ملف انرفع بس رسالته ما انرسلت: نشيله عشان ما يبقى في التخزين بدون رسالة */
+export function removeChatMedia(path: string) {
+  supabase.storage.from('chat').remove([path]).then(() => {}, () => {});
+}
+
 /** روابط مؤقتة (ساعة) لصور وفيديوهات المحادثة */
 export async function chatMediaUrls(paths: string[]): Promise<Record<string, string>> {
   if (!paths.length) return {};

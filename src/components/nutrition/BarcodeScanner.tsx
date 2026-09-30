@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, T } from '@/components/ui';
+import { onlyDigits } from '@/lib/digits';
 import { barcodeCandidates } from '@/lib/nutrition/barcode';
 import { brand, radius, space } from '@/theme';
 
@@ -71,7 +72,7 @@ function ScannerBody({ onClose, onScanned }: Omit<Props, 'visible'>) {
   };
 
   const submitManual = () => {
-    const code = manual.replace(/\D/g, '');
+    const code = onlyDigits(manual);
     if (!barcodeCandidates(code).length) { setManualBad(true); return; }
     finish(code, '');
   };
@@ -125,7 +126,7 @@ function ScannerBody({ onClose, onScanned }: Omit<Props, 'visible'>) {
             <Ionicons name="barcode-outline" size={48} color={brand.cream} style={{ alignSelf: 'center' }} />
             <T bold size="lg" center color={brand.cream}>{t('meal.bcTypeTitle')}</T>
             <T size="sm" center color="rgba(248,237,218,0.75)">{t('meal.bcTypeHint')}</T>
-            <TextInput value={manual} onChangeText={(v) => { setManual(v.replace(/\D/g, '').slice(0, 14)); setManualBad(false); }}
+            <TextInput value={manual} onChangeText={(v) => { setManual(onlyDigits(v).slice(0, 14)); setManualBad(false); }}
               keyboardType="number-pad" autoFocus maxLength={14} placeholder="6281234567890" placeholderTextColor="rgba(248,237,218,0.35)"
               returnKeyType="search" onSubmitEditing={submitManual} accessibilityLabel={t('meal.bcTypeTitle')}
               style={{ backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: radius.lg, borderWidth: 1, borderColor: manualBad ? '#FF8A65' : 'rgba(248,237,218,0.3)',

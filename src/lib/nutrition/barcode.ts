@@ -67,7 +67,8 @@ export function barcodeCandidates(raw: string, type = ''): string[] {
   const t = type.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (code.length === 8 && (t.includes('upce') || (!t.includes('ean8') && !validGtin(code)))) {
     const a = upcEtoA(code);
-    if (a && validGtin(a)) return [code, a, `0${a}`];
+    // الصيغة الكاملة (UPC-A) أول: هي اللي تنحفظ فيها المنتجات عادة، وبعض أرقام UPC-E تعدّي فحص EAN-8 بالصدفة
+    if (a && validGtin(a)) return [a, `0${a}`, code];
   }
   if (!validGtin(code)) return [];
   const out = [code];

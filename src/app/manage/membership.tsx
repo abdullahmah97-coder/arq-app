@@ -7,6 +7,7 @@ import { Button, Card, Empty, Input, Row, Screen, Segmented, T } from '@/compone
 import { deleteMembership, loadMembership, normDate, saveMembership } from '@/lib/gymops';
 import { canManageGymOrChain } from '@/lib/services';
 import { goBackOrHome } from '@/lib/nav';
+import { toLatinDigits } from '@/lib/digits';
 import { errorKey } from '@/lib/supabase';
 import { colors, space } from '@/theme';
 
@@ -57,7 +58,7 @@ export default function MembershipForm() {
       const r = await saveMembership({
         id: id ?? null, gymId: chainWide ? null : String(gym), chainId: null, username: who === 'user' ? username : undefined,
         memberName: who === 'guest' ? name : undefined, memberContact: who === 'guest' ? contact : undefined,
-        kind, plan, starts: s, ends: e, price: price.trim() ? Number(price.replace(/[^\d.]/g, '')) : null, notes, referral,
+        kind, plan, starts: s, ends: e, price: price.trim() ? Number(toLatinDigits(price).replace(/[^\d.]/g, '')) : null, notes, referral,
       });
       if (!id && r.claim_code) setClaim(r.claim_code); else goBackOrHome();
     } catch (err) { Alert.alert(t(errorKey(err))); } finally { setBusy(false); }

@@ -179,11 +179,16 @@ Deno.serve(async (req) => {
   if (r.error) return json({ error: r.error }, 502);
   const result = r.parsed ? normalize(r.parsed) : null;
 
-  const row = result
-    ? { code, found: true, source: 'ai', product: result.product, confidence: result.confidence, source_url: result.source_url, updated_at: new Date().toISOString() }
-    : { code, found: false, source: 'ai', product: null, confidence: null, source_url: null, updated_at: new Date().toISOString() };
-  const { error: saveErr } = await admin.from('barcode_products').upsert(row, { onConflict: 'code' });
-  if (saveErr) console.error('cache_save_failed', saveErr.message);
+  // الذاكرة المشتركة يشوفها كل المستخدمين: نحفظ فيها بس اللي ما أثّر عليه اسم جا من الجوال (ممكن يكون أي شي)
+  // وبثقة عالية. الباقي يرجع لصاحب الطلب بس.
+  const shareable = !hint && (!result || result.confidence === 'high');
+  if (shareable) {
+    const row = result
+      ? { code, found: true, source: 'ai', product: result.product, confidence: result.confidence, source_url: result.source_url, updated_at: new Date().toISOString() }
+      : { code, found: false, source: 'ai', product: null, confidence: null, source_url: null, updated_at: new Date().toISOString() };
+    const { error: saveErr } = await admin.from('barcode_products').upsert(row, { onConflict: 'code' });
+    if (saveErr) console.error('cache_save_failed', saveErr.message);
+  }
 
   return json(result
     ? { found: true, product: result.product, confidence: result.confidence, source_url: result.source_url, cached: false, remaining }

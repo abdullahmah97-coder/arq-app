@@ -14,7 +14,7 @@ import { useUser } from '@/lib/auth';
 import { acceptRequest, relationTo, sendRequest, type Relation } from '@/lib/friends';
 import { useLocalized } from '@/lib/i18n';
 import { pickMedia } from '@/lib/images';
-import { canMessage, chatMediaUrls, loadThread, markRead, sendMessage, uploadChatMedia, useIncoming, type Message } from '@/lib/messages';
+import { canMessage, chatMediaUrls, loadThread, markRead, removeChatMedia, sendMessage, uploadChatMedia, useIncoming, type Message } from '@/lib/messages';
 import { clearChatNotifications, setOpenChat } from '@/lib/push';
 import { errorKey, publicUrl, supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
@@ -105,11 +105,14 @@ export default function Chat() {
     const it = await pickMedia(source);
     if (!it) return;
     if (it.fileSize && it.fileSize > MAX_BYTES) { Alert.alert(t('chat.tooBig')); return; }
+    // حد الدقيقة في الكاميرا بس؛ فيديو من الألبوم ممكن يكون أطول
+    if (it.type === 'video' && it.duration && it.duration > 61) { Alert.alert(t('chat.tooBig')); return; }
     const tmp: Pending = { id: `tmp-${Date.now()}`, uri: it.uri, type: it.type, w: it.width, h: it.height, dur: it.duration };
     setPending((x) => [...x, tmp]);
     try {
       const path = await uploadChatMedia(userId, other, it.uri, it.mimeType);
-      const m = await sendMessage(userId, other, '', { path, type: it.type, width: it.width, height: it.height, duration: it.duration });
+      const m = await sendMessage(userId, other, '', { path, type: it.type, width: it.width, height: it.height, duration: it.duration })
+        .catch((e) => { removeChatMedia(path); throw e; });
       setUrls((u) => ({ ...u, [path]: it.uri })); // اللي أرسلته يبان من الجوال على طول
       setMsgs((x) => [...x, m]);
     } catch (e) {

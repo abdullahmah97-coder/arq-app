@@ -9,6 +9,7 @@ import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/compo
 import { useUser } from '@/lib/auth';
 import { loadChains, type Chain } from '@/lib/clubs';
 import { CLUB_ROLES, myClubRequest, requestClubPartner, type ClubRequest, type ClubRole } from '@/lib/partners';
+import { onlyDigits } from '@/lib/digits';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 
@@ -43,7 +44,7 @@ export default function JoinClub() {
 
   const submit = async () => {
     if (name.trim().length < 2) return Alert.alert(t('partners.err_clubName'));
-    if (phone.replace(/\D/g, '').length < 9) return Alert.alert(t('partners.err_phone'));
+    if (onlyDigits(phone).length < 9) return Alert.alert(t('partners.err_phone'));
     if (!agree) return Alert.alert(t('store.err_agree'));
     setBusy(true);
     try {
