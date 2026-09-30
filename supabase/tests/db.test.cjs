@@ -378,7 +378,7 @@ grant usage on schema public, auth, storage to authenticated;
   const pgc = chains.find(c => c.slug === 'puregym');
   check('chain best monthly price', Number(pgc.best_monthly) === 96, String(pgc.best_monthly));
   const bm = chains.find(c => c.slug === 'body-masters');
-  check('dated offers counted until they end', Number(bm.offers) === (new Date().toISOString().slice(0, 10) <= '2026-09-30' ? 6 : 0));
+  check('dated offers counted until they end', Number(bm.offers) === (new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10) <= '2026-09-30' ? 6 : 0)); // يوم الرياض
   await q(`update gyms set chain_id = $1 where id = $2`, [pgc.id, gym.id]);
   const gd = (await as(A, 'select * from gyms_directory() where id = $1', [gym.id]))[0];
   check('branch directory includes chain offers + name', Number(gd.best_monthly) === 96 && gd.chain === 'PureGym KSA' && gd.chain_id === pgc.id, JSON.stringify([gd.best_monthly, gd.chain]));
