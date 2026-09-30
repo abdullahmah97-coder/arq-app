@@ -40,6 +40,11 @@ export const colors = {
   tabBar: brand.deepGreen,
   tabActive: brand.amber,
   tabInactive: 'rgba(248,237,218,0.55)',
+  // المحادثات (مثل الواتساب): فقاعتي فاتحة، فقاعة الطرف الثاني بيضاء، وعلامة القراءة زرقاء
+  bubbleMine: '#D9FDD3',
+  bubbleTheirs: '#FFFFFF',
+  bubbleMeta: '#667781',
+  readTick: '#53BDEB',
 };
 
 /**
@@ -122,7 +127,7 @@ export const THEMES: Record<ThemeId, { name: { ar: string; en: string }; swatch:
     name: { ar: 'الكثبان', en: 'Dune' }, swatch: ['#6E2A10', '#F1551D', '#FEA94F'],
     brand: { deepGreen: '#5C230D', green: '#8C3A17' },
     night: { bg: '#2A0E04', bg2: '#5C230D' },
-    colors: { muted: '#7A5B4B', border: '#EFCFAE' },
+    colors: { muted: '#7A5B4B', border: '#EFCFAE', bubbleMine: '#FCE2CF' },
   },
   sand: {
     name: { ar: 'الرمال', en: 'Sand' }, swatch: ['#F7DFBB', '#FEA94F', '#0A332D'],
@@ -138,7 +143,7 @@ export const THEMES: Record<ThemeId, { name: { ar: string; en: string }; swatch:
     name: { ar: 'الخزامى', en: 'Lavender' }, swatch: ['#2E2248', '#7B5BC4', '#C9B6EE'],
     brand: { deepGreen: '#2E2248', green: '#4A3A6E', orange: '#7B5BC4', amber: '#C9B6EE', sand: '#E9E1F5', cream: '#F7F3FC' },
     night: { bg: '#140E22', bg2: '#2E2248', accent: '#C9B6EE' },
-    colors: { muted: '#6B6180', border: '#E0D6F0' },
+    colors: { muted: '#6B6180', border: '#E0D6F0', bubbleMine: '#E6DCFA' },
     pulse: { sleep: '#A993E0' },
   },
 };

@@ -9,12 +9,27 @@ export interface Message {
   media_path?: string | null; media_type?: 'image' | 'video' | null; media_w?: number | null; media_h?: number | null;
   /** مدة الفيديو بالثواني */
   media_dur?: number | null;
+  /** وقت آخر تعديل (تطلع «معدّلة») */
+  edited_at?: string | null;
+  /** انحذفت للجميع: بدون نص ولا ملف، وتطلع «انحذفت هذي الرسالة» */
+  deleted_at?: string | null;
 }
 export interface ChatMedia { path: string; type: 'image' | 'video'; width?: number; height?: number; duration?: number }
 export interface InboxRow {
   other_id: string; username: string; full_name: string | null; avatar_url: string | null; points: number; is_coach: boolean;
   last_body: string; last_at: string; last_from_me: boolean; unread: number; can_message: boolean;
+  /** آخر رسالة: انقرت؟ انحذفت للجميع؟ ونوعها (text / image / video) — قبل تحديث القاعدة ما تجي */
+  last_read?: boolean; last_deleted?: boolean; last_type?: 'text' | 'image' | 'video';
 }
+
+/** نافذة التعديل والحذف للجميع (نفس القاعدة: ١٥ دقيقة ويومين) */
+export const EDIT_WINDOW_MS = 15 * 60 * 1000;
+export const DELETE_ALL_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+const age = (m: Message) => Date.now() - new Date(m.created_at).getTime();
+/** أقدر أعدّلها؟ رسالتي، ما انحذفت، فيها نص (أو صورة أضيف لها تعليق)، وخلال ١٥ دقيقة */
+export const canEditMessage = (m: Message, me: string) => m.sender === me && !m.deleted_at && age(m) < EDIT_WINDOW_MS - 5000;
+/** أقدر أحذفها للجميع؟ رسالتي، ما انحذفت، وخلال يومين */
+export const canDeleteForAll = (m: Message, me: string) => m.sender === me && !m.deleted_at && age(m) < DELETE_ALL_WINDOW_MS - 5000;
 export type ContactRelation = 'friend' | 'mutual' | 'coach';
 export interface Contact { id: string; username: string; full_name: string | null; avatar_url: string | null; points: number; is_coach: boolean; relation?: ContactRelation }
 
@@ -53,6 +68,26 @@ export async function sendMessage(me: string, other: string, body: string, media
   const { data, error } = await supabase.from('messages').insert(row).select('*').single();
   if (error) throw error;
   return data as Message;
+}
+
+/** تعديل نص رسالة أرسلتها (خلال ١٥ دقيقة) */
+export async function editMessage(id: string, body: string): Promise<Message> {
+  const { data, error } = await supabase.rpc('edit_message', { p_id: id, p_body: body.trim() });
+  if (error) throw error;
+  return data as Message;
+}
+
+/** حذف رسالة: لي بس، أو للجميع (رسالتي خلال يومين) — وملف الصورة/الفيديو ينشال من الحاوية */
+export async function deleteMessage(id: string, everyone: boolean): Promise<void> {
+  const { data, error } = await supabase.rpc('delete_message', { p_id: id, p_everyone: everyone });
+  if (error) throw error;
+  if (typeof data === 'string' && data) removeChatMedia(data);
+}
+
+/** حذف المحادثة من عندي (الطرف الثاني تبقى عنده) */
+export async function clearChat(other: string): Promise<void> {
+  const { error } = await supabase.rpc('clear_chat', { p_other: other });
+  if (error) throw error;
 }
 
 /** رفع صورة أو فيديو للمحادثة: مجلد المرسل ثم المستلم (الحاوية خاصة، يشوفها الطرفين بس) */
@@ -105,34 +140,50 @@ export async function unreadCount(me: string): Promise<number> {
  * ترجع نفس القناة وتنقفل الصفحة بخطأ «cannot add postgres_changes callbacks after subscribe()».
  */
 type Listener = (m: Message) => void;
-let live: { me: string; ch: RealtimeChannel; listeners: Set<Listener> } | null = null;
+type Live = { me: string; ch: RealtimeChannel; inserts: Set<Listener>; updates: Set<Listener> };
+let live: Live | null = null;
 let seq = 0;
 
-function retainIncoming(me: string, fn: Listener) {
+const emit = (set: Set<Listener>, m: Message) => {
+  for (const l of set) { try { l(m); } catch { /* مستمع واحد ما يوقف الباقي */ } }
+};
+
+function retain(me: string, kind: 'inserts' | 'updates', fn: Listener) {
   if (live && live.me !== me) { supabase.removeChannel(live.ch); live = null; }
   if (!live) {
-    const listeners = new Set<Listener>();
+    const inserts = new Set<Listener>(); const updates = new Set<Listener>();
     // اسم جديد لكل قناة: القناة القديمة ممكن تكون لسا تنقفل
+    // الجديد لي، والتعديل/الحذف على اللي وصلني، وعلامة القراءة (✓✓) على اللي أرسلته
     const ch = supabase.channel(`dm:${me}:${++seq}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `recipient=eq.${me}` }, (p) => {
-        for (const l of listeners) { try { l(p.new as Message); } catch { /* مستمع واحد ما يوقف الباقي */ } }
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `recipient=eq.${me}` }, (p) => emit(inserts, p.new as Message))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `recipient=eq.${me}` }, (p) => emit(updates, p.new as Message))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `sender=eq.${me}` }, (p) => emit(updates, p.new as Message))
       .subscribe();
-    live = { me, ch, listeners };
+    live = { me, ch, inserts, updates };
   }
-  live.listeners.add(fn);
+  live[kind].add(fn);
 }
 
-function releaseIncoming(me: string, fn: Listener) {
+function release(me: string, kind: 'inserts' | 'updates', fn: Listener) {
   if (!live || live.me !== me) return;
-  live.listeners.delete(fn);
-  if (!live.listeners.size) { supabase.removeChannel(live.ch); live = null; }
+  live[kind].delete(fn);
+  if (!live.inserts.size && !live.updates.size) { supabase.removeChannel(live.ch); live = null; }
 }
 
+/** رسالة جديدة وصلتني (لحظياً) */
 export function useIncoming(me: string, onMessage: Listener) {
   useEffect(() => {
     if (!me) return;
-    retainIncoming(me, onMessage);
-    return () => releaseIncoming(me, onMessage);
+    retain(me, 'inserts', onMessage);
+    return () => release(me, 'inserts', onMessage);
   }, [me, onMessage]);
+}
+
+/** تعديل أو حذف أو قراءة رسالة في محادثاتي (لحظياً) */
+export function useMessageUpdates(me: string, onUpdate: Listener) {
+  useEffect(() => {
+    if (!me) return;
+    retain(me, 'updates', onUpdate);
+    return () => release(me, 'updates', onUpdate);
+  }, [me, onUpdate]);
 }
