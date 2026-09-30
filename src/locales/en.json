@@ -238,7 +238,10 @@
     "pendingInvite": "You're invited",
     "metric_steps": "Most steps",
     "stepsTab": "Steps",
-    "pointsTab": "Points"
+    "pointsTab": "Points",
+    "showMe": "Show me on leaderboards",
+    "showMeOff": "Hidden from people you don't know. In “My gym” and “Everyone” you'll see your friends and people who chose to show.",
+    "showMeOn": "You're shown in “My gym” and “Everyone” with your name, photo and points, and anyone can open your profile. Turn it off anytime."
   },
   "friends": {
     "title": "Friends",
@@ -290,7 +293,8 @@
     "coverAutoHint": "\"Auto\" follows the app theme. Other colours look the same for everyone.",
     "coverPhoto": "Photo from your device",
     "coverChangePhoto": "Change photo",
-    "coverRemovePhoto": "Remove photo"
+    "coverRemovePhoto": "Remove photo",
+    "privacyTitle": "Privacy"
   },
   "errors": {
     "generic": "Something went wrong, please try again",

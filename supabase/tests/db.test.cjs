@@ -116,7 +116,8 @@ grant usage on schema public, auth, storage to authenticated;
   const lbF = await as(A, `select * from leaderboard('friends', now() - interval '7 days')`);
   check('friends leaderboard has A+B, B first', lbF.length === 2 && lbF[0].user_id === B, JSON.stringify(lbF.map(r => [r.username, Number(r.points), Number(r.rank)])));
   const lbG = await as(A, `select * from leaderboard('global', now() - interval '7 days')`);
-  check('global leaderboard has 3', lbG.length === 3);
+  // غير الأصدقاء ما يطلعون إلا إذا شغّلوا «أظهرني في المتصدرين» (leaderboard.test.cjs)
+  check('global leaderboard: me + my friend (strangers hidden by default)', lbG.length === 2, JSON.stringify(lbG.map(r => r.username)));
   await as(A, 'update profiles set gym_id = $1 where id = $2', [gym.id, A]);
   const lbGym = await as(A, `select * from leaderboard('gym', now() - interval '7 days')`);
   check('gym leaderboard only same gym', lbGym.length === 1);

@@ -8,6 +8,7 @@ import { checkForAppUpdate, isBeta, versionLabel } from '@/lib/appInfo';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { MembershipEntry } from '@/components/gymops/MembershipEntry';
 import { ShortcutMenu } from '@/components/Shortcuts';
+import { LeaderboardVisibility } from '@/components/social/LeaderboardVisibility';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { errorKey, supabase } from '@/lib/supabase';
@@ -65,6 +66,12 @@ export default function ProfileTab() {
         {owner ? <MenuItem icon="shield-checkmark-outline" label={`${t('owner.title')}${owner.reports + owner.brands ? ` · ${owner.reports + owner.brands}` : ''}`} onPress={() => router.push('/owner')} /> : null}
         {isBeta ? <MenuItem icon="chatbubble-ellipses-outline" label={t('beta.feedback')} onPress={() => router.push('/feedback')} /> : null}
         <ShortcutMenu />
+      </Card>
+
+      {/* الخصوصية: مين يشوفني في المنافسة */}
+      <Card style={{ gap: space.md }}>
+        <T bold>{t('profile.privacyTitle')}</T>
+        <LeaderboardVisibility bare />
       </Card>
 
       <Card style={{ gap: space.md }}>

@@ -38,6 +38,8 @@ export interface Profile {
   /** التايم لاين: يطلع لأصدقائي لما أصحى ☀️ ولما أدخل النادي 🏋️ */
   share_wake?: boolean;
   share_checkins?: boolean;
+  /** المنافسة: أظهر في «ناديي» و«الكل» للي ما يعرفوني (طافي من البداية) */
+  show_on_leaderboard?: boolean;
 }
 
 export type PresenceVisibility = 'gym' | 'friends' | 'hidden';

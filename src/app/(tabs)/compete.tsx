@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { Num } from '@/components/pulse/widgets';
+import { LeaderboardVisibility } from '@/components/social/LeaderboardVisibility';
 import { Avatar, Button, Card, Empty, H, ProfileButton, Row, Screen, SectionTitle, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { addDays, daysBetween, isoDate, startOfWeek } from '@/lib/dates';
@@ -66,6 +67,8 @@ export default function Compete() {
         <Segmented value={scope} onChange={setScope}
           options={(['friends', 'gym', 'global'] as const).map((s) => ({ value: s, label: t(`compete.scope_${s}`) }))} />
       ) : null}
+      {/* «ناديي» و«الكل»: أصدقاؤك + اللي اختاروا يظهرون (وأنت تختار تظهر لهم أو لا) */}
+      {kind === 'points' && scope !== 'friends' ? <LeaderboardVisibility onChanged={() => loadBoard(kind, scope)} /> : null}
 
       {/* منصة التتويج */}
       <BrandGradient name="ember" style={styles.podiumWrap}>

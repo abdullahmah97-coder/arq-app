@@ -49,7 +49,7 @@ async function setup() {
   await db.exec(fs.readFileSync(`${ROOT}/seed.sql`, 'utf8'));
   await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
                  revoke update on public.profiles from authenticated;
-                 grant update (username, full_name, avatar_url, bio, gym_id, locale, onboarded, presence_visibility, notify_prefs, cover, cover_url, account_type, kcal_goal, share_wake, share_checkins) on public.profiles to authenticated;
+                 grant update (username, full_name, avatar_url, bio, gym_id, locale, onboarded, presence_visibility, notify_prefs, cover, cover_url, account_type, kcal_goal, share_wake, share_checkins, show_on_leaderboard) on public.profiles to authenticated;
                  revoke insert, update on public.program_adopts from authenticated;
                  revoke insert, update, delete on public.app_admins from authenticated;
                  revoke update on public.post_likes, public.checkin_likes from authenticated;
