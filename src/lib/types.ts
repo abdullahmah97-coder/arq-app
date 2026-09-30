@@ -34,6 +34,9 @@ export interface Profile {
   account_type?: 'trainee' | 'club' | 'coach' | 'store' | 'restaurant' | 'center' | 'venue';
   /** هدف السعرات اليومي اللي حطّه بنفسه (null = هدف الخطة) */
   kcal_goal?: number | null;
+  /** التايم لاين: يطلع لأصدقائي لما أصحى ☀️ ولما أدخل النادي 🏋️ */
+  share_wake?: boolean;
+  share_checkins?: boolean;
 }
 
 export type PresenceVisibility = 'gym' | 'friends' | 'hidden';
@@ -98,7 +101,13 @@ export interface FeedPost {
   like_count: number;
   comment_count: number;
   liked_by_me: boolean;
+  /** post = صورة أو رسالة، wake = «صحى ☀️» التلقائي */
+  kind?: 'post' | 'wake';
+  meta?: WakeMeta;
 }
+
+/** «صحى ☀️»: الوقت ومن وين (وقت المنبّه أو وقت فتح التطبيق) */
+export interface WakeMeta { at?: string; src?: 'alarm' | 'open' }
 
 export interface Comment {
   id: string;

@@ -5,15 +5,16 @@ import { useTranslation } from 'react-i18next';
 import { Alert, FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NotificationBell } from '@/components/NotificationBell';
-import { PostCard, toggleLikeLocal } from '@/components/PostCard';
+import { PostCard } from '@/components/PostCard';
 import { ProgramCard, TipCard } from '@/components/social/cards';
-import { Empty, H, IconButton, ProfileButton, Row, Segmented } from '@/components/ui';
+import { CheckinItemCard, SharingNotice, TimelineComposer, TimelineSettings } from '@/components/timeline/Timeline';
+import { Button, Empty, H, IconButton, ProfileButton, Row, Segmented } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
-import { deletePost, normalizeFeed, setLike } from '@/lib/posts';
+import { deletePost } from '@/lib/posts';
 import { canPublish, RANKS } from '@/lib/ranks';
 import { deleteTip, likeTip, loadPrograms, loadTips, type Tip, type UserProgram } from '@/lib/social';
-import { supabase } from '@/lib/supabase';
+import { asFeedPost, loadTimeline, setTimelineLike, TIMELINE_PAGE, toggledLike, type TimelineItem } from '@/lib/timeline';
 import type { FeedPost } from '@/lib/types';
 import { colors, space, TAB_BAR_SPACE } from '@/theme';
 
@@ -27,15 +28,21 @@ export default function Community() {
   const [tips, setTips] = useState<Tip[]>([]);
   const [tipsDone, setTipsDone] = useState(false);
   const [programs, setPrograms] = useState<UserProgram[]>([]);
-  const [posts, setPosts] = useState<FeedPost[]>([]);
+  // التايم لاين: أنا وأصدقائي (منشورات، «صحى ☀️»، والحضور)
+  const [items, setItems] = useState<TimelineItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [done, setDone] = useState(false);
+  const [sharingOpen, setSharingOpen] = useState(false);
 
   const load = useCallback(async (before?: string) => {
-    const { data } = await supabase.rpc('feed', { p_before: before ?? new Date().toISOString(), p_limit: PAGE });
-    const rows = normalizeFeed(data);
-    setDone(rows.length < PAGE);
-    setPosts((prev) => (before ? [...prev, ...rows] : rows));
+    try {
+      const rows = await loadTimeline(before);
+      setDone(rows.length < TIMELINE_PAGE);
+      setItems((prev) => (before ? [...prev, ...rows.filter((r) => !prev.some((p) => p.id === r.id))] : rows));
+    } catch (e) {
+      if (!before) setItems([]);
+      console.warn('timeline', e);
+    }
   }, []);
 
   const loadT = useCallback(async (before?: string) => {
@@ -71,10 +78,10 @@ export default function Community() {
     ]);
   };
 
-  const like = useCallback(async (p: FeedPost) => {
-    setPosts((ps) => ps.map((x) => (x.id === p.id ? toggleLikeLocal(x) : x)));
-    const { error } = await setLike(p, userId);
-    if (error) setPosts((ps) => ps.map((x) => (x.id === p.id ? p : x)));
+  const like = useCallback(async (it: TimelineItem) => {
+    setItems((xs) => xs.map((x) => (x.id === it.id ? toggledLike(x) : x)));
+    const { error } = await setTimelineLike(it, userId);
+    if (error) setItems((xs) => xs.map((x) => (x.id === it.id ? it : x)));
   }, [userId]);
 
   const remove = useCallback((p: FeedPost) => {
@@ -82,7 +89,7 @@ export default function Community() {
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: async () => {
         await deletePost(p);
-        setPosts((ps) => ps.filter((x) => x.id !== p.id));
+        setItems((xs) => xs.filter((x) => x.id !== p.id));
       } },
     ]);
   }, [t]);
@@ -100,21 +107,34 @@ export default function Community() {
       </Row>
       <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
         <Segmented value={tab} onChange={setTab} options={[
-          { value: 'posts', label: t('social.posts') },
+          { value: 'posts', label: t('timeline.tab') },
           { value: 'tips', label: t('social.tips') },
           { value: 'programs', label: t('social.programs') },
         ]} />
       </View>
       {tab === 'posts' ? (
         <FlatList
-          data={posts}
-          keyExtractor={(p) => p.id}
+          data={items}
+          keyExtractor={(x) => `${x.item_type}:${x.id}`}
           contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: TAB_BAR_SPACE }}
-          renderItem={({ item }) => <PostCard post={item} onLike={like} onDelete={remove} isMine={item.user_id === userId} />}
-          ListEmptyComponent={<Empty text={t('feed.emptyFeed')} icon="people-outline" />}
+          ListHeaderComponent={
+            <View style={{ gap: space.md }}>
+              <TimelineComposer onSettings={() => setSharingOpen(true)} />
+              <SharingNotice onSettings={() => setSharingOpen(true)} />
+            </View>
+          }
+          renderItem={({ item }) => item.item_type === 'checkin'
+            ? <CheckinItemCard it={item} onLike={like} />
+            : <PostCard post={asFeedPost(item)} onLike={() => like(item)} onDelete={remove} isMine={item.user_id === userId} verified={item.is_coach} />}
+          ListEmptyComponent={
+            <View style={{ gap: space.md, alignItems: 'center' }}>
+              <Empty text={t('timeline.empty')} icon="people-outline" />
+              <Button small icon="person-add-outline" title={t('timeline.addFriends')} onPress={() => router.push('/friends')} />
+            </View>
+          }
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
           onEndReachedThreshold={0.5}
-          onEndReached={() => { if (!done && posts.length) load(posts[posts.length - 1].created_at); }}
+          onEndReached={() => { if (!done && items.length) load(items[items.length - 1].at); }}
         />
       ) : tab === 'tips' ? (
         <FlatList
@@ -149,6 +169,7 @@ export default function Community() {
           <Ionicons name={tab === 'posts' ? 'add' : tab === 'tips' ? 'bulb' : 'barbell'} size={tab === 'posts' ? 30 : 24} color={colors.onPrimary} />
         </Pressable>
       </View>
+      {sharingOpen ? <TimelineSettings onClose={() => setSharingOpen(false)} /> : null}
     </SafeAreaView>
   );
 }

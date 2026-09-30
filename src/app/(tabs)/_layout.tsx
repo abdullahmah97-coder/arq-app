@@ -4,6 +4,7 @@ import { PulseTabBar } from '@/components/pulse/TabBar';
 import { ScreenErrorBoundary } from '@/components/ScreenErrorBoundary';
 import { LaunchAdGate } from '@/components/ads/LaunchAd';
 import { UpdateBanner } from '@/components/UpdateBanner';
+import { WakeWatcher } from '@/components/timeline/Timeline';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -25,6 +26,8 @@ export default function TabsLayout() {
     <UpdateBanner />
     {/* إعلان البداية: يظهر مرة بعد فتح التطبيق حسب إعدادات إدارة التطبيق */}
     <LaunchAdGate />
+    {/* «صحى ☀️» في التايم لاين: مرة باليوم لما تفتح التطبيق الصبح */}
+    <WakeWatcher />
     </>
   );
 }
