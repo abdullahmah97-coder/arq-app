@@ -6,8 +6,9 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as THREE from 'three';
 import { createHuman } from '@/three/human';
-import { floorFor, motionDuration, MOTIONS, poseOpts, sampleMotion } from '@/three/motions';
+import { floorFor, motionDuration, MOTIONS, poseOpts } from '@/three/motions';
 import { bakeStaticProps, createFloor, createProps } from '@/three/equipment';
+import { fitMotion, fittedFrame, type Fit } from '@/three/fit';
 import { motionBounds, placeCamera } from '@/three/framing';
 import type { HumanStyle } from '@/three/human';
 import { createStudio, enableShadows } from '@/three/studio';
@@ -67,17 +68,26 @@ function Scene({ motion, gender, focus, muscles, playing, yaw, speed, bodyStyle,
   const rig = useMemo(() => {
     const driver = createRig();
     const human = createHuman(gltf.scene, driver);
+    if (m.grip !== undefined) human.setGrip(m.grip);
     const props = createProps(human.propRig, m.props);
     const floor = createFloor();
     const world = new THREE.Group();
     world.add(human.object, props.group, floor);
+    // الجسم يرتكز فعلاً على المقعد/المسند والقدمين على الأرض (تنحسب مرة لهذا النموذج)
+    let fit: Fit | null = null;
+    try { fit = fitMotion(human, driver, props, m); } catch (e) { logEvent('3d_fit_error', errorDetail(e), { once: true }); }
+    const off = new THREE.Vector3();
+    const frameAt = (time: number) => {
+      const f = fittedFrame(m, fit, time, off);
+      applyPose(driver, f.pose, poseOpts(m));
+      human.sync(!!m.ground, floorFor(m), f.off);
+    };
     // حدود اللاعب والجهاز خلال الحركة كلها: الكاميرا تقرّب عليها تلقائياً
-    const bounds = motionBounds(driver, props, m, () => human.sync(!!m.ground, floorFor(m)));
+    const bounds = motionBounds(driver, props, m, undefined, frameAt);
     // دمج أجزاء الأجهزة الثابتة (أسرع بالرسم)
     const dur = motionDuration(m);
     bakeStaticProps(props.group, [0, 0.21, 0.43, 0.62, 0.81].map((f) => () => {
-      applyPose(driver, sampleMotion(m, f * dur), poseOpts(m));
-      human.sync(!!m.ground, floorFor(m));
+      frameAt(f * dur);
       props.update();
     }));
     const center = bounds.getCenter(new THREE.Vector3());
@@ -87,7 +97,7 @@ function Scene({ motion, gender, focus, muscles, playing, yaw, speed, bodyStyle,
       enableShadows(human.object);
       enableShadows(props.group);
     } catch (e) { logEvent('3d_studio_error', errorDetail(e), { once: true }); }
-    return { driver, human, props, world, bounds, center };
+    return { driver, human, props, world, bounds, center, frameAt };
   }, [gltf, m]);
   const cam = useRef({ dist: 0 });
   const perf = useRef({ n: 0, t0: 0, sent: false });
@@ -109,8 +119,7 @@ function Scene({ motion, gender, focus, muscles, playing, yaw, speed, bodyStyle,
     if (dead.current) return;
     try {
       if (playing) t.current += Math.min(dt, 0.05) * speed;
-      applyPose(rig.driver, sampleMotion(m, t.current), poseOpts(m));
-      rig.human.sync(!!m.ground, floorFor(m));
+      rig.frameAt(t.current);
       rig.props.update();
       // الكاميرا تدور حول اللاعب وتقرّب لأقصى حد يظهر فيه هو والجهاز
       // خريطة العضلات: دوران بطيء عشان تبان العضلات من قدام ومن ورا

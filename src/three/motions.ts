@@ -1,5 +1,5 @@
 // مكتبة الحركات: لكل تمرين وضعيات مفتاحية + أدوات + العضلات + زاوية الكاميرا
-import { lerpPose, sym, type FloorFn, type Muscle, type Pose, type PoseOpts, type PropSpec } from './rig';
+import { lerpPose, poseQuats, slerpQuats, sym, type FloorFn, type Muscle, type Pose, type PoseOpts, type PropSpec } from './rig';
 
 export interface Motion {
   keys: Pose[];            // تدور الحركة: 0 → 1 → … → 0
@@ -14,6 +14,13 @@ export interface Motion {
   flow?: boolean;
   /** القدم الثابتة على الأرض (للحركات بـ ground). الافتراضي: القدمين. none = القدمين تتحركان عمداً */
   plant?: 'both' | 'L' | 'R' | 'none';
+  /**
+   * وش يرتكز عليه الجسم (تنحسب بـ fit.ts لكل نموذج): bench = متمدد على بنش، seat = جالس على مقعد،
+   * back = الظهر على المسند، floor = القدمين على الأرض (نعدّل ثني الركبة)
+   */
+  rest?: ('bench' | 'seat' | 'back' | 'floor')[];
+  /** قفلة الأصابع: 1 = قبضة على مقبض رفيع (الافتراضي 0.85)، أقل = كف مفتوح أكثر (مسكة رأس دمبل كبير، كف على الأرض) */
+  grip?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -21,14 +28,18 @@ export interface Motion {
 // ---------------------------------------------------------------------------
 const STAND = sym({ shoulder: [0, 6, 0], elbow: 8, hip: [0, 4, 0] });
 const armsHangFront = (flex = 6): Pose => sym({ shoulder: [flex, 4, 0], elbow: 4, hip: [0, 5, 0] });
-const withHands = (p: Pose, h: Pose): Pose => ({ ...p, lShoulder: h.lShoulder, rShoulder: h.rShoulder, lElbow: h.lElbow, rElbow: h.rElbow });
+const withHands = (p: Pose, h: Pose): Pose => ({ ...p, lShoulder: h.lShoulder, rShoulder: h.rShoulder, lElbow: h.lElbow, rElbow: h.rElbow, lRoll: h.lRoll, rRoll: h.rRoll });
 
 // ---------------------------------------------------------------------------
 // الحركات
 // ---------------------------------------------------------------------------
 const squatTop = (arms: Pose) => withHands(sym({ hip: [0, 10, 12], knee: 0 }), arms);
 const squatBottom = (arms: Pose, lean = 30) => withHands(sym({ spine: lean, hip: [108, 18, 12], knee: 118, neck: -lean * 0.6 }), arms);
-const GOBLET_ARMS = sym({ shoulder: [28, 22, 0], elbow: 142 });
+// مسكة الجوبلت: الكفين مع بعض قدام أعلى الصدر ماسكة رأس الدمبل، والكوعين لتحت قريبة من الجسم
+const GOBLET_HOLD = sym({ shoulder: [4, 10, -28], elbow: 137, roll: -30 });
+// ضغط البار واقف: يبدأ عند مستوى الذقن قدام الرقبة (قبضة من فوق) وينتهي فوق الرأس والذراعين ممدودة
+const OHP_BB_BOTTOM = sym({ shoulder: [15, 7, 22], elbow: 150, roll: -68 });
+const OHP_BB_TOP = sym({ shoulder: [180, -6, -22], elbow: 4, roll: -68 });
 const BACK_ARMS = sym({ shoulder: [-22, 78, 90], elbow: 142 });
 
 const hinge = (pitch: number, thigh: number, knee: number, armFlexExtra = 0): Pose => ({
@@ -50,8 +61,9 @@ const bulgarian = (depth: number): Pose => ({
 // الاستلقاء على البنش: الحوض فوق البنش، الرأس باتجاه −Z
 const SUPINE_ROOT = { y: 0.56, z: 0.1, pitch: -90 };
 const supineLegs = { lHip: [-8, 31, 0] as [number, number, number], rHip: [-8, 31, 0] as [number, number, number], lKnee: 106, rKnee: 106 };
-const pressTop = (abd = 12): Pose => ({ root: SUPINE_ROOT, ...supineLegs, ...sym({ shoulder: [90, abd, 0], elbow: 2 }) });
-const pressBottom = (): Pose => ({ root: SUPINE_ROOT, ...supineLegs, ...sym({ shoulder: [-12, 66, 0], elbow: 88 }) });
+// ضغط على بنش مستوي: الكفين باتجاه الرجلين طول الحركة (لفّ الساعد ثابت)، أسفل: الساعد عمودي والكوع عند مستوى البنش
+const supine = (p: Pose): Pose => ({ root: SUPINE_ROOT, ...supineLegs, ...p });
+const pressBottom = (): Pose => supine(sym({ shoulder: [-17, 61, 0], elbow: 107, roll: -29 }));
 
 const INCLINE_ROOT = { y: 0.52, z: 0.08, pitch: -52 };
 // بنش مائل للأسفل: الرأس أوطى من الحوض والرجلين مثبتة عند المسند
@@ -64,8 +76,9 @@ const SEATED_ROOT = { y: 0.58, z: 0 };
 const seatedLegs = { lHip: [88, 14, 0] as [number, number, number], rHip: [88, 14, 0] as [number, number, number], lKnee: 88, rKnee: 88 };
 const seated = (p: Pose): Pose => ({ root: SEATED_ROOT, ...seatedLegs, ...p, lHip: p.lHip ?? seatedLegs.lHip, rHip: p.rHip ?? seatedLegs.rHip, lKnee: p.lKnee ?? 88, rKnee: p.rKnee ?? 88 });
 
-const pressOverheadBottom = sym({ shoulder: [0, 82, 90], elbow: 100 });
-const pressOverheadTop = sym({ shoulder: [0, 168, 90], elbow: 6 });
+// ضغط فوق الرأس بالدمبل/المكينة: أسفل العضد للجنب (مستوى لوح الكتف) والساعد عمودي، أعلى الذراع عمودية — الكف للأمام طول الحركة
+const pressOverheadBottom = sym({ shoulder: [17, 87, 89], elbow: 93, roll: -17 });
+const pressOverheadTop = sym({ shoulder: [177, 5, -73], elbow: 2, roll: -17 });
 
 
 // ---------------------------------------------------------------------------
@@ -88,8 +101,8 @@ export const MOTIONS: Record<string, Motion> = {
   // ---------------- أرجل ----------------
   goblet_squat: {
     keys: [
-      { root: { z: 0 }, ...sym({ shoulder: [28, 22, 0], elbow: 142, hip: [0, 10, 12], knee: 0, hipOut: 20 }) },
-      { root: { z: -0.15 }, spine: 21, neck: -11, ...sym({ shoulder: [28, 22, 0], elbow: 142, hip: [90, 23, 12], knee: 126, hipOut: 32 }) },
+      { root: { z: 0 }, ...sym({ hip: [0, 10, 12], knee: 0, hipOut: 20 }), ...GOBLET_HOLD },
+      { root: { z: -0.15 }, spine: 21, neck: -11, ...sym({ hip: [90, 23, 12], knee: 126, hipOut: 32 }), ...GOBLET_HOLD },
     ], tempo: [1.7, 1.2], hold: [0.3, 0.2], ground: true,
     props: [{ kind: 'goblet' }], primary: ['quads', 'glutes'], secondary: ['hamstrings', 'abs', 'lowerBack'],
   },
@@ -116,7 +129,7 @@ export const MOTIONS: Record<string, Motion> = {
   },
   leg_extension: {
     keys: [seated({ lKnee: 90, rKnee: 90, ...sym({ shoulder: [15, 18, 0], elbow: 20 }) }), seated({ lKnee: 5, rKnee: 5, ...sym({ shoulder: [15, 18, 0], elbow: 20 }) })],
-    tempo: [1.2, 1.8], hold: [0.1, 0.5], props: [{ kind: 'legExtension', pos: [0, 0, -0.05] }],
+    tempo: [1.2, 1.8], hold: [0.1, 0.5], props: [{ kind: 'legExtension', pos: [0, 0, -0.05] }], rest: ['seat', 'back'],
     primary: ['quads'], secondary: [], view: { yaw: 75 },
   },
   leg_curl_lying: {
@@ -130,7 +143,7 @@ export const MOTIONS: Record<string, Motion> = {
     keys: [
       { root: { y: 0.6 }, ...sym({ hip: [88, 12, 0], knee: 5, shoulder: [15, 18, 0], elbow: 20 }) },
       { root: { y: 0.6 }, ...sym({ hip: [88, 12, 0], knee: 105, shoulder: [15, 18, 0], elbow: 20 }) },
-    ], tempo: [1.2, 1.8], hold: [0.1, 0.4], props: [{ kind: 'legCurlSeated', pos: [0, 0, -0.05] }],
+    ], tempo: [1.2, 1.8], hold: [0.1, 0.4], props: [{ kind: 'legCurlSeated', pos: [0, 0, -0.05] }], rest: ['seat', 'back'],
     primary: ['hamstrings'], secondary: ['calves'], view: { yaw: 75 },
   },
   split_squat: {
@@ -154,8 +167,9 @@ export const MOTIONS: Record<string, Motion> = {
   },
   rdl_db: {
     keys: [
-      { ...sym({ shoulder: [4, 4, 0], elbow: 4, hip: [0, 5, 0] }) },
-      { root: { z: 0.05, pitch: 72 }, neck: -32, ...sym({ shoulder: [72, 5, 0], elbow: 3, hip: [80, 4, 2], knee: 20, hipOut: 4 }) },
+      // قبضة من فوق (الكفين للخلف) والدمبل قدام الفخذين طول الحركة
+      { ...sym({ shoulder: [4, 4, 0], elbow: 4, hip: [0, 5, 0], roll: -90 }) },
+      { root: { z: 0.05, pitch: 72 }, neck: -32, ...sym({ shoulder: [72, 5, 0], elbow: 3, hip: [80, 4, 2], knee: 20, hipOut: 4, roll: -90 }) },
     ], tempo: [1.9, 1.3], hold: [0.3, 0.2], ground: true,
     props: [{ kind: 'dumbbells' }], primary: ['hamstrings', 'glutes'], secondary: ['lowerBack', 'forearms'], view: { yaw: 75 },
   },
@@ -200,30 +214,36 @@ export const MOTIONS: Record<string, Motion> = {
 
   // ---------------- صدر ----------------
   bench_bb: {
-    keys: [pressTop(14), pressBottom()], tempo: [1.8, 1.2], hold: [0.2, 0.2],
-    props: [{ kind: 'barbell' }, { kind: 'benchPress', pos: [0, 0, -0.3] }], primary: ['chest'], secondary: ['triceps', 'shoulders'], view: { yaw: 60, y: 0.7 },
+    // البار: نفس عرض القبضة فوق وتحت (الذراعين مايلة للخارج فوق)
+    keys: [supine(sym({ shoulder: [66, 83, 22], elbow: 16, roll: -29 })), pressBottom()], tempo: [1.8, 1.2], hold: [0.2, 0.2],
+    props: [{ kind: 'barbell' }, { kind: 'benchPress', pos: [0, 0, -0.3] }], rest: ['bench', 'floor'],
+    primary: ['chest'], secondary: ['triceps', 'shoulders'], view: { yaw: 60, y: 0.7 },
   },
   bench_db: {
-    keys: [pressTop(10), pressBottom()], tempo: [1.8, 1.2], hold: [0.2, 0.2],
-    props: [{ kind: 'dumbbells' }, { kind: 'bench', pos: [0, 0, -0.3] }], primary: ['chest'], secondary: ['triceps', 'shoulders'], view: { yaw: 60, y: 0.7 },
+    keys: [supine(sym({ shoulder: [91, 16, -45], elbow: 1, roll: -29 })), pressBottom()], tempo: [1.8, 1.2], hold: [0.2, 0.2],
+    props: [{ kind: 'dumbbells' }, { kind: 'bench', pos: [0, 0, -0.3] }], rest: ['bench', 'floor'],
+    primary: ['chest'], secondary: ['triceps', 'shoulders'], view: { yaw: 60, y: 0.7 },
   },
   chest_press_machine: {
     keys: [
-      seated({ ...sym({ shoulder: [-10, 66, 0], elbow: 88 }) }),
-      seated({ ...sym({ shoulder: [88, 18, 0], elbow: 5 }) }),
-    ], tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'chestPress', pos: [0, 0, -0.05] }],
+      // مقابض عمودية (الكفين متقابلين)
+      seated(sym({ shoulder: [-27, 67, 0], elbow: 117, roll: 67 })),
+      seated(sym({ shoulder: [83, 67, 0], elbow: 8, roll: 67 })),
+    ], tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'chestPress', pos: [0, 0, -0.05] }], rest: ['seat', 'back', 'floor'],
     primary: ['chest'], secondary: ['triceps', 'shoulders'], view: { yaw: 55 },
   },
   incline_db_press: {
+    // أعلى: الذراعين عمودية بالعالم فوق أعلى الصدر. أسفل: الكوع تحت مستوى الصدر والساعد عمودي (الدمبل جنب أعلى الصدر)
     keys: [
-      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [100, 14, 0], elbow: 2 }) },
-      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [-8, 64, 0], elbow: 90 }) },
+      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [128, 6, -72], elbow: 2, roll: -13 }) },
+      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [-17, 61, 38], elbow: 121, roll: -13 }) },
     ], tempo: [1.8, 1.2], hold: [0.2, 0.2], props: [{ kind: 'dumbbells' }, { kind: 'inclineBench', pos: [0, 0, -0.05] }],
+    rest: ['seat', 'back', 'floor'],
     primary: ['chest', 'shoulders'], secondary: ['triceps'], view: { yaw: 60 },
   },
   pec_deck: {
     keys: [seated(sym({ shoulder: [0, 88, 90], elbow: 88 })), seated(sym({ shoulder: [80, 30, 90], elbow: 88 }))],
-    tempo: [1.8, 1.2], hold: [0.1, 0.5], props: [{ kind: 'pecDeck', pos: [0, 0, -0.05] }], primary: ['chest'], secondary: ['shoulders'], view: { yaw: 35 },
+    tempo: [1.8, 1.2], hold: [0.1, 0.5], props: [{ kind: 'pecDeck', pos: [0, 0, -0.05] }], rest: ['seat', 'back', 'floor'], primary: ['chest'], secondary: ['shoulders'], view: { yaw: 35 },
   },
   cable_fly: {
     keys: [
@@ -240,16 +260,16 @@ export const MOTIONS: Record<string, Motion> = {
 
   // ---------------- أكتاف ----------------
   ohp_standing: {
-    keys: [withHands(STAND, pressOverheadBottom), withHands(STAND, pressOverheadTop)], tempo: [1.2, 1.8], hold: [0.2, 0.2], ground: true,
+    keys: [withHands(STAND, OHP_BB_BOTTOM), withHands(STAND, OHP_BB_TOP)], tempo: [1.2, 1.8], hold: [0.2, 0.2], ground: true,
     props: [{ kind: 'barbell' }], primary: ['shoulders'], secondary: ['triceps', 'upperBack', 'abs'], view: { yaw: 35, y: 1.1 },
   },
   shoulder_press_db_seated: {
     keys: [seated(pressOverheadBottom), seated(pressOverheadTop)], tempo: [1.2, 1.8], hold: [0.2, 0.2],
-    props: [{ kind: 'dumbbells' }, { kind: 'seatBack', pos: [0, 0, -0.05] }], primary: ['shoulders'], secondary: ['triceps'], view: { yaw: 35, y: 1.0 },
+    props: [{ kind: 'dumbbells' }, { kind: 'seatBack', pos: [0, 0, -0.05] }], rest: ['seat', 'back', 'floor'], primary: ['shoulders'], secondary: ['triceps'], view: { yaw: 35, y: 1.0 },
   },
   shoulder_press_machine: {
     keys: [seated(pressOverheadBottom), seated(pressOverheadTop)], tempo: [1.2, 1.8], hold: [0.2, 0.2],
-    props: [{ kind: 'shoulderPress', pos: [0, 0, -0.05] }], primary: ['shoulders'], secondary: ['triceps'], view: { yaw: 35, y: 1.0 },
+    props: [{ kind: 'shoulderPress', pos: [0, 0, -0.05] }], rest: ['seat', 'back', 'floor'], primary: ['shoulders'], secondary: ['triceps'], view: { yaw: 35, y: 1.0 },
   },
   lateral_raise: {
     keys: [sym({ shoulder: [8, 10, 0], elbow: 15, hip: [0, 5, 0] }), sym({ shoulder: [8, 86, 0], elbow: 15, hip: [0, 5, 0] })],
@@ -274,12 +294,12 @@ export const MOTIONS: Record<string, Motion> = {
       { root: { y: 0.58, z: 0 }, spine: -8, ...sym({ shoulder: [162, -19, 0], elbow: 5, hip: [88, 14, 0], knee: 88 }) },
       seated({ ...sym({ shoulder: [15, 55, 90], elbow: 115 }), spine: -12 }),
     ],
-    tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'latBar' }, { kind: 'latMachine', pos: [0, 0, -0.02] }],
+    tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'latBar' }, { kind: 'latMachine', pos: [0, 0, -0.02] }], rest: ['seat', 'floor'],
     primary: ['lats'], secondary: ['biceps', 'upperBack', 'rearDelts'], view: { yaw: 150, y: 1.2 },
   },
   lat_pulldown_close: {
     keys: [seated(sym({ shoulder: [168, 10, 0], elbow: 5, spine: -8 })), seated({ ...sym({ shoulder: [35, 12, 0], elbow: 110 }), spine: -14 })],
-    tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'latBar' }, { kind: 'latMachine', pos: [0, 0, -0.02] }],
+    tempo: [1.2, 1.8], hold: [0.1, 0.3], props: [{ kind: 'latBar' }, { kind: 'latMachine', pos: [0, 0, -0.02] }], rest: ['seat', 'floor'],
     primary: ['lats'], secondary: ['biceps', 'upperBack'], view: { yaw: 150, y: 1.2 },
   },
   pullup: {
@@ -292,13 +312,13 @@ export const MOTIONS: Record<string, Motion> = {
     keys: [
       { root: { y: 0.55, z: -0.2 }, spine: 18, ...sym({ hip: [82, 10, 0], knee: 34, ankle: -10, shoulder: [80, 10, 0], elbow: 4 }) },
       { root: { y: 0.55, z: -0.2 }, spine: 0, chest: -8, ...sym({ hip: [82, 10, 0], knee: 34, ankle: -10, shoulder: [-20, 12, 0], elbow: 100 }) },
-    ], tempo: [1.2, 1.8], hold: [0.1, 0.4], props: [{ kind: 'rowStation', pos: [0, 0, 0] }],
+    ], tempo: [1.2, 1.8], hold: [0.1, 0.4], props: [{ kind: 'rowStation', pos: [0, 0, 0] }], rest: ['seat'],
     primary: ['upperBack', 'lats'], secondary: ['biceps', 'rearDelts'], view: { yaw: 75, y: 0.6 },
   },
   row_db_one_arm: {
     keys: [
       { root: { y: 0.93, pitch: 71 }, neck: -35, ...sym({ elbow: 2 }), lShoulder: [85, 8, 0], rShoulder: [80, 6, 0], lHip: [74, 6, 0], rHip: [68, 8, 0], lKnee: 96, rKnee: 20 },
-      { root: { y: 0.93, pitch: 71 }, neck: -35, lShoulder: [85, 8, 0], rShoulder: [8, 10, 0], lElbow: 2, rElbow: 95, lHip: [74, 6, 0], rHip: [68, 8, 0], lKnee: 96, rKnee: 20 },
+      { root: { y: 0.93, pitch: 71 }, neck: -35, lShoulder: [85, 8, 0], rShoulder: [-12, 12, 0], lElbow: 2, rElbow: 78, lHip: [74, 6, 0], rHip: [68, 8, 0], lKnee: 96, rKnee: 20 },
     ], tempo: [1.2, 1.8], hold: [0.1, 0.4], props: [{ kind: 'dumbbellR' }, { kind: 'benchSideRow', pos: [0.15, 0, 0.07] }],
     primary: ['lats', 'upperBack'], secondary: ['biceps', 'rearDelts'], view: { yaw: -60, y: 0.8 },
   },
@@ -312,7 +332,8 @@ export const MOTIONS: Record<string, Motion> = {
 
   // ---------------- ذراعين ----------------
   curl_db: {
-    keys: [sym({ shoulder: [2, 8, 0], elbow: 5, hip: [0, 5, 0] }), sym({ shoulder: [12, 8, 0], elbow: 138, hip: [0, 5, 0] })],
+    // الكفين للأمام من تحت وللكتف فوق (قبضة من تحت)
+    keys: [sym({ shoulder: [2, 8, 0], elbow: 5, hip: [0, 5, 0], roll: 90 }), sym({ shoulder: [12, 8, 0], elbow: 138, hip: [0, 5, 0], roll: 90 })],
     tempo: [1.1, 1.8], hold: [0.1, 0.3], ground: true, props: [{ kind: 'dumbbells' }], primary: ['biceps'], secondary: ['forearms'], view: { yaw: 45, y: 1.1 },
   },
   curl_hammer: {
@@ -336,9 +357,10 @@ export const MOTIONS: Record<string, Motion> = {
   },
   triceps_overhead_db: {
     keys: [
-      sym({ shoulder: [170, 12, 0], elbow: 140, hip: [0, 5, 0] }),
-      sym({ shoulder: [170, 12, 0], elbow: 8, hip: [0, 5, 0] }),
-    ], tempo: [1.2, 1.8], hold: [0.1, 0.3], ground: true, props: [{ kind: 'goblet' }], primary: ['triceps'], secondary: [], view: { yaw: 70, y: 1.2 },
+      // الكفين مع بعض ماسكة رأس الدمبل: تحت = ورا الرأس والكوعين للسقف، فوق = الذراعين ممدودة فوق الرأس
+      sym({ shoulder: [163, 5, -24], elbow: 141, roll: -22, hip: [0, 5, 0] }),
+      sym({ shoulder: [169, 11, 17], elbow: 14, roll: -22, hip: [0, 5, 0] }),
+    ], tempo: [1.2, 1.8], hold: [0.1, 0.3], ground: true, props: [{ kind: 'dumbbellOverhead' }], primary: ['triceps'], secondary: [], view: { yaw: 70, y: 1.2 },
   },
 
   // ---------------- بطن ----------------
@@ -371,8 +393,8 @@ export const MOTIONS: Record<string, Motion> = {
   },
   sumo_squat: {
     keys: [
-      { ...sym({ shoulder: [28, 22, 0], elbow: 142, hip: [0, 17, 28], knee: 0 }) },
-      { root: { z: -0.05 }, spine: 12, neck: -6, ...sym({ shoulder: [28, 22, 0], elbow: 142, hip: [82, 45, 30], knee: 110, hipOut: 43 }) },
+      { ...sym({ hip: [0, 17, 28], knee: 0 }), ...GOBLET_HOLD },
+      { root: { z: -0.05 }, spine: 12, neck: -6, ...sym({ hip: [82, 45, 30], knee: 110, hipOut: 43 }), ...GOBLET_HOLD },
     ], tempo: [1.8, 1.3], hold: [0.3, 0.2], ground: true,
     props: [{ kind: 'goblet' }], primary: ['glutes', 'quads'], secondary: ['hamstrings'], view: { yaw: 25 },
   },
@@ -405,14 +427,15 @@ export const MOTIONS: Record<string, Motion> = {
   },
   hip_abduction: {
     keys: [seated({ lHip: [88, 8, 0], rHip: [88, 8, 0], ...sym({ shoulder: [15, 18, 0], elbow: 20 }) }), seated({ lHip: [88, 38, 0], rHip: [88, 38, 0], ...sym({ shoulder: [15, 18, 0], elbow: 20 }) })],
-    tempo: [1.2, 1.8], hold: [0.1, 0.5], props: [{ kind: 'hipAbduction', pos: [0, 0, -0.05] }], primary: ['glutes'], secondary: [], view: { yaw: 20, y: 0.8 },
+    tempo: [1.2, 1.8], hold: [0.1, 0.5], props: [{ kind: 'hipAbduction', pos: [0, 0, -0.05] }], rest: ['seat', 'back'], primary: ['glutes'], secondary: [], view: { yaw: 20, y: 0.8 },
   },
   seated_calf_raise: {
     keys: [
-      { root: { y: 0.58, z: 0 }, ...sym({ shoulder: [30, 12, 0], elbow: 60, hip: [88, 14, 0], knee: 88, ankle: 0 }) },
-      { root: { y: 0.58, z: 0 }, ...sym({ shoulder: [30, 12, 0], elbow: 60, hip: [98, 14, 0], knee: 88, ankle: 34 }) },
+      // الدمبل بالعرض فوق الركب والكفين عليه
+      { root: { y: 0.58, z: 0 }, ...sym({ shoulder: [35, 4, -1], elbow: 42, roll: -86, hip: [88, 14, 0], knee: 88, ankle: 0 }) },
+      { root: { y: 0.58, z: 0 }, ...sym({ shoulder: [35, 4, -1], elbow: 42, roll: -86, hip: [98, 14, 0], knee: 88, ankle: 34 }) },
     ],
-    tempo: [0.9, 1.4], hold: [0.1, 0.6], props: [{ kind: 'seat' }, { kind: 'dumbbells' }], primary: ['calves'], secondary: [], view: { yaw: 75, y: 0.6 },
+    tempo: [0.9, 1.4], hold: [0.1, 0.6], props: [{ kind: 'seat' }, { kind: 'dumbbells' }], rest: ['seat'], primary: ['calves'], secondary: [], view: { yaw: 75, y: 0.6 },
   },
   single_leg_rdl: {
     keys: [
@@ -443,14 +466,15 @@ export const MOTIONS: Record<string, Motion> = {
   // ---------------- صدر (إضافية) ----------------
   incline_bench_bb: {
     keys: [
-      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [100, 16, 0], elbow: 2 }) },
-      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [-8, 66, 0], elbow: 90 }) },
-    ], tempo: [1.8, 1.2], hold: [0.2, 0.2], props: [{ kind: 'barbell' }, { kind: 'inclineBench', pos: [0, 0, -0.05] }],
+      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [133, -30, -100], elbow: 11, roll: -13 }) },
+      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [-17, 61, 39], elbow: 121, roll: -13 }) },
+    ], tempo: [1.8, 1.2], hold: [0.2, 0.2], props: [{ kind: 'barbell' }, { kind: 'inclineBench', pos: [0, 0, -0.05] }], rest: ['seat', 'back', 'floor'],
     primary: ['chest', 'shoulders'], secondary: ['triceps'], view: { yaw: 60 },
   },
   close_grip_bench: {
-    keys: [pressTop(5), { root: SUPINE_ROOT, ...supineLegs, ...sym({ shoulder: [-10, 22, 0], elbow: 100 }) }], tempo: [1.8, 1.2], hold: [0.2, 0.2],
-    props: [{ kind: 'barbell' }, { kind: 'benchPress', pos: [0, 0, -0.3] }], primary: ['triceps', 'chest'], secondary: ['shoulders'], view: { yaw: 60, y: 0.7 },
+    // قبضة بعرض الكتفين والكوع قريب من الجسم
+    keys: [supine(sym({ shoulder: [95, -30, -57], elbow: 0, roll: -63 })), supine(sym({ shoulder: [-21, 27, 0], elbow: 111, roll: -63 }))], tempo: [1.8, 1.2], hold: [0.2, 0.2],
+    props: [{ kind: 'barbell' }, { kind: 'benchPress', pos: [0, 0, -0.3] }], rest: ['bench', 'floor'], primary: ['triceps', 'chest'], secondary: ['shoulders'], view: { yaw: 60, y: 0.7 },
   },
   push_up: {
     keys: [
@@ -466,29 +490,32 @@ export const MOTIONS: Record<string, Motion> = {
   },
   db_fly: {
     keys: [
-      { root: SUPINE_ROOT, ...supineLegs, ...sym({ shoulder: [90, 8, 0], elbow: 14 }) },
-      { root: SUPINE_ROOT, ...supineLegs, ...sym({ shoulder: [8, 78, 0], elbow: 22 }) },
-    ], tempo: [1.8, 1.3], hold: [0.2, 0.2], props: [{ kind: 'dumbbells' }, { kind: 'bench', pos: [0, 0, -0.3] }],
+      // الكفين متقابلين فوق، ولما تنفتح الذراعين الكفين للسقف
+      supine(sym({ shoulder: [83, 74, 0], elbow: 8, roll: 74 })),
+      supine(sym({ shoulder: [-6, 86, 16], elbow: 14, roll: 74 })),
+    ], tempo: [1.8, 1.3], hold: [0.2, 0.2], props: [{ kind: 'dumbbells' }, { kind: 'bench', pos: [0, 0, -0.3] }], rest: ['bench', 'floor'],
     primary: ['chest'], secondary: ['shoulders'], view: { yaw: 25, y: 0.7 },
   },
   incline_db_fly: {
     keys: [
-      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [100, 8, 0], elbow: 14 }) },
-      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [14, 76, 0], elbow: 22 }) },
-    ], tempo: [1.8, 1.3], hold: [0.2, 0.2], props: [{ kind: 'dumbbells' }, { kind: 'inclineBench', pos: [0, 0, -0.05] }],
+      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [128, -6, 0], elbow: 6, roll: -5 }) },
+      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [-6, 86, 17], elbow: 14, roll: 72 }) },
+    ], tempo: [1.8, 1.3], hold: [0.2, 0.2], props: [{ kind: 'dumbbells' }, { kind: 'inclineBench', pos: [0, 0, -0.05] }], rest: ['seat', 'back', 'floor'],
     primary: ['chest'], secondary: ['shoulders'], view: { yaw: 30 },
   },
 
   // ---------------- أكتاف (إضافية) ----------------
   arnold_press: {
     keys: [
-      { root: { y: 0.58, z: 0 }, ...sym({ shoulder: [33, 7, -22], elbow: 135, hip: [88, 14, 0], knee: 88 }) },
+      // البداية: الدمبل قدام الأكتاف والكفين للوجه، وخلال الضغط يلفّ الكف للأمام
+      seated(sym({ shoulder: [39, 14, 18], elbow: 138, roll: 104 })),
       seated(pressOverheadTop),
     ], tempo: [1.4, 1.8], hold: [0.2, 0.2],
-    props: [{ kind: 'dumbbells' }, { kind: 'seatBack', pos: [0, 0, -0.05] }], primary: ['shoulders'], secondary: ['triceps'], view: { yaw: 35, y: 1.0 },
+    props: [{ kind: 'dumbbells' }, { kind: 'seatBack', pos: [0, 0, -0.05] }], rest: ['seat', 'back', 'floor'], primary: ['shoulders'], secondary: ['triceps'], view: { yaw: 35, y: 1.0 },
   },
   front_raise: {
-    keys: [sym({ shoulder: [6, 8, 0], elbow: 8, hip: [0, 5, 0] }), sym({ shoulder: [90, 8, 0], elbow: 8, hip: [0, 5, 0] })],
+    // الكفين للأسفل (قبضة من فوق) والدمبل أفقي فوق
+    keys: [sym({ shoulder: [6, 8, 0], elbow: 8, hip: [0, 5, 0], roll: -90 }), sym({ shoulder: [90, 8, 0], elbow: 8, hip: [0, 5, 0], roll: -90 })],
     tempo: [1.2, 1.8], hold: [0.1, 0.3], ground: true, props: [{ kind: 'dumbbells' }], primary: ['shoulders'], secondary: ['chest'], view: { yaw: 70, y: 1.1 },
   },
   face_pull: {
@@ -500,7 +527,7 @@ export const MOTIONS: Record<string, Motion> = {
   },
   reverse_pec_deck: {
     keys: [seated(sym({ shoulder: [88, 12, 0], elbow: 8 })), seated(sym({ shoulder: [88, 88, 0], elbow: 8 }))],
-    tempo: [1.2, 1.8], hold: [0.1, 0.5], props: [{ kind: 'seat', pos: [0, 0, -0.02] }], primary: ['rearDelts'], secondary: ['upperBack'], view: { yaw: 160, y: 1.0 },
+    tempo: [1.2, 1.8], hold: [0.1, 0.5], props: [{ kind: 'seat', pos: [0, 0, -0.02] }], rest: ['seat', 'floor'], primary: ['rearDelts'], secondary: ['upperBack'], view: { yaw: 160, y: 1.0 },
   },
 
   // ---------------- ظهر (إضافية) ----------------
@@ -534,16 +561,17 @@ export const MOTIONS: Record<string, Motion> = {
     keys: [
       { root: SUPINE_ROOT, ...supineLegs, ...sym({ shoulder: [92, 10, 0], elbow: 20 }) },
       { root: SUPINE_ROOT, ...supineLegs, ...sym({ shoulder: [172, 10, 0], elbow: 25 }) },
-    ], tempo: [1.8, 1.4], hold: [0.2, 0.2], props: [{ kind: 'goblet' }, { kind: 'bench', pos: [0, 0, -0.3] }],
+    ], tempo: [1.8, 1.4], hold: [0.2, 0.2], props: [{ kind: 'dumbbellPullover' }, { kind: 'bench', pos: [0, 0, -0.3] }], rest: ['bench', 'floor'],
     primary: ['lats', 'chest'], secondary: ['triceps'], view: { yaw: 80, y: 0.7 },
   },
 
   // ---------------- ذراعين (إضافية) ----------------
   concentration_curl: {
     keys: [
-      seated({ spine: 28, neck: -15, lShoulder: [45, 20, 0], lElbow: 40, rShoulder: [40, 22, 0], rElbow: 8 }),
-      seated({ spine: 28, neck: -15, lShoulder: [45, 20, 0], lElbow: 40, rShoulder: [40, 22, 0], rElbow: 140 }),
-    ], tempo: [1.1, 1.8], hold: [0.1, 0.4], props: [{ kind: 'dumbbellR' }, { kind: 'seat' }], primary: ['biceps'], secondary: ['forearms'], view: { yaw: -40, y: 0.8 },
+      // الذراع اليمين معلّقة بين الركبتين والكف للأمام (كيرل)، واليسار على الركبة
+      seated({ spine: 28, neck: -15, lShoulder: [45, 20, 0], lElbow: 40, rShoulder: [38, 3, 0], rElbow: 3, rRoll: 92 }),
+      seated({ spine: 28, neck: -15, lShoulder: [45, 20, 0], lElbow: 40, rShoulder: [39, 5, 3], rElbow: 140, rRoll: 92 }),
+    ], tempo: [1.1, 1.8], hold: [0.1, 0.4], props: [{ kind: 'dumbbellR' }, { kind: 'seat' }], rest: ['seat', 'floor'], primary: ['biceps'], secondary: ['forearms'], view: { yaw: -40, y: 0.8 },
   },
   cable_curl: {
     keys: [sym({ shoulder: [8, 14, 0], elbow: 6, hip: [0, 5, 0] }), sym({ shoulder: [16, 14, 0], elbow: 135, hip: [0, 5, 0] })],
@@ -552,16 +580,18 @@ export const MOTIONS: Record<string, Motion> = {
   },
   incline_db_curl: {
     keys: [
-      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [-12, 10, 0], elbow: 5 }) },
-      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [-6, 10, 0], elbow: 130 }) },
-    ], tempo: [1.1, 1.8], hold: [0.1, 0.3], props: [{ kind: 'dumbbells' }, { kind: 'inclineBench', pos: [0, 0, -0.05] }],
+      // الذراع معلّقة عمودي ورا الجذع، والكفين للأمام (كيرل عادي)
+      // الذراعين مبعدة شوي للجنب عشان الدمبل (قبضة من تحت) يعدّي جنب الحوض والمقعد
+      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [-52, 20, 0], elbow: 3, roll: 87 }) },
+      { root: INCLINE_ROOT, ...inclineLegs, ...sym({ shoulder: [-52, 20, 0], elbow: 135, roll: 87 }) },
+    ], tempo: [1.1, 1.8], hold: [0.1, 0.3], props: [{ kind: 'dumbbells' }, { kind: 'inclineBench', pos: [0, 0, -0.05] }], rest: ['seat', 'back', 'floor'],
     primary: ['biceps'], secondary: ['forearms'], view: { yaw: 70 },
   },
   skull_crusher: {
     keys: [
-      { root: SUPINE_ROOT, ...supineLegs, ...sym({ shoulder: [100, 12, 0], elbow: 4 }) },
-      { root: SUPINE_ROOT, ...supineLegs, ...sym({ shoulder: [108, 12, 0], elbow: 118 }) },
-    ], tempo: [1.1, 1.7], hold: [0.1, 0.2], props: [{ kind: 'ezbar' }, { kind: 'bench', pos: [0, 0, -0.3] }],
+      supine(sym({ shoulder: [97, 5, 6], elbow: 0, roll: -91 })),
+      supine(sym({ shoulder: [110, 4, 4], elbow: 115, roll: -91 })),
+    ], tempo: [1.1, 1.7], hold: [0.1, 0.2], props: [{ kind: 'ezbar' }, { kind: 'bench', pos: [0, 0, -0.3] }], rest: ['bench', 'floor'],
     primary: ['triceps'], secondary: [], view: { yaw: 70, y: 0.7 },
   },
   triceps_kickback: {
@@ -647,9 +677,9 @@ export const MOTIONS: Record<string, Motion> = {
   // ---------------- صدر ----------------
   decline_bench_bb: {
     keys: [
-      { root: { y: 0.84, z: 0.05, pitch: -108 }, ...sym({ shoulder: [63, -1, 0], elbow: 2, hip: [22, 14, 0], knee: 95 }) },
-      { root: { y: 0.84, z: 0.05, pitch: -108 }, ...sym({ shoulder: [-32, 58, 0], elbow: 102, hip: [22, 14, 0], knee: 95 }) },
-    ], tempo: [1.8, 1.2], hold: [0.2, 0.2], props: [{ kind: 'barbell' }, { kind: 'declineBench', pos: [0, 0, -0.15] }],
+      { root: { y: 0.84, z: 0.05, pitch: -108 }, ...sym({ shoulder: [59, 51, -10], elbow: 16, roll: -32, hip: [22, 14, 0], knee: 95 }) },
+      { root: { y: 0.84, z: 0.05, pitch: -108 }, ...sym({ shoulder: [-17, 61, -15], elbow: 98, roll: -32, hip: [22, 14, 0], knee: 95 }) },
+    ], tempo: [1.8, 1.2], hold: [0.2, 0.2], props: [{ kind: 'barbell' }, { kind: 'declineBench', pos: [0, 0, -0.15] }], rest: ['bench'],
     primary: ['chest'], secondary: ['triceps', 'shoulders'], view: { yaw: 60, y: 0.8 },
   },
   incline_push_up: {
@@ -695,7 +725,7 @@ export const MOTIONS: Record<string, Motion> = {
   row_db_bent: {
     keys: [
       { ...sym({ root: { pitch: 55 }, hip: [65, 6, 0], knee: 22, shoulder: [55, 8, 0], elbow: 3 }), neck: -25 },
-      { ...sym({ root: { pitch: 55 }, hip: [65, 6, 0], knee: 22, shoulder: [-12, 14, 0], elbow: 95 }), neck: -25 },
+      { ...sym({ root: { pitch: 55 }, hip: [65, 6, 0], knee: 22, shoulder: [-28, 16, 0], elbow: 88 }), neck: -25 },
     ], tempo: [1.2, 1.8], hold: [0.1, 0.3], ground: true, props: [{ kind: 'hammerDumbbells' }],
     primary: ['upperBack', 'lats'], secondary: ['biceps', 'lowerBack', 'rearDelts'], view: { yaw: 70 },
   },
@@ -731,14 +761,15 @@ export const MOTIONS: Record<string, Motion> = {
     keys: [
       { root: { y: 0.66, z: -0.05 }, spine: 14, neck: -8, ...sym({ shoulder: [59, 11, 0], elbow: 14, hip: [88, 14, 0], knee: 88 }) },
       { root: { y: 0.66, z: -0.05 }, spine: 14, neck: -8, ...sym({ shoulder: [59, 11, 0], elbow: 128, hip: [88, 14, 0], knee: 88 }) },
-    ], tempo: [1.1, 1.9], hold: [0.1, 0.4], props: [{ kind: 'ezbar' }, { kind: 'preacherBench' }],
+    ], tempo: [1.1, 1.9], hold: [0.1, 0.4], props: [{ kind: 'ezbar' }, { kind: 'preacherBench' }], rest: ['seat', 'floor'],
     primary: ['biceps'], secondary: ['forearms'], view: { yaw: 70, y: 0.9 },
   },
   wrist_curl: {
     keys: [
-      seated({ spine: 32, neck: -20, ...sym({ shoulder: [36, 12, 0], elbow: 82, wrist: -40 }) }),
-      seated({ spine: 32, neck: -20, ...sym({ shoulder: [36, 12, 0], elbow: 82, wrist: 45 }) }),
-    ], tempo: [0.9, 1.3], hold: [0.1, 0.3], props: [{ kind: 'dumbbells' }, { kind: 'seat' }],
+      // الساعد على الفخذ والكف للأعلى، والرسغ بس يتحرك
+      seated({ spine: 32, neck: -20, ...sym({ shoulder: [54, 9, 3], elbow: 51, roll: 97, wrist: -40 }) }),
+      seated({ spine: 32, neck: -20, ...sym({ shoulder: [54, 9, 3], elbow: 51, roll: 97, wrist: 45 }) }),
+    ], tempo: [0.9, 1.3], hold: [0.1, 0.3], props: [{ kind: 'dumbbells' }, { kind: 'seat' }], rest: ['seat', 'floor'],
     primary: ['forearms'], secondary: [], view: { yaw: 70, y: 0.7 },
   },
   overhead_cable_triceps: {
@@ -759,7 +790,8 @@ export const MOTIONS: Record<string, Motion> = {
   db_squat: {
     keys: [
       { root: { z: 0 }, ...sym({ shoulder: [2, 14, 0], elbow: 4, hip: [0, 10, 12], knee: 0, hipOut: 20 }) },
-      { root: { z: -0.17 }, spine: 40, neck: -13, ...sym({ shoulder: [16, 14, 0], elbow: 4, hip: [92, 21, 12], knee: 125, hipOut: 34 }) },
+      // الذراعين متدلية عمودية (الدمبل أفقي جنب الساقين) = ثني الكتف يعادل ميلان الجذع
+      { root: { z: -0.17 }, spine: 40, neck: -13, ...sym({ shoulder: [40, 14, 0], elbow: 4, hip: [92, 21, 12], knee: 125, hipOut: 34 }) },
     ], tempo: [1.7, 1.2], hold: [0.3, 0.2], ground: true,
     props: [{ kind: 'hammerDumbbells' }], primary: ['quads', 'glutes'], secondary: ['hamstrings', 'forearms'],
   },
@@ -785,7 +817,7 @@ export const MOTIONS: Record<string, Motion> = {
   },
   hip_adduction: {
     keys: [seated({ lHip: [88, 36, 0], rHip: [88, 36, 0], ...sym({ shoulder: [15, 18, 0], elbow: 20 }) }), seated({ lHip: [88, 6, 0], rHip: [88, 6, 0], ...sym({ shoulder: [15, 18, 0], elbow: 20 }) })],
-    tempo: [1.2, 1.8], hold: [0.1, 0.5], props: [{ kind: 'hipAdduction', pos: [0, 0, -0.05] }], primary: ['quads'], secondary: ['glutes'], view: { yaw: 20, y: 0.8 },
+    tempo: [1.2, 1.8], hold: [0.1, 0.5], props: [{ kind: 'hipAdduction', pos: [0, 0, -0.05] }], rest: ['seat', 'back'], primary: ['quads'], secondary: ['glutes'], view: { yaw: 20, y: 0.8 },
   },
   single_leg_bridge: {
     keys: [
@@ -902,7 +934,14 @@ export function sampleMotion(m: Motion, t: number): Pose {
     if (x < hold) return m.keys[i];
     x -= hold;
     const dur = m.tempo[i] ?? 1;
-    if (x < dur) return lerpPose(m.keys[i], m.keys[(i + 1) % n], m.flow ? x / dur : ease(x / dur));
+    if (x < dur) {
+      const a = m.keys[i]; const b = m.keys[(i + 1) % n];
+      const f = m.flow ? x / dur : ease(x / dur);
+      const p = lerpPose(a, b, f);
+      // الكتف والرسغ: أقصر دوران بين الوضعيتين (حركة طبيعية بدون لفّ زايد)
+      p.q = slerpQuats(poseQuats(a), poseQuats(b), f);
+      return p;
+    }
     x -= dur;
   }
   return m.keys[0];

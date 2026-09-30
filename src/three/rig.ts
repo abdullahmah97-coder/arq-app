@@ -40,12 +40,18 @@ export interface Pose {
   lShoulder?: Joint3; rShoulder?: Joint3;
   lElbow?: number; rElbow?: number;
   lWrist?: number; rWrist?: number;
+  /** لفّ الساعد (موجب = الكف يلتف للأمام/للأعلى مثل الكيرل، سالب = للخلف/للأسفل). 0 = الكفين متقابلين */
+  lRoll?: number; rRoll?: number;
   lHip?: Joint3; rHip?: Joint3;
   lKnee?: number; rKnee?: number;
   lAnkle?: number; rAnkle?: number; // موجب = رفع الكعب (وقوف على الأصابع)
   /** فتح الركبة للخارج حول المحور العمودي للحوض (مهم بالسكوات العميق: الركبة فوق أصابع القدم) */
   lHipOut?: number; rHipOut?: number;
+  /** بين وضعيتين: دوران الكتف والرسغ بأقصر طريق (بدل خلط الزوايا اللي يلف الذراع بشكل غريب) */
+  q?: PoseQuats;
 }
+
+export interface PoseQuats { lShoulder: THREE.Quaternion; rShoulder: THREE.Quaternion; lWrist: THREE.Quaternion; rWrist: THREE.Quaternion }
 
 const J0: Joint3 = [0, 0, 0];
 
@@ -66,6 +72,7 @@ export function lerpPose(a: Pose, b: Pose, t: number): Pose {
     lShoulder: j(a.lShoulder, b.lShoulder), rShoulder: j(a.rShoulder, b.rShoulder),
     lElbow: n(a.lElbow, b.lElbow), rElbow: n(a.rElbow, b.rElbow),
     lWrist: n(a.lWrist, b.lWrist), rWrist: n(a.rWrist, b.rWrist),
+    lRoll: n(a.lRoll, b.lRoll), rRoll: n(a.rRoll, b.rRoll),
     lHip: j(a.lHip, b.lHip), rHip: j(a.rHip, b.rHip),
     lKnee: n(a.lKnee, b.lKnee), rKnee: n(a.rKnee, b.rKnee),
     lAnkle: n(a.lAnkle, b.lAnkle), rAnkle: n(a.rAnkle, b.rAnkle),
@@ -73,15 +80,39 @@ export function lerpPose(a: Pose, b: Pose, t: number): Pose {
   };
 }
 
+const _e = new THREE.Euler();
+const quatCache = new WeakMap<Pose, PoseQuats>();
+/** دوران الكتفين والرسغين من زوايا الوضعية (نفس ترتيب المحاور في applyPose) */
+export function poseQuats(p: Pose): PoseQuats {
+  let q = quatCache.get(p);
+  if (q) return q;
+  const sh = (a: Joint3 | undefined, s: 1 | -1) => {
+    const j = a ?? J0;
+    return new THREE.Quaternion().setFromEuler(_e.set(D(-j[0]), D(j[2] * s), D(j[1] * s), 'ZXY'));
+  };
+  const wr = (w: number | undefined, r: number | undefined, s: 1 | -1) =>
+    new THREE.Quaternion().setFromEuler(_e.set(D(-(w ?? 0)), D((r ?? 0) * s), 0, 'YXZ'));
+  q = { lShoulder: sh(p.lShoulder, 1), rShoulder: sh(p.rShoulder, -1), lWrist: wr(p.lWrist, p.lRoll, 1), rWrist: wr(p.rWrist, p.rRoll, -1) };
+  quatCache.set(p, q);
+  return q;
+}
+/** بين وضعيتين: أقصر دوران للكتف والرسغ */
+export function slerpQuats(a: PoseQuats, b: PoseQuats, t: number): PoseQuats {
+  return {
+    lShoulder: a.lShoulder.clone().slerp(b.lShoulder, t), rShoulder: a.rShoulder.clone().slerp(b.rShoulder, t),
+    lWrist: a.lWrist.clone().slerp(b.lWrist, t), rWrist: a.rWrist.clone().slerp(b.rWrist, t),
+  };
+}
+
 /** وضعية متماثلة: نفس القيم لليمين واليسار */
 export function sym(p: {
   root?: Pose['root']; spine?: number; chest?: number; neck?: number; twist?: number; lean?: number;
-  shoulder?: Joint3; elbow?: number; wrist?: number; hip?: Joint3; knee?: number; ankle?: number; hipOut?: number;
+  shoulder?: Joint3; elbow?: number; wrist?: number; roll?: number; hip?: Joint3; knee?: number; ankle?: number; hipOut?: number;
 }): Pose {
   const out: Pose = {
     root: p.root, spine: p.spine, chest: p.chest, neck: p.neck, twist: p.twist, lean: p.lean,
     lShoulder: p.shoulder, rShoulder: p.shoulder, lElbow: p.elbow, rElbow: p.elbow,
-    lWrist: p.wrist, rWrist: p.wrist,
+    lWrist: p.wrist, rWrist: p.wrist, lRoll: p.roll, rRoll: p.roll,
     lHip: p.hip, rHip: p.hip, lKnee: p.knee, rKnee: p.knee, lAnkle: p.ankle, rAnkle: p.ankle,
     lHipOut: p.hipOut, rHipOut: p.hipOut,
   };
@@ -178,7 +209,8 @@ export function createRig(): Rig {
     shoulder.add(pad('triceps', 0.038, 0.1, 0.034, [0, -0.13, -0.033]));
     const elbow = new THREE.Group(); elbow.position.set(0, -0.29, 0); shoulder.add(elbow);
     elbow.add(reg('forearms', capsule(0.04, 0.17, padMat.clone(), -0.125)));
-    const wrist = new THREE.Group(); wrist.position.set(0, -0.26, 0); elbow.add(wrist);
+    // الرسغ: لفّ حول محور الساعد أول (YXZ) ثم ثني الكف
+    const wrist = new THREE.Group(); wrist.rotation.order = 'YXZ'; wrist.position.set(0, -0.26, 0); elbow.add(wrist);
     wrist.add(ellipsoid(0.03, 0.05, 0.045, bodyMat, [0, -0.04, 0]));
     const grip = new THREE.Object3D(); grip.position.set(0, -0.055, 0.01); wrist.add(grip);
     return { shoulder, elbow, wrist, grip };
@@ -251,11 +283,11 @@ export function applyPose(rig: Rig, p: Pose, opts: PoseOpts = {}) {
   rig.chest.rotation.set(D(p.chest ?? 0), D((p.twist ?? 0) * 0.55), D((p.lean ?? 0) * 0.45));
   rig.neck.rotation.x = D(p.neck ?? 0);
 
-  const side = (S: Side, s: 1 | -1, sh?: Joint3, el?: number, wr?: number, hp?: Joint3, kn?: number, an?: number, out?: number) => {
+  const side = (S: Side, s: 1 | -1, sh?: Joint3, el?: number, wr?: number, hp?: Joint3, kn?: number, an?: number, out?: number, roll?: number) => {
     const a = sh ?? J0;
     S.shoulder.rotation.set(D(-a[0]), D(a[2] * s), D(a[1] * s));
     S.elbow.rotation.x = D(-(el ?? 0));
-    S.wrist.rotation.x = D(-(wr ?? 0));
+    S.wrist.rotation.set(D(-(wr ?? 0)), D((roll ?? 0) * s), 0);
     const h = hp ?? J0;
     S.hip.rotation.set(D(-h[0]), D(h[2] * s), D(h[1] * s));
     if (out) S.hip.quaternion.premultiply(_qOut.setFromAxisAngle(_Y, D(out * s)));
@@ -264,8 +296,12 @@ export function applyPose(rig: Rig, p: Pose, opts: PoseOpts = {}) {
     const chain = -(h[0]) + (kn ?? 0) + (r.pitch ?? 0);
     S.ankle.rotation.x = opts.flatFeet === false ? D(an ?? 0) : D(-chain + (an ?? 0));
   };
-  side(rig.L, 1, p.lShoulder, p.lElbow, p.lWrist, p.lHip, p.lKnee, p.lAnkle, p.lHipOut);
-  side(rig.R, -1, p.rShoulder, p.rElbow, p.rWrist, p.rHip, p.rKnee, p.rAnkle, p.rHipOut);
+  side(rig.L, 1, p.lShoulder, p.lElbow, p.lWrist, p.lHip, p.lKnee, p.lAnkle, p.lHipOut, p.lRoll);
+  side(rig.R, -1, p.rShoulder, p.rElbow, p.rWrist, p.rHip, p.rKnee, p.rAnkle, p.rHipOut, p.rRoll);
+  if (p.q) {
+    rig.L.shoulder.quaternion.copy(p.q.lShoulder); rig.R.shoulder.quaternion.copy(p.q.rShoulder);
+    rig.L.wrist.quaternion.copy(p.q.lWrist); rig.R.wrist.quaternion.copy(p.q.rWrist);
+  }
 
   if (opts.ground) {
     rig.object.updateMatrixWorld(true);
@@ -304,11 +340,17 @@ export type PropKind =
   | 'abWheel' | 'mat' | 'matSide' | 'step' | 'benchBehind' | 'benchSideRow' | 'latBar' | 'backPad'
   | 'benchPress' | 'chestPress' | 'shoulderPress' | 'hipAbduction' | 'latMachine' | 'rowStation'
   | 'declineBench' | 'preacherBench' | 'hyperBench' | 'plyoBox' | 'smithBar' | 'lowBar' | 'band'
-  | 'cableAnkle' | 'cableSide' | 'hipAdduction' | 'kettlebell' | 'medBall' | 'cableFlyLow' | 'rackPins';
+  | 'cableAnkle' | 'cableSide' | 'hipAdduction' | 'kettlebell' | 'medBall' | 'cableFlyLow' | 'rackPins'
+  | 'dumbbellPullover' | 'dumbbellOverhead';
 
 export interface PropSpec { kind: PropKind; pos?: [number, number, number]; }
 
-export interface PropsRuntime { group: THREE.Group; update(): void; }
+/** دور السطح: bench = بنش مستوي يتمدد عليه، seat = مقعد، back = مسند ظهر */
+export type SupportRole = 'bench' | 'seat' | 'back';
+/** سطح يرتكز عليه اللاعب (مستطيل): المركز، العمودي باتجاه اللاعب، محورا السطح ونصف الطول بكل اتجاه */
+export interface Support { role: SupportRole; c: THREE.Vector3; n: THREE.Vector3; u: THREE.Vector3; v: THREE.Vector3; hu: number; hv: number }
+
+export interface PropsRuntime { group: THREE.Group; update(): void; supports: Support[] }
 
 // الأدوات والأرضية انتقلت إلى equipment.ts
 export { createFloor, createProps } from './equipment';

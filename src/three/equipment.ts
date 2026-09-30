@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { PropSpec, PropsRuntime, Rig } from './rig';
+import type { PropSpec, PropsRuntime, Rig, Support, SupportRole } from './rig';
 
 export const EQUIP_COLORS = {
   steel: '#AEB8B4',
@@ -43,6 +43,11 @@ function rbox(w: number, h: number, d: number, m: THREE.Material, pos: V3, r = 0
   const rr = Math.max(0.002, Math.min(r, w / 2 - 0.002, h / 2 - 0.002, d / 2 - 0.002));
   const mesh = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, rr), m);
   mesh.position.set(...pos);
+  return mesh;
+}
+/** يعلّم مسند كسطح يرتكز عليه اللاعب (face = وجه المسند: y = الوجه العلوي، z = الوجه الأمامي) */
+function support<T extends THREE.Mesh>(mesh: T, role: SupportRole, face: 'y' | 'z' = 'y'): T {
+  mesh.userData.support = { role, face };
   return mesh;
 }
 function box(w: number, h: number, d: number, m: THREE.Material, pos: V3) {
@@ -102,7 +107,7 @@ export function makeDumbbell(M: Mats, len = 0.34) {
 // ------------------------------------------------------------------ مقاعد وبنشات
 function flatBench(M: Mats, w = 0.3, len = 1.15, h = 0.44) {
   const g = new THREE.Group();
-  g.add(rbox(w, 0.08, len, M.pad, [0, h - 0.04, 0], 0.03));
+  g.add(support(rbox(w, 0.08, len, M.pad, [0, h - 0.04, 0], 0.03), 'bench'));
   g.add(tubeAB([0, h - 0.11, -len / 2 + 0.12], [0, h - 0.11, len / 2 - 0.12], 0.028, M.steel));
   for (const z of [-len / 2 + 0.12, len / 2 - 0.12]) {
     g.add(tubeAB([0, h - 0.11, z], [0, 0.03, z], 0.026, M.steel));
@@ -111,29 +116,78 @@ function flatBench(M: Mats, w = 0.3, len = 1.15, h = 0.44) {
   return g;
 }
 
-function inclineBench(M: Mats, angle = 38) {
+/**
+ * بنش قابل للتعديل (مثل بنشات الأندية): مقعد مائل قليلاً للأمام، ومسند ظهر طويل يبدأ من ورا المقعد مباشرة
+ * ويرتفع للخلف بزاوية `angle` من الأرض، وهيكل: عمود أرضي بقاعدتين، عمود تحت المقعد، ودعامة تحت المسند.
+ * اللاعب يواجه +Z، فالمسند يرتفع باتجاه −Z (ورا ظهره). يرجع المقعد والمسند كسطوح جلوس/إسناد للاعب.
+ */
+function adjustableBench(M: Mats, angle = 38) {
   const g = new THREE.Group();
-  g.add(rbox(0.32, 0.08, 0.36, M.pad, [0, 0.44, 0.25], 0.03));
-  const back = rbox(0.32, 0.08, 0.9, M.pad, [0, 0.72, -0.18], 0.03); back.rotation.x = D(-angle); g.add(back);
-  g.add(tubeAB([0, 0.38, 0.3], [0, 0.03, 0.3], 0.026, M.steel));
-  g.add(tubeAB([0, 0.62, -0.28], [0, 0.03, -0.45], 0.026, M.steel));
-  g.add(tubeAB([0, 0.05, 0.4], [0, 0.05, -0.55], 0.028, M.steel));
-  for (const z of [0.4, -0.55]) g.add(tubeAB([-0.22, 0.025, z], [0.22, 0.025, z], 0.025, M.steelDark));
-  return g;
+  const padW = 0.29, padT = 0.075, seatLen = 0.36, backLen = 0.88;
+  const a = D(angle), st = D(5);
+  // خط التقاء سطح المقعد بسطح المسند (المفصل) — ارتفاع يخلي القدمين على الأرض (رجل وامرأة)
+  const H = new THREE.Vector3(0, 0.37, 0);
+  const u = new THREE.Vector3(0, Math.sin(a), -Math.cos(a));   // على طول المسند للأعلى (للخلف)
+  const n = new THREE.Vector3(0, Math.cos(a), Math.sin(a));    // وجه المسند (باتجاه ظهر اللاعب)
+  const sDir = new THREE.Vector3(0, Math.sin(st), Math.cos(st)); // على طول المقعد للأمام (مرفوع قليلاً)
+  const sN = new THREE.Vector3(0, Math.cos(st), -Math.sin(st));
+
+  const seat = rbox(padW, padT, seatLen, M.pad, [0, 0, 0], 0.03);
+  seat.position.copy(H).addScaledVector(sDir, 0.02 + seatLen / 2).addScaledVector(sN, -padT / 2);
+  seat.rotation.x = -st;
+  const back = rbox(padW, padT, backLen, M.pad, [0, 0, 0], 0.03);
+  back.position.copy(H).addScaledVector(u, 0.025 + backLen / 2).addScaledVector(n, -padT / 2);
+  back.rotation.x = a;
+  g.add(support(seat, 'seat'), support(back, 'back'));
+
+  // لوح حديد تحت كل مسند (مثل الأجهزة الحقيقية)
+  const under = (pad: THREE.Mesh, len: number, nn: THREE.Vector3) => {
+    const b = box(0.07, 0.025, len - 0.08, M.steelDark, [0, 0, 0]);
+    b.position.copy(pad.position).addScaledVector(nn, -padT / 2 - 0.012);
+    b.rotation.copy(pad.rotation);
+    g.add(b);
+  };
+  under(seat, seatLen, sN);
+  under(back, backLen, n);
+
+  // الهيكل: عمود أرضي من القاعدة الأمامية للخلفية
+  const zF = 0.24, zB = -0.86, yB = 0.1;
+  g.add(box(0.075, 0.075, zF - zB, M.steel, [0, yB, (zF + zB) / 2]));
+  for (const z of [zF, zB]) {
+    g.add(tubeAB([-0.26, 0.035, z], [0.26, 0.035, z], 0.032, M.steelDark));
+    for (const x of [-0.26, 0.26]) g.add(rbox(0.07, 0.03, 0.07, M.pad, [x, 0.015, z], 0.01));
+  }
+  g.add(tubeAB([0, yB, zF], [0, 0.035, zF], 0.03, M.steel));
+  g.add(tubeAB([0, yB, zB], [0, 0.035, zB], 0.03, M.steel));
+  // عمود المقعد والمفصل
+  const seatUnder = seat.position.clone().addScaledVector(sN, -padT / 2 - 0.025);
+  const hinge = H.clone().addScaledVector(n, -padT - 0.03).addScaledVector(sN, -0.01);
+  g.add(tubeAB([0, yB, seatUnder.z], [0, seatUnder.y, seatUnder.z], 0.034, M.steel));
+  g.add(tubeAB([0, seatUnder.y - 0.06, seatUnder.z], [0, hinge.y, hinge.z], 0.028, M.steel));
+  const pin = tube(0.022, M.chrome); pin.rotation.z = Math.PI / 2; pin.scale.set(1, 0.12, 1); pin.position.copy(hinge); g.add(pin);
+  // دعامة المسند من العمود الأرضي (سلّم التعديل) إلى تحت منتصف المسند
+  const backUnder = H.clone().addScaledVector(u, 0.025 + backLen * 0.52).addScaledVector(n, -padT - 0.02);
+  const foot = new THREE.Vector3(0, yB + 0.04, backUnder.z + 0.16);
+  g.add(tubeAB([0, foot.y, foot.z], [0, backUnder.y, backUnder.z], 0.026, M.steel));
+  g.add(box(0.05, 0.03, 0.42, M.steelDark, [0, yB + 0.05, foot.z - 0.02]));
+  return { g, seat, back };
 }
 
 /** مقعد بمسند ظهر (للدمبل جلوس ولأجهزة الضغط) */
 function seatUnit(M: Mats, o: { h?: number; back?: boolean; backH?: number; tilt?: number } = {}) {
-  const h = o.h ?? 0.46;
+  // سطح المقعد على ٤١ سم: القدمين على الأرض والفخذ أفقي تقريباً (للنموذجين)
+  const h = o.h ?? 0.37;
   const g = new THREE.Group();
-  g.add(rbox(0.38, 0.08, 0.38, M.pad, [0, h, 0], 0.035));
+  g.add(support(rbox(0.38, 0.08, 0.38, M.pad, [0, h, 0], 0.035), 'seat'));
   g.add(tubeAB([0, h - 0.04, 0], [0, 0.04, 0], 0.03, M.steel));
-  g.add(rbox(0.5, 0.04, 0.46, M.steelDark, [0, 0.02, -0.02], 0.012));
+  // قاعدة على شكل T (ضيقة قدام عشان القدمين على الأرض مو فوق الحديد)
+  g.add(rbox(0.44, 0.04, 0.08, M.steelDark, [0, 0.02, -0.02], 0.012));
+  g.add(rbox(0.08, 0.04, 0.34, M.steelDark, [0, 0.02, -0.17], 0.012));
   if (o.back !== false) {
     const bh = o.backH ?? 0.7;
     const back = rbox(0.36, bh, 0.08, M.pad, [0, h + 0.05 + bh / 2, -0.22], 0.035);
     back.rotation.x = D(-(o.tilt ?? 8));
-    g.add(back);
+    g.add(support(back, 'back', 'z'));
     g.add(tubeAB([0, h - 0.05, -0.02], [0, h + 0.2, -0.3], 0.026, M.steel));
   }
   return g;
@@ -263,7 +317,9 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
       j.set(_a.x + out * 0.13, _a.y, _a.z);
       setTube(arm, pivot, j);
       setTube(link, j, _a);
-      _b.set(_a.x, _a.y + 0.09, _a.z); _c.set(_a.x, _a.y - 0.09, _a.z);
+      // المقبض على عرض الكف (يتبع اتجاه القبضة)
+      S.wrist.getWorldQuaternion(_q);
+      _b.set(0, 0, 0.09).applyQuaternion(_q).add(_a); _c.set(0, 0, -0.09).applyQuaternion(_q).add(_a);
       setTube(handle, _c, _b);
     });
   };
@@ -303,13 +359,13 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
       case 'hammerDumbbells':
       case 'dumbbellR': {
         const sides = s.kind === 'dumbbellR' ? [rig.R] : [rig.L, rig.R];
+        // المقبض يمر بعرض الكف داخل القبضة (محور Z للرسغ). اتجاه الكف (متقابلين/للأمام/للخلف) من لفّ الساعد بالوضعية
         for (const S of sides) {
           const db = makeDumbbell(M); group.add(db);
-          const hammer = s.kind === 'hammerDumbbells';
           updaters.push(() => {
             grip(S, _a); db.position.copy(_a);
             S.wrist.getWorldQuaternion(_q); db.quaternion.copy(_q);
-            if (hammer) db.rotateY(Math.PI / 2);
+            db.rotateY(Math.PI / 2);
           });
         }
         break;
@@ -317,8 +373,31 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
       case 'goblet': {
         const db = makeDumbbell(M, 0.3); group.add(db);
         updaters.push(() => {
-          midHands(_a); db.position.copy(_a); db.position.y -= 0.17; db.position.addScaledVector(new THREE.Vector3(0, 0, 1), 0.03);
+          midHands(_a); db.position.copy(_a); db.position.y -= 0.15; db.position.addScaledVector(new THREE.Vector3(0, 0, 1), 0.03);
           db.rotation.set(0, 0, Math.PI / 2);
+        });
+        break;
+      }
+      case 'dumbbellOverhead': {
+        // ترايسبس فوق الرأس: دمبل واحد عمودي، رأسه العلوي بين الكفين وجسمه متدلي تحتها (أقصر شوي عشان يعدّي فوق الرأس)
+        const len = 0.22;
+        const db = makeDumbbell(M, len); group.add(db);
+        updaters.push(() => {
+          midHands(_a); db.position.copy(_a); db.position.y += 0.035 - (len / 2 - 0.02);
+          db.rotation.set(0, 0, Math.PI / 2);
+        });
+        break;
+      }
+      case 'dumbbellPullover': {
+        // دمبل واحد بالكفين (بول أوفر / ترايسبس فوق الرأس): الصحن العلوي بين الكفين والدمبل على امتداد الساعدين
+        const db = makeDumbbell(M, 0.3); group.add(db);
+        const X1 = new THREE.Vector3(1, 0, 0);
+        updaters.push(() => {
+          midHands(_a);
+          rig.L.elbow.getWorldPosition(_b); rig.R.elbow.getWorldPosition(_c);
+          _b.add(_c).multiplyScalar(0.5).sub(_a).normalize();
+          db.position.copy(_a).addScaledVector(_b, 0.13);
+          db.quaternion.setFromUnitVectors(X1, _b);
         });
         break;
       }
@@ -339,7 +418,7 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
       case 'step': {
         group.add(rbox(0.5, 0.2, 0.42, M.pad, [pos[0], 0.1, pos[2]], 0.03)); break;
       }
-      case 'inclineBench': { const g = inclineBench(M); g.position.set(...pos); group.add(g); break; }
+      case 'inclineBench': { const { g } = adjustableBench(M); g.position.set(...pos); group.add(g); break; }
       case 'seat': case 'seatBack': {
         const g = seatUnit(M, { back: s.kind === 'seatBack' }); g.position.set(...pos); group.add(g); break;
       }
@@ -416,7 +495,7 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
       case 'rowStation': {
         // جهاز السحب الأرضي: مقعد طويل منخفض + مسند قدمين + برج أوزان أمام القدمين
         const z0 = pos[2];
-        group.add(rbox(0.34, 0.08, 0.9, M.pad, [0, 0.42, z0 - 0.35], 0.03));
+        group.add(support(rbox(0.34, 0.08, 0.9, M.pad, [0, 0.42, z0 - 0.35], 0.03), 'seat'));
         group.add(tubeAB([0, 0.36, z0 - 0.75], [0, 0.36, z0 + 0.15], 0.03, M.steel));
         for (const z of [z0 - 0.7, z0 + 0.05]) group.add(tubeAB([0, 0.36, z], [0, 0.03, z], 0.03, M.steel));
         group.add(rbox(0.16, 0.06, 2.1, M.steelDark, [0, 0.03, z0 + 0.1], 0.015));
@@ -551,27 +630,54 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         break;
       }
       case 'declineBench': {
-        // بنش مائل للأسفل (الرأس أوطى من الحوض) مع مسند للرجلين
-        const g = new THREE.Group(); g.position.set(...pos);
-        const pad = rbox(0.3, 0.08, 1.15, M.pad, [0, 0.62, 0], 0.03); pad.rotation.x = D(-18); g.add(pad);
-        g.add(tubeAB([0, 0.5, 0.35], [0, 0.03, 0.4], 0.028, M.steel));
-        g.add(tubeAB([0, 0.28, -0.4], [0, 0.03, -0.45], 0.028, M.steel));
-        g.add(tubeAB([0, 0.03, 0.55], [0, 0.03, -0.6], 0.028, M.steelDark));
-        for (const z of [0.55, -0.6]) g.add(tubeAB([-0.22, 0.025, z], [0.22, 0.025, z], 0.025, M.steelDark));
-        // مسند الرجلين أمام أسفل الساق (فوق الكاحل)
-        const roll = disc(0.055, 0.34, M.pad, 16); roll.position.set(0, 0.84, 0.86); g.add(roll);
-        g.add(tubeAB([0, 0.84, 0.86], [0, 0.5, 0.42], 0.022, M.steel));
-        group.add(g); break;
+        // بنش مائل للأسفل (الرأس أوطى من الحوض ١٨°): المسند على قائمين يوصلون له، ومسند رجلين عند الطرف العالي
+        const g = new THREE.Group(); g.position.set(...pos); group.add(g);
+        const ang = D(18); const padT = 0.075; const len = 1.2;
+        const c = new THREE.Vector3(0, 0.6, 0);                                    // منتصف سطح المسند
+        const along = new THREE.Vector3(0, Math.sin(ang), Math.cos(ang));          // على طول المسند باتجاه الرجلين (للأعلى)
+        const nrm = new THREE.Vector3(0, Math.cos(ang), -Math.sin(ang));           // وجه المسند
+        const pad = rbox(0.3, padT, len, M.pad, [0, 0, 0], 0.03);
+        pad.position.copy(c).addScaledVector(nrm, -padT / 2);
+        pad.rotation.x = -ang;
+        g.add(support(pad, 'bench'));
+        const under = (t: number) => c.clone().addScaledVector(along, t).addScaledVector(nrm, -padT - 0.012);
+        const plate = box(0.07, 0.025, len - 0.1, M.steelDark, [0, 0, 0]);
+        plate.position.copy(c).addScaledVector(nrm, -padT - 0.012); plate.rotation.x = -ang; g.add(plate);
+        g.add(box(0.075, 0.075, 1.3, M.steel, [0, 0.07, 0.02]));
+        for (const z of [-0.62, 0.66]) {
+          g.add(tubeAB([-0.25, 0.035, z], [0.25, 0.035, z], 0.032, M.steelDark));
+          for (const x of [-0.25, 0.25]) g.add(rbox(0.07, 0.03, 0.07, M.pad, [x, 0.015, z], 0.01));
+        }
+        for (const t of [-0.42, 0.34]) { const u = under(t); g.add(tubeAB([0, 0.07, u.z], [0, u.y, u.z], 0.032, M.steel)); }
+        // مسند الرجلين: الساق مثبتة تحت أسطوانتين (تتبع مكان الكاحل)
+        const top = under(len / 2 - 0.08).add(g.position);
+        const post = tube(0.028, M.steel); group.add(post);
+        const rollers = [disc(0.055, 0.2, M.pad, 16), disc(0.055, 0.2, M.pad, 16)];
+        group.add(...rollers);
+        const axle = tube(0.016, M.chrome); axle.rotation.z = Math.PI / 2; group.add(axle);
+        updaters.push(() => {
+          rig.L.ankle.getWorldPosition(_a); rig.R.ankle.getWorldPosition(_b);
+          const mid = _a.clone().add(_b).multiplyScalar(0.5);
+          rig.L.knee.getWorldQuaternion(_q);
+          // قدام الساق (فوق مشط القدم) بشوي
+          mid.add(new THREE.Vector3(0, 0.07, 0.07).applyQuaternion(_q));
+          rollers[0].position.set(mid.x + 0.11, mid.y, mid.z);
+          rollers[1].position.set(mid.x - 0.11, mid.y, mid.z);
+          axle.position.copy(mid); axle.scale.set(1, 0.44, 1);
+          setTube(post, top, new THREE.Vector3(mid.x, mid.y - 0.03, mid.z));
+        });
+        break;
       }
       case 'preacherBench': {
         // مقعد بريتشر: مسند مائل للذراعين أمام الصدر
         const g = new THREE.Group(); g.position.set(...pos);
-        g.add(rbox(0.36, 0.07, 0.34, M.pad, [0, 0.5, -0.05], 0.03));
-        g.add(tubeAB([0, 0.46, -0.05], [0, 0.03, -0.05], 0.03, M.steel));
+        g.add(support(rbox(0.36, 0.07, 0.34, M.pad, [0, 0.385, -0.05], 0.03), 'seat'));
+        g.add(tubeAB([0, 0.345, -0.05], [0, 0.03, -0.05], 0.03, M.steel));
         // المسند تحت العضد مباشرة (مائل 45°) والكوع عند طرفه
-        const armPad = rbox(0.46, 0.07, 0.25, M.pad, [0, 0.89, 0.12], 0.03); armPad.rotation.x = D(45); g.add(armPad);
-        g.add(tubeAB([0, 0.84, 0.17], [0, 0.03, 0.3], 0.03, M.steel));
-        g.add(rbox(0.5, 0.04, 0.8, M.steelDark, [0, 0.02, 0.15], 0.012));
+        const armPad = rbox(0.46, 0.07, 0.25, M.pad, [0, 0.775, 0.12], 0.03); armPad.rotation.x = D(45); g.add(armPad);
+        g.add(tubeAB([0, 0.725, 0.17], [0, 0.03, 0.3], 0.03, M.steel));
+        g.add(rbox(0.1, 0.04, 0.8, M.steelDark, [0, 0.02, 0.15], 0.012));
+        g.add(rbox(0.44, 0.04, 0.08, M.steelDark, [0, 0.02, -0.05], 0.012));
         group.add(g); break;
       }
       case 'hyperBench': {
@@ -697,7 +803,25 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
       }
     }
   }
-  return { group, update: () => updaters.forEach((u) => u()) };
+  // سطوح الإسناد (المقاعد والمساند الثابتة) بإحداثيات المشهد
+  group.updateMatrixWorld(true);
+  const supports: Support[] = [];
+  group.traverse((o) => {
+    const tag = o.userData.support as { role: SupportRole; face: 'y' | 'z' } | undefined;
+    const mesh = o as THREE.Mesh;
+    if (!tag || !mesh.isMesh) return;
+    mesh.geometry.computeBoundingBox();
+    const size = mesh.geometry.boundingBox!.getSize(new THREE.Vector3());
+    const q = mesh.getWorldQuaternion(new THREE.Quaternion());
+    const X = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+    const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+    const Z = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+    const c = mesh.getWorldPosition(new THREE.Vector3());
+    supports.push(tag.face === 'y'
+      ? { role: tag.role, c: c.addScaledVector(Y, size.y / 2), n: Y, u: X, v: Z, hu: size.x / 2, hv: size.z / 2 }
+      : { role: tag.role, c: c.addScaledVector(Z, size.z / 2), n: Z, u: X, v: Y, hu: size.x / 2, hv: size.y / 2 });
+  });
+  return { group, update: () => updaters.forEach((u) => u()), supports };
 }
 
 /**

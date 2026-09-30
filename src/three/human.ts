@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { applyPose, sym, type FloorFn, type Muscle, type Rig } from './rig';
+import { makeSneakers } from './shoes';
 
 export const HUMAN_COLORS = {
   skin: '#EFD3B0',
@@ -23,14 +24,21 @@ const findBone = (root: THREE.Object3D, name: string) => {
   return hit;
 };
 
-type Pair = { bone: THREE.Bone; driver: THREE.Object3D; offset: THREE.Quaternion };
+/** roll = رسغ السائق: الساعد ياخذ نص لفّته (والكف الباقي) عشان ما ينعصر الجلد عند الرسغ */
+type Pair = { bone: THREE.Bone; driver: THREE.Object3D; offset: THREE.Quaternion; roll?: THREE.Object3D };
 type SkinLayer = { mesh: THREE.SkinnedMesh; base: Float32Array; colors: Float32Array; cloth: boolean };
+
+/** رؤوس الجسم اللي تلمس الأجهزة: back = الجذع والرأس (الظهر على المسند/البنش)، seat = الحوض والفخذ (الجلوس) */
+export type ContactRegion = 'back' | 'seat';
+export type ContactVerts = { mesh: THREE.SkinnedMesh; idx: Uint32Array }[];
 
 export interface Human {
   object: THREE.Group;
   /** كائن بنفس شكل Rig لكن نقاطه على جسم النموذج الحقيقي (تستخدمه الأدوات) */
   propRig: Rig;
-  sync(ground: boolean, floor?: FloorFn): void;
+  /** extra = إزاحة إضافية للجسم كامل (الجلوس على الجهاز، من fit.ts) */
+  sync(ground: boolean, floor?: FloorFn, extra?: THREE.Vector3 | null): void;
+  contact: Record<ContactRegion, ContactVerts>;
   setHighlight(primary: Muscle[], secondary: Muscle[]): void;
   /** قبضة الأصابع: 0 مفتوح … 1 مقفل */
   setGrip(amount: number): void;
@@ -46,6 +54,7 @@ const ANAT_S = new THREE.Color('#F08A2E');
 const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
 
 export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: THREE.AnimationClip | null): Human {
   const model = cloneSkinned(template) as THREE.Object3D;
@@ -91,6 +100,31 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
   });
   const extras: THREE.Object3D[] = [];
   model.traverse((o) => { if ((o as THREE.Mesh).isMesh && /Logo/i.test(o.name)) extras.push(o); });
+  // حذاء رياضي حقيقي بدل المرسوم على القدم
+  let shoes: ReturnType<typeof makeSneakers> = null;
+  try { shoes = makeSneakers(model, template); } catch { shoes = null; }
+
+  // رؤوس الملامسة حسب العظمة المسيطرة (نص الرؤوس يكفي للدقة ويخفف الحساب)
+  const REGION: Record<ContactRegion, RegExp> = {
+    back: /^(Hips|Spine|Spine1|Spine2|Neck|Head|LeftShoulder|RightShoulder)$/,
+    seat: /^(Hips|LeftUpLeg|RightUpLeg)$/,
+  };
+  const contact: Record<ContactRegion, ContactVerts> = { back: [], seat: [] };
+  for (const l of skins) {
+    const g = l.mesh.geometry;
+    const si = g.attributes.skinIndex as THREE.BufferAttribute;
+    const sw = g.attributes.skinWeight as THREE.BufferAttribute;
+    const names = l.mesh.skeleton.bones.map((b) => b.name.replace(/[:_]/g, '').replace('mixamorig', ''));
+    const lists: Record<ContactRegion, number[]> = { back: [], seat: [] };
+    for (let i = 0; i < g.attributes.position.count; i += 2) {
+      let best = 0; let bi = 0;
+      for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > best) { best = w; bi = si.getComponent(i, k); } }
+      const n = names[bi] ?? '';
+      if (REGION.back.test(n)) lists.back.push(i);
+      if (REGION.seat.test(n)) lists.seat.push(i);
+    }
+    for (const r of ['back', 'seat'] as const) if (lists[r].length) contact[r].push({ mesh: l.mesh, idx: Uint32Array.from(lists[r]) });
+  }
 
   const bone = (n: string) => {
     const b = findBone(model, n);
@@ -134,7 +168,8 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
     const b = bone(n);
     const qd = d.getWorldQuaternion(new THREE.Quaternion());
     const qm = b.getWorldQuaternion(new THREE.Quaternion());
-    return { bone: b, driver: d, offset: qd.clone().invert().multiply(qm) };
+    const roll = n === 'LeftForeArm' ? driver.L.wrist : n === 'RightForeArm' ? driver.R.wrist : undefined;
+    return { bone: b, driver: d, offset: qd.clone().invert().multiply(qm), roll };
   });
   // موضع الحوض بالنسبة لجذر السائق
   const rootQ = driver.root.getWorldQuaternion(new THREE.Quaternion());
@@ -200,7 +235,9 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
     const ankle = frameFor(pairOf(`${s}Foot`));
     return {
       shoulder: frameFor(pairOf(`${s}Arm`)), elbow: frameFor(pairOf(`${s}ForeArm`)), wrist,
-      grip: child(wrist, [0, -0.085, 0.015]),
+      // مركز القبضة: داخل الكف (باتجاه باطنه) على بعد ٨.٥ سم من الرسغ.
+      // باطن الكف = −X المحلي لليسار و +X لليمين (اليد اليمين انعكاس، ومحاورها المحلية نفس محاور اليسار)
+      grip: child(wrist, [s === 'Left' ? -0.025 : 0.025, -0.085, 0]),
       hip: frameFor(pairOf(`${s}UpLeg`)), knee: frameFor(pairOf(`${s}Leg`)), ankle,
       toe: child(ankle, [0, -0.085, 0.17]), heel: child(ankle, [0, -0.085, -0.06]),
     };
@@ -256,12 +293,13 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
   const setStyle = (next: HumanStyle) => {
     style = next;
     for (const e of extras) e.visible = next !== 'anatomy';
+    shoes?.setClay(next === 'anatomy');
     setHighlight(lastP, lastS);
   };
   setHighlight([], []);
 
   // ------------------------------------------------------------------ التحريك
-  const sync = (ground: boolean, floor?: FloorFn) => {
+  const sync = (ground: boolean, floor?: FloorFn, extra?: THREE.Vector3 | null) => {
     object.position.set(0, 0, 0);
     driver.object.updateMatrixWorld(true);
     object.updateMatrixWorld(true);
@@ -274,6 +312,12 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
     // الدوران: من الأب للابن
     for (const p of pairs) {
       p.driver.getWorldQuaternion(_q).multiply(p.offset);                 // الاتجاه المطلوب عالمياً
+      if (p.roll && p.roll.rotation.y) {
+        // نص لفّ الساعد حول محوره (من الرسغ للكوع)
+        p.driver.getWorldPosition(_v); p.roll.getWorldPosition(_v2);
+        _q2.setFromAxisAngle(_v.sub(_v2).normalize(), p.roll.rotation.y * 0.5);
+        _q.premultiply(_q2);
+      }
       p.bone.parent!.getWorldQuaternion(_q2).invert();
       p.bone.quaternion.copy(_q2.multiply(_q));
       p.bone.updateMatrixWorld(true);
@@ -290,9 +334,10 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
       for (const o of [propRig.L.toe, propRig.L.heel, propRig.R.toe, propRig.R.heel]) { o.getWorldPosition(_v); pen = Math.max(pen, floor(_v.x, _v.z) - _v.y); }
       if (pen > 0) { object.position.y = pen; object.updateMatrixWorld(true); }
     }
+    if (extra) { object.position.add(extra); object.updateMatrixWorld(true); }
   };
 
-  return { object, propRig, sync, setHighlight, setGrip, setStyle };
+  return { object, propRig, sync, setHighlight, setGrip, setStyle, contact };
 }
 
 // ---------------------------------------------------------------------------

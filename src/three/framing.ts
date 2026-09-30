@@ -5,15 +5,18 @@ import { applyPose, type PropsRuntime, type Rig } from './rig';
 
 const PITCH = THREE.MathUtils.degToRad(10);
 
-/** حدود المشهد خلال دورة الحركة (اللاعب + الأدوات) */
-export function motionBounds(rig: Rig, props: PropsRuntime, m: Motion, sync?: () => void): THREE.Box3 {
+/**
+ * حدود المشهد خلال دورة الحركة (اللاعب + الأدوات).
+ * frame (اختياري) يطبّق الإطار كامل عند الزمن t (الوضعية + ملاءمة الجسم للجهاز) بدل الوضعية الخام.
+ */
+export function motionBounds(rig: Rig, props: PropsRuntime, m: Motion, sync?: () => void, frame?: (t: number) => void): THREE.Box3 {
   const box = new THREE.Box3();
   const tmp = new THREE.Box3();
   const dur = Math.max(0.1, motionDuration(m));
   const N = 20;
   for (let i = 0; i < N; i++) {
-    applyPose(rig, sampleMotion(m, (i / N) * dur), poseOpts(m));
-    sync?.();
+    if (frame) frame((i / N) * dur);
+    else { applyPose(rig, sampleMotion(m, (i / N) * dur), poseOpts(m)); sync?.(); }
     props.update();
     rig.object.updateMatrixWorld(true);
     props.group.updateMatrixWorld(true);
