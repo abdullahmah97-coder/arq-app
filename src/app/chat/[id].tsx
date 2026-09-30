@@ -420,10 +420,10 @@ export default function Chat() {
                 ) : null}
               </View>
               <Pressable onPress={send} disabled={!canSend} accessibilityRole="button" accessibilityLabel={editing ? t('chat.saveEdit') : t('presence.send')}
-                style={({ pressed }) => ({ width: 46, height: 46, borderRadius: 23, backgroundColor: brand.deepGreen, alignItems: 'center', justifyContent: 'center', opacity: !canSend ? 0.5 : pressed ? 0.8 : 1 })}>
-                {busy ? <ActivityIndicator color={brand.cream} /> : editing
-                  ? <Ionicons name="checkmark" size={25} color={brand.cream} />
-                  : <Ionicons name="send" size={19} color={brand.cream} style={{ marginStart: 3, transform: [{ scaleX: uiRTL ? -1 : 1 }] }} />}
+                style={({ pressed }) => ({ width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', opacity: !canSend ? 0.5 : pressed ? 0.8 : 1 })}>
+                {busy ? <ActivityIndicator color={colors.onPrimary} /> : editing
+                  ? <Ionicons name="checkmark" size={25} color={colors.onPrimary} />
+                  : <Ionicons name="send" size={19} color={colors.onPrimary} style={{ marginStart: 3, transform: [{ scaleX: uiRTL ? -1 : 1 }] }} />}
               </Pressable>
             </View>
           </View>

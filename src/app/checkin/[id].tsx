@@ -1,6 +1,7 @@
 // تعليقات على حضور شخص في النادي
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
@@ -21,6 +22,8 @@ export default function CheckinComments() {
   const [list, setList] = useState<CheckinComment[] | null>(null);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  // ارتفاع الشريط العلوي الفعلي عشان خانة التعليق تطلع فوق الكيبورد بالضبط
+  const headerHeight = useHeaderHeight();
   const load = useCallback(() => loadCheckinComments(String(id)).then(setList), [id]);
   useEffect(() => { load(); }, [load]);
 
@@ -36,7 +39,7 @@ export default function CheckinComments() {
   return (
     <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.bg }}>
       <Stack.Screen options={{ title: name ? t('presence.commentsOn', { name }) : t('presence.comments') }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={headerHeight}>
         <FlatList data={list ?? []} keyExtractor={(c) => c.id} contentContainerStyle={{ padding: space.lg, gap: space.md }}
           ListEmptyComponent={list ? <Empty icon="chatbubbles-outline" text={t('presence.noComments')} /> : null}
           renderItem={({ item: c }) => (

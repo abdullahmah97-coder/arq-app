@@ -11,6 +11,7 @@ import { AppState, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { HeaderBack } from '@/components/HeaderBack';
 import { ScreenErrorBoundary } from '@/components/ScreenErrorBoundary';
+import { SleepGate } from '@/components/timeline/SleepGate';
 import { Button, Loading, T } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { flushLastFatal, installGlobalErrorLogger } from '@/lib/events';
@@ -63,6 +64,7 @@ function RootNavigator() {
   const onboarded = !!profile?.onboarded;
 
   return (
+    <View style={{ flex: 1 }}>
     <Stack
       screenOptions={({ route }) => ({
         headerStyle: { backgroundColor: colors.bg },
@@ -169,6 +171,9 @@ function RootNavigator() {
         <Stack.Screen name="venues/manage" options={{ title: t('venue.dashboard') }} />
       </Stack.Protected>
     </Stack>
+    {/* بعد «تصبحون على خير»: شاشة الليل فوق التطبيق كله لين «صباح الخير» */}
+    {session && onboarded ? <SleepGate uid={session.user.id} /> : null}
+    </View>
   );
 }
 

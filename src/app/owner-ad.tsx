@@ -8,10 +8,12 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, Switch, View } from 'react-native';
 import { LaunchAdView } from '@/components/ads/LaunchAd';
+import { DateField, prettyDay } from '@/components/owner/DateField';
 import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
+import { useLocalized } from '@/lib/i18n';
 import { AD_MAX_BYTES, AD_MAX_VIDEO_SEC, adMediaTypeOf, adMediaUrl, deleteLaunchAd, loadLaunchAd, saveLaunchAd, uploadAdMedia, type AdMediaType } from '@/lib/launchAds';
 import {
-  AD_TARGETS, isoToRiyadhDate, parseTarget, riyadhDateToIso, targetLink, validAdLink,
+  AD_TARGETS, adState, isoToRiyadhDate, parseTarget, riyadhDateToIso, targetLink, validAdLink,
   type AdAudience, type AdFrequency, type AdKind, type AdPartnerTarget, type AdTarget,
 } from '@/lib/launchAdsCore';
 import { listPartners, statusGroup, type PartnerRow } from '@/lib/partners';
@@ -33,8 +35,29 @@ function VideoThumb({ uri }: { uri: string }) {
   return <VideoView player={player} style={{ width: '100%', height: '100%' }} contentFit="contain" nativeControls={false} allowsPictureInPicture={false} />;
 }
 
+/** حالة الإعلان الحين حسب التواريخ و«مفعّل»: فعّال / مجدول / انتهى / موقوف */
+function AdDatesStatus({ starts, ends, active, lng }: { starts: string; ends: string; active: boolean; lng: 'ar' | 'en' }) {
+  const { t } = useTranslation();
+  const s = riyadhDateToIso(starts);
+  const e = riyadhDateToIso(ends, true);
+  if (s === undefined || e === undefined) return null;
+  const st = adState({ active, starts_at: s, ends_at: e });
+  const v = st === 'live'
+    ? { icon: 'checkmark-circle' as const, color: colors.success, text: ends ? t('ads.statusLiveUntil', { d: prettyDay(ends, lng) }) : t('ads.statusLiveAlways') }
+    : st === 'scheduled' ? { icon: 'time' as const, color: brand.orange, text: t('ads.statusScheduled', { d: prettyDay(starts, lng) }) }
+      : st === 'ended' ? { icon: 'close-circle' as const, color: colors.danger, text: t('ads.statusEnded', { d: prettyDay(ends, lng) }) }
+        : { icon: 'pause-circle' as const, color: colors.muted, text: t('ads.statusOff') };
+  return (
+    <View accessibilityRole="text" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: space.sm, borderRadius: radius.md, borderWidth: 1, borderColor: v.color, backgroundColor: colors.card }}>
+      <Ionicons name={v.icon} size={18} color={v.color} />
+      <T size="sm" semibold style={{ flex: 1, lineHeight: 21 }} color={st === 'off' ? colors.text : v.color}>{v.text}</T>
+    </View>
+  );
+}
+
 export default function OwnerAdEdit() {
   const { t } = useTranslation();
+  const { lng } = useLocalized();
   const { id, kind: kindParam } = useLocalSearchParams<{ id?: string; kind?: AdKind }>();
   const [loading, setLoading] = useState(!!id);
   const [busy, setBusy] = useState(false);
@@ -244,10 +267,13 @@ export default function OwnerAdEdit() {
       <Card style={{ gap: space.sm }}>
         <T size="sm" semibold>{t('ads.audience')}</T>
         <Segmented<AdAudience> value={audience} onChange={setAudience} options={(['all', 'men', 'women'] as const).map((a) => ({ value: a, label: t(`ads.aud_${a}`) }))} />
-        <Row gap={space.sm}>
-          <View style={{ flex: 1 }}><Input label={t('ads.starts')} value={starts} onChangeText={setStarts} placeholder="2026-09-23" keyboardType="numbers-and-punctuation" /></View>
-          <View style={{ flex: 1 }}><Input label={t('ads.ends')} value={ends} onChangeText={setEnds} placeholder="2026-09-24" keyboardType="numbers-and-punctuation" /></View>
+        {/* التواريخ من التقويم (بدل الكتابة)، وتحتها حالة الإعلان الحين حسب التواريخ و«مفعّل» */}
+        <Row gap={space.sm} style={{ alignItems: 'flex-start' }}>
+          <DateField label={t('ads.starts')} value={starts} lng={lng}
+            onChange={(v) => { setStarts(v); if (v && ends && ends < v) setEnds(''); }} />
+          <DateField label={t('ads.ends')} value={ends} lng={lng} min={starts || undefined} onChange={setEnds} />
         </Row>
+        <AdDatesStatus starts={starts} ends={ends} active={active} lng={lng} />
         <T size="xs" muted>{t('ads.datesHint')}</T>
         <T size="sm" semibold>{t('ads.frequency')}</T>
         <Segmented<AdFrequency> wrap value={frequency} onChange={setFrequency} options={(['every_open', 'daily', 'once'] as const).map((f) => ({ value: f, label: t(`ads.freq_${f}`) }))} />

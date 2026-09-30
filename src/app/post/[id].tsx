@@ -1,4 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
@@ -26,6 +27,8 @@ export default function PostDetail() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  // ارتفاع الشريط العلوي الفعلي (يختلف من جوال لجوال) عشان خانة التعليق تطلع فوق الكيبورد بالضبط
+  const headerHeight = useHeaderHeight();
 
   const load = useCallback(async () => {
     const { data } = await supabase.rpc('feed', { p_post: id, p_limit: 1 });
@@ -70,7 +73,7 @@ export default function PostDetail() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={headerHeight}>
         <FlatList
           data={comments}
           keyExtractor={(c) => c.id}

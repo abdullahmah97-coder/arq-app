@@ -37,7 +37,7 @@ function Preview({ r }: { r: InboxRow }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, flex: 1, minWidth: 0 }}>
       {r.last_from_me && !deleted ? (
-        <Ionicons name={r.last_read ? 'checkmark-done' : 'checkmark'} size={17} color={r.last_read ? colors.readTick : colors.bubbleMeta} />
+        <Ionicons name={r.last_read ? 'checkmark-done' : 'checkmark'} size={17} color={r.last_read ? colors.primary : colors.bubbleMeta} />
       ) : null}
       {icon ? <Ionicons name={icon} size={15} color={colors.bubbleMeta} /> : null}
       {/* بعرض النص بس (مو ممتد): يبقى جنب العلامات حتى لو النص إنجليزي والواجهة عربية */}

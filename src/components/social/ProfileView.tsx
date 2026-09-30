@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, I18nManager, Pressable, View } from 'react-native';
+import { ActivityIndicator, Alert, I18nManager, Pressable, TextInput, View } from 'react-native';
 import { Num } from '@/components/pulse/widgets';
 import { Avatar, Button, Card, Empty, Row, Segmented, T } from '@/components/ui';
 import type { CoverId } from '@/lib/cover';
@@ -13,7 +13,7 @@ import { canPublish, rankProgress, RANKS } from '@/lib/ranks';
 import { deleteTip, likeTip, loadPrograms, loadTips, profileCounts, type PublicProfile, type Tip, type UserProgram } from '@/lib/social';
 import { pickImage } from '@/lib/images';
 import { errorKey, publicUrl, supabase, uploadImage } from '@/lib/supabase';
-import { brand, colors, radius, space } from '@/theme';
+import { brand, colors, fonts, radius, space } from '@/theme';
 import { Hideable } from '@/components/owner/Hideable';
 import { useIsOwnerId } from '@/lib/appOwner';
 import { ProgramCard, TipCard } from './cards';
@@ -107,6 +107,21 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
   const cover = coverLocal ?? { cover: p.cover ?? 'auto', photoPath: p.cover_url ?? null };
   const [coverOpen, setCoverOpen] = useState(false);
 
+  // النبذة (البايو) تحت الشارة: صاحب الحساب يضغطها ويعدّلها بمكانها
+  const [bioLocal, setBioLocal] = useState<string | null | undefined>(undefined);
+  const bio = bioLocal !== undefined ? bioLocal : p.bio;
+  const [bioDraft, setBioDraft] = useState<string | null>(null);
+  const [bioBusy, setBioBusy] = useState(false);
+  const saveBio = async () => {
+    if (bioDraft === null || bioBusy) return;
+    const v = bioDraft.trim().slice(0, 200);
+    setBioBusy(true);
+    const { error } = await supabase.from('profiles').update({ bio: v || null }).eq('id', me);
+    setBioBusy(false);
+    if (error) { Alert.alert(t(errorKey(error))); return; }
+    setBioLocal(v || null); setBioDraft(null); onProfileChanged?.();
+  };
+
   const like = async (x: Tip) => {
     setTips((ts) => ts?.map((y) => (y.id === x.id ? { ...y, liked: !y.liked, likes: y.likes + (y.liked ? -1 : 1) } : y)) ?? null);
     const { error } = await likeTip(x, me);
@@ -144,8 +159,40 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
         </Row>
         <T color={brand.sand}>@{p.username}{gymLabel ? ` · 📍 ${gymLabel}` : ''}</T>
         <RankBadge points={p.points} onDark userId={p.id} owner={p.is_owner} />
-        {p.is_coach ? <T size="xs" color={brand.amber}>{t('social.verifiedCoach')}</T> : null}
-        {p.bio ? <T center color={brand.cream} style={{ lineHeight: 24 }}>{p.bio}</T> : null}
+        {/* المالك شارته تكفي (وعلامة التوثيق جنب اسمه)، فالسطر اللي تحتها للنبذة بس */}
+        {p.is_coach && !ownerProfile ? <T size="xs" color={brand.amber}>{t('social.verifiedCoach')}</T> : null}
+        {bioDraft !== null ? (
+          <View style={{ alignSelf: 'stretch', gap: space.sm }}>
+            <TextInput value={bioDraft} onChangeText={setBioDraft} autoFocus multiline maxLength={200}
+              placeholder={t('profile.bioPh')} placeholderTextColor="rgba(248,237,218,0.55)" accessibilityLabel={t('profile.editBio')}
+              style={{ color: brand.cream, fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, textAlign: 'center', minHeight: 64, maxHeight: 140,
+                paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.lg, borderWidth: 1,
+                borderColor: 'rgba(248,237,218,0.4)', backgroundColor: 'rgba(10,51,45,0.4)' }} />
+            <Row gap={space.md} style={{ justifyContent: 'center' }}>
+              <T size="xs" color={brand.sand}>{bioDraft.length}/200</T>
+              <Pressable onPress={() => setBioDraft(null)} hitSlop={8} accessibilityRole="button" style={{ paddingHorizontal: 12, paddingVertical: 7 }}>
+                <T size="sm" color={brand.cream}>{t('common.cancel')}</T>
+              </Pressable>
+              <Pressable onPress={saveBio} disabled={bioBusy} accessibilityRole="button"
+                style={({ pressed }) => ({ minWidth: 72, alignItems: 'center', backgroundColor: brand.orange, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 7, opacity: pressed ? 0.8 : 1 })}>
+                {bioBusy ? <ActivityIndicator size="small" color={brand.cream} /> : <T size="sm" semibold color={brand.cream}>{t('common.save')}</T>}
+              </Pressable>
+            </Row>
+          </View>
+        ) : bio ? (
+          <Pressable disabled={!self} onPress={() => setBioDraft(bio)} accessibilityRole={self ? 'button' : undefined} accessibilityLabel={self ? t('profile.editBio') : undefined}>
+            <T center color={brand.cream} style={{ lineHeight: 24 }}>
+              {bio}{self ? '  ' : null}{self ? <Ionicons name="create-outline" size={14} color={brand.amber} /> : null}
+            </T>
+          </Pressable>
+        ) : self ? (
+          <Pressable onPress={() => setBioDraft('')} accessibilityRole="button"
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+              borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(254,169,79,0.7)', opacity: pressed ? 0.7 : 1 })}>
+            <Ionicons name="create-outline" size={14} color={brand.amber} />
+            <T size="sm" color={brand.amber}>{t('profile.addBio')}</T>
+          </Pressable>
+        ) : null}
 
         <View style={{ flexDirection: 'row', alignSelf: 'stretch', marginTop: space.md, backgroundColor: 'rgba(10,51,45,0.35)', borderRadius: 16, paddingVertical: space.md }}>
           <Count n={p.followers_count} label={t('social.followers')} onPress={() => router.push({ pathname: '/follows/[id]', params: { id: p.id, kind: 'followers' } })} />

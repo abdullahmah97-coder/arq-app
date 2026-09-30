@@ -39,17 +39,19 @@ export function CoachCheck({ size = 16 }: { size?: number }) {
   return <Ionicons name="checkmark-circle" size={size} color={brand.orange} accessibilityLabel={t('social.verifiedCoach')} />;
 }
 
-/** «المالك»: شارة مالك التطبيق بدل الرتبة */
+/** «المالك»: شارة مالك التطبيق بدل الرتبة (مكانها مثل شارة الرتبة بالضبط: في النص بصفحة الحساب) */
 export function OwnerBadge({ small, onDark }: { small?: boolean; onDark?: boolean }) {
   const { t } = useTranslation();
   return (
-    <View accessibilityLabel={t('social.owner')} style={{
-      flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, alignSelf: 'flex-start',
-      paddingHorizontal: small ? 7 : 10, paddingVertical: small ? 2 : 4,
-      backgroundColor: onDark ? 'rgba(254,169,79,0.18)' : brand.deepGreen, borderWidth: 1, borderColor: brand.amber,
-    }}>
-      <Ionicons name="key" size={small ? 11 : 13} color={brand.amber} />
-      <T size="xs" semibold color={brand.amber} style={{ fontSize: small ? 11 : 12 }}>{t('social.owner')}</T>
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View accessibilityLabel={t('social.owner')} style={{
+        flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999,
+        paddingHorizontal: small ? 7 : 10, paddingVertical: small ? 2 : 4,
+        backgroundColor: onDark ? 'rgba(254,169,79,0.18)' : brand.deepGreen, borderWidth: 1, borderColor: brand.amber,
+      }}>
+        <Ionicons name="key" size={small ? 11 : 13} color={brand.amber} />
+        <T size="xs" semibold color={brand.amber} style={{ fontSize: small ? 11 : 12 }}>{t('social.owner')}</T>
+      </View>
     </View>
   );
 }

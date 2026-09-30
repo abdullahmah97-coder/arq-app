@@ -1,6 +1,6 @@
-// فقاعة رسالة مثل الواتساب: ذيل على أول رسالة من كل مجموعة، والوقت وعلامة القراءة داخل الفقاعة
+// فقاعة رسالة (ترتيب الواتساب بألوان أرك): ذيل على أول رسالة من كل مجموعة، والوقت وعلامة القراءة داخل الفقاعة
 // (على آخر سطر لو فيه مكان)، «معدّلة» للمعدّلة، و«انحذفت هذي الرسالة» للمحذوفة للجميع،
-// والصورة/الفيديو بإطار رفيع والوقت فوقها.
+// والصورة/الفيديو بإطار رفيع والوقت فوقها. فقاعتي بلون التطبيق الداكن ونصها كريمي.
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +12,7 @@ import { msgTime, textIsRTL } from '@/lib/chatFormat';
 import type { Message } from '@/lib/messages';
 import { brand, colors, fonts } from '@/theme';
 
-/** حالة رسالتي: تنرسل (ساعة)، وصلت (✓)، انقرت (✓✓ زرقاء) */
+/** حالة رسالتي: تنرسل (ساعة)، وصلت (✓)، انقرت (✓✓ كهرماني) */
 export type BubbleStatus = 'sending' | 'sent' | 'read';
 
 /** اتجاه الواجهة الفعلي (الجوال: I18nManager، الويب: dir الصفحة) */
@@ -29,14 +29,18 @@ export function photoSize(w?: number | null, h?: number | null) {
 }
 
 /** ظل خفيف تحت الفقاعة (مثل الواتساب) */
-export const BUBBLE_SHADOW = '0px 1px 0.5px rgba(11,20,26,0.13)';
+export const BUBBLE_SHADOW = '0px 1px 0.5px rgba(10,51,45,0.14)';
 const NB = ' ';
 const metaText = (): TextStyle => ({ fontSize: 11, lineHeight: 15, fontFamily: fonts.regular });
 
+/** لون الوقت: فوق الصورة أبيض، وفي فقاعتي كريمي خافت، وفي فقاعة الطرف الثاني خافت */
+type Tone = 'mine' | 'theirs' | 'light';
+const metaColor = (tone: Tone) => (tone === 'light' ? '#FFFFFF' : tone === 'mine' ? colors.bubbleMineMeta : colors.bubbleMeta);
+
 /** الوقت و«معدّلة» وعلامة القراءة */
-function Meta({ time, edited, status, light }: { time: string; edited?: boolean; status?: BubbleStatus; light?: boolean }) {
+function Meta({ time, edited, status, tone }: { time: string; edited?: boolean; status?: BubbleStatus; tone: Tone }) {
   const { t } = useTranslation();
-  const c = light ? '#FFFFFF' : colors.bubbleMeta;
+  const c = metaColor(tone);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
       {edited ? <Text style={[metaText(), { color: c }]}>{t('chat.edited')}</Text> : null}
@@ -51,22 +55,24 @@ function Meta({ time, edited, status, light }: { time: string; edited?: boolean;
  * نص الرسالة مع مكان محجوز (شفاف) بآخره بعرض الوقت: لو فيه مكان بآخر سطر يجي الوقت جنبه، وإلا ينزل لسطر لحاله.
  * الوقت يجي في الجهة اللي ينتهي فيها السطر حسب اتجاه النص نفسه (عربي يسار، إنجليزي يمين).
  */
-function Body({ text, time, edited, status, uiRTL, muted }: {
-  text: string; time: string; edited?: boolean; status?: BubbleStatus; uiRTL: boolean; muted?: boolean;
+function Body({ text, time, edited, status, uiRTL, muted, mine }: {
+  text: string; time: string; edited?: boolean; status?: BubbleStatus; uiRTL: boolean; muted?: boolean; mine: boolean;
 }) {
   const { t } = useTranslation();
   const rtl = textIsRTL(text, uiRTL);
   // الجهة اللي ينتهي فيها السطر: يسار للعربي ويمين للإنجليزي (start/end تنقلب مع اتجاه الواجهة)
   const atEnd = rtl === uiRTL;
   const spacer = ` ${NB}${edited ? t('chat.edited') + NB : ''}${time.replace(/\s/g, NB)}${status ? NB.repeat(status === 'sending' ? 5 : 6) : ''}${NB}`;
+  const tone: Tone = mine ? 'mine' : 'theirs';
+  const color = muted ? metaColor(tone) : mine ? colors.bubbleMineText : colors.text;
   return (
     <View style={{ flexShrink: 1 }}>
-      <Text style={{ fontFamily: fonts.regular, fontSize: 16, lineHeight: 23, color: muted ? colors.bubbleMeta : colors.text, writingDirection: rtl ? 'rtl' : 'ltr' }}>
+      <Text style={{ fontFamily: fonts.regular, fontSize: 16, lineHeight: 23, color, writingDirection: rtl ? 'rtl' : 'ltr' }}>
         {rtl ? '‏' : '‎'}{text}
         <Text style={{ fontSize: 11, fontFamily: fonts.regular, color: 'transparent' }}>{spacer}</Text>
       </Text>
       <View pointerEvents="none" style={[{ position: 'absolute', bottom: -3 }, atEnd ? { end: 0 } : { start: 0 }]}>
-        <Meta time={time} edited={edited} status={status} />
+        <Meta time={time} edited={edited} status={status} tone={tone} />
       </View>
     </View>
   );
@@ -152,24 +158,24 @@ export const Bubble = memo(function Bubble({ m, mine, first, lng, uiRTL, status,
                   <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.45)']}
                     style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 42 }} />
                   <View pointerEvents="none" style={{ position: 'absolute', bottom: 4, end: 8 }}>
-                    <Meta time={time} edited={edited} status={tick} light />
+                    <Meta time={time} edited={edited} status={tick} tone="light" />
                   </View>
                 </>
               ) : null}
             </View>
             {caption ? (
               <View style={{ width: size.width, paddingHorizontal: 6, paddingTop: 4, paddingBottom: 5 }}>
-                <Body text={caption} time={time} edited={edited} status={tick} uiRTL={uiRTL} />
+                <Body text={caption} time={time} edited={edited} status={tick} uiRTL={uiRTL} mine={mine} />
               </View>
             ) : null}
           </>
         ) : deleted ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <Ionicons name="ban" size={15} color={colors.bubbleMeta} />
-            <Body text={label} time={time} uiRTL={uiRTL} muted />
+            <Ionicons name="ban" size={15} color={metaColor(mine ? 'mine' : 'theirs')} />
+            <Body text={label} time={time} uiRTL={uiRTL} muted mine={mine} />
           </View>
         ) : (
-          <Body text={m.body} time={time} edited={edited} status={tick} uiRTL={uiRTL} />
+          <Body text={m.body} time={time} edited={edited} status={tick} uiRTL={uiRTL} mine={mine} />
         )}
       </Pressable>
       {first ? <Tail mine={mine} color={bg} /> : null}

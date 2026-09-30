@@ -294,7 +294,10 @@
     "coverPhoto": "Photo from your device",
     "coverChangePhoto": "Change photo",
     "coverRemovePhoto": "Remove photo",
-    "privacyTitle": "Privacy"
+    "privacyTitle": "Privacy",
+    "addBio": "Add a bio",
+    "editBio": "Edit bio",
+    "bioPh": "A short bio about you…"
   },
   "errors": {
     "generic": "Something went wrong, please try again",
@@ -2892,7 +2895,7 @@
     "defaultCta": "Explore",
     "starts": "Starts (optional)",
     "ends": "Ends (optional)",
-    "datesHint": "Format 2026-09-23, Riyadh time. The end day is included.",
+    "datesHint": "Tap a box and pick the day from the calendar (Riyadh time; the end day is included). No date = shows until you switch it off.",
     "autoClose": "Auto-close after",
     "seconds": "{{n}}s",
     "manual": "Manual",
@@ -2937,7 +2940,16 @@
     "cta_coach": "Meet the coach",
     "cta_center": "Book a visit",
     "changeTarget": "Change",
-    "buttonLine": "Button \"{{cta}}\" → {{where}}"
+    "buttonLine": "Button \"{{cta}}\" → {{where}}",
+    "noDate": "No date",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "statusLiveUntil": "Live now: shows to users until the end of {{d}}",
+    "statusLiveAlways": "Live now: shows to users until you switch it off (no end date)",
+    "statusScheduled": "Scheduled: starts showing to users on {{d}}",
+    "statusEnded": "Ended {{d}}: not shown to users. Change the end date or pick “No date”.",
+    "statusOff": "Off: not shown to users until you switch “On” below."
   },
   "watch": {
     "featuresTitle": "With Apple Watch",
@@ -3515,7 +3527,8 @@
     "undoSleepYes": "Yes, remove it",
     "undoSleepNo": "No",
     "wokeToast": "Good morning ☀️ You slept {{d}} — your friends can see it",
-    "wokeToastShort": "Good morning ☀️ — your friends can see you're up"
+    "wokeToastShort": "Good morning ☀️ — your friends can see you're up",
+    "sleepLockedApp": "ARQ is locked while you sleep 😴 When you wake up, tap “Good morning” and your friends will see you’re up and how long you slept."
   },
   "ownerParts": {
     "hiddenTag": "Hidden for everyone",

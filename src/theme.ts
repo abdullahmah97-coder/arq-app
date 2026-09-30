@@ -40,12 +40,22 @@ export const colors = {
   tabBar: brand.deepGreen,
   tabActive: brand.amber,
   tabInactive: 'rgba(248,237,218,0.55)',
-  // المحادثات (مثل الواتساب): فقاعتي فاتحة، فقاعة الطرف الثاني بيضاء، وعلامة القراءة زرقاء
-  bubbleMine: '#D9FDD3',
-  bubbleTheirs: '#FFFFFF',
-  bubbleMeta: '#667781',
-  readTick: '#53BDEB',
+  // المحادثات بألوان أرك: فقاعتي بلون التطبيق الداكن ونصها كريمي، فقاعة الطرف الثاني بيضاء دافئة،
+  // وعلامة القراءة بالكهرماني (تتبدّل مع ثيم لون التطبيق — شوف applyTheme)
+  bubbleMine: brand.deepGreen,
+  bubbleMineText: brand.cream,
+  bubbleMineMeta: 'rgba(248,237,218,0.72)',
+  bubbleTheirs: '#FFFCF6',
+  bubbleMeta: '#5B7066',
+  readTick: brand.amber,
 };
+
+/** '#RRGGBB' → 'rgba(r,g,b,a)' */
+export function withAlpha(hex: string, a: number): string {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!m) return hex;
+  return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})`;
+}
 
 /**
  * الخطوط حسب دليل الهوية:
@@ -127,7 +137,7 @@ export const THEMES: Record<ThemeId, { name: { ar: string; en: string }; swatch:
     name: { ar: 'الكثبان', en: 'Dune' }, swatch: ['#6E2A10', '#F1551D', '#FEA94F'],
     brand: { deepGreen: '#5C230D', green: '#8C3A17' },
     night: { bg: '#2A0E04', bg2: '#5C230D' },
-    colors: { muted: '#7A5B4B', border: '#EFCFAE', bubbleMine: '#FCE2CF' },
+    colors: { muted: '#7A5B4B', border: '#EFCFAE' },
   },
   sand: {
     name: { ar: 'الرمال', en: 'Sand' }, swatch: ['#F7DFBB', '#FEA94F', '#0A332D'],
@@ -143,7 +153,7 @@ export const THEMES: Record<ThemeId, { name: { ar: string; en: string }; swatch:
     name: { ar: 'الخزامى', en: 'Lavender' }, swatch: ['#2E2248', '#7B5BC4', '#C9B6EE'],
     brand: { deepGreen: '#2E2248', green: '#4A3A6E', orange: '#7B5BC4', amber: '#C9B6EE', sand: '#E9E1F5', cream: '#F7F3FC' },
     night: { bg: '#140E22', bg2: '#2E2248', accent: '#C9B6EE' },
-    colors: { muted: '#6B6180', border: '#E0D6F0', bubbleMine: '#E6DCFA' },
+    colors: { muted: '#6B6180', border: '#E0D6F0', bubbleTheirs: '#FFFFFF' },
     pulse: { sleep: '#A993E0' },
   },
 };
@@ -161,7 +171,10 @@ export function applyTheme(id: ThemeId) {
   Object.assign(colors, BASE.colors, {
     bg: brand.cream, cardAlt: brand.sand, text: brand.deepGreen, primary: brand.orange, onPrimary: brand.cream,
     accent: brand.green, fire: brand.orange, success: brand.green, gold: brand.amber, tabBar: brand.deepGreen, tabActive: brand.amber,
+    bubbleMine: brand.deepGreen, bubbleMineText: brand.cream, bubbleMineMeta: withAlpha(brand.cream, 0.72), readTick: brand.amber,
   }, t.colors);
+  // الوقت ونص الأيقونات في المحادثة بنفس اللون الخافت حق الثيم
+  if (!t.colors?.bubbleMeta) colors.bubbleMeta = colors.muted;
   const g = gradients as unknown as Record<string, string[]>;
   g.dune = [brand.deepGreen, brand.orange, brand.amber, brand.cream];
   g.ember = [brand.deepGreen, brand.orange];

@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Animated, AppState, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import { errorKey } from '@/lib/supabase';
@@ -33,9 +34,14 @@ function splitClock(s: string): [string, string] {
 
 export interface Woke { id: string; slept: number }
 
-export function SleepScreen({ uid, sleep, onWoke }: { uid: string; sleep: OpenSleep; onWoke: (w: Woke | null) => void }) {
+export function SleepScreen({ uid, sleep, onWoke, full }: {
+  uid: string; sleep: OpenSleep; onWoke: (w: Woke | null) => void;
+  /** يغطي التطبيق كله (فوق كل الصفحات وشريط التبويبات) بدل التايم لاين بس */
+  full?: boolean;
+}) {
   const { t } = useTranslation();
   const { lng } = useLocalized();
+  const insets = useSafeAreaInsets();
   const native = Platform.OS !== 'web';
   const [now, setNow] = useState(() => new Date());
   const [busy, setBusy] = useState(false);
@@ -116,7 +122,7 @@ export function SleepScreen({ uid, sleep, onWoke }: { uid: string; sleep: OpenSl
   };
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, full && styles.wrapFull]}>
       <LinearGradient colors={SKY} style={StyleSheet.absoluteFill} />
       {/* الصبح: ضو خفيف تحت كأنه الفجر */}
       {due ? <LinearGradient colors={['rgba(254,169,79,0)', 'rgba(254,169,79,0.26)']} style={styles.horizon} pointerEvents="none" /> : null}
@@ -131,7 +137,8 @@ export function SleepScreen({ uid, sleep, onWoke }: { uid: string; sleep: OpenSl
         ))}
       </Animated.View>
 
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false} bounces={false}>
+      <ScrollView showsVerticalScrollIndicator={false} bounces={false}
+        contentContainerStyle={[styles.body, full && { paddingTop: insets.top + space.xl, paddingBottom: insets.bottom + space.xl }]}>
         <View style={styles.orb} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <View style={[styles.glow, { width: 148, height: 148, borderRadius: 74 }]} />
           <View style={[styles.glow, { width: 108, height: 108, borderRadius: 54 }]} />
@@ -150,7 +157,7 @@ export function SleepScreen({ uid, sleep, onWoke }: { uid: string; sleep: OpenSl
         </T>
         <T size="sm" semibold color={brand.sand} center style={{ lineHeight: 22 }}>{since.join(' · ')}</T>
         <T size="sm" color={brand.sand} center style={{ opacity: 0.8, lineHeight: 22, marginTop: space.xs, maxWidth: 320 }}>
-          {t('timeline.sleepLocked')}
+          {t(full ? 'timeline.sleepLockedApp' : 'timeline.sleepLocked')}
         </T>
 
         <Animated.View style={[styles.btnWrap, due && !busy ? look.pulse : null]}>
@@ -203,6 +210,7 @@ export function WokeToast({ uid, woke, onDone }: { uid: string; woke: Woke; onDo
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, overflow: 'hidden', borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
+  wrapFull: { borderTopLeftRadius: 0, borderTopRightRadius: 0 },
   horizon: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%' },
   body: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: TAB_BAR_SPACE + space.md, gap: 6 },
   center: { alignItems: 'center', justifyContent: 'center' },
