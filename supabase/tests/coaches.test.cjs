@@ -62,10 +62,11 @@ const { setup } = require('./_harness.cjs');
   check('coach notified of acceptance', (await q(`select count(*)::int n from notifications where user_id = $1 and data->>'key' = $2`, [U.B, 'cla:' + link]))[0].n === 1);
 
   // بيانات المتدرب
-  const s = (await as(U.A, `insert into workout_sessions (user_id, title, started_at, finished_at) values ($1, 'صدر', now() - interval '2 hours', now() - interval '1 hour') returning id`, [U.A]))[0];
+  // كل البيانات «أمس» بنفس الوقت: تبقى بنفس الشهر مهما كان وقت تشغيل الاختبار (أول الشهر كان يفشل)
+  const s = (await as(U.A, `insert into workout_sessions (user_id, title, started_at, finished_at) values ($1, 'صدر', now() - interval '1 day', now() - interval '1 day' + interval '30 minutes') returning id`, [U.A]))[0];
   await as(U.A, `insert into workout_sets (session_id, user_id, exercise_id, set_index, reps, weight_kg) values ($1, $2, 'bench', 1, 10, 60), ($1, $2, 'bench', 2, 8, 70)`, [s.id, U.A]);
   await visit(U.A, gym.id);
-  await as(U.A, `insert into inbody_reports (user_id, test_date, metrics) values ($1, app_today(), '{"weight_kg": 82.5, "pbf_pct": 21}')`, [U.A]);
+  await as(U.A, `insert into inbody_reports (user_id, test_date, metrics) values ($1, ((now() - interval '1 day') at time zone 'Asia/Riyadh')::date, '{"weight_kg": 82.5, "pbf_pct": 21}')`, [U.A]);
   await as(U.A, `insert into food_logs (slot, name, kcal, protein_g) values ('lunch', 'رز ودجاج', 650, 45)`);
 
   const tl = await as(U.B, `select * from client_timeline($1)`, [U.A]);
@@ -103,7 +104,7 @@ const { setup } = require('./_harness.cjs');
   const done = (await as(U.B, `insert into coach_sessions (client_id, starts_at, status) values ($1, now() - interval '1 day', 'done') returning id`, [U.A]))[0];
 
   // التقرير الشهري
-  const rep = (await as(U.B, `select * from client_month_report($1)`, [U.A]))[0];
+  const rep = (await as(U.B, `select * from client_month_report($1, ((now() - interval '1 day') at time zone 'Asia/Riyadh')::date)`, [U.A]))[0];
   check('month report scoped', rep.workouts === 1 && rep.visits >= 1 && Number(rep.weight_end) === 82.5 && rep.avg_kcal === null && rep.sessions_done >= 1, JSON.stringify(rep));
   const repSelf = (await as(U.A, `select * from client_month_report($1)`, [U.A]))[0];
   check('self report includes food', repSelf.avg_kcal === 650 && repSelf.avg_protein === 45);
