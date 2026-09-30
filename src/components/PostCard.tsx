@@ -1,43 +1,52 @@
+// صفحة المنشور: المنشور (صورة أو كلام) أو «صباح الخير ☀️» أو «تصبحون على خير 🌙»، مع التفاعل بالإيموجي
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { BrandGradient } from '@/brand/Brand';
-import { timeAgo } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
+import type { ReactionKey, Reactor } from '@/lib/reactions';
 import { publicUrl } from '@/lib/supabase';
-import type { FeedPost, WakeMeta } from '@/lib/types';
+import type { FeedPost, MomentMeta } from '@/lib/types';
+import { clockOf } from '@/lib/wakeCore';
 import { brand, colors, radius, space } from '@/theme';
 import { CoachCheck } from './social/RankBadge';
-import { Avatar, Card, Row, T } from './ui';
+import { MomentAvatar, MomentBubble, momentText, NIGHT, ReactionPicker, ReactionPill, ReactorsStrip } from './timeline/Moments';
+import { Card, Row, T } from './ui';
 
-export const PostCard = memo(function PostCard({ post, onLike, onDelete, isMine, detail, verified }: {
-  post: FeedPost; onLike: (p: FeedPost) => void; onDelete?: (p: FeedPost) => void; isMine?: boolean; detail?: boolean;
-  /** علامة التوثيق ✓ جنب الاسم */
-  verified?: boolean;
+export const PostCard = memo(function PostCard({ post, onReact, onReactors, onDelete, isMine }: {
+  post: FeedPost;
+  onReact: (next: ReactionKey | null) => void;
+  onReactors: () => void;
+  onDelete?: (p: FeedPost) => void;
+  isMine?: boolean;
 }) {
   const { t } = useTranslation();
   const { lng } = useLocalized();
+  const [picker, setPicker] = useState(false);
+  const [now] = useState(() => new Date());
   const img = publicUrl('posts', post.image_path);
-  const wake = post.kind === 'wake';
+  const kind = post.kind ?? 'post';
+  const name = post.full_name || post.username;
+  const meta: MomentMeta = post.meta ?? {};
+  const { headline, sub } = momentText({ item_type: kind, id: post.id, at: post.created_at, meta, gym_name: post.gym_name }, t, lng, now);
+  const mine = post.my_reaction ?? null;
+  const reactors: Reactor[] = post.reactors ?? [];
 
   return (
-    <Card style={{ padding: 0, overflow: 'hidden' }}>
-      <Row style={{ padding: space.md }}>
-        <Pressable onPress={() => router.push({ pathname: '/user/[id]', params: { id: post.user_id } })}>
-          <Avatar uri={publicUrl('avatars', post.avatar_url)} name={post.full_name ?? post.username} />
+    <Card style={{ padding: 0 }}>
+      <Row style={{ padding: space.md, alignItems: 'flex-start' }} gap={space.md}>
+        <Pressable onPress={() => router.push({ pathname: '/user/[id]', params: { id: post.user_id } })} accessibilityRole="link" accessibilityLabel={name}>
+          <MomentAvatar uri={publicUrl('avatars', post.avatar_url)} name={name} size={44} />
         </Pressable>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, gap: 2 }}>
           <Row gap={4}>
-            <T bold numberOfLines={1} style={{ flexShrink: 1 }}>{post.full_name || post.username}</T>
-            {verified ? <CoachCheck size={15} /> : null}
+            <T bold numberOfLines={1} style={{ flexShrink: 1 }}>{name}</T>
+            {post.is_coach ? <CoachCheck size={15} /> : null}
           </Row>
-          <T size="xs" muted>
-            @{post.username} · {timeAgo(post.created_at, lng)}
-            {post.gym_name ? ` · 📍 ${t('feed.atGym', { gym: post.gym_name })}` : ''}
-          </T>
+          <T size="xs" muted>@{post.username}{kind === 'post' ? ` · ${sub}` : ''}</T>
         </View>
         {isMine && onDelete ? (
           <Pressable hitSlop={10} onPress={() => onDelete(post)} accessibilityRole="button" accessibilityLabel={t('common.delete')}>
@@ -46,64 +55,49 @@ export const PostCard = memo(function PostCard({ post, onLike, onDelete, isMine,
         ) : null}
       </Row>
 
-      {wake ? <WakeBody meta={post.meta} created={post.created_at} /> : (
+      {kind === 'wake' || kind === 'sleep' ? (
+        <MomentBanner kind={kind} headline={headline} sub={sub} />
+      ) : (
         <>
           {img ? <Image source={{ uri: img }} style={{ width: '100%', aspectRatio: 1, backgroundColor: colors.cardAlt }} contentFit="cover" transition={150} /> : null}
-          {post.caption ? <T style={{ paddingHorizontal: space.md, paddingTop: space.md }}>{post.caption}</T> : null}
+          {post.caption ? <T style={{ paddingHorizontal: space.md, paddingTop: space.md, lineHeight: 24 }}>{post.caption}</T> : null}
         </>
       )}
 
-      <Row style={{ padding: space.md }} gap={space.lg}>
-        <Pressable onPress={() => onLike(post)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('timeline.like')}>
-          <Row gap={space.xs}>
-            <Ionicons name={post.liked_by_me ? 'heart' : 'heart-outline'} size={22} color={post.liked_by_me ? colors.danger : colors.text} />
-            <T size="sm">{post.like_count}</T>
-          </Row>
-        </Pressable>
-        <Pressable disabled={detail} onPress={() => router.push({ pathname: '/post/[id]', params: { id: post.id } })} hitSlop={8}
-          accessibilityRole="button" accessibilityLabel={t('timeline.comment')}>
-          <Row gap={space.xs}>
-            <Ionicons name="chatbubble-outline" size={20} color={colors.text} />
-            <T size="sm">{post.comment_count}</T>
-          </Row>
-        </Pressable>
+      <Row style={{ padding: space.md, justifyContent: 'space-between' }}>
+        <ReactorsStrip count={post.like_count} reactors={reactors} comments={post.comment_count} onReactors={onReactors} onComments={() => {}} />
+        <ReactionPill value={mine} open={picker} onToggle={() => setPicker((v) => !v)} />
       </Row>
+      {picker ? (
+        <View style={{ paddingHorizontal: space.md, paddingBottom: space.md }}>
+          <ReactionPicker value={mine} onPick={(e) => { setPicker(false); onReact(e === mine ? null : e); }} />
+        </View>
+      ) : null}
     </Card>
   );
 });
 
-/** وقت على الساعة: ٦:٣٠ ص / 6:30 AM */
-export function clockText(iso: string, lng: 'ar' | 'en') {
-  const d = new Date(iso);
-  try {
-    return d.toLocaleTimeString(lng === 'ar' ? 'ar-SA-u-nu-latn' : 'en-US', { hour: 'numeric', minute: '2-digit' });
-  } catch {
-    return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+/** «صباح الخير ☀️» و«تصبحون على خير 🌙» بشكل كبير في صفحة المنشور */
+function MomentBanner({ kind, headline, sub }: { kind: 'wake' | 'sleep'; headline: string; sub: string }) {
+  const night = kind === 'sleep';
+  const body = (
+    <Row gap={space.md}>
+      <MomentBubble kind={kind} size={52} ring={night ? NIGHT : brand.cream} />
+      <View style={{ flex: 1, gap: 4 }}>
+        <T size="lg" bold color={night ? brand.cream : brand.deepGreen}>{headline}</T>
+        <T size="sm" color={night ? brand.sand : brand.deepGreen} style={{ lineHeight: 21 }}>{sub}</T>
+      </View>
+    </Row>
+  );
+  if (night) {
+    return <View style={{ marginHorizontal: space.md, borderRadius: radius.md, padding: space.lg, backgroundColor: NIGHT }}>{body}</View>;
   }
-}
-
-/** «صحى ☀️»: وقت المنبّه، أو «صباح الخير» بوقت فتح التطبيق */
-function WakeBody({ meta, created }: { meta?: WakeMeta; created: string }) {
-  const { t } = useTranslation();
-  const { lng } = useLocalized();
-  const time = clockText(meta?.at ?? created, lng);
-  const alarm = meta?.src === 'alarm';
   return (
-    <BrandGradient name="sand" style={{ marginHorizontal: space.md, borderRadius: radius.md, paddingVertical: space.lg, paddingHorizontal: space.lg }}>
-      <Row gap={space.md}>
-        <T size="xxl">{alarm ? '⏰' : '☀️'}</T>
-        <View style={{ flex: 1, gap: 2 }}>
-          <T size="lg" bold color={brand.deepGreen}>{alarm ? t('timeline.woke', { time }) : t('timeline.morning')}</T>
-          <T size="sm" color={brand.deepGreen}>{alarm ? t('timeline.wokeSub') : t('timeline.morningSub', { time })}</T>
-        </View>
-      </Row>
-    </BrandGradient>
+    <BrandGradient name="sand" style={{ marginHorizontal: space.md, borderRadius: radius.md, padding: space.lg }}>{body}</BrandGradient>
   );
 }
 
-/** تبديل الإعجاب مع تحديث متفائل */
-export function toggleLikeLocal(p: FeedPost): FeedPost {
-  return { ...p, liked_by_me: !p.liked_by_me, like_count: p.like_count + (p.liked_by_me ? -1 : 1) };
+/** وقت على الساعة: 6:30 ص / 6:30 AM */
+export function clockText(iso: string, lng: 'ar' | 'en') {
+  return clockOf(new Date(iso), lng);
 }
-
-export const postImageStyle = { borderRadius: radius.md };

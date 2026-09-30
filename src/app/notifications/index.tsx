@@ -17,6 +17,7 @@ import {
 } from '@/lib/notifications';
 import { clearFeedNotifications } from '@/lib/push';
 import { RANKS } from '@/lib/ranks';
+import { isReaction, REACTION_EMOJI } from '@/lib/reactions';
 import { errorKey, publicUrl } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
 
@@ -190,10 +191,15 @@ function useNotifText() {
     const name = n.full_name?.trim() || n.username || t('notif.someone');
     if (n.kind === 'nudge' || n.kind === 'notice' || n.kind === 'promo') return { parts: [], name }; // نصه جاهز من الخادم
     const d = n.data ?? {};
-    const key = n.kind === 'follow' && d.mutual ? 'notif.followMutual' : `notif.${n.kind}`;
+    // التفاعل بالإيموجي: «فيصل تفاعل 🔥 مع صباحك ☀️» (التنبيهات القديمة بدون إيموجي تبقى «أعجبه منشورك»)
+    const emoji = isReaction(d.emoji) ? REACTION_EMOJI[d.emoji] : '';
+    const key = n.kind === 'follow' && d.mutual ? 'notif.followMutual'
+      : emoji && n.kind === 'post_like' ? (d.post_kind === 'wake' ? 'notif.post_react_wake' : d.post_kind === 'sleep' ? 'notif.post_react_sleep' : 'notif.post_react')
+      : emoji && n.kind === 'checkin_like' ? 'notif.checkin_react'
+      : `notif.${n.kind}`;
     const rank = n.kind === 'rank_up' ? RANKS[Number(d.level) || 0]?.name[lng] : undefined;
     const MARK = '\u2063'; // علامة غير مرئية نقسم عندها النص عشان نكتب الاسم بخط عريض
-    const s = t(key, { name: MARK, preview: d.preview ?? '', title: d.title ?? '', gym: d.gym ?? '', price: d.price ?? '', points: d.points ?? 50, rank: rank ?? '' });
+    const s = t(key, { name: MARK, preview: d.preview ?? '', title: d.title ?? '', gym: d.gym ?? '', price: d.price ?? '', points: d.points ?? 50, rank: rank ?? '', emoji });
     return { parts: s.split(MARK), name };
   };
 }

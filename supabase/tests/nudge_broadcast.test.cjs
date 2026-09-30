@@ -111,6 +111,48 @@ const { setup } = require('./_harness.cjs');
   // A: عنده خطة، B: سجّل قبل أمس، C: سجّل اليوم → A و B
   check('meal text: plan or recent food logging, and nothing logged today', (await bc(ml, noon('16'), false)) === 2);
 
+  // ---------- «أرسل الحين» بخيارات الإدارة ----------
+  const bco = async (tpl, when, send, o = {}) => (await q('select _nudge_broadcast($1, $2, $3, $4, $5, $6, $7, $8) n',
+    [tpl, when, send, o.aud ?? 'rule', o.users ?? null, o.free ?? false, o.url ?? null, o.quiet ?? false]))[0].n;
+  const D = (d, h = '12:00') => `2030-01-${d} ${h}:00+03`;
+  await q(`update profiles set notify_prefs = notify_prefs - 'nudges', account_type = 'trainee', locale = 'ar' where id in ($1, $2, $3)`, [U.A, U.B, U.C]);
+  // الأحد ٢٠ يناير: A حضر الصبح
+  await q(`insert into check_ins (user_id, gym_id, checked_in_at) values ($1, $2, '2030-01-20 09:00:00+03')`, [U.A, gym.id]);
+  check('options — by the rule: who checked in today is skipped (only C)', (await bco(gymM, D(20), false)) === 1);
+  check('options — all trainees: the rule is ignored (A and C, still men only for a men text)', (await bco(gymM, D(20), false, { aud: 'all' })) === 2);
+  check('options — sent to all', (await bco(gymM, D(20), true, { aud: 'all', url: '/(tabs)/community' })) === 2);
+  const oA = await last(U.A);
+  check('options — opens where the admin chose', oA?.data.url === '/(tabs)/community' && oA.data.body === 'روح النادي اليوم يا Ahmed', JSON.stringify(oA));
+  check('options — pressing again the same day: nobody (one of a kind a day)', (await bco(gymM, D(20, '13:00'), false, { aud: 'all' })) === 0);
+  check('options — «even if they got one today» sends again', (await bco(gymM, D(20, '13:00'), true, { aud: 'all', free: true })) === 2);
+  check('options — …and it arrives', (await q(`select count(*)::int n from notifications where user_id = $1 and kind = 'nudge' and data->>'url' = '/checkin' and created_at > now() - interval '1 minute'`, [U.A]))[0].n >= 1);
+  // أشخاص تختارهم
+  check('options — picked people only (a woman gets a text written for men if the admin picks her)', (await bco(gymM, D(20), true, { aud: 'pick', users: [U.B], free: true })) === 1
+    && (await last(U.B))?.data.title === 'يلا Sara 💪');
+  await q(`update profiles set account_type = 'club' where id = $1`, [U.C]);
+  check('options — a picked partner account gets it', (await bco(gymM, D(20), false, { aud: 'pick', users: [U.C], free: true })) === 1);
+  check('options — …but «all trainees» leaves partner accounts out', (await bco(gymM, D(20), false, { aud: 'all', free: true })) === 1);
+  await q(`update profiles set account_type = 'trainee' where id = $1`, [U.C]);
+  check('options — someone who did not finish signing up is never sent to', (await bco(gymM, D(20), false, { aud: 'pick', users: [U.D], free: true })) === 0);
+  await q(`update profiles set notify_prefs = notify_prefs || '{"nudges": false}' where id = $1`, [U.B]);
+  check('options — motivation turned off in settings is always respected', (await bco(gymM, D(20), false, { aud: 'pick', users: [U.B], free: true })) === 0);
+  await q(`update profiles set notify_prefs = notify_prefs - 'nudges' where id = $1`, [U.B]);
+  // وقت الهدوء
+  await expectErr('options — night is still quiet by default', () => bco(gymM, D(20, '23:00'), false, { aud: 'all', free: true }), /quiet_hours/);
+  check('options — «even in quiet hours» when the admin wants', (await bco(gymM, D(20, '23:00'), false, { aud: 'all', free: true, quiet: true })) === 2);
+  // مدخلات غلط
+  await expectErr('options — only known pages to open', () => bco(gymM, D(20), false, { aud: 'all', url: 'https://evil.example' }), /bad_input/);
+  await expectErr('options — «picked» needs people', () => bco(gymM, D(20), false, { aud: 'pick', users: [] }), /bad_input/);
+  await expectErr('options — unknown audience', () => bco(gymM, D(20), false, { aud: 'everyone' }), /bad_input/);
+  // المتغيرات اللي ما لها قيمة تتعبّى بكلمة عامة (غير «حسب الشرط»)
+  check('options — friend text by the rule: nobody (no friend at the gym on the 21st)', (await bco(frF, D(21), false)) === 0);
+  check('options — friend text to all: sent with «صديقك»', (await bco(frF, D(21), true, { aud: 'all' })) === 1
+    && (await last(U.B))?.data.title === 'صديقك سبقك 👀', JSON.stringify(await last(U.B)));
+  check('options — workout text to all on a rest day: «تمرينك»', (await bco(wk, D(21), true, { aud: 'all' })) === 2
+    && (await last(U.A))?.data.body === 'تمرينك اليوم: تمرينك', JSON.stringify(await last(U.A)));
+  await expectErr('options — regular users cannot send with options either', () => as(U.A, `select admin_broadcast_nudge($1, true, 'all', null, true, null, true)`, [gymM]), /not_allowed/);
+  check('options — admin preview from the app with options', typeof (await as(U.E, `select admin_broadcast_nudge($1, true, 'all', null, true, null, true) n`, [gymM]))[0].n === 'number');
+
   // من التطبيق (الوقت الحقيقي): المعاينة ترجع رقم أو «وقت الهدوء»
   let real;
   try { real = (await as(U.E, 'select admin_broadcast_nudge($1, false) n', [gymEn]))[0].n; }

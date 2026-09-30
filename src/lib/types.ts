@@ -1,4 +1,5 @@
 // أنواع البيانات المشتركة بين التطبيق وقاعدة البيانات
+import type { ReactionKey, Reactor } from './reactionsCore';
 
 export type Locale = 'ar' | 'en';
 export type I18nText = { ar: string; en: string };
@@ -101,13 +102,22 @@ export interface FeedPost {
   like_count: number;
   comment_count: number;
   liked_by_me: boolean;
-  /** post = صورة أو رسالة، wake = «صحى ☀️» التلقائي */
-  kind?: 'post' | 'wake';
-  meta?: WakeMeta;
+  /** post = صورة أو رسالة، wake = «صباح الخير ☀️»، sleep = «تصبحون على خير 🌙» */
+  kind?: 'post' | 'wake' | 'sleep';
+  meta?: MomentMeta;
+  /** تفاعلي بالإيموجي وآخر اللي تفاعلوا (من feed الجديدة) */
+  my_reaction?: ReactionKey | null;
+  reactors?: Reactor[];
+  is_coach?: boolean;
 }
 
-/** «صحى ☀️»: الوقت ومن وين (وقت المنبّه أو وقت فتح التطبيق) */
-export interface WakeMeta { at?: string; src?: 'alarm' | 'open' }
+/**
+ * تفاصيل اللحظة: at = الوقت (منبّه أرك / فتح التطبيق / وقت النوم)، src = من وين،
+ * slept = كم دقيقة نام (من «تصبحون على خير» لين «صباح الخير»)، out = وقت الخروج من النادي
+ */
+export interface MomentMeta { at?: string; src?: 'alarm' | 'open' | 'manual'; slept?: number; sleep_id?: string; out?: string | null }
+/** @deprecated الاسم القديم */
+export type WakeMeta = MomentMeta;
 
 export interface Comment {
   id: string;

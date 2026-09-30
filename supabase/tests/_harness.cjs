@@ -51,7 +51,9 @@ async function setup() {
                  revoke update on public.profiles from authenticated;
                  grant update (username, full_name, avatar_url, bio, gym_id, locale, onboarded, presence_visibility, notify_prefs, cover, cover_url, account_type, kcal_goal, share_wake, share_checkins) on public.profiles to authenticated;
                  revoke insert, update on public.program_adopts from authenticated;
-                 revoke insert, update, delete on public.app_admins from authenticated;`);
+                 revoke insert, update, delete on public.app_admins from authenticated;
+                 revoke update on public.post_likes, public.checkin_likes from authenticated;
+                 grant update (emoji) on public.post_likes, public.checkin_likes to authenticated;`);
   await q(`insert into auth.users (id, raw_user_meta_data) values
     ($1, '{"username":"ahmed","full_name":"Ahmed","gender":"male"}'),
     ($2, '{"username":"sara","full_name":"Sara","gender":"female"}'),

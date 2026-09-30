@@ -1,3 +1,4 @@
+import { isReaction, normalizeReactors } from './reactions';
 import { supabase } from './supabase';
 import type { FeedPost } from './types';
 
@@ -14,5 +15,13 @@ export async function deletePost(post: FeedPost) {
 }
 
 export function normalizeFeed(rows: any[] | null): FeedPost[] {
-  return (rows ?? []).map((r) => ({ ...r, like_count: Number(r.like_count), comment_count: Number(r.comment_count) }));
+  return (rows ?? []).map((r) => ({
+    ...r,
+    like_count: Number(r.like_count ?? 0),
+    comment_count: Number(r.comment_count ?? 0),
+    meta: r.meta && typeof r.meta === 'object' ? r.meta : {},
+    // قبل التفاعل بالإيموجي كان فيه لايك بس (❤️)
+    my_reaction: isReaction(r.my_reaction) ? r.my_reaction : r.liked_by_me ? 'love' : null,
+    reactors: normalizeReactors(r.reactors),
+  }));
 }

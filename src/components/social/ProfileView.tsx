@@ -38,7 +38,7 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
       profileCounts(p.id),
       loadPrograms({ author: p.id, limit: 20 }),
       loadTips(me, { author: p.id, limit: 30 }),
-      supabase.from('posts').select('id, image_path, caption').eq('user_id', p.id).order('created_at', { ascending: false }).limit(30),
+      supabase.from('posts').select('id, image_path, caption').eq('user_id', p.id).eq('kind', 'post').order('created_at', { ascending: false }).limit(30),
     ]);
     setCounts(c); setPrograms(pr); setTips(tp); setPosts((po.data ?? []) as PostTile[]);
     // أول تبويب فيه محتوى

@@ -81,12 +81,38 @@ export async function sendTestNudge(id: string) {
   if (error) throw error;
 }
 
+/** وين يفتح التنبيه لما يضغطونه (نفس القائمة المسموحة في الخادم) */
+export const NUDGE_OPEN = [
+  { key: 'home', url: '/(tabs)' },
+  { key: 'timeline', url: '/(tabs)/community' },
+  { key: 'checkin', url: '/checkin' },
+  { key: 'plan', url: '/(tabs)/plan' },
+  { key: 'food', url: '/food/add' },
+] as const;
+export const defaultNudgeUrl = (c: NudgeCategory) => (c === 'workout' ? '/(tabs)/plan' : c === 'meal' ? '/food/add' : '/checkin');
+
+export type NudgeAudience = 'rule' | 'all' | 'pick';
+export interface BroadcastOptions {
+  /** rule = حسب شرط النوع، all = كل المتدربين، pick = أشخاص تختارهم */
+  audience?: NudgeAudience;
+  users?: string[];
+  /** حتى لو وصلهم تنبيه من هالنوع اليوم أو وصلوا ٣ */
+  ignoreLimits?: boolean;
+  /** وين يفتح (null = حسب النوع) */
+  url?: string | null;
+  /** حتى بوقت الهدوء (١٠ الليل – ٨ الصبح) */
+  quietOk?: boolean;
+}
+
 /**
- * «أرسل الحين»: dryRun = true يرجع كم متدرب بيوصله (بدون إرسال)، وبدونها يرسل ويرجع كم انرسل.
- * الخادم يرفض من ١٠ الليل لين ٨ الصبح (quiet_hours).
+ * «أرسل الحين»: dryRun = true يرجع كم بيوصله (بدون إرسال)، وبدونها يرسل ويرجع كم انرسل.
+ * الخادم يرفض من ١٠ الليل لين ٨ الصبح (quiet_hours) إلا لو quietOk.
  */
-export async function broadcastNudge(id: string, dryRun = false): Promise<number> {
-  const { data, error } = await supabase.rpc('admin_broadcast_nudge', { p_template: id, p_dry_run: dryRun });
+export async function broadcastNudge(id: string, dryRun = false, o: BroadcastOptions = {}): Promise<number> {
+  const { data, error } = await supabase.rpc('admin_broadcast_nudge', {
+    p_template: id, p_dry_run: dryRun, p_audience: o.audience ?? 'rule', p_users: o.users?.length ? o.users : null,
+    p_ignore_limits: !!o.ignoreLimits, p_url: o.url ?? null, p_quiet_ok: !!o.quietOk,
+  });
   if (error) throw error;
   return Number(data ?? 0);
 }

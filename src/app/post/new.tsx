@@ -13,13 +13,21 @@ import { goBackOrHome } from '@/lib/nav';
 export default function NewPost() {
   const { t } = useTranslation();
   const { userId } = useUser();
-  const params = useLocalSearchParams<{ checkIn?: string }>();
+  // mode: photo = من زر ＋ ← 📷 (يفتح الصور على طول)، text = ← “ (يبدأ بالكتابة)
+  const params = useLocalSearchParams<{ checkIn?: string; mode?: string }>();
   const [image, setImage] = useState<PickedImage | null>(null);
   const [caption, setCaption] = useState('');
   const [visibility, setVisibility] = useState<'friends' | 'public'>('friends');
   const [todayCheckIn, setTodayCheckIn] = useState<string | null>(params.checkIn ?? null);
   const [attach, setAttach] = useState(!!params.checkIn);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (params.mode !== 'photo') return;
+    let alive = true;
+    pickImage('library', [1, 1]).then((i) => { if (alive && i) setImage(i); }, () => {});
+    return () => { alive = false; };
+  }, [params.mode]);
 
   useEffect(() => {
     if (params.checkIn) return;
@@ -62,7 +70,7 @@ export default function NewPost() {
           <Button style={{ flex: 1 }} small title={t('onboarding.pickPhoto')} icon="images-outline" variant="secondary"
             onPress={async () => { const i = await pickImage('library', [1, 1]); if (i) setImage(i); }} />
         </Row>
-        <Input placeholder={t('feed.caption')} value={caption} onChangeText={setCaption} multiline maxLength={1000} />
+        <Input placeholder={t('feed.caption')} value={caption} onChangeText={setCaption} multiline maxLength={1000} autoFocus={params.mode === 'text'} />
         <T size="sm" muted>{t('feed.visibility')}</T>
         <Segmented value={visibility} onChange={setVisibility}
           options={[{ value: 'friends', label: t('feed.vis_friends') }, { value: 'public', label: t('feed.vis_public') }]} />
