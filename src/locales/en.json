@@ -60,7 +60,7 @@
     "noAccount": "No account yet?",
     "haveAccount": "Already have an account?",
     "signOut": "Sign out",
-    "checkEmail": "We sent a confirmation link to your email. Confirm it, then sign in.",
+    "checkEmail": "We sent a confirmation link to your email. Open it on this phone and ARQ signs you straight in (check spam too).",
     "usernameHint": "3–24 chars: letters, numbers, _ and .",
     "passwordHint": "At least 8 characters",
     "forgot": "Forgot password?",
@@ -79,7 +79,13 @@
     "passwordNotSaved": "You're signed in ✅ but the new password wasn't saved. If you need it, recover it again after signing out.",
     "backToSignIn": "Back to sign in",
     "emailTakenHint": "This email already has an ARQ account. Sign in, or if you forgot the password we'll email you a code.",
-    "usernameTakenHint": "If this is your account, sign in or recover your password. If not, pick another username."
+    "usernameTakenHint": "If this is your account, sign in or recover your password. If not, pick another username.",
+    "confirmFirstBody": "Open the confirmation link we emailed you (check spam too). Opening it on this phone signs you straight in.",
+    "resendConfirm": "Send the link again",
+    "confirmResent": "We sent a new confirmation link to your email.",
+    "invalidLoginHint": "Check your email and password. Forgot your password? Reset it with a code sent to your email.",
+    "linkExpired": "This confirmation link has expired or was already used",
+    "linkExpiredBody": "Sign in with your email and password. If it asks you to confirm your email, request a new link there."
   },
   "onboarding": {
     "title": "Let's build your plan",
@@ -309,7 +315,8 @@
     "badCode": "Wrong or expired code. Check it or request a new one.",
     "tooSoon": "Wait a minute before requesting a new code.",
     "passwordMismatch": "The passwords don't match",
-    "badEmail": "Check the email address"
+    "badEmail": "Check the email address",
+    "emailNotConfirmed": "Your email isn't confirmed yet"
   },
   "inbody": {
     "title": "InBody report",

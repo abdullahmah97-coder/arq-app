@@ -16,12 +16,35 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const forgot = () => { handOffEmail(email); router.push('/forgot-password'); };
+
+  /** يرسل رابط تأكيد الإيميل مرة ثانية */
+  const resendConfirm = async () => {
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
+    Alert.alert(error ? t(errorKey(error)) : t('auth.confirmResent'));
+  };
+
   const submit = async () => {
     if (!email || !password) return Alert.alert(t('errors.required'));
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
-    if (error) Alert.alert(t(errorKey(error)));
+    if (!error) return;
+    const key = errorKey(error);
+    // ما أكّد إيميله للحين: نقول له وش يسوي بدل «صار خطأ»
+    if (key === 'errors.emailNotConfirmed') {
+      return Alert.alert(t(key), t('auth.confirmFirstBody'), [
+        { text: t('auth.resendConfirm'), onPress: () => { void resendConfirm(); } },
+        { text: t('common.close'), style: 'cancel' },
+      ]);
+    }
+    if (key === 'errors.invalidLogin') {
+      return Alert.alert(t(key), t('auth.invalidLoginHint'), [
+        { text: t('auth.forgot'), onPress: forgot },
+        { text: t('common.close'), style: 'cancel' },
+      ]);
+    }
+    Alert.alert(t(key));
   };
 
   return (
@@ -48,7 +71,7 @@ export default function SignIn() {
           <View style={{ gap: space.sm }}>
             <Input label={t('auth.password')} value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" />
             {/* استرجاع الحساب برمز على الإيميل */}
-            <Pressable onPress={() => { handOffEmail(email); router.push('/forgot-password'); }} hitSlop={10}
+            <Pressable onPress={forgot} hitSlop={10}
               accessibilityRole="link" style={{ alignSelf: 'flex-end', paddingVertical: space.xs }}>
               <T size="sm" semibold color={colors.primary}>{t('auth.forgot')}</T>
             </Pressable>

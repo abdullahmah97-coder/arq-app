@@ -86,6 +86,8 @@ export function errorKey(e: unknown): string {
   if (msg.includes('User already registered')) return 'errors.emailTaken';
   // أخطاء الدخول والاسترجاع (Supabase Auth يرجع رمز الخطأ في code)
   const authCode = String((e as any)?.code ?? '');
+  // سجّل دخول قبل ما يفتح رابط التأكيد اللي وصله على الإيميل
+  if (authCode === 'email_not_confirmed' || msg.includes('Email not confirmed')) return 'errors.emailNotConfirmed';
   if (authCode === 'otp_expired' || msg.includes('Token has expired or is invalid')) return 'errors.badCode';
   if (authCode.startsWith('over_') || msg.includes('only request this after') || /email rate limit/i.test(msg)) return 'errors.tooSoon';
   if (authCode === 'weak_password' || msg.includes('Password should')) return 'errors.shortPassword';
