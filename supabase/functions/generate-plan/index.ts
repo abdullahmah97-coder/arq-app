@@ -461,14 +461,31 @@ async function askClaude(apiKey: string, system: string, content: unknown, maxTo
 // التحقق من الطلب
 // ---------------------------------------------------------------------------
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : NaN);
+const oneOf = <T extends string>(v: unknown, ok: readonly T[]): T | null => ((ok as readonly unknown[]).includes(v) ? (v as T) : null);
+const GENDERS = ['male', 'female'] as const;
+const GOALS = ['lose', 'gain', 'maintain', 'fit'] as const;
+const LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
+/** حدود السعرات والماكروز: تغطي كل ملف صحي يقبله التطبيق (الطول ١٢٠–٢٣٠، الوزن ٣٠–٣٠٠، العمر ١٣–١٠٠) */
+const TARGET_BOUNDS = [['bmi', 5, 220], ['bmr', 350, 4500], ['calories', 1000, 8000], ['protein_g', 20, 400], ['carbs_g', 20, 1200], ['fat_g', 10, 300], ['water_l', 0.5, 12]] as const;
+
 export function checkRequest(body: Record<string, unknown>) {
-  const input = body.input as Record<string, unknown> | undefined;
+  const raw = body.input as Record<string, unknown> | undefined;
   const tg = body.targets as Record<string, unknown> | undefined;
-  if (!input || !tg || typeof input !== 'object' || typeof tg !== 'object') return null;
-  const days = num(input.days_per_week);
+  if (!raw || !tg || typeof raw !== 'object' || typeof tg !== 'object') return null;
+  const days = num(raw.days_per_week);
   if (!(days >= 2 && days <= 6)) return null;
+  // بس الحقول المعروفة تروح للذكاء الاصطناعي (نفس حدود التطبيق)
+  const gender = oneOf(raw.gender, GENDERS), goal = oneOf(raw.goal, GOALS), level = oneOf(raw.level, LEVELS);
+  const age = num(raw.age), height = num(raw.height_cm), weight = num(raw.weight_kg);
+  if (!gender || !goal || !level) return null;
+  if (!(age >= 13 && age <= 100) || !(height >= 120 && height <= 230) || !(weight >= 30 && weight <= 300)) return null;
+  const ib = raw.inbody && typeof raw.inbody === 'object' && !Array.isArray(raw.inbody) ? raw.inbody : null;
+  const input = {
+    gender, age: Math.round(age), height_cm: height, weight_kg: weight, goal, level, days_per_week: Math.round(days),
+    ...(ib && JSON.stringify(ib).length <= 20_000 ? { inbody: ib } : {}),
+  };
   const targets: Record<string, number> = {};
-  for (const [k, lo, hi] of [['bmi', 10, 80], ['bmr', 600, 4000], ['calories', 1000, 6000], ['protein_g', 20, 400], ['carbs_g', 20, 900], ['fat_g', 10, 300], ['water_l', 0.5, 10]] as const) {
+  for (const [k, lo, hi] of TARGET_BOUNDS) {
     const v = num(tg[k]);
     if (!(v >= lo && v <= hi)) return null;
     targets[k] = v;
@@ -503,11 +520,14 @@ Deno.serve(async (req) => {
 
   // الحد اليومي: خطط الذكاء الاصطناعي بس (اعتماد برنامج جاهز على خطة ذكية ما ينحسب)
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const { count } = await supabase.from('plans').select('id', { count: 'exact', head: true })
+  const { count, error: countError } = await supabase.from('plans').select('id', { count: 'exact', head: true })
     .eq('source', 'ai').gte('created_at', since).is('data->program', null);
+  // ما قدرنا نتأكد من الحد؟ ما نكمل (عشان الحد ما يتعدّى)
+  if (countError) { console.error('rate_check_failed', countError.message); return json({ error: 'busy' }, 503); }
   if ((count ?? 0) >= MAX_AI_PLANS_PER_DAY) return json({ error: 'rate_limited' }, 429);
 
   // الشغل كله هنا: يكمل حتى لو التطبيق قطع الاتصال (waitUntil) ويحفظ الخطة لو طلبنا
+  const startedIso = new Date().toISOString();
   const job = (async () => {
     const started = Date.now();
     const profile = { ...r.input, notes: r.notes || undefined, place: r.place };
@@ -552,24 +572,41 @@ Deno.serve(async (req) => {
     };
 
     let planId: string | null = null;
+    let active = false;
     if (r.save) {
       let inbody: string | null = null;
       if (r.inbodyId) {
         const { data } = await supabase.from('inbody_reports').select('id').eq('id', r.inbodyId).eq('user_id', user.id).maybeSingle();
         inbody = data?.id ?? null;
       }
+      // نحفظها أول بدون تفعيل وبعدين نبدّل: لو صار خطأ تبقى خطتك القديمة فعّالة
       for (let attempt = 0; attempt < 2 && !planId; attempt++) {
-        await supabase.from('plans').update({ active: false }).eq('user_id', user.id).eq('active', true);
+        if (attempt > 0 && r.requestId) {
+          // المحاولة الأولى ممكن انحفظت وضاع ردها: ما نكررها
+          const { data: prev } = await supabase.from('plans').select('id').eq('user_id', user.id).eq('data->>request_id', r.requestId).limit(1);
+          if (prev?.[0]?.id) { planId = prev[0].id as string; break; }
+        }
         const { data, error } = await supabase.from('plans')
-          .insert({ user_id: user.id, source: 'ai', data: plan, active: true, inbody_report_id: inbody })
+          .insert({ user_id: user.id, source: 'ai', data: plan, active: false, inbody_report_id: inbody })
           .select('id').single();
         if (error) console.error('plan_save_failed', attempt, error.message);
         planId = data?.id ?? null;
       }
       if (!planId) return { status: 500, body: { error: 'save_failed' } };
+      // اختار خطة ثانية وهو ينتظر (برنامج جاهز أو جدوله)؟ تبقى هي الفعّالة، وهذي تنحفظ بسجله بس
+      const { data: newer } = await supabase.from('plans').select('id').eq('user_id', user.id).eq('active', true).gt('created_at', startedIso).limit(1);
+      if (!newer?.length) {
+        for (let attempt = 0; attempt < 2 && !active; attempt++) {
+          await supabase.from('plans').update({ active: false }).eq('user_id', user.id).eq('active', true).neq('id', planId);
+          const { error } = await supabase.from('plans').update({ active: true }).eq('id', planId);
+          if (error) console.error('plan_activate_failed', attempt, error.message);
+          else active = true;
+        }
+        if (!active) return { status: 500, body: { error: 'save_failed' } };
+      }
     }
-    console.log('plan_ready', JSON.stringify({ ms: Date.now() - started, meals: aiMeals ? 'ai' : 'templates', saved: !!planId }));
-    return { status: 200, body: { plan, ...(planId ? { plan_id: planId } : {}), meals_source: aiMeals ? 'ai' : 'templates' } };
+    console.log('plan_ready', JSON.stringify({ ms: Date.now() - started, meals: aiMeals ? 'ai' : 'templates', saved: !!planId, active }));
+    return { status: 200, body: { plan, ...(planId ? { plan_id: planId, active } : {}), meals_source: aiMeals ? 'ai' : 'templates' } };
   })();
 
   // لو التطبيق انقفل أو انقطع الاتصال، الدالة تكمّل وتحفظ الخطة
