@@ -15,6 +15,7 @@ import { deleteMyAccount } from '@/lib/account';
 import { unreadCount } from '@/lib/messages';
 import { ownerCounts } from '@/lib/owner';
 import { unregisterPush } from '@/lib/push';
+import { clearSleepSchedule } from '@/lib/sleep';
 import { colors, space, THEMES, type ThemeId } from '@/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/lib/appTheme';
@@ -77,7 +78,7 @@ export default function ProfileTab() {
       </Card>
 
       <T size="xs" muted center>🔒 {t('profile.privacy')}</T>
-      <Button title={t('auth.signOut')} variant="ghost" icon="log-out-outline" onPress={async () => { await unregisterPush(); await supabase.auth.signOut(); }} />
+      <Button title={t('auth.signOut')} variant="ghost" icon="log-out-outline" onPress={async () => { await unregisterPush(); await clearSleepSchedule(userId); await supabase.auth.signOut(); }} />
       <Pressable onPress={() => Alert.alert(t('profile.deleteAccount'), t('profile.deleteConfirm'), [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('profile.deleteYes'), style: 'destructive', onPress: () => deleteMyAccount(userId).catch((e) => Alert.alert(t(errorKey(e)))) },

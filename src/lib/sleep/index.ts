@@ -117,22 +117,65 @@ export async function applySleepSchedule(s: SleepSettings, needMin: number, text
   return result;
 }
 
-/** توقيع الجدولة الحالية: نعيد الجدولة بس لما يتغير شي (احتياج النوم يتغير كل يوم مع الساعة) */
-export const scheduleSignature = (s: SleepSettings, needMin: number, lng: string) =>
-  JSON.stringify([s.wake, s.days, s.alarm, s.remind, s.remindBefore, s.remind ? Math.round(needMin / 5) * 5 : 0, lng]);
+/** حالة الأذونات (الإشعارات + المنبّه): لو فتحها المستخدم من الإعدادات نعيد الجدولة */
+async function permissionState(): Promise<string> {
+  let notif = 'n';
+  if (Platform.OS !== 'web') {
+    try {
+      const p = await Notifications.getPermissionsAsync();
+      notif = p.granted || p.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL ? 'y' : 'n';
+    } catch { notif = '?'; }
+  }
+  return `${notif}:${alarmAuthorization()}`;
+}
 
-/** يعيد الجدولة بهدوء لو تغيّر شي من آخر مرة (بدون طلب أذونات) */
-export async function syncSleepSchedule(userId: string, s: SleepSettings, needMin: number, text: SleepTexts, lng: string) {
-  if (!s.alarm && !s.remind) return;
-  const sig = scheduleSignature(s, needMin, lng);
+/** توقيع الجدولة الحالية: نعيد الجدولة بس لما يتغير شي (الإعدادات، احتياج النوم مع الساعة، اللغة، أو الأذونات) */
+export const scheduleSignature = (s: SleepSettings, needMin: number, lng: string, perm: string) =>
+  s.alarm || s.remind
+    ? JSON.stringify([s.wake, s.days, s.alarm, s.remind, s.remindBefore, s.remind ? Math.round(needMin / 5) * 5 : 0, lng, perm])
+    : 'off';
+
+async function syncNow(userId: string, s: SleepSettings, needMin: number, text: SleepTexts, lng: string) {
+  const sig = scheduleSignature(s, needMin, lng, await permissionState());
   const last = await AsyncStorage.getItem(SIG_KEY(userId)).catch(() => null);
   if (last === sig) return;
-  await applySleepSchedule(s, needMin, text, false);
+  // مطفي: نلغي أي منبّه أو تذكير باقي (مثلاً من حساب ثاني على نفس الجوال)
+  if (sig === 'off') await cancelAll();
+  else await applySleepSchedule(s, needMin, text, false);
   await AsyncStorage.setItem(SIG_KEY(userId), sig).catch(() => {});
 }
 
+let syncing: Promise<void> | null = null;
+let queued: (() => Promise<void>) | null = null;
+
+/**
+ * يعيد الجدولة بهدوء لو تغيّر شي من آخر مرة (بدون طلب أذونات).
+ * الطلبات تمشي وحدة وحدة، ولو جا أكثر من طلب وهي شغّالة ننفّذ الأحدث بس.
+ */
+export function syncSleepSchedule(userId: string, s: SleepSettings, needMin: number, text: SleepTexts, lng: string): Promise<void> {
+  queued = () => syncNow(userId, s, needMin, text, lng);
+  if (!syncing) {
+    syncing = (async () => {
+      while (queued) {
+        const job = queued;
+        queued = null;
+        await job().catch(() => {});
+      }
+      syncing = null;
+    })();
+  }
+  return syncing;
+}
+
+/** بعد «احفظ»: نسجّل اللي انجدول مع حالة الأذونات وقتها (لو رفض ورجع فتحها من الإعدادات، المزامنة تجدول من جديد) */
 export async function markApplied(userId: string, s: SleepSettings, needMin: number, lng: string) {
-  await AsyncStorage.setItem(SIG_KEY(userId), scheduleSignature(s, needMin, lng)).catch(() => {});
+  await AsyncStorage.setItem(SIG_KEY(userId), scheduleSignature(s, needMin, lng, await permissionState())).catch(() => {});
+}
+
+/** تسجيل الخروج أو حذف الحساب: نلغي المنبّه والتذكيرات (ولو رجع دخل، المزامنة ترجّعها) */
+export async function clearSleepSchedule(userId: string | null | undefined) {
+  await cancelAll().catch(() => {});
+  if (userId) await AsyncStorage.removeItem(SIG_KEY(userId)).catch(() => {});
 }
 
 /** وقت على الساعة للعرض: ١٠:٤٥ م / 10:45 PM */

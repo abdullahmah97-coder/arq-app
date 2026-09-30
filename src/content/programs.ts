@@ -270,8 +270,10 @@ export function applyProgram(p: Program, base: WeeklyPlan, schedule = p.schedule
     }));
     return { day, rest: false, focus: p.days[k].title, exercises };
   });
+  // ملاحظات صورة الجسم ورقم طلب الذكاء الاصطناعي تخص الخطة القديمة، مو هذا البرنامج
+  const { request_id: _req, photo_notes: _photo, custom: _custom, ...rest } = base;
   return {
-    ...base,
+    ...rest,
     generated_at: new Date().toISOString(),
     summary: t(`${p.name.ar} — ${p.summary.ar}`, `${p.name.en} — ${p.summary.en}`),
     days,

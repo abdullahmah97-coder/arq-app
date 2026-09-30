@@ -9,9 +9,10 @@ import { ExercisePicker } from '@/components/ExercisePicker';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
-import { createCustomPlan, loadPlanInput, PlanError } from '@/lib/plan';
+import { builderDaysFromPlan, cleanReps, createCustomPlan, loadPlanInput, planDaysFromBuilder, PlanError, validReps, type BuilderDay as BDay } from '@/lib/plan';
 import type { PlanDay, PlanExercise } from '@/lib/plan/types';
 import { errorKey } from '@/lib/supabase';
+import type { I18nText } from '@/lib/types';
 import { findExercise, getExercise } from '@/three/catalog';
 import { brand, colors, fonts, radius, space } from '@/theme';
 
@@ -20,24 +21,19 @@ const RIRS = ['', '0-1', '1-2', '2-3'];
 /** أيام التمرين المقترحة لعدد الأيام (٠ = الأحد) — الجمعة راحة قدر الإمكان */
 const DEFAULT_DAYS: Record<number, number[]> = { 1: [0], 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4], 6: [6, 0, 1, 2, 3, 4], 7: [0, 1, 2, 3, 4, 5, 6] };
 
-interface BDay { on: boolean; title: string; exercises: PlanExercise[] }
+/** يربط التمرين بدليل التمارين (الاسم والرقم الموحّد) */
+const resolveExercise = (e: PlanExercise): PlanExercise | null => {
+  const g = findExercise(e.exercise_id ?? e.name.en);
+  return g ? { ...e, exercise_id: g.id, name: g.name } : null;
+};
 
-/** يبدأ من الخطة الحالية (نفس الأيام والتمارين) أو من الصفر */
-function initialDays(plan: { data: { days: PlanDay[] } } | null, perWeek: number, L: (x: { ar: string; en: string }) => string): BDay[] {
-  const out: BDay[] = Array.from({ length: 7 }, () => ({ on: false, title: '', exercises: [] }));
+/** يبدأ من الخطة الحالية (نفس الأيام والتمارين والعناوين) أو من الصفر */
+function initialDays(plan: { data: { days: PlanDay[] } } | null, perWeek: number, L: (x: I18nText) => string): BDay[] {
   if (plan) {
-    for (const d of plan.data.days) {
-      if (d.day < 0 || d.day > 6 || d.rest) continue;
-      out[d.day] = {
-        on: true, title: L(d.focus),
-        exercises: d.exercises.flatMap((e) => {
-          const g = findExercise(e.exercise_id ?? e.name.en);
-          return g ? [{ ...e, exercise_id: g.id, name: g.name }] : [];
-        }),
-      };
-    }
+    const out = builderDaysFromPlan(plan.data.days, L, resolveExercise);
     if (out.some((d) => d.on)) return out;
   }
+  const out: BDay[] = Array.from({ length: 7 }, () => ({ on: false, title: '', exercises: [] }));
   for (const d of DEFAULT_DAYS[perWeek] ?? DEFAULT_DAYS[3]) out[d].on = true;
   return out;
 }
@@ -73,13 +69,17 @@ export default function PlanBuilder() {
     if (!training) return Alert.alert(t('builder.errNoDays'));
     const empty = days.findIndex((d) => d.on && !d.exercises.length);
     if (empty >= 0) return Alert.alert(t('builder.errEmptyDay', { day: weekdays[empty] }));
-    const badReps = days.some((d) => d.on && d.exercises.some((e) => !e.reps.trim()));
+    const badReps = days.some((d) => d.on && d.exercises.some((e) => !validReps(e.reps)));
     if (badReps) return Alert.alert(t('builder.errReps'));
     setBusy(true);
     try {
-      const planDays: PlanDay[] = days.map((d, i) => d.on
-        ? { day: i, rest: false, focus: { ar: d.title.trim() || t('builder.dayN', { day: weekdays[i] }), en: d.title.trim() || `Day ${i + 1}` }, exercises: d.exercises }
-        : { day: i, rest: true, focus: { ar: 'راحة واستشفاء', en: 'Rest & recovery' }, exercises: [], cardio: { ar: 'مشي خفيف ٣٠ دقيقة + إطالات', en: '30 min easy walk + stretching' } });
+      // اسم اليوم الافتراضي باللغتين (مو بلغة التطبيق بس)
+      const dayTitle = (i: number): I18nText => {
+        const [ar, en] = (['ar', 'en'] as const).map((lng) =>
+          t('builder.dayN', { lng, day: (t('weekdays', { lng, returnObjects: true }) as string[])[i] }));
+        return { ar, en };
+      };
+      const planDays = planDaysFromBuilder(days, L, dayTitle);
       const base = plan ? null : await loadPlanInput(userId, health);
       if (!plan && !base) throw new PlanError('incomplete');
       await createCustomPlan(userId, planDays, plan?.data ?? null, base?.input ?? null);
@@ -149,7 +149,7 @@ export default function PlanBuilder() {
                   <Stepper label={t('social.sets')} value={e.sets} onChange={(v) => setEx(i, j, { sets: v })} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <T size="xs" muted>{t('social.reps')}</T>
-                    <TextInput value={e.reps} onChangeText={(v) => setEx(i, j, { reps: v.replace(/[^\d\-sث ]/g, '').slice(0, 8) })} keyboardType="numbers-and-punctuation"
+                    <TextInput value={e.reps} onChangeText={(v) => setEx(i, j, { reps: cleanReps(v) })} keyboardType="numbers-and-punctuation"
                       style={{ height: 38, borderRadius: 10, backgroundColor: colors.cardAlt, color: colors.text, textAlign: 'center', fontFamily: fonts.semibold, fontSize: 16 }} />
                   </View>
                 </Row>

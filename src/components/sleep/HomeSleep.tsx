@@ -5,7 +5,7 @@ import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, Modal, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Alert, AppState, Linking, Modal, Pressable, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { alarmSupported } from '../../../modules/arq-alarm';
 import { NCard, NSection, NT, Num, Pill } from '@/components/pulse/widgets';
@@ -39,10 +39,24 @@ export function HomeSleep() {
   const night_ = isNightWindow(nowMin, bed, wakeMin);
   const texts = useSleepTexts(bed);
 
+  // نرجع للتطبيق (مثلاً بعد ما فتح الإشعارات من الإعدادات) → نشيّك الجدولة من جديد
+  const [active, setActive] = useState(0);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') setActive((n) => n + 1); });
+    return () => sub.remove();
+  }, []);
+  // ننتظر أرقام الساعة قبل أول جدولة (احتياج النوم منها)، وبحد أقصى ١٢ ثانية لو تأخرت
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setWaited(true), 12_000);
+    return () => clearTimeout(id);
+  }, []);
+  const healthReady = waited || h.status === 'disconnected' || h.status === 'unavailable' || (h.status === 'connected' && h.lastSync != null);
+
   // احتياج النوم يتغير مع الساعة: نعيد جدولة التذكير بهدوء لو تغيّر
   useEffect(() => {
-    if (ready) void syncSleepSchedule(userId, settings, need, texts, lng);
-  }, [ready, userId, settings, need, texts, lng]);
+    if (ready && healthReady) void syncSleepSchedule(userId, settings, need, texts, lng);
+  }, [ready, healthReady, userId, settings, need, texts, lng, active]);
 
   return (
     <>

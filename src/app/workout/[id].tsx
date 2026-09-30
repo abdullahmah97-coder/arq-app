@@ -17,6 +17,18 @@ import { compareSession, daysAgo, fmtSet, loadFriendsBest, loadHistory, loadSess
 import { getExercise } from '@/three/catalog';
 import { brand, night, pulse, space } from '@/theme';
 
+/** الفرق عن آخر جلسة: سهم وأخضر لو زاد، برتقالي لو نقص */
+function Delta({ v, unit = '%' }: { v: number | null; unit?: string }) {
+  if (v == null) return <NT size={12} faint>—</NT>;
+  const up = v > 0, same = v === 0;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+      {!same ? <Ionicons name={up ? 'arrow-up' : 'arrow-down'} size={12} color={up ? pulse.green : brand.orange} /> : null}
+      <Num size={14} color={same ? night.muted : up ? pulse.green : brand.orange}>{up ? '+' : ''}{v}{unit}</Num>
+    </View>
+  );
+}
+
 export default function WorkoutSummary() {
   const { id, points } = useLocalSearchParams<{ id: string; points?: string }>();
   const { t } = useTranslation();
@@ -45,17 +57,6 @@ export default function WorkoutSummary() {
       }
     })();
   }, [id]);
-
-  const Delta = ({ v, unit = '%' }: { v: number | null; unit?: string }) => {
-    if (v == null) return <NT size={12} faint>—</NT>;
-    const up = v > 0, same = v === 0;
-    return (
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-        {!same ? <Ionicons name={up ? 'arrow-up' : 'arrow-down'} size={12} color={up ? pulse.green : brand.orange} /> : null}
-        <Num size={14} color={same ? night.muted : up ? pulse.green : brand.orange}>{up ? '+' : ''}{v}{unit}</Num>
-      </View>
-    );
-  };
 
   const date = session ? new Date(session.started_at).toLocaleDateString(lng === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
   const prevDays = session && cmp?.previous ? daysAgo(cmp.previous.started_at, Date.parse(session.started_at)) : 0;

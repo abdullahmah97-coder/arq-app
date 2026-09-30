@@ -1,4 +1,5 @@
 // حذف الحساب نهائياً: الملفات أولاً ثم الحساب (البيانات تنحذف تلقائياً بالتسلسل)
+import { clearSleepSchedule } from './sleep';
 import { supabase } from './supabase';
 
 const BUCKETS = ['avatars', 'posts', 'body', 'inbody', 'chat'] as const;
@@ -18,5 +19,7 @@ export async function deleteMyAccount(userId: string) {
   }
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw error;
+  // منبّه الصحيان وتذكير النوم على الجوال ما يبقون بعد حذف الحساب
+  await clearSleepSchedule(userId);
   await supabase.auth.signOut();
 }

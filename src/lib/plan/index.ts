@@ -9,7 +9,7 @@ import type { PlanDay, PlanInput, WeeklyPlan } from './types';
 import { buildCustomPlan } from './custom';
 import { isWeeklyPlan } from './validate';
 
-export { buildCustomPlan, planKind } from './custom';
+export { buildCustomPlan, builderDaysFromPlan, cleanReps, planDaysFromBuilder, planKind, validReps, type BuilderDay } from './custom';
 
 export interface GeneratedPlan {
   plan: WeeklyPlan;
@@ -74,16 +74,25 @@ async function serverError(error: unknown): Promise<PlanErrorCode | null> {
   return 'failed';
 }
 
-/** يدوّر على الخطة اللي حفظتها الدالة لهذا الطلب (كل ٣ ثواني لين المهلة) */
+/** الخطة المحفوظة لهذا الطلب (لو انحفظت مرتين ناخذ الأحدث) */
+async function findSavedPlan(userId: string, requestId: string) {
+  const { data } = await supabase.from('plans').select('id, data').eq('user_id', userId).eq('data->>request_id', requestId)
+    .order('created_at', { ascending: false }).limit(1);
+  const row = data?.[0];
+  return row?.id && isWeeklyPlan(row.data) ? { planId: row.id as string, plan: row.data as WeeklyPlan } : null;
+}
+
+/** يدوّر على الخطة اللي حفظتها الدالة لهذا الطلب (كل ٣ ثواني لين المهلة، ونشيّك مرة أخيرة بعدها) */
 async function waitForSavedPlan(userId: string, requestId: string, timeoutMs: number, onWait?: () => void) {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
-    const { data } = await supabase.from('plans').select('id, data').eq('user_id', userId).eq('data->>request_id', requestId).maybeSingle();
-    if (data?.id && isWeeklyPlan(data.data)) return { planId: data.id as string, plan: data.data as WeeklyPlan };
+    const found = await findSavedPlan(userId, requestId).catch(() => null);
+    if (found) return found;
     onWait?.();
     await new Promise((r) => setTimeout(r, 3000));
   }
-  return null;
+  // التطبيق كان بالخلفية وفاتته المهلة: ممكن الخطة انحفظت
+  return findSavedPlan(userId, requestId).catch(() => null);
 }
 
 /**
@@ -155,14 +164,21 @@ export async function createCustomPlan(userId: string, days: PlanDay[], base: We
   return { planId, plan };
 }
 
-/** يحفظ الخطة كخطة فعّالة ويُلغي تفعيل السابقة */
+/**
+ * يحفظ الخطة كخطة فعّالة ويُلغي تفعيل السابقة.
+ * نحفظ الجديدة أول (غير فعّالة) وبعدين نبدّل: لو انقطع الاتصال وقت الحفظ تبقى خطتك القديمة فعّالة بدل ما تصير بدون خطة.
+ */
 export async function savePlan(userId: string, g: GeneratedPlan, inbodyReportId?: string | null) {
-  await supabase.from('plans').update({ active: false }).eq('user_id', userId).eq('active', true);
   const { data, error } = await supabase
     .from('plans')
-    .insert({ user_id: userId, source: g.source, data: g.plan, active: true, inbody_report_id: inbodyReportId ?? null })
+    .insert({ user_id: userId, source: g.source, data: g.plan, active: false, inbody_report_id: inbodyReportId ?? null })
     .select('id')
     .single();
   if (error) throw error;
-  return data.id as string;
+  const id = data.id as string;
+  const off = await supabase.from('plans').update({ active: false }).eq('user_id', userId).eq('active', true).neq('id', id);
+  if (off.error) throw off.error;
+  const on = await supabase.from('plans').update({ active: true }).eq('id', id);
+  if (on.error) throw on.error;
+  return id;
 }
