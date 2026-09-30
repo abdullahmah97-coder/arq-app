@@ -166,7 +166,8 @@ export async function createCustomPlan(userId: string, days: PlanDay[], base: We
 
 /**
  * يحفظ الخطة كخطة فعّالة ويُلغي تفعيل السابقة.
- * نحفظ الجديدة أول (غير فعّالة) وبعدين نبدّل: لو انقطع الاتصال وقت الحفظ تبقى خطتك القديمة فعّالة بدل ما تصير بدون خطة.
+ * نحفظ الجديدة أول (غير فعّالة) وبعدين نبدّل بخطوة وحدة في القاعدة (activate_plan): لو انقطع الاتصال
+ * تبقى خطتك القديمة فعّالة بدل ما تصير بدون خطة.
  */
 export async function savePlan(userId: string, g: GeneratedPlan, inbodyReportId?: string | null) {
   const { data, error } = await supabase
@@ -176,6 +177,10 @@ export async function savePlan(userId: string, g: GeneratedPlan, inbodyReportId?
     .single();
   if (error) throw error;
   const id = data.id as string;
+  const swap = await supabase.rpc('activate_plan', { p_id: id });
+  if (!swap.error) return id;
+  // قبل تحديث القاعدة (ما فيه activate_plan): الخطوتين زي قبل
+  if (swap.error.code !== 'PGRST202') throw swap.error;
   const off = await supabase.from('plans').update({ active: false }).eq('user_id', userId).eq('active', true).neq('id', id);
   if (off.error) throw off.error;
   const on = await supabase.from('plans').update({ active: true }).eq('id', id);
