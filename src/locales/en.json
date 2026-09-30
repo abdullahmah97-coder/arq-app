@@ -3526,6 +3526,7 @@
     "sharingNotice": "Timeline sharing notice",
     "listTitle": "Parts hidden from users",
     "listHint": "Long-press any section in the app (or a tab at the bottom) to hide it for everyone. Everything hidden is listed here to bring back.",
-    "listEmpty": "Nothing is hidden right now."
+    "listEmpty": "Nothing is hidden right now.",
+    "library": "Exercise library"
   }
 }

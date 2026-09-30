@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { Hideable } from '@/components/owner/Hideable';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { Num } from '@/components/pulse/widgets';
 import { LeaderboardVisibility } from '@/components/social/LeaderboardVisibility';
@@ -71,6 +72,7 @@ export default function Compete() {
       {kind === 'points' && scope !== 'friends' ? <LeaderboardVisibility onChanged={() => loadBoard(kind, scope)} /> : null}
 
       {/* منصة التتويج */}
+      <Hideable id="compete.podium" label={t('compete.leaderboard')}>
       <BrandGradient name="ember" style={styles.podiumWrap}>
         <SaduPattern variant="chevron" opacity={0.1} />
         <T size="sm" semibold color={brand.sand} center>{t('compete.leaderboard')} · {t('compete.thisWeek')}</T>
@@ -94,8 +96,10 @@ export default function Compete() {
           </View>
         )}
       </BrandGradient>
+      </Hideable>
 
       {rest.length ? (
+        <Hideable id="compete.list" label={`${t('compete.leaderboard')} (4+)`}>
         <Card style={{ padding: space.sm }}>
           {rest.map((r) => {
             const me = r.user_id === userId;
@@ -114,8 +118,10 @@ export default function Compete() {
             );
           })}
         </Card>
+        </Hideable>
       ) : null}
 
+      <Hideable id="compete.challenges" label={t('compete.challenges')} style={{ gap: space.lg }}>
       <SectionTitle title={t('compete.challenges')} action={t('compete.newChallenge')} onAction={() => router.push('/challenge/new')} />
       {challenges.length === 0 ? (
         <Card style={{ gap: space.md }}>
@@ -141,6 +147,7 @@ export default function Compete() {
           </Card>
         );
       })}
+      </Hideable>
     </Screen>
   );
 }

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, I18nManager, Pressable, ScrollView, View } from 'react-native';
+import { Hideable } from '@/components/owner/Hideable';
 import { router, useFocusEffect } from 'expo-router';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { AteButton, CalorieCard } from '@/components/nutrition/CalorieCard';
@@ -89,6 +90,7 @@ export default function PlanScreen() {
 
       <T muted>{L(p.summary)}</T>
       {p.program?.credit ? <T size="xs" muted>{t('programs.source')}: {p.program.credit}</T> : null}
+      <Hideable id="plan.programs" label={t('programs.browse')}>
       <Pressable onPress={() => router.push('/programs')}>
         <Row style={{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: space.md }}>
           <Ionicons name="albums-outline" size={20} color={colors.primary} />
@@ -99,8 +101,10 @@ export default function PlanScreen() {
           <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.muted} />
         </Row>
       </Pressable>
-      <LibraryLink />
+      </Hideable>
+      <Hideable id="plan.library" label={t('ownerParts.library')}><LibraryLink /></Hideable>
 
+      <Hideable id="plan.inbody" label={t('inbody.improvePlan')}>
       {p.based_on_inbody ? (
         <Pressable onPress={() => router.push('/inbody')}>
           <Row gap={6}>
@@ -123,7 +127,9 @@ export default function PlanScreen() {
           </BrandGradient>
         </Pressable>
       )}
+      </Hideable>
 
+      <Hideable id="plan.targets" label={t('plan.targets')}>
       <Card style={{ gap: space.md }}>
         <T bold>{t('plan.targets')}</T>
         <Row style={{ justifyContent: 'space-between' }} gap={space.xs}>
@@ -134,6 +140,7 @@ export default function PlanScreen() {
           <Macro label={t('plan.water')} value={`${p.targets.water_l}`} unit={t('plan.liters')} color={colors.accent} />
         </Row>
       </Card>
+      </Hideable>
 
       <Segmented value={tab} onChange={setTab}
         options={[{ value: 'workouts', label: t('plan.workouts') }, { value: 'meals', label: t('plan.meals') }]} />
