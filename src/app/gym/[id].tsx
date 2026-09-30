@@ -121,7 +121,7 @@ function PersonRow({ r, onFive }: { r: PresenceRow; onFive: (r: PresenceRow) => 
         <View style={{ flex: 1, gap: 2 }}>
           <Row gap={6}>
             <T semibold numberOfLines={1} style={{ flexShrink: 1 }}>{r.is_me ? t('presence.you') : r.full_name || r.username}</T>
-            <RankBadge points={r.points} coach={r.is_coach} small />
+            <RankBadge points={r.points} coach={r.is_coach} small userId={r.user_id} />
           </Row>
           <Row gap={6}>
             {here ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.success }} /> : null}

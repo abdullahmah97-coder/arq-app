@@ -842,6 +842,7 @@
     "tipsLocked": "Publishing tips unlocks at “{{rank}}”",
     "noPosts": "No visible posts",
     "morePosts": "Show older posts",
+    "owner": "Owner",
     "newTip": "New tip",
     "newProgram": "Publish a program",
     "lockedTitle": "Locked for now 🔒",
@@ -3515,5 +3516,16 @@
     "undoSleepNo": "No",
     "wokeToast": "Good morning ☀️ You slept {{d}} — your friends can see it",
     "wokeToastShort": "Good morning ☀️ — your friends can see you're up"
+  },
+  "ownerParts": {
+    "hiddenTag": "Hidden for everyone",
+    "isHidden": "Hidden from all users. Only you see it, faded, so you can bring it back.",
+    "isShown": "Visible to all users.",
+    "hide": "Hide for everyone",
+    "show": "Show to everyone",
+    "sharingNotice": "Timeline sharing notice",
+    "listTitle": "Parts hidden from users",
+    "listHint": "Long-press any section in the app (or a tab at the bottom) to hide it for everyone. Everything hidden is listed here to bring back.",
+    "listEmpty": "Nothing is hidden right now."
   }
 }

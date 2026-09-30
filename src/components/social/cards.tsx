@@ -25,7 +25,7 @@ export function AuthorRow({ a, sub, right }: { a?: Author; sub?: string; right?:
       <View style={{ flex: 1, gap: 2 }}>
         <Row gap={6}>
           <T semibold numberOfLines={1} style={{ flexShrink: 1 }}>{a.full_name || a.username}</T>
-          <RankBadge points={a.points} coach={a.is_coach} small />
+          <RankBadge points={a.points} coach={a.is_coach} small userId={a.id} />
         </Row>
         {sub ? <T size="xs" muted numberOfLines={1}>{sub}</T> : null}
       </View>

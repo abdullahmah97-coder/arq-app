@@ -12,6 +12,7 @@ import { fabBottom, PlusMenu } from '@/components/timeline/PlusMenu';
 import { ReactionsSheet } from '@/components/timeline/ReactionsSheet';
 import { SleepScreen, WokeToast, type Woke } from '@/components/timeline/SleepScreen';
 import { SharingNotice, TimelineSettings } from '@/components/timeline/Timeline';
+import { Hideable } from '@/components/owner/Hideable';
 import { Button, Empty, H, IconButton, ProfileButton, Row, Segmented } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
@@ -161,10 +162,14 @@ export default function Community() {
           contentContainerStyle={{ paddingBottom: TAB_BAR_SPACE + 40 }}
           ListHeaderComponent={
             <View>
-              <TimelineHeader items={items} onSettings={() => setSharingOpen(true)} />
-              <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
-                <SharingNotice onSettings={() => setSharingOpen(true)} />
-              </View>
+              <Hideable id="community.header" label={t('timeline.tab')}>
+                <TimelineHeader items={items} onSettings={() => setSharingOpen(true)} />
+              </Hideable>
+              <Hideable id="community.sharing" label={t('ownerParts.sharingNotice')}>
+                <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
+                  <SharingNotice onSettings={() => setSharingOpen(true)} />
+                </View>
+              </Hideable>
             </View>
           }
           renderItem={({ item, index }) => (

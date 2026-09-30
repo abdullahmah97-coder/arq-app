@@ -63,7 +63,7 @@ function InboxItem({ r, lng, onOpen, onMenu }: { r: InboxRow; lng: 'ar' | 'en'; 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <T semibold numberOfLines={1} style={{ flexShrink: 1, lineHeight: 23 }}>{name}</T>
-            <RankBadge points={r.points} coach={r.is_coach} small />
+            <RankBadge points={r.points} coach={r.is_coach} small userId={r.other_id} />
           </View>
           <Text style={{ fontSize: 12, lineHeight: 17, fontFamily: unread ? fonts.semibold : fonts.regular, color: unread ? brand.orange : colors.bubbleMeta }}>
             {inboxTime(r.last_at, lng, t)}

@@ -26,6 +26,8 @@ export interface Profile {
   following_count: number;
   /** مدرب موثّق (يُمنح من الإدارة) */
   is_coach: boolean;
+  /** مالك التطبيق (هو بس): شارة «المالك» وكل صلاحيات النشر وإخفاء أجزاء التطبيق */
+  is_owner?: boolean;
   /** مين يشوفني في النادي: gym (الموجودين معي + الأصدقاء) | friends | hidden */
   presence_visibility: PresenceVisibility;
   /** خلفية الهيدر: لون من ألوان أرك ('auto' يتبع ثيم التطبيق) أو صورة في مجلد المستخدم */

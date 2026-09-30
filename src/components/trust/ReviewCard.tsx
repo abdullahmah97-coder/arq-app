@@ -46,7 +46,7 @@ export function ReviewCard({ r, gymId: pageGym, onChanged, showGym }: { r: FullR
         <View style={{ flex: 1, gap: 2 }}>
           <Row gap={6}>
             <T size="sm" semibold numberOfLines={1} style={{ flexShrink: 1 }}>{r.is_me ? t('presence.you') : r.full_name || r.username}</T>
-            <RankBadge points={r.points} small />
+            <RankBadge points={r.points} small userId={r.user_id} />
           </Row>
           <Row gap={6} style={{ flexWrap: 'wrap' }}>
             <Stars value={r.rating} size={11} />

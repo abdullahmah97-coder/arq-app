@@ -8,6 +8,7 @@ import { Alert, I18nManager, Linking, Modal, Pressable, TextInput, View } from '
 import { Num } from '@/components/pulse/widgets';
 import { CoachVerifyQueue } from '@/components/coaching/CoachVerifyQueue';
 import { ClubRequestQueue } from '@/components/owner/ClubRequestQueue';
+import { HiddenPartsCard } from '@/components/owner/HiddenPartsCard';
 import { CenterReviewQueue } from '@/components/recovery/CenterReviewQueue';
 import { VenueReviewQueue } from '@/components/bookings/VenueReviewQueue';
 import { BrandLogo } from '@/components/store/parts';
@@ -86,6 +87,9 @@ export default function Owner() {
         <Stat n={liveAll} label={t('partners.livePartners')} color={STATUS_COLOR.fixed} />
         <Stat n={count('new')} label={t('owner.newReports')} color={STATUS_COLOR.new} />
       </View>
+
+      {/* المالك بس: الأجزاء اللي أخفاها عن المستخدمين بالضغط المطوّل */}
+      <HiddenPartsCard />
 
       {/* الإعلانات والإشعارات أول شي في اللوحة */}
       <View style={{ gap: 2 }}>

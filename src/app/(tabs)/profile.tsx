@@ -22,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/lib/appTheme';
 import { useLocalized } from '@/lib/i18n';
 import type { IconName } from '@/components/ui';
+import { Hideable } from '@/components/owner/Hideable';
 
 function MenuItem({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
   return (
@@ -47,9 +48,10 @@ export default function ProfileTab() {
 
   return (
     <Screen>
-      <ProfileView p={profile} me={userId} reloadKey={reloadKey} onProfileChanged={refreshProfile} actions={<MessagesButton userId={userId} />} />
+      <ProfileView p={profile} me={userId} reloadKey={reloadKey} onProfileChanged={refreshProfile} actions={<Hideable id="profile.messages" label={t('chat.title')}><MessagesButton userId={userId} /></Hideable>} />
 
       {health?.weight_kg ? (
+        <Hideable id="profile.health" label={t('profile.healthInfo')}>
         <Card style={{ gap: space.xs }}>
           <T size="sm" muted>{t('profile.healthInfo')}</T>
           <T bold>
@@ -57,10 +59,11 @@ export default function ProfileTab() {
             {health.goal ? ` · ${t(`onboarding.goal_${health.goal}`)}` : ''}
           </T>
         </Card>
+        </Hideable>
       ) : null}
 
       {/* اشتراكي وبطاقة الدخول + إدارة النادي للموظفين */}
-      <MembershipEntry />
+      <Hideable id="profile.membership" label={t('gymops.myMembership')}><MembershipEntry /></Hideable>
 
       <Card style={{ paddingVertical: space.xs }}>
         {owner ? <MenuItem icon="shield-checkmark-outline" label={`${t('owner.title')}${owner.reports + owner.brands ? ` · ${owner.reports + owner.brands}` : ''}`} onPress={() => router.push('/owner')} /> : null}
@@ -69,20 +72,26 @@ export default function ProfileTab() {
       </Card>
 
       {/* الخصوصية: مين يشوفني في المنافسة */}
+      <Hideable id="profile.privacy" label={t('profile.privacyTitle')}>
       <Card style={{ gap: space.md }}>
         <T bold>{t('profile.privacyTitle')}</T>
         <LeaderboardVisibility bare />
       </Card>
+      </Hideable>
 
+      <Hideable id="profile.theme" label={t('profile.theme')}>
       <Card style={{ gap: space.md }}>
         <T bold>{t('profile.theme')}</T>
         <ThemePicker />
       </Card>
+      </Hideable>
 
+      <Hideable id="profile.language" label={t('profile.language')}>
       <Card style={{ gap: space.md }}>
         <T bold>{t('profile.language')}</T>
         <LanguageToggle userId={userId} />
       </Card>
+      </Hideable>
 
       <T size="xs" muted center>🔒 {t('profile.privacy')}</T>
       <Button title={t('auth.signOut')} variant="ghost" icon="log-out-outline" onPress={async () => { await unregisterPush(); await clearSleepSchedule(userId); await supabase.auth.signOut(); }} />

@@ -34,7 +34,7 @@ export default function Follows() {
                 <T semibold numberOfLines={1}>{a.full_name || a.username}</T>
                 <T size="xs" muted>@{a.username}</T>
               </Row>
-              <RankBadge points={a.points} coach={a.is_coach} small />
+              <RankBadge points={a.points} coach={a.is_coach} small userId={a.id} />
             </Row>
           </Pressable>
         )}

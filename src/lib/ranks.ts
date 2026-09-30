@@ -49,8 +49,9 @@ export function rankProgress(points: number) {
   return { cur, next, pct, remaining: next.min - points };
 }
 
-export function canPublish(kind: 'tip' | 'program', p: { points: number; is_coach?: boolean | null }) {
-  if (p.is_coach) return true;
+export function canPublish(kind: 'tip' | 'program', p: { points: number; is_coach?: boolean | null; is_owner?: boolean | null }) {
+  // المدرب الموثّق ومالك التطبيق مفتوح لهم النشر بدون شرط الرتبة
+  if (p.is_coach || p.is_owner) return true;
   return rankLevel(p.points) >= (kind === 'tip' ? TIP_LEVEL : PROGRAM_LEVEL);
 }
 

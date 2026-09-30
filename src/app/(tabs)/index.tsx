@@ -25,11 +25,13 @@ import { PartnerHome } from '@/components/partners/PartnerHome';
 import { DashboardList, MonitorCards, StrainRecoveryChart, StressCard } from '@/components/pulse/Insights';
 import { ChevronBar, MiniBars, Rings } from '@/components/pulse/Rings';
 import { MetricChip, NCard, NSection, NT, Num, OnDark, Pill, zoneColor } from '@/components/pulse/widgets';
+import { HiddenTag, OwnerPartSheet, useOwnerMode } from '@/components/owner/Hideable';
 import { Avatar } from '@/components/ui';
+import { useHiddenParts } from '@/lib/appOwner';
 import { useUser } from '@/lib/auth';
 import { startOfWeek, todayIndex } from '@/lib/dates';
 import { adaptWorkout, useHealth } from '@/lib/health';
-import { HomeLongPress, LONG_PRESS_MS, useHomeLayout, type HomeSection } from '@/lib/homeLayout';
+import { HomeLongPress, LONG_PRESS_MS, SECTION_META, useHomeLayout, type HomeSection } from '@/lib/homeLayout';
 import { useLocalized } from '@/lib/i18n';
 import { isBeta } from '@/lib/appInfo';
 import { useRingStyle } from '@/lib/ringStyle';
@@ -77,6 +79,15 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setArranging(true);
   };
+  // المالك: الضغط المطوّل على قسم يفتح «إخفاء عن الكل / إظهار» (والترتيب من نفس القائمة).
+  // الأقسام اللي أخفاها ما تطلع للمستخدمين، وعنده تطلع باهتة
+  const owner = useOwnerMode();
+  const parts = useHiddenParts();
+  const [ownerMenu, setOwnerMenu] = useState<HomeSection | null>(null);
+  const sectionLongPress = (k: HomeSection) => (owner ? () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setOwnerMenu(k);
+  } : openArrange);
 
   const loadRank = useCallback(async () => {
     const { data } = await supabase.rpc('leaderboard', { p_scope: 'friends', p_since: startOfWeek().toISOString(), p_limit: 200 });
@@ -347,11 +358,19 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
             </Pressable>
           ) : null}
 
-          {ready ? layout.order.filter((k) => !layout.hidden.includes(k)).map((k) => (
-            <Pressable key={k} accessible={false} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS} style={{ gap: space.lg }}>
-              {blocks[k]}
-            </Pressable>
-          )) : null}
+          {ready ? layout.order.filter((k) => !layout.hidden.includes(k) && (owner || !parts.has(`home.${k}`))).map((k) => {
+            const off = parts.has(`home.${k}`);
+            return (
+              <HomeLongPress.Provider key={k} value={sectionLongPress(k)}>
+                <View>
+                  <Pressable accessible={false} onLongPress={sectionLongPress(k)} delayLongPress={LONG_PRESS_MS} style={{ gap: space.lg, opacity: off ? 0.35 : 1 }}>
+                    {blocks[k]}
+                  </Pressable>
+                  {off ? <HiddenTag /> : null}
+                </View>
+              </HomeLongPress.Provider>
+            );
+          }) : null}
 
           <Pressable onPress={openArrange} accessibilityRole="button" style={({ pressed }) => [styles.arrange, { opacity: pressed ? 0.7 : 1 }]}>
             <Ionicons name="options-outline" size={15} color={night.accent} />
@@ -368,6 +387,10 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
       {arranging ? (
         <HomeArrange visible layout={layout} onSave={save} onClose={() => setArranging(false)}
           ringStyle={ringStyle.style} onRingStyle={ringStyle.save} />
+      ) : null}
+      {owner && ownerMenu ? (
+        <OwnerPartSheet id={`home.${ownerMenu}`} label={t(SECTION_META[ownerMenu].label)} visible onClose={() => setOwnerMenu(null)}
+          extra={[{ key: 'arrange', label: t('homeLayout.customize'), icon: 'options-outline', onPress: () => { setOwnerMenu(null); setTimeout(() => setArranging(true), 450); } }]} />
       ) : null}
     </View>
     </HomeLongPress.Provider>

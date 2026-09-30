@@ -14,6 +14,8 @@ import { deleteTip, likeTip, loadPrograms, loadTips, profileCounts, type PublicP
 import { pickImage } from '@/lib/images';
 import { errorKey, publicUrl, supabase, uploadImage } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
+import { Hideable } from '@/components/owner/Hideable';
+import { useIsOwnerId } from '@/lib/appOwner';
 import { ProgramCard, TipCard } from './cards';
 import { CoachCheck, RankBadge } from './RankBadge';
 import { CoverPicker, coverPhotoUrl, ProfileCover } from './Cover';
@@ -37,6 +39,7 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
   const { t } = useTranslation();
   const { L, lng } = useLocalized();
   const self = p.id === me;
+  const ownerProfile = useIsOwnerId(p.id) || !!p.is_owner;
   const [tab, setTab] = useState<Tab>('programs');
   const [counts, setCounts] = useState({ posts: 0, programs: 0, tips: 0 });
   const [programs, setPrograms] = useState<UserProgram[] | null>(null);
@@ -140,7 +143,7 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
           {p.is_coach ? <CoachCheck size={20} /> : null}
         </Row>
         <T color={brand.sand}>@{p.username}{gymLabel ? ` · 📍 ${gymLabel}` : ''}</T>
-        <RankBadge points={p.points} onDark />
+        <RankBadge points={p.points} onDark userId={p.id} owner={p.is_owner} />
         {p.is_coach ? <T size="xs" color={brand.amber}>{t('social.verifiedCoach')}</T> : null}
         {p.bio ? <T center color={brand.cream} style={{ lineHeight: 24 }}>{p.bio}</T> : null}
 
@@ -158,7 +161,9 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
 
       {actions}
 
-      {/* تقدم الرتبة */}
+      {/* تقدم الرتبة (المالك ما عنده رتبة: شارته «المالك») */}
+      {ownerProfile ? null : (
+      <Hideable id="profile.rank" label={t('social.ranksTitle')}>
       <Card onPress={() => router.push('/ranks')} style={{ gap: space.sm }}>
         <Row style={{ justifyContent: 'space-between' }}>
           <Row gap={6}>
@@ -176,9 +181,12 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
           {prog.next ? t(self ? 'social.toNextSelf' : 'social.toNext', { n: prog.remaining, rank: L(prog.next.name) }) : t('social.maxRank')}
         </T>
       </Card>
+      </Hideable>
+      )}
 
-      {self ? <PublishRow p={p} /> : null}
+      {self ? <Hideable id="profile.publish" label={`${t('social.newTip')} · ${t('social.newProgram')}`}><PublishRow p={p} /></Hideable> : null}
 
+      <Hideable id="profile.content" label={`${t('social.programs')} · ${t('social.tips')} · ${t('social.posts')}`} style={{ gap: space.lg }}>
       <Segmented<Tab> value={tab} onChange={setTab} options={[
         { value: 'programs', label: `${t('social.programs')} ${counts.programs || ''}`.trim() },
         { value: 'tips', label: `${t('social.tips')} ${counts.tips || ''}`.trim() },
@@ -210,6 +218,7 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
           </View>
         ) : posts ? <Empty icon="images-outline" text={t('social.noPosts')} /> : null
       ) : null}
+      </Hideable>
     </View>
   );
 }

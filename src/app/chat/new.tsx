@@ -87,7 +87,7 @@ export default function NewMessage() {
                 <View style={{ flex: 1, gap: 2 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <T semibold numberOfLines={1} style={{ flexShrink: 1 }}>{c.full_name || c.username}</T>
-                    <RankBadge points={c.points} coach={c.is_coach} small />
+                    <RankBadge points={c.points} coach={c.is_coach} small userId={c.id} />
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <T size="xs" muted numberOfLines={1} style={{ flexShrink: 1 }}>@{c.username}</T>
