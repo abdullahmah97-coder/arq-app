@@ -47,6 +47,18 @@ const { setup } = require('./_harness.cjs');
   await as(U.B, `update profiles set presence_visibility = 'gym' where id = $1`, [U.B]);
   check('back to normal → shows again', has(await tl(U.A), (r) => r.id === ciB));
 
+  // ---------- «انتهى التمرين 💪» لما يسجّل خروج ----------
+  const co = (await tl(U.A)).filter((r) => r.id === ciB);
+  check('checking out shows a second moment «workout done» at the check-out time', co.length === 2 && co[0].item_type === 'checkout'
+    && co[1].item_type === 'checkin' && !!co[0].meta.in && !!co[0].meta.out, JSON.stringify(co.map((r) => r.item_type)));
+  const [{ id: ciShort }] = await q(`insert into check_ins (user_id, gym_id, checked_in_at, checked_out_at) values ($1, $2, now() - interval '30 minutes', now() - interval '28 minutes') returning id`, [U.B, gym.id]);
+  check('a 2-minute visit has no «workout done»', (await tl(U.A)).filter((r) => r.id === ciShort).map((r) => r.item_type).join() === 'checkin');
+  const [{ id: ciOpen }] = await q(`insert into check_ins (user_id, gym_id, checked_in_at) values ($1, $2, now() - interval '10 minutes') returning id`, [U.A, gym.id]);
+  check('still at the gym → only the check-in', (await tl(U.A)).filter((r) => r.id === ciOpen).map((r) => r.item_type).join() === 'checkin');
+  await as(U.B, `update profiles set presence_visibility = 'hidden' where id = $1`, [U.B]);
+  check('hidden mode hides «workout done» too', !has(await tl(U.A), (r) => r.id === ciB));
+  await as(U.B, `update profiles set presence_visibility = 'gym' where id = $1`, [U.B]);
+
   // ---------- التفاعل بالإيموجي ----------
   await as(U.B, `insert into post_likes (post_id, user_id, emoji) values ($1, $2, 'fire')`, [pA, U.B]);
   let rA = (await tl(U.A)).find((r) => r.id === pA);
@@ -75,6 +87,8 @@ const { setup } = require('./_harness.cjs');
   check('…and 👏 on check-ins; check-in reactions show in the timeline', cB.my_reaction === 'clap' && Number(cB.like_count) === 1 && cB.reactors[0].e === 'clap');
   await as(U.A, `update checkin_likes set emoji = 'fire' where check_in_id = $1 and user_id = $2`, [ciB, U.A]);
   check('check-in reaction can change too', (await tl(U.A)).find((r) => r.id === ciB).my_reaction === 'fire');
+  const both = (await tl(U.A)).filter((r) => r.id === ciB);
+  check('the check-in and its «workout done» share the same reactions', both.length === 2 && both.every((r) => r.my_reaction === 'fire' && Number(r.like_count) === 1));
   await expectErr('a stranger cannot react to my friend\'s check-in', () => as(U.C, `insert into checkin_likes (check_in_id, user_id) values ($1, $2)`, [ciA, U.C]), /row-level security/);
   const who = await as(U.A, `select user_id, emoji, full_name from reactions_of('post', $1)`, [pA]);
   check('«who reacted» list for friends', who.length === 1 && who[0].user_id === U.B && who[0].emoji === 'strong', JSON.stringify(who));
@@ -114,20 +128,25 @@ const { setup } = require('./_harness.cjs');
   const s1 = await sleep(U.A, '06 23:30');
   check('good night posted (friends-only)', (await post(s1)).kind === 'sleep' && (await post(s1)).visibility === 'friends');
   check('pressing again while still asleep → same post', (await sleep(U.A, '06 23:45')) === s1);
-  const w2 = await wake(U.A, '07 06:45', 'open', '07 06:50');
+  // نايم: فتح التطبيق الصبح ما ينشر «صباح الخير» تلقائي — ينتظر زر شاشة النوم
+  check('asleep → opening the app does not wake you automatically', (await wake(U.A, '07 06:45', 'open', '07 06:50')) === null
+    && (await wake(U.A, '07 06:30', 'alarm', '07 06:50')) === null);
+  const openSleep = async (uid, now) => (await q(`select s.id, s.created_at from _open_sleep($1, $2) s where s.id is not null`, [uid, R(now)]))[0];
+  check('…still asleep (the sleep screen stays)', (await openSleep(U.A, '07 06:50'))?.id === s1);
+  const w2 = await wake(U.A, '07 06:45', 'manual', '07 06:45');
   w = await post(w2);
-  check('waking after it → how long you slept (7h15m) from the two times only', w2 !== w1 && w.meta.slept === 435 && w.meta.sleep_id === s1, JSON.stringify(w.meta));
+  check('«good morning» button → how long you slept (7h15m) from the two times only', w2 !== w1 && w.meta.slept === 435 && w.meta.sleep_id === s1 && w.meta.src === 'manual', JSON.stringify(w.meta));
+  check('…and you are awake (the timeline opens)', !(await openSleep(U.A, '07 06:50')));
   check('then one a day again', (await wake(U.A, '07 09:00', 'open', '07 09:00')) === w2);
   // قيلولة العصر: ينام ٢:٥٢ ويصحى ٩:١٤ الليل
   const s2 = await sleep(U.A, '07 14:52');
   check('a nap is a new good night', s2 !== s1);
-  const w3 = await wake(U.A, '07 21:14', 'open', '07 21:14');
+  const w3 = await wake(U.A, '07 21:14', 'manual', '07 21:14');
   check('waking from a nap → a second morning post that day, with 6h22m', w3 !== w2 && (await post(w3)).meta.slept === 382);
   const s3 = await sleep(U.A, '07 22:00');
-  await expectErr('an automatic wake time before the good night → too_soon (try later)', () => wake(U.A, '07 21:50', 'alarm', '07 22:05'), /too_soon/);
   const w4 = await wake(U.A, '07 21:50', 'manual', '07 22:10');
   w = await post(w4);
-  check('the + button right after → uses now, no sleep length under 20 min', Date.parse(w.meta.at) === Date.parse(R('07 22:10')) && !('slept' in w.meta) && w.meta.sleep_id === s3, JSON.stringify(w.meta));
+  check('pressing it right after → uses now, no sleep length under 20 min', Date.parse(w.meta.at) === Date.parse(R('07 22:10')) && !('slept' in w.meta) && w.meta.sleep_id === s3, JSON.stringify(w.meta));
   // حد ٤ «تصبحون على خير» خلال ٢٤ ساعة (٢٣:٣٠، ١٤:٥٢، ٢٢:٠٠، ٢٢:٢٠)
   await sleep(U.A, '07 22:20'); await wake(U.A, '07 22:30', 'manual', '07 22:30');
   await expectErr('max 4 good nights a day', () => sleep(U.A, '07 22:40'), /rate_limited/);
@@ -142,6 +161,12 @@ const { setup } = require('./_harness.cjs');
   await expectErr('the inner functions are not callable by users', () => as(U.A, `select _post_wake($1, now(), 'open', 'x', now())`, [U.A]), /permission denied/);
   await expectErr('…nor the sleep one', () => as(U.A, `select _post_sleep($1, 'x', now())`, [U.A]), /permission denied/);
   check('post_sleep works for a signed-in user', !!(await as(U.D, `select post_sleep('🌙') id`))[0].id);
+  check('my_open_sleep tells the app you are asleep (sleep screen)', (await as(U.D, `select id from my_open_sleep()`)).length === 1);
+  check('…opening the app does not wake you', (await as(U.D, `select post_wake(now(), 'open', 'x') id`))[0].id === null
+    && (await as(U.D, `select id from my_open_sleep()`)).length === 1);
+  check('…the «good morning» button does', !!(await as(U.D, `select post_wake(now(), 'manual', 'x') id`))[0].id
+    && (await as(U.D, `select id from my_open_sleep()`)).length === 0);
+  await expectErr('anonymous cannot ask', () => as(null, `select * from my_open_sleep()`), /permission denied/);
   await expectErr('anonymous cannot post', () => as(null, `select post_sleep('x')`), /permission denied/);
   await expectErr('morning / night posts cannot be inserted directly', () => as(U.B, `insert into posts (user_id, kind, caption) values ($1, 'wake', 'x')`, [U.B]), /row-level security/);
   await expectErr('…nor turned into one by editing', () => as(U.A, `update posts set kind = 'wake' where id = $1`, [pA]), /not_allowed/);

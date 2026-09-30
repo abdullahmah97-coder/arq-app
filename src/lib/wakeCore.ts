@@ -1,6 +1,6 @@
 // «صباح الخير ☀️» و«تصبحون على خير 🌙» في التايم لاين (منطق بحت عشان يتختبر):
 // «صباح الخير» تلقائي مرة باليوم لما تفتح التطبيق الصبح. الوقت = وقت منبّه أرك لو رنّ اليوم، وإلا وقت الفتح.
-// ولو نشرت «تصبحون على خير» من زر ＋: أول فتح بعدها بساعتين أو أكثر = صحيت (بأي ساعة إلا ١٢–٣ الفجر)، والخادم يحسب كم نمت.
+// ولو نشرت «تصبحون على خير» من زر ＋: التايم لاين يتقفل بشاشة النوم لين تضغط «صباح الخير»، والخادم يحسب كم نمت.
 // ما نستخدم بيانات النوم من الساعة (بيانات صحية) — بس إعداد المنبّه والوقتين اللي نشرتهم أنت.
 
 export interface AlarmInfo { on: boolean; wakeMin: number | null; days: number[] }
@@ -10,7 +10,7 @@ export interface WakePlan extends WakeMoment { afterSleep: boolean }
 /** أول ساعة وآخر ساعة نعتبر فيها فتح التطبيق «صحيان» */
 export const WAKE_FROM_HOUR = 3;
 export const WAKE_UNTIL_HOUR = 14;
-/** بعد «تصبحون على خير»: كم دقيقة لازم تمر قبل ما نعتبر فتح التطبيق صحيان تلقائي */
+/** بعد «تصبحون على خير»: كم دقيقة لازم تمر قبل ما نفتح له شاشة النوم الصبح */
 export const AUTO_WAKE_AFTER_MIN = 120;
 /** «تصبحون على خير» أقدم من كذا نعتبرها خلصت (نسي يفتح التطبيق) */
 export const SLEEP_OPEN_HOURS = 20;
@@ -35,21 +35,20 @@ export const sleepStillOpen = (now: Date, sleepAt: Date | null) =>
   !!sleepAt && sleepAt.getTime() <= now.getTime() + 60_000 && now.getTime() - sleepAt.getTime() < SLEEP_OPEN_HOURS * 3600_000;
 
 /**
- * متى ننشر «صباح الخير» تلقائياً (null = لا الحين):
- *  - بعد «تصبحون على خير» (sleepAt): بعد ساعتين على الأقل، بأي ساعة إلا ١٢–٣ الفجر.
- *    الوقت = منبّه أرك لو رنّ بعد النوم، وإلا وقت الفتح.
- *  - بدونها: مرة باليوم (doneToday) الصبح ٣:٠٠–١٣:٥٩.
+ * متى ننشر «صباح الخير» تلقائياً (null = لا الحين): مرة باليوم (doneToday) الصبح ٣:٠٠–١٣:٥٩.
+ * وأنت نايم (بعد «تصبحون على خير») ما ننشر تلقائي: التايم لاين مقفل بشاشة النوم لين تضغط «صباح الخير».
  */
 export function wakePlan(now: Date, alarm: AlarmInfo | null, sleepAt: Date | null, doneToday: boolean): WakePlan | null {
-  if (sleepAt && sleepStillOpen(now, sleepAt)) {
-    if ((now.getTime() - sleepAt.getTime()) / 60000 < AUTO_WAKE_AFTER_MIN || now.getHours() < WAKE_FROM_HOUR) return null;
-    const a = alarmRangToday(now, alarm);
-    if (a && a.getTime() >= sleepAt.getTime() + 20 * 60000) return { at: a, src: 'alarm', afterSleep: true };
-    return { at: now, src: 'open', afterSleep: true };
-  }
+  if (sleepAt && sleepStillOpen(now, sleepAt)) return null;
   if (doneToday) return null;
   const m = wakeMoment(now, alarm);
   return m ? { ...m, afterSleep: false } : null;
+}
+
+/** نايم من ساعتين أو أكثر والوقت صار الصبح (من ٣ الفجر): نفتح له شاشة النوم في التايم لاين عشان يضغط «صباح الخير» */
+export function wakePromptDue(now: Date, sleepAt: Date | null): boolean {
+  if (!sleepAt || !sleepStillOpen(now, sleepAt)) return false;
+  return (now.getTime() - sleepAt.getTime()) / 60000 >= AUTO_WAKE_AFTER_MIN && now.getHours() >= WAKE_FROM_HOUR;
 }
 
 /** اليوم المحلي YYYY-MM-DD (نسجّل فيه إننا نشرنا «صباح الخير» اليوم) */

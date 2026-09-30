@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { REACTION_EMOJI, isReaction, normalizeReactors, withReaction, type Reactable } from '../src/lib/reactionsCore.ts';
 import {
-  alarmRangToday, clockOf, dateLine, dayOf, durationText, greetingOf, localDayKey, stableIndex, trainedMinutes, wakeMoment, wakePlan,
+  alarmRangToday, clockOf, dateLine, dayOf, durationText, greetingOf, localDayKey, stableIndex, trainedMinutes, wakeMoment, wakePlan, wakePromptDue,
 } from '../src/lib/wakeCore.ts';
 
 let passed = 0;
@@ -43,19 +43,21 @@ test('plan without a good night: once a day in the morning', () => {
   assert.equal(wakePlan(at(16, 0), null, null, false), null, 'afternoon without a good night → nothing');
 });
 
-test('plan after «good night»: first open 2h+ later, any hour except midnight–3', () => {
+test('asleep (after «good night»): never an automatic good morning — the sleep screen waits for the button', () => {
   const slept = at(23, 30, 29);
-  assert.equal(wakePlan(at(0, 45), null, slept, false), null, 'still in bed (1h15)');
-  assert.equal(wakePlan(at(2, 30), null, slept, false), null, '2:30 AM — probably up for a moment');
-  const p = wakePlan(at(6, 50), null, slept, true)!;
-  assert.ok(p && p.afterSleep && p.src === 'open' && p.at.getTime() === at(6, 50).getTime(), 'posts even if a morning post was already marked');
-  const a = wakePlan(at(8, 10), alarm, slept, false)!;
-  assert.equal(a.src, 'alarm');
-  assert.equal(a.at.getHours(), 6);
-  // قيلولة: ينام ٢:٥٢ العصر ويفتح ٩:١٤ الليل
-  const nap = wakePlan(at(21, 14), alarm, at(14, 52), true)!;
-  assert.ok(nap.afterSleep && nap.src === 'open', 'the alarm rang before the nap → use the open time');
-  assert.equal(wakePlan(at(21, 14), null, at(0, 30, 29), true), null, 'a good night older than 20h is over');
+  assert.equal(wakePlan(at(0, 45), null, slept, false), null);
+  assert.equal(wakePlan(at(6, 50), null, slept, false), null, 'even in the morning');
+  assert.equal(wakePlan(at(8, 10), alarm, slept, false), null, 'even after the ARQ alarm');
+  assert.equal(wakePlan(at(9, 0), null, at(0, 30, 29), false)?.src, 'open', 'a good night older than 20h is over → normal morning');
+});
+
+test('when to open the sleep screen by itself (2h+ asleep and it is morning)', () => {
+  const slept = at(23, 30, 29);
+  assert.equal(wakePromptDue(at(0, 45), slept), false, 'just went to bed');
+  assert.equal(wakePromptDue(at(2, 30), slept), false, 'middle of the night');
+  assert.equal(wakePromptDue(at(6, 50), slept), true);
+  assert.equal(wakePromptDue(at(21, 14), at(14, 52)), true, 'after a nap');
+  assert.equal(wakePromptDue(at(6, 50), null), false);
 });
 
 test('trained minutes from a check-in', () => {

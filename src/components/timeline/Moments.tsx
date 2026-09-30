@@ -14,7 +14,7 @@ import { timeAgo } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import { REACTION_EMOJI, REACTIONS, type ReactionKey, type Reactor } from '@/lib/reactions';
 import { publicUrl } from '@/lib/supabase';
-import { itemKey, type TimelineItem } from '@/lib/timeline';
+import { isVisit, itemKey, type TimelineItem } from '@/lib/timeline';
 import type { MomentMeta } from '@/lib/types';
 import { clockOf, dayOf, durationText, stableIndex, trainedMinutes } from '@/lib/wakeCore';
 import { brand, colors, fonts, radius, space } from '@/theme';
@@ -49,12 +49,13 @@ export function MomentAvatar({ uri, name, size = AV }: { uri?: string | null; na
   );
 }
 
-/** فقاعة اللحظة على الخط: ☀️ صباح الخير، 🌙 تصبحون على خير، 🏋️ النادي، 📷 صورة، “ كلام */
+/** فقاعة اللحظة على الخط: ☀️ صباح الخير، 🌙 تصبحون على خير، 🏋️ دخل النادي، 🏆 انتهى التمرين، 📷 صورة، “ كلام */
 export function bubbleLook(kind: MomentKind, photo: boolean): { bg: string; fg: string; icon?: IconName; glyph?: string } {
   switch (kind) {
     case 'wake': return { bg: brand.amber, fg: '#FFFFFF', icon: 'sunny' };
     case 'sleep': return { bg: NIGHT, fg: brand.sand, icon: 'moon' };
     case 'checkin': return { bg: brand.deepGreen, fg: brand.amber, icon: 'barbell' };
+    case 'checkout': return { bg: brand.deepGreen, fg: brand.amber, icon: 'trophy' };
     default: return photo ? { bg: brand.orange, fg: brand.cream, icon: 'camera' } : { bg: brand.green, fg: brand.cream, glyph: '“' };
   }
 }
@@ -94,12 +95,18 @@ export function momentText(it: { item_type: MomentKind; id: string; at: string; 
         sub: `${whenText(it.meta.at ?? it.at, lng, now, t)} · ${t(`timeline.sleepLine${stableIndex(it.id, SLEEP_LINES) + 1}`)}`,
       };
     case 'checkin': {
-      const mins = trainedMinutes(it.at, it.meta.out);
+      // مدة التمرين تطلع في لحظة «انتهى التمرين» (checkout) فوقها
       const here = !it.meta.out && now.getTime() - Date.parse(it.at) < 6 * 3600_000;
       const parts = [whenText(it.at, lng, now, t)];
-      if (mins) parts.push(t('timeline.m_trained', { d: durationText(mins, lng) }));
-      else if (here) parts.push(t('timeline.m_hereNow'));
+      if (here) parts.push(t('timeline.m_hereNow'));
       return { headline: it.gym_name ? t('timeline.m_gym', { gym: it.gym_name }) : t('timeline.m_gymNoName'), sub: parts.join(' · ') };
+    }
+    case 'checkout': {
+      const out = it.meta.out ?? it.at;
+      const mins = it.meta.in ? trainedMinutes(it.meta.in, out) : null;
+      const parts = [whenText(out, lng, now, t)];
+      if (mins) parts.push(t('timeline.m_trained', { d: durationText(mins, lng) }));
+      return { headline: it.gym_name ? t('timeline.m_gymDone', { gym: it.gym_name }) : t('timeline.m_gymDoneNoName'), sub: parts.join(' · ') };
     }
     default: {
       const parts = [whenText(it.at, lng, now, t)];
@@ -130,10 +137,11 @@ export const MomentRow = memo(function MomentRow({ it, mine, pickerOpen, last, o
   const { headline, sub } = momentText(it, t, lng, now);
   const open = () => {
     onPicker(null);
-    if (it.item_type === 'checkin') router.push({ pathname: '/checkin/[id]', params: { id: it.id, name } });
+    if (isVisit(it.item_type)) router.push({ pathname: '/checkin/[id]', params: { id: it.id, name } });
     else router.push({ pathname: '/post/[id]', params: { id: it.id } });
   };
-  const canDelete = mine && it.item_type !== 'checkin' && !!onLongPress;
+  // الحضور ينشال من صفحة الحضور، مو من هنا
+  const canDelete = mine && !isVisit(it.item_type) && !!onLongPress;
   return (
     <Pressable onPress={open} onLongPress={canDelete ? () => onLongPress!(it) : undefined} delayLongPress={350}
       accessibilityRole="button" accessibilityLabel={[name, headline, it.item_type === 'post' ? it.caption : '', sub].filter(Boolean).join('، ')}

@@ -113,9 +113,9 @@ export interface FeedPost {
 
 /**
  * تفاصيل اللحظة: at = الوقت (منبّه أرك / فتح التطبيق / وقت النوم)، src = من وين،
- * slept = كم دقيقة نام (من «تصبحون على خير» لين «صباح الخير»)، out = وقت الخروج من النادي
+ * slept = كم دقيقة نام (من «تصبحون على خير» لين «صباح الخير»)، in / out = وقت الدخول والخروج من النادي
  */
-export interface MomentMeta { at?: string; src?: 'alarm' | 'open' | 'manual'; slept?: number; sleep_id?: string; out?: string | null }
+export interface MomentMeta { at?: string; src?: 'alarm' | 'open' | 'manual'; slept?: number; sleep_id?: string; in?: string; out?: string | null }
 /** @deprecated الاسم القديم */
 export type WakeMeta = MomentMeta;
 

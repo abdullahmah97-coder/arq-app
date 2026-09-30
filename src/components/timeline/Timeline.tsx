@@ -1,13 +1,14 @@
-// قطع التايم لاين: تنبيه المشاركة (مرة وحدة)، إعدادات المشاركة، ونشر «صباح الخير ☀️» تلقائياً
+// قطع التايم لاين: تنبيه المشاركة (مرة وحدة)، إعدادات المشاركة، ونشر «صباح الخير ☀️» تلقائياً (أو فتح شاشة النوم الصبح)
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { router, usePathname } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppState, Modal, Pressable, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, Row, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { postWakeIfDue, setSharing } from '@/lib/timeline';
+import { claimWakePrompt, setSharing, wakeTick } from '@/lib/timeline';
 import { brand, colors, radius, space } from '@/theme';
 
 const NOTICE_KEY = 'arq.timeline.notice.v1';
@@ -81,17 +82,33 @@ function ShareRow({ title, sub, value, onChange }: { title: string; sub: string;
   );
 }
 
-/** ينشر «صباح الخير ☀️» مرة باليوم لما تفتح التطبيق الصبح، أو أول فتح بعد «تصبحون على خير» (لو المشاركة شغّالة) */
+/** الصفحات الرئيسية (التبويبات): منها بس نفتح شاشة «صباح الخير» لحالها، مو لو فاتح شي ثاني (رسالة، إشعار…) */
+const TAB_ROOTS = new Set(['/', '/plan', '/community', '/compete', '/profile']);
+
+/**
+ * كل ما تفتح التطبيق:
+ *  - مو نايم: ينشر «صباح الخير ☀️» مرة باليوم الصبح (لو المشاركة شغّالة)
+ *  - نايم من التطبيق («تصبحون على خير») وصار الصبح: يفتح لك التايم لاين على شاشة «صباح الخير» (مرة وحدة لكل نومة)
+ */
 export function WakeWatcher() {
   const { session, profile } = useAuth();
   const uid = session?.user.id;
-  const on = !!profile?.onboarded && profile?.share_wake !== false;
+  const onboarded = !!profile?.onboarded;
+  const auto = profile?.share_wake !== false;
+  const path = usePathname();
+  const pathRef = useRef(path);
+  useEffect(() => { pathRef.current = path; }, [path]);
   useEffect(() => {
-    if (!uid || !on) return;
-    const run = () => { postWakeIfDue(uid).catch(() => {}); };
-    run();
-    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') run(); });
-    return () => sub.remove();
-  }, [uid, on]);
+    if (!uid || !onboarded) return;
+    let alive = true;
+    const run = async () => {
+      const r = await wakeTick(uid, auto).catch(() => null);
+      if (!alive || !r?.due || !r.sleep?.id || !TAB_ROOTS.has(pathRef.current)) return;
+      if (await claimWakePrompt(uid, r.sleep.id)) router.navigate({ pathname: '/(tabs)/community', params: { tl: r.sleep.id } });
+    };
+    void run();
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') void run(); });
+    return () => { alive = false; sub.remove(); };
+  }, [uid, onboarded, auto]);
   return null;
 }

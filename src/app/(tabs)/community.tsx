@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, FlatList, Pressable, RefreshControl, View } from 'react-native';
@@ -10,6 +10,7 @@ import { TimelineHeader } from '@/components/timeline/Header';
 import { MomentRow } from '@/components/timeline/Moments';
 import { fabBottom, PlusMenu } from '@/components/timeline/PlusMenu';
 import { ReactionsSheet } from '@/components/timeline/ReactionsSheet';
+import { SleepScreen, WokeToast, type Woke } from '@/components/timeline/SleepScreen';
 import { SharingNotice, TimelineSettings } from '@/components/timeline/Timeline';
 import { Button, Empty, H, IconButton, ProfileButton, Row, Segmented } from '@/components/ui';
 import { useUser } from '@/lib/auth';
@@ -18,12 +19,16 @@ import { deletePost } from '@/lib/posts';
 import { canPublish, RANKS } from '@/lib/ranks';
 import { saveReaction, withReaction, type ReactionKey, type ReactTarget } from '@/lib/reactions';
 import { deleteTip, likeTip, loadPrograms, loadTips, type Tip, type UserProgram } from '@/lib/social';
-import { itemKey, loadTimeline, onTimelineChanged, TIMELINE_PAGE, type TimelineItem } from '@/lib/timeline';
+import {
+  isVisit, itemKey, knownSleep, loadOpenSleep, loadTimeline, onSleepChanged, onTimelineChanged, sameSleep, TIMELINE_PAGE, type OpenSleep, type TimelineItem,
+} from '@/lib/timeline';
 import type { FeedPost } from '@/lib/types';
 import { colors, space, TAB_BAR_SPACE } from '@/theme';
 
 const PAGE = 20;
-const target = (it: TimelineItem): ReactTarget => ({ type: it.item_type === 'checkin' ? 'checkin' : 'post', id: it.id });
+// دخول النادي و«انتهى التمرين» نفس الزيارة: التفاعل على الحضور
+const target = (it: TimelineItem): ReactTarget => ({ type: isVisit(it.item_type) ? 'checkin' : 'post', id: it.id });
+const sameTarget = (a: TimelineItem, b: TimelineItem) => a.id === b.id && isVisit(a.item_type) === isVisit(b.item_type);
 
 export default function Community() {
   const { t } = useTranslation();
@@ -31,6 +36,13 @@ export default function Community() {
   const insets = useSafeAreaInsets();
   const { userId, profile } = useUser();
   const [tab, setTab] = useState<'posts' | 'tips' | 'programs'>('posts');
+  // شاشة «صباح الخير» تنفتح لحالها الصبح (tl): نرجع لتبويب التايم لاين
+  const { tl } = useLocalSearchParams<{ tl?: string }>();
+  const [tlSeen, setTlSeen] = useState(tl);
+  if (tl !== tlSeen) {
+    setTlSeen(tl);
+    setTab('posts');
+  }
   const [tips, setTips] = useState<Tip[]>([]);
   const [tipsDone, setTipsDone] = useState(false);
   const [programs, setPrograms] = useState<UserProgram[]>([]);
@@ -42,8 +54,14 @@ export default function Community() {
   const [sharingOpen, setSharingOpen] = useState(false);
   const [picker, setPicker] = useState<string | null>(null);
   const [reactorsOf, setReactorsOf] = useState<ReactTarget | null>(null);
+  // نايم (بعد «تصبحون على خير»)؟ التايم لاين يتقفل بشاشة النوم لين «صباح الخير». undefined = للحين ما نعرف
+  const [sleep, setSleep] = useState<OpenSleep | null | undefined>(() => knownSleep(userId));
+  const [woke, setWoke] = useState<Woke | null>(null);
+  const clearWoke = useCallback(() => setWoke(null), []);
+  useEffect(() => onSleepChanged((u, s) => { if (u === userId) setSleep((p) => (sameSleep(p, s) ? p : s)); }), [userId]);
 
   const load = useCallback(async (before?: string) => {
+    if (!before) void loadOpenSleep(userId);
     try {
       const rows = await loadTimeline(before);
       setDone(rows.length < TIMELINE_PAGE);
@@ -54,7 +72,7 @@ export default function Community() {
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [userId]);
 
   const loadT = useCallback(async (before?: string) => {
     const rows = await loadTips(userId, { before, limit: PAGE });
@@ -94,11 +112,11 @@ export default function Community() {
   const react = useCallback(async (it: TimelineItem, next: ReactionKey | null) => {
     setPicker(null);
     const me = { id: userId, name: profile.full_name || profile.username, avatar: profile.avatar_url ?? null };
-    const k = itemKey(it);
-    setItems((xs) => xs.map((x) => (itemKey(x) === k ? withReaction(x, me, next) : x)));
+    // دخول النادي و«انتهى التمرين» يتحدثون مع بعض
+    setItems((xs) => xs.map((x) => (sameTarget(x, it) ? withReaction(x, me, next) : x)));
     const { error } = await saveReaction(target(it), userId, it.my_reaction, next);
     if (error) {
-      setItems((xs) => xs.map((x) => (itemKey(x) === k ? it : x)));
+      setItems((xs) => xs.map((x) => (sameTarget(x, it) ? { ...x, like_count: it.like_count, my_reaction: it.my_reaction, reactors: it.reactors } : x)));
       console.warn('reaction', error.message);
     }
   }, [userId, profile.full_name, profile.username, profile.avatar_url]);
@@ -134,7 +152,9 @@ export default function Community() {
           { value: 'programs', label: t('social.programs') },
         ]} />
       </View>
-      {tab === 'posts' ? (
+      {tab === 'posts' ? (sleep === undefined ? <View style={{ flex: 1 }} /> : sleep ? (
+        <SleepScreen uid={userId} sleep={sleep} onWoke={setWoke} />
+      ) : (
         <FlatList
           data={items}
           keyExtractor={itemKey}
@@ -163,7 +183,7 @@ export default function Community() {
           onEndReachedThreshold={0.5}
           onEndReached={() => { if (!done && items.length) load(items[items.length - 1].at); }}
         />
-      ) : tab === 'tips' ? (
+      )) : tab === 'tips' ? (
         <FlatList
           data={tips}
           keyExtractor={(x) => x.id}
@@ -184,7 +204,8 @@ export default function Community() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
         />
       )}
-      {tab === 'posts' ? <PlusMenu /> : (
+      {tab === 'posts' && woke && sleep === null ? <WokeToast uid={userId} woke={woke} onDone={clearWoke} /> : null}
+      {tab === 'posts' ? (sleep === null ? <PlusMenu /> : null) : (
         <View style={{ position: 'absolute', bottom: fabBottom(insets.bottom), end: 16 }}>
           <Pressable
             onPress={compose}
