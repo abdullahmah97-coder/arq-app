@@ -16,7 +16,7 @@ import { Button, Loading, T } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { flushLastFatal, installGlobalErrorLogger } from '@/lib/events';
 import { HealthProvider } from '@/lib/health';
-import { restoreLocale } from '@/lib/i18n';
+import { restoreLocale, watchDeviceLocale } from '@/lib/i18n';
 import { usePushSetup } from '@/lib/push';
 import { colors, fontAssets, fonts, space, type ThemeId } from '@/theme';
 import { restoreTheme, saveTheme, ThemeCtx } from '@/lib/appTheme';
@@ -187,6 +187,8 @@ export default function RootLayout() {
     Promise.all([restoreLocale(), restoreTheme().then(setThemeId)]).finally(() => setReady(true));
     // لو انقفل التطبيق بخطأ في التشغيل السابق نرسل تفاصيله الحين
     flushLastFatal();
+    // اللغة تتغيّر كمان من إعدادات الجوال (الأندرويد ما يعيد تشغيل التطبيق لحاله)
+    return watchDeviceLocale();
   }, []);
   // أيقونة التطبيق بلون التطبيق: نتأكد بعد ما يفتح (iOS ما يغيّرها إلا والتطبيق قدامك)، وكل ما يرجع للواجهة
   useEffect(() => {

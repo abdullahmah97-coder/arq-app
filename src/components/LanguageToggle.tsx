@@ -2,7 +2,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, Text, View } from 'react-native';
-import { setLocale } from '@/lib/i18n';
+import { reloadForDirection, setLocale } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import type { Locale } from '@/lib/types';
 import { brand, colors, font, fonts, radius, space } from '@/theme';
@@ -19,8 +19,9 @@ export function LanguageToggle({ userId, compact }: { userId?: string; compact?:
   const change = async (lng: Locale) => {
     if (lng === value) return;
     const { needsRestart } = await setLocale(lng);
-    if (userId) await supabase.from('profiles').update({ locale: lng }).eq('id', userId);
-    if (needsRestart) Alert.alert(t('profile.restartTitle'), t('profile.restartBody'));
+    if (userId) await supabase.from('profiles').update({ locale: lng }).eq('id', userId).then(() => {}, () => {});
+    // الاتجاه (يمين/يسار) يحتاج إعادة تشغيل: نسويها على طول، ولو ما قدرنا نطلب منه يقفل ويفتح
+    if (needsRestart && !(await reloadForDirection())) Alert.alert(t('profile.restartTitle'), t('profile.restartBody'));
   };
 
   return (
