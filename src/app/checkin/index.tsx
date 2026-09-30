@@ -1,7 +1,7 @@
 // تسجيل الحضور خطوة بخطوة: نحدد موقعك ← نجيب النوادي الحقيقية حولك من الخريطة ← نوضح وين أنت وكم تبعد
 // ← تسجّل في النادي اللي أنت داخله. ولو ناديك مو موجود: تبحث عنه بالاسم في الخريطة أو تضيفه.
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Linking, Platform, Pressable, View } from 'react-native';
@@ -12,6 +12,7 @@ import { logEvent } from '@/lib/events';
 import { GymSearchError, gymsInRange, mapsUrl, nearbyGyms, refreshNearbyGyms, searchGymsOnMap, searchGymsSaved } from '@/lib/gyms';
 import { useLocalized } from '@/lib/i18n';
 import { locate, type Position } from '@/lib/location';
+import { emitCheckedIn } from '@/lib/timeline';
 import { errorKey, supabase, tooFarMeters } from '@/lib/supabase';
 import type { CheckIn, Gym } from '@/lib/types';
 import { brand, colors, radius, space } from '@/theme';
@@ -29,6 +30,8 @@ export default function CheckInScreen() {
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const { userId, profile, refreshProfile } = useUser();
+  // from=timeline: من زر ＋ في التايم لاين — بعد التسجيل نرجع له على طول والحضور طالع فوق
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const [phase, setPhase] = useState<Phase>('locating');
   const [pos, setPos] = useState<Position | null>(null);
   const [gyms, setGyms] = useState<Gym[]>([]);
@@ -70,8 +73,10 @@ export default function CheckInScreen() {
   const inRangeIds = new Set(inRange.map((g) => g.id));
   const nearest = gyms[0];
 
+  // الضغط على اسم النادي (أو زر التسجيل) = تسجيل دخول على طول، والخادم يتأكد إنك داخله
   const checkIn = async (g: Gym) => {
-    if (!pos) return;
+    if (busyGym) return;
+    if (!pos) { Alert.alert(t('checkin.needLocation'), '', [{ text: t('checkin.retry'), onPress: scan }, { text: t('common.cancel'), style: 'cancel' }]); return; }
     setBusyGym(g.id);
     try {
       const { data, error } = await supabase.rpc('check_in', { p_gym: g.id, p_lat: pos.lat, p_lng: pos.lng, p_accuracy: pos.accuracy });
@@ -79,10 +84,25 @@ export default function CheckInScreen() {
       // أول مرة: نخلي هذا ناديك الأساسي
       if (!profile.gym_id) await supabase.from('profiles').update({ gym_id: g.id }).eq('id', userId);
       await refreshProfile();
-      setDone({ gym: g, row: data as CheckIn });
+      const row = data as CheckIn;
+      logEvent('checkin_done', { from: from ?? null, points: row.points_awarded });
+      if (from === 'timeline') {
+        emitCheckedIn(gymName(g, lng), row.points_awarded);
+        goBackOrHome();
+        return;
+      }
+      setDone({ gym: g, row });
     } catch (e) {
       const m = tooFarMeters(e);
-      Alert.alert(m != null ? t('errors.tooFar', { m }) : t(errorKey(e)));
+      if (m != null) {
+        const left = Math.max(0, m - (g.radius_m ?? 0));
+        Alert.alert(t('checkin.tooFarTitle', { name: gymName(g, lng) }), t('checkin.tooFarBody', { d: fmtDist(m, lng), left: fmtDist(left, lng) }), [
+          { text: t('checkin.retry'), onPress: scan },
+          { text: t('common.ok'), style: 'cancel' },
+        ]);
+      } else {
+        Alert.alert(t(errorKey(e)));
+      }
     } finally {
       setBusyGym(null);
     }
@@ -174,7 +194,10 @@ export default function CheckInScreen() {
             </Row>
             {!inRange.length ? (
               <T size="sm" muted>{nearest ? t('checkin.nearestLine', { name: gymName(nearest, lng), d: fmtDist(nearest.distance_m, lng) }) : t('checkin.noneNearLine')}</T>
-            ) : null}
+            ) : (
+              <Button icon="finger-print" title={t('checkin.oneTap', { name: gymName(inRange[0], lng) })}
+                loading={busyGym === inRange[0].id} onPress={() => checkIn(inRange[0])} />
+            )}
           </>
         ) : (
           <Row>
@@ -261,14 +284,15 @@ function GymRow({ g, lng, here, main, busy, onCheckIn, onMain }: {
     <Card style={{ gap: space.sm, borderColor: here ? colors.success : colors.border, borderWidth: here ? 1.5 : 1 }}>
       <Row style={{ alignItems: 'flex-start' }}>
         <Ionicons name="barbell-outline" size={20} color={here ? colors.success : colors.primary} style={{ marginTop: 2 }} />
-        <View style={{ flex: 1, gap: 2 }}>
-          <T semibold numberOfLines={2}>{gymName(g, lng)}</T>
+        <Pressable style={{ flex: 1, gap: 2 }} onPress={onCheckIn} disabled={busy} accessibilityRole="button"
+          accessibilityLabel={t('checkin.tapToCheckIn', { name: gymName(g, lng) })}>
+          <T semibold numberOfLines={2} color={here ? colors.success : colors.text}>{gymName(g, lng)}</T>
           {sub ? <T size="xs" muted numberOfLines={2}>{sub}</T> : null}
           <Row gap={6} style={{ flexWrap: 'wrap' }}>
             <Tag text={g.verified ? t('checkin.pointsOk') : t('checkin.noPoints')} color={g.verified ? colors.success : colors.muted} />
             {main ? <Tag text={t('checkin.mainGym')} color={colors.primary} /> : null}
           </Row>
-        </View>
+        </Pressable>
         <Pressable hitSlop={8} accessibilityRole="link" accessibilityLabel={t('checkin.openMap')}
           onPress={() => Linking.openURL(mapsUrl(g, Platform.OS === 'ios')).catch(() => {})}>
           <Ionicons name="map-outline" size={20} color={colors.muted} />

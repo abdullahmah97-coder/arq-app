@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { errorKey } from '@/lib/supabase';
-import { openSleep, postSleepNow, postWakeNow, undoMoment } from '@/lib/timeline';
+import { onCheckedIn, openSleep, postSleepNow, postWakeNow, undoMoment } from '@/lib/timeline';
 import { brand } from '@/theme';
 import { MomentBubble, tap, type MomentKind } from './Moments';
 
@@ -34,6 +34,14 @@ export function PlusMenu() {
   const [asleep, setAsleep] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ id: string; kind: 'wake' | 'sleep' } | null>(null);
+  // رجع من تسجيل الحضور (زر 🏋️): «سجّلت دخولك في …»
+  const [gymToast, setGymToast] = useState<{ gym: string; points: number } | null>(null);
+  useEffect(() => onCheckedIn((gym, points) => setGymToast({ gym, points })), []);
+  useEffect(() => {
+    if (!gymToast) return;
+    const h = setTimeout(() => setGymToast(null), 5000);
+    return () => clearTimeout(h);
+  }, [gymToast]);
   const native = Platform.OS !== 'web';
   const [main] = useState(() => new Animated.Value(0));
   const [parts] = useState(() => [0, 1, 2, 3].map(() => new Animated.Value(0)));
@@ -104,7 +112,7 @@ export function PlusMenu() {
   const actions: { key: Key; label: string; run: () => void }[] = [
     { key: 'photo', label: t('timeline.plusPhoto'), run: () => router.push({ pathname: '/post/new', params: { mode: 'photo' } }) },
     { key: 'thought', label: t('timeline.plusThought'), run: () => router.push({ pathname: '/post/new', params: { mode: 'text' } }) },
-    { key: 'gym', label: t('timeline.plusGym'), run: () => router.push('/checkin') },
+    { key: 'gym', label: t('timeline.plusGym'), run: () => router.push({ pathname: '/checkin', params: { from: 'timeline' } }) },
     asleep ? { key: 'wake', label: t('timeline.plusWake'), run: () => moment('wake') }
       : { key: 'sleep', label: t('timeline.plusSleep'), run: () => moment('sleep') },
   ];
@@ -123,6 +131,15 @@ export function PlusMenu() {
           <Pressable onPress={undo} hitSlop={10} accessibilityRole="button">
             <T size="sm" bold color={brand.amber}>{t('timeline.undo')}</T>
           </Pressable>
+        </View>
+      ) : null}
+
+      {gymToast && !toast ? (
+        <View style={[styles.toast, { bottom: bottom + SIZE + 14, backgroundColor: brand.deepGreen }]} accessibilityLiveRegion="polite">
+          <T size="sm" semibold color={brand.cream} style={{ flex: 1 }} numberOfLines={2}>
+            {t('timeline.checkedInToast', { gym: gymToast.gym })}{gymToast.points ? ` · ${t('timeline.checkedInPoints', { n: gymToast.points })}` : ''}
+          </T>
+          <Ionicons name="checkmark-circle" size={20} color={brand.amber} />
         </View>
       ) : null}
 

@@ -55,6 +55,14 @@ const changed = new Set<() => void>();
 export const onTimelineChanged = (fn: () => void) => { changed.add(fn); return () => { changed.delete(fn); }; };
 const emitChanged = () => changed.forEach((fn) => fn());
 
+// سجّل دخول النادي من زر ＋ ← نرجع للتايم لاين ونعرض «سجّلت دخولك في …»
+const checkedIn = new Set<(gym: string, points: number) => void>();
+export const onCheckedIn = (fn: (gym: string, points: number) => void) => { checkedIn.add(fn); return () => { checkedIn.delete(fn); }; };
+export function emitCheckedIn(gym: string, points: number) {
+  checkedIn.forEach((fn) => fn(gym, points));
+  emitChanged();
+}
+
 // ---------- «صباح الخير ☀️» و«تصبحون على خير 🌙» ----------
 const WAKE_KEY = (uid: string) => `arq.wake.v1:${uid}`;
 const SLEEP_KEY = (uid: string) => `arq.sleepAt.v1:${uid}`;

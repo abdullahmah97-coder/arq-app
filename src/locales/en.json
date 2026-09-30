@@ -1202,7 +1202,12 @@
     "addNote": "A gym you add shows up for you right away; points count once we verify it.",
     "doneTitle": "You're checked in",
     "doneHint": "Don't forget to check out after training — 45 minutes or more earns 5 extra points.",
-    "back": "Back"
+    "back": "Back",
+    "needLocation": "We need your location to confirm you are inside the gym",
+    "tooFarTitle": "You're outside {{name}}",
+    "tooFarBody": "You're {{d}} away — about {{left}} to go. Check in once you're inside (so nobody can game points and rankings).",
+    "oneTap": "Check me in at {{name}}",
+    "tapToCheckIn": "Check me in at {{name}}"
   },
   "food": {
     "today": "Today's calories",
@@ -3454,6 +3459,8 @@
     "captionWoke": "Up ☀️ {{time}}",
     "captionMorning": "Good morning ☀️",
     "captionSleep": "Good night 🌙",
-    "hiddenNote": "Your gym presence is set to hidden, so your check-ins aren't shown to anyone even with this on."
+    "hiddenNote": "Your gym presence is set to hidden, so your check-ins aren't shown to anyone even with this on.",
+    "checkedInToast": "You're checked in at {{gym}} — your friends see it on the timeline",
+    "checkedInPoints": "+{{n}} points"
   }
 }
