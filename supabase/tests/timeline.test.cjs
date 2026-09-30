@@ -65,6 +65,9 @@ const { setup } = require('./_harness.cjs');
   check('nobody can change someone else\'s reaction', (await q(`select emoji from post_likes where post_id = $1`, [pA]))[0].emoji === 'strong');
   await expectErr('a reaction cannot be moved to another post', () => as(U.B, `update post_likes set post_id = $1 where post_id = $2 and user_id = $3`, [pC, pA, U.B]), /permission denied/);
   await expectErr('unknown emoji rejected', () => as(U.A, `insert into post_likes (post_id, user_id, emoji) values ($1, $2, 'poop')`, [pB, U.A]), /check constraint/);
+  await as(U.C, `insert into post_likes (post_id, user_id, emoji) values ($1, $2, 'sheep')`, [pC, U.C]);
+  check('the sheep 🐑 is a reaction too', (await q(`select emoji from post_likes where post_id = $1 and user_id = $2`, [pC, U.C]))[0]?.emoji === 'sheep'
+    && (await q(`select _reaction_char('sheep') c`))[0].c === '🐑');
   await as(U.A, `insert into post_likes (post_id, user_id) values ($1, $2)`, [pB, U.A]);
   check('old app versions (no emoji) → ❤️ on posts', (await q(`select emoji from post_likes where post_id = $1 and user_id = $2`, [pB, U.A]))[0].emoji === 'love');
   await as(U.A, `insert into checkin_likes (check_in_id, user_id) values ($1, $2)`, [ciB, U.A]);

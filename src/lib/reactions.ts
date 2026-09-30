@@ -1,4 +1,4 @@
-// التفاعل بالإيموجي على المنشورات والحضور (بدل اللايك): ❤️ 💪 🔥 😂 👏
+// التفاعل بالإيموجي على المنشورات والحضور (بدل اللايك): ❤️ 💪 🔥 😂 👏 🐑
 // نفس جداول اللايك القديمة (post_likes / checkin_likes) + عمود emoji، فالنسخ القديمة من التطبيق تشتغل مثل قبل.
 import { isReaction, type ReactionKey, type ReactTarget } from './reactionsCore';
 import { supabase } from './supabase';

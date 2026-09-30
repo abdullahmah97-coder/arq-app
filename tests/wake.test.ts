@@ -139,6 +139,8 @@ test('server rows are cleaned (unknown emoji dropped)', () => {
   assert.deepEqual(normalizeReactors(null), []);
   assert.ok(isReaction('clap') && !isReaction('like'));
   assert.equal(REACTION_EMOJI.strong, '💪');
+  assert.equal(REACTION_EMOJI.sheep, '🐑');
+  assert.ok(isReaction('sheep'));
 });
 
 console.log(`\n${passed} wake + reaction tests passed`);

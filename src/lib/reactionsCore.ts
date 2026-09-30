@@ -1,7 +1,7 @@
-// التفاعل بالإيموجي (منطق بحت عشان يتختبر): ❤️ 💪 🔥 😂 👏
-export const REACTIONS = ['love', 'strong', 'fire', 'laugh', 'clap'] as const;
+// التفاعل بالإيموجي (منطق بحت عشان يتختبر): ❤️ 💪 🔥 😂 👏 🐑
+export const REACTIONS = ['love', 'strong', 'fire', 'laugh', 'clap', 'sheep'] as const;
 export type ReactionKey = (typeof REACTIONS)[number];
-export const REACTION_EMOJI: Record<ReactionKey, string> = { love: '❤️', strong: '💪', fire: '🔥', laugh: '😂', clap: '👏' };
+export const REACTION_EMOJI: Record<ReactionKey, string> = { love: '❤️', strong: '💪', fire: '🔥', laugh: '😂', clap: '👏', sheep: '🐑' };
 export const isReaction = (x: unknown): x is ReactionKey => typeof x === 'string' && (REACTIONS as readonly string[]).includes(x);
 
 /** واحد من آخر اللي تفاعلوا (u = رقمه، n = اسمه، a = صورته، e = الإيموجي) */

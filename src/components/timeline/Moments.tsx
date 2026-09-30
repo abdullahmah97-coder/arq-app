@@ -1,5 +1,5 @@
 // لحظات التايم لاين (نفس فكرة Path بهوية أرك): صورة مربعة، خط زمني عمودي بفقاعة أيقونة لكل لحظة،
-// سطر اللحظة وتفاصيلها، وزر تفاعل بالإيموجي ❤️ 💪 🔥 😂 👏 مع صور اللي تفاعلوا
+// سطر اللحظة وتفاصيلها، وزر تفاعل بالإيموجي ❤️ 💪 🔥 😂 👏 🐑 مع صور اللي تفاعلوا
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -184,7 +184,7 @@ export function ReactionPill({ value, open, onToggle }: { value: ReactionKey | n
   );
 }
 
-/** الخمسة ❤️ 💪 🔥 😂 👏 (تنعرض تحت الزر بمكانها في الصف) */
+/** الإيموجي ❤️ 💪 🔥 😂 👏 🐑 (تنعرض تحت الزر بمكانها في الصف) */
 export function ReactionPicker({ value, onPick }: { value: ReactionKey | null; onPick: (e: ReactionKey) => void }) {
   const { t } = useTranslation();
   const [a] = useState(() => new Animated.Value(0));
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end', flexDirection: 'row', gap: 2, padding: 4, borderRadius: 22, borderWidth: 1, marginTop: -2,
     shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  pickBtn: { width: 36, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  pickBtn: { width: 35, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   strip: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
   stripBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   face: { borderRadius: 13, borderWidth: 2 },
