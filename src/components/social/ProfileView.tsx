@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, I18nManager, Pressable, View } from 'react-native';
 import { Num } from '@/components/pulse/widgets';
-import { Avatar, Card, Empty, Row, Segmented, T } from '@/components/ui';
+import { Avatar, Button, Card, Empty, Row, Segmented, T } from '@/components/ui';
 import type { CoverId } from '@/lib/cover';
 import { useLocalized } from '@/lib/i18n';
 import { canPublish, rankProgress, RANKS } from '@/lib/ranks';
@@ -19,7 +19,17 @@ import { CoachCheck, RankBadge } from './RankBadge';
 import { CoverPicker, coverPhotoUrl, ProfileCover } from './Cover';
 
 type Tab = 'programs' | 'tips' | 'posts';
-type PostTile = { id: string; image_path: string | null; caption: string | null };
+/** المنشورات مثل انستقرام: شبكة الصور اللي نزّلها بالمنشورات بس (بدون لحظات التايم لاين: صباح الخير، تصبحون على خير، الكلام بدون صورة) */
+type PostTile = { id: string; image_path: string; caption: string | null; created_at: string };
+const POSTS_PAGE = 30;
+const GRID_GAP = 3;
+const loadPostTiles = async (uid: string, before?: string): Promise<PostTile[]> => {
+  let q = supabase.from('posts').select('id, image_path, caption, created_at').eq('user_id', uid).eq('kind', 'post')
+    .not('image_path', 'is', null).order('created_at', { ascending: false }).limit(POSTS_PAGE);
+  if (before) q = q.lt('created_at', before);
+  const { data } = await q;
+  return (data ?? []) as PostTile[];
+};
 
 export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfileChanged }: {
   p: PublicProfile; me: string; gymLabel?: string | null; actions?: ReactNode; reloadKey?: number; onProfileChanged?: () => void;
@@ -32,19 +42,39 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
   const [programs, setPrograms] = useState<UserProgram[] | null>(null);
   const [tips, setTips] = useState<Tip[] | null>(null);
   const [posts, setPosts] = useState<PostTile[] | null>(null);
+  const [postsDone, setPostsDone] = useState(false);
+  const [morePosts, setMorePosts] = useState(false);
+  // ٣ صور بالصف بالضبط (نقيس عرض الشبكة)
+  const [gridW, setGridW] = useState(0);
+  const tile = gridW ? Math.floor((gridW - GRID_GAP * 2) / 3) : 0;
 
-  const load = useCallback(async () => {
-    const [c, pr, tp, po] = await Promise.all([
-      profileCounts(p.id),
-      loadPrograms({ author: p.id, limit: 20 }),
-      loadTips(me, { author: p.id, limit: 30 }),
-      supabase.from('posts').select('id, image_path, caption').eq('user_id', p.id).eq('kind', 'post').order('created_at', { ascending: false }).limit(30),
-    ]);
-    setCounts(c); setPrograms(pr); setTips(tp); setPosts((po.data ?? []) as PostTile[]);
+  const load = useCallback((alive: () => boolean = () => true) => Promise.all([
+    profileCounts(p.id),
+    loadPrograms({ author: p.id, limit: 20 }),
+    loadTips(me, { author: p.id, limit: 30 }),
+    loadPostTiles(p.id),
+  ]).then(([c, pr, tp, po]) => {
+    if (!alive()) return;
+    setCounts(c); setPrograms(pr); setTips(tp); setPosts(po); setPostsDone(po.length < POSTS_PAGE);
     // أول تبويب فيه محتوى
-    setTab((cur) => (cur === 'programs' && !pr.length ? (tp.length ? 'tips' : po.data?.length ? 'posts' : cur) : cur));
-  }, [p.id, me]);
-  useEffect(() => { load(); }, [load, reloadKey]);
+    setTab((cur) => (cur === 'programs' && !pr.length ? (tp.length ? 'tips' : po.length ? 'posts' : cur) : cur));
+  }, () => {}), [p.id, me]);
+  // كل المنشورات: ٣٠ ٣٠ لين تخلص
+  const loadMorePosts = async () => {
+    const last = posts?.[posts.length - 1];
+    if (!last || morePosts) return;
+    setMorePosts(true);
+    try {
+      const rows = await loadPostTiles(p.id, last.created_at);
+      setPosts((cur) => [...(cur ?? []), ...rows.filter((r) => !(cur ?? []).some((x) => x.id === r.id))]);
+      setPostsDone(rows.length < POSTS_PAGE);
+    } finally { setMorePosts(false); }
+  };
+  useEffect(() => {
+    let alive = true;
+    load(() => alive);
+    return () => { alive = false; };
+  }, [load, reloadKey]);
 
   const prog = rankProgress(p.points);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -163,23 +193,22 @@ export function ProfileView({ p, me, gymLabel, actions, reloadKey = 0, onProfile
         tips?.length ? tips.map((x) => <TipCard key={x.id} tip={x} hideAuthor mine={self} onLike={like} onDelete={removeTip} />)
           : <Empty icon="bulb-outline" text={self ? (canPublish('tip', p) ? t('social.noTipsSelf') : t('social.tipsLocked', { rank: L(RANKS[2].name) })) : t('social.noTips')} />
       ) : null}
+      {/* شبكة الصور مثل انستقرام (٣ بالصف)، كلها: ٣٠ ٣٠ مع «عرض منشورات أقدم» */}
       {tab === 'posts' ? (
         posts?.length ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-            {posts.map((x) => (
-              <Pressable key={x.id} onPress={() => router.push({ pathname: '/post/[id]', params: { id: x.id } })}
-                style={{ width: '32.5%', aspectRatio: 1, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.cardAlt }}>
-                {x.image_path ? (
-                  <Image source={{ uri: publicUrl('posts', x.image_path) ?? undefined }} style={{ flex: 1 }} contentFit="cover" />
-                ) : (
-                  <View style={{ flex: 1, padding: 8, justifyContent: 'center', backgroundColor: brand.deepGreen }}>
-                    <T size="xs" color={brand.cream} numberOfLines={5}>{x.caption}</T>
-                  </View>
-                )}
-              </Pressable>
-            ))}
+          <View style={{ gap: space.md }}>
+            <View onLayout={(e) => setGridW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP, marginHorizontal: -space.sm }}>
+              {posts.map((x) => (
+                <Pressable key={x.id} onPress={() => router.push({ pathname: '/post/[id]', params: { id: x.id } })}
+                  accessibilityRole="imagebutton" accessibilityLabel={x.caption || t('social.posts')}
+                  style={({ pressed }) => ({ width: tile, height: tile, overflow: 'hidden', backgroundColor: colors.cardAlt, opacity: pressed ? 0.85 : 1 })}>
+                  <Image source={{ uri: publicUrl('posts', x.image_path) ?? undefined }} style={{ flex: 1 }} contentFit="cover" transition={120} />
+                </Pressable>
+              ))}
+            </View>
+            {!postsDone ? <Button variant="secondary" small icon="chevron-down" title={t('social.morePosts')} loading={morePosts} onPress={loadMorePosts} /> : null}
           </View>
-        ) : <Empty icon="images-outline" text={t('social.noPosts')} />
+        ) : posts ? <Empty icon="images-outline" text={t('social.noPosts')} /> : null
       ) : null}
     </View>
   );

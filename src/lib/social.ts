@@ -134,8 +134,12 @@ export const deleteTip = (id: string) => supabase.from('tips').delete().eq('id',
 
 /** عدّاد المنشورات والبرامج والنصائح لصفحة الحساب */
 export async function profileCounts(userId: string) {
-  const c = async (table: string, col: string) =>
-    (await supabase.from(table).select('id', { count: 'exact', head: true }).eq(col, userId)).count ?? 0;
-  const [posts, programs, tips] = await Promise.all([c('posts', 'user_id'), c('user_programs', 'author'), c('tips', 'author')]);
+  const c = async (table: string, col: string, photosOnly?: boolean) => {
+    let q = supabase.from(table).select('id', { count: 'exact', head: true }).eq(col, userId);
+    if (photosOnly) q = q.eq('kind', 'post').not('image_path', 'is', null);
+    return (await q).count ?? 0;
+  };
+  // المنشورات مثل انستقرام: الصور بس (بدون لحظات التايم لاين)
+  const [posts, programs, tips] = await Promise.all([c('posts', 'user_id', true), c('user_programs', 'author'), c('tips', 'author')]);
   return { posts, programs, tips };
 }

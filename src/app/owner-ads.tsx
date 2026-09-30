@@ -89,7 +89,13 @@ export default function OwnerAds() {
         return (
           <Card key={r.id} style={{ gap: space.sm }}>
             <Row style={{ alignItems: 'flex-start' }} gap={space.md}>
-              <Image source={{ uri: adMediaUrl(r.media_path) }} style={{ width: 64, height: 110, borderRadius: 8, backgroundColor: '#000' }} contentFit="cover" autoplay={false} />
+              {r.media_type === 'video' ? (
+                <View style={{ width: 64, height: 110, borderRadius: 8, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="play-circle" size={30} color={brand.sand} />
+                </View>
+              ) : (
+                <Image source={{ uri: adMediaUrl(r.media_path) }} style={{ width: 64, height: 110, borderRadius: 8, backgroundColor: '#000' }} contentFit="cover" autoplay={false} />
+              )}
               <View style={{ flex: 1, gap: 4 }}>
                 <Row>
                   <T bold style={{ flex: 1 }} numberOfLines={2}>{r.title}</T>
@@ -100,7 +106,7 @@ export default function OwnerAds() {
                     <T size="xs" semibold color="#fff">{t(`ads.state_${st}`)}</T>
                   </View>
                   {winner === r.id ? <View style={{ backgroundColor: brand.orange, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}><T size="xs" semibold color="#fff">{t('ads.showingNow')}</T></View> : null}
-                  <T size="xs" muted>{t(`ads.kind_${r.kind}`)} · {r.media_type === 'gif' ? 'GIF' : t('ads.image')} · {t(`ads.aud_${r.audience}`)} · {t(`ads.freq_${r.frequency}`)}</T>
+                  <T size="xs" muted>{t(`ads.kind_${r.kind}`)} · {r.media_type === 'gif' ? 'GIF' : r.media_type === 'video' ? t('ads.video') : t('ads.image')} · {t(`ads.aud_${r.audience}`)} · {t(`ads.freq_${r.frequency}`)}</T>
                 </Row>
                 {dates ? <T size="xs" muted>{dates}</T> : null}
                 {r.link ? <T size="xs" muted numberOfLines={1}>{buttonLine(r)}</T> : null}

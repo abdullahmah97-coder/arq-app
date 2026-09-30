@@ -1,14 +1,15 @@
-// لوحة المالك ← إضافة أو تعديل إعلان البداية: صورة أو GIF، رابط وزر، الجمهور، المدة، وعدد مرات الظهور
+// لوحة المالك ← إضافة أو تعديل إعلان البداية: صورة أو GIF أو فيديو قصير، رابط وزر، الجمهور، المدة، وعدد مرات الظهور
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, Switch, View } from 'react-native';
 import { LaunchAdView } from '@/components/ads/LaunchAd';
 import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
-import { AD_MAX_BYTES, adMediaUrl, deleteLaunchAd, loadLaunchAd, saveLaunchAd, uploadAdMedia, type AdMediaType } from '@/lib/launchAds';
+import { AD_MAX_BYTES, AD_MAX_VIDEO_SEC, adMediaTypeOf, adMediaUrl, deleteLaunchAd, loadLaunchAd, saveLaunchAd, uploadAdMedia, type AdMediaType } from '@/lib/launchAds';
 import {
   AD_TARGETS, isoToRiyadhDate, parseTarget, riyadhDateToIso, targetLink, validAdLink,
   type AdAudience, type AdFrequency, type AdKind, type AdPartnerTarget, type AdTarget,
@@ -25,6 +26,12 @@ const TARGET_ICON: Record<AdTarget, keyof typeof Ionicons.glyphMap> = {
 const QUICK_LABEL: Record<(typeof QUICK_LINKS)[number], string> = {
   '/store': 'store.title', '/events': 'events.title', '/clubs': 'clubs.title', '/coaches': 'coaching.directory', '/recovery': 'recovery.title', '/partners': 'partners.hubName',
 };
+
+/** معاينة الفيديو الصغيرة (بدون صوت وتعيد) */
+function VideoThumb({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (p) => { p.muted = true; p.loop = true; p.play(); });
+  return <VideoView player={player} style={{ width: '100%', height: '100%' }} contentFit="contain" nativeControls={false} allowsPictureInPicture={false} />;
+}
 
 export default function OwnerAdEdit() {
   const { t } = useTranslation();
@@ -99,12 +106,17 @@ export default function OwnerAdEdit() {
   const pick = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return;
-    // الجودة ١ وبدون قص: عشان الـGIF يبقى متحرك
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, allowsEditing: false });
+    // الجودة ١ وبدون قص: عشان الـGIF يبقى متحرك. الفيديو يتحوّل H.264 بدقة 720 (يشتغل على كل الجوالات وحجمه أخف)
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images', 'videos'], quality: 1, allowsEditing: false,
+      videoExportPreset: ImagePicker.VideoExportPreset.H264_1280x720,
+    });
     const a = res.canceled ? null : res.assets?.[0];
     if (!a) return;
-    const mime = a.mimeType ?? (a.uri.toLowerCase().endsWith('.gif') ? 'image/gif' : 'image/jpeg');
-    const type: AdMediaType = mime.includes('gif') ? 'gif' : 'image';
+    const isVideo = a.type === 'video' || (a.mimeType ?? '').startsWith('video/');
+    const mime = a.mimeType ?? (isVideo ? 'video/mp4' : a.uri.toLowerCase().endsWith('.gif') ? 'image/gif' : 'image/jpeg');
+    const type = adMediaTypeOf(mime);
+    if (type === 'video' && a.duration && a.duration / 1000 > AD_MAX_VIDEO_SEC + 1) return Alert.alert(t('ads.videoTooLong', { s: AD_MAX_VIDEO_SEC }));
     if (a.fileSize && a.fileSize > AD_MAX_BYTES[type]) return Alert.alert(t('ads.tooBig', { mb: AD_MAX_BYTES[type] / 1024 / 1024 }));
     setBusy(true);
     try { const up = await uploadAdMedia(a.uri, mime); setMedia({ path: up.path, type: up.media_type }); }
@@ -153,15 +165,16 @@ export default function OwnerAdEdit() {
         <Row gap={space.md} style={{ alignItems: 'flex-start' }}>
           <Pressable onPress={pick} disabled={busy} accessibilityRole="button" accessibilityLabel={t('ads.pick')}
             style={{ width: 108, height: 192, borderRadius: radius.md, backgroundColor: '#000', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
-            {url ? <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} contentFit="contain" autoplay />
+            {url && media?.type === 'video' ? <VideoThumb uri={url} />
+              : url ? <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} contentFit="contain" autoplay />
               : <Ionicons name="image-outline" size={34} color={brand.sand} />}
           </Pressable>
           <View style={{ flex: 1, gap: 6 }}>
             <Button small icon="images-outline" title={media ? t('ads.change') : t('ads.pick')} loading={busy} onPress={pick} />
             <T size="xs" muted style={{ lineHeight: 18 }}>{t('ads.mediaHint')}</T>
-            <Row gap={6} style={{ opacity: 0.55 }}>
+            <Row gap={6}>
               <Ionicons name="videocam-outline" size={16} color={colors.muted} />
-              <T size="xs" muted style={{ flex: 1 }}>{t('ads.videoSoon')}</T>
+              <T size="xs" muted style={{ flex: 1, lineHeight: 18 }}>{t('ads.videoHint', { s: AD_MAX_VIDEO_SEC, mb: AD_MAX_BYTES.video / 1024 / 1024 })}</T>
             </Row>
           </View>
         </Row>
@@ -238,8 +251,18 @@ export default function OwnerAdEdit() {
         <T size="xs" muted>{t('ads.datesHint')}</T>
         <T size="sm" semibold>{t('ads.frequency')}</T>
         <Segmented<AdFrequency> wrap value={frequency} onChange={setFrequency} options={(['every_open', 'daily', 'once'] as const).map((f) => ({ value: f, label: t(`ads.freq_${f}`) }))} />
-        <T size="sm" semibold>{t('ads.autoClose')}</T>
-        <Segmented<number> value={autoClose} onChange={setAutoClose} options={[0, 4, 6, 10].map((n) => ({ value: n, label: n ? t('ads.seconds', { n }) : t('ads.manual') }))} />
+        {media?.type === 'video' ? (
+          // الفيديو: يقفل لحاله بعد ما يخلص، أو يبقى لين يضغط تخطي
+          <Row>
+            <View style={{ flex: 1 }}><T semibold>{t('ads.closeAtEnd')}</T><T size="xs" muted>{t('ads.closeAtEndHint')}</T></View>
+            <Switch value={autoClose > 0} onValueChange={(v) => setAutoClose(v ? 6 : 0)} trackColor={{ true: brand.orange }} />
+          </Row>
+        ) : (
+          <>
+            <T size="sm" semibold>{t('ads.autoClose')}</T>
+            <Segmented<number> value={autoClose} onChange={setAutoClose} options={[0, 4, 6, 10].map((n) => ({ value: n, label: n ? t('ads.seconds', { n }) : t('ads.manual') }))} />
+          </>
+        )}
         <Row>
           <View style={{ flex: 1 }}><T semibold>{t('ads.pinned')}</T><T size="xs" muted>{t('ads.pinnedHint')}</T></View>
           <Switch value={pinned} onValueChange={setPinned} trackColor={{ true: brand.orange }} />
@@ -258,7 +281,7 @@ export default function OwnerAdEdit() {
 
       {preview && media ? (
         <LaunchAdView preview onClose={() => setPreview(false)}
-          ad={{ id: id ?? 'preview', kind, title, media_path: media.path, link: link.trim() || null, cta: cta.trim() || null, auto_close: autoClose }} />
+          ad={{ id: id ?? 'preview', kind, title, media_path: media.path, media_type: media.type, link: link.trim() || null, cta: cta.trim() || null, auto_close: autoClose }} />
       ) : null}
     </Screen>
   );

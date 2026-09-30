@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { markSeen, riyadhDay, shouldShowAd, type AdAudience, type AdFrequency, type AdKind, type SeenMap } from './launchAdsCore';
 import { publicUrl, supabase } from './supabase';
 
-export type AdMediaType = 'image' | 'gif';
+export type AdMediaType = 'image' | 'gif' | 'video';
 export interface LaunchAd {
   id: string; kind: AdKind; title: string; media_path: string; media_type: AdMediaType;
   link: string | null; cta: string | null; frequency: AdFrequency; auto_close: number; updated_at: string;
@@ -78,12 +78,18 @@ export async function deleteLaunchAd(ad: Pick<LaunchAdRow, 'id' | 'media_path'>)
   supabase.storage.from('ads').remove([ad.media_path]).then(() => {}, () => {});
 }
 
-/** الحد: GIF ٨ ميقا، والصور ٥ ميقا (عشان يفتح بسرعة على الجوال) */
-export const AD_MAX_BYTES: Record<AdMediaType, number> = { image: 5 * 1024 * 1024, gif: 8 * 1024 * 1024 };
+/** الحد: الصور ٥ ميقا، GIF ٨، والفيديو ٢٠ ميقا ولين ٣٠ ثانية (عشان يفتح بسرعة على الجوال) */
+export const AD_MAX_BYTES: Record<AdMediaType, number> = { image: 5 * 1024 * 1024, gif: 8 * 1024 * 1024, video: 20 * 1024 * 1024 };
+export const AD_MAX_VIDEO_SEC = 30;
+
+/** نوع الملف من الـ MIME */
+export const adMediaTypeOf = (mimeType: string): AdMediaType =>
+  (mimeType.startsWith('video/') ? 'video' : mimeType.includes('gif') ? 'gif' : 'image');
 
 export async function uploadAdMedia(uri: string, mimeType: string): Promise<{ path: string; media_type: AdMediaType }> {
-  const media_type: AdMediaType = mimeType.includes('gif') ? 'gif' : 'image';
-  const ext = media_type === 'gif' ? 'gif' : mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
+  const media_type = adMediaTypeOf(mimeType);
+  const ext = media_type === 'video' ? (mimeType.includes('quicktime') ? 'mov' : mimeType.includes('webm') ? 'webm' : 'mp4')
+    : media_type === 'gif' ? 'gif' : mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
   const body = await (await fetch(uri)).arrayBuffer();
   if (body.byteLength > AD_MAX_BYTES[media_type]) throw new Error('file_too_big');
   const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;

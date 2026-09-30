@@ -57,4 +57,12 @@ const { setup } = require('./_harness.cjs');
   check('ads bucket is public', (await q(`select public from storage.buckets where id = 'ads'`))[0]?.public === true);
   const pols = (await q(`select policyname, cmd, coalesce(qual, '') || coalesce(with_check, '') expr from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname like '%ads'`));
   check('ad media writes are admin-only', pols.length === 4 && pols.every((p) => /is_admin/.test(p.expr) && /'ads'/.test(p.expr)), pols.map((p) => p.cmd).join(','));
+
+  // الفيديو
+  const [{ id: av }] = await as(U.E, `insert into launch_ads (title, media_path, media_type, priority) values ('فيديو البداية', 'ads/v.mp4', 'video', 50) returning id`);
+  const vid = await cur(U.A);
+  check('a video launch ad can be added and reaches users as video', vid?.id === av && vid?.media_type === 'video', JSON.stringify(vid));
+  await expectErr('other media types are still rejected', () => as(U.E, `insert into launch_ads (title, media_path, media_type) values ('صوت', 'ads/a.mp3', 'audio')`), /check constraint/);
+  const cons = await q(`select count(*)::int n from pg_constraint where conrelid = 'public.launch_ads'::regclass and contype = 'c' and pg_get_constraintdef(oid) ilike '%media_type%'`);
+  check('exactly one media type rule', cons[0].n === 1, JSON.stringify(cons));
 })();
