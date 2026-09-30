@@ -42,6 +42,8 @@ export interface Pose {
   lWrist?: number; rWrist?: number;
   /** لفّ الساعد (موجب = الكف يلتف للأمام/للأعلى مثل الكيرل، سالب = للخلف/للأسفل). 0 = الكفين متقابلين */
   lRoll?: number; rRoll?: number;
+  /** ثني الرسغ للخلف (موجب = ظهر الكف باتجاه الساعد مثل الكف على الأرض بالضغط، سالب = ثني الكف للداخل) */
+  lWext?: number; rWext?: number;
   lHip?: Joint3; rHip?: Joint3;
   lKnee?: number; rKnee?: number;
   lAnkle?: number; rAnkle?: number; // موجب = رفع الكعب (وقوف على الأصابع)
@@ -73,6 +75,7 @@ export function lerpPose(a: Pose, b: Pose, t: number): Pose {
     lElbow: n(a.lElbow, b.lElbow), rElbow: n(a.rElbow, b.rElbow),
     lWrist: n(a.lWrist, b.lWrist), rWrist: n(a.rWrist, b.rWrist),
     lRoll: n(a.lRoll, b.lRoll), rRoll: n(a.rRoll, b.rRoll),
+    lWext: n(a.lWext, b.lWext), rWext: n(a.rWext, b.rWext),
     lHip: j(a.lHip, b.lHip), rHip: j(a.rHip, b.rHip),
     lKnee: n(a.lKnee, b.lKnee), rKnee: n(a.rKnee, b.rKnee),
     lAnkle: n(a.lAnkle, b.lAnkle), rAnkle: n(a.rAnkle, b.rAnkle),
@@ -90,9 +93,9 @@ export function poseQuats(p: Pose): PoseQuats {
     const j = a ?? J0;
     return new THREE.Quaternion().setFromEuler(_e.set(D(-j[0]), D(j[2] * s), D(j[1] * s), 'ZXY'));
   };
-  const wr = (w: number | undefined, r: number | undefined, s: 1 | -1) =>
-    new THREE.Quaternion().setFromEuler(_e.set(D(-(w ?? 0)), D((r ?? 0) * s), 0, 'YXZ'));
-  q = { lShoulder: sh(p.lShoulder, 1), rShoulder: sh(p.rShoulder, -1), lWrist: wr(p.lWrist, p.lRoll, 1), rWrist: wr(p.rWrist, p.rRoll, -1) };
+  const wr = (w: number | undefined, r: number | undefined, x: number | undefined, s: 1 | -1) =>
+    new THREE.Quaternion().setFromEuler(_e.set(D(-(w ?? 0)), D((r ?? 0) * s), D((x ?? 0) * s), 'YXZ'));
+  q = { lShoulder: sh(p.lShoulder, 1), rShoulder: sh(p.rShoulder, -1), lWrist: wr(p.lWrist, p.lRoll, p.lWext, 1), rWrist: wr(p.rWrist, p.rRoll, p.rWext, -1) };
   quatCache.set(p, q);
   return q;
 }
@@ -107,12 +110,12 @@ export function slerpQuats(a: PoseQuats, b: PoseQuats, t: number): PoseQuats {
 /** وضعية متماثلة: نفس القيم لليمين واليسار */
 export function sym(p: {
   root?: Pose['root']; spine?: number; chest?: number; neck?: number; twist?: number; lean?: number;
-  shoulder?: Joint3; elbow?: number; wrist?: number; roll?: number; hip?: Joint3; knee?: number; ankle?: number; hipOut?: number;
+  shoulder?: Joint3; elbow?: number; wrist?: number; roll?: number; wext?: number; hip?: Joint3; knee?: number; ankle?: number; hipOut?: number;
 }): Pose {
   const out: Pose = {
     root: p.root, spine: p.spine, chest: p.chest, neck: p.neck, twist: p.twist, lean: p.lean,
     lShoulder: p.shoulder, rShoulder: p.shoulder, lElbow: p.elbow, rElbow: p.elbow,
-    lWrist: p.wrist, rWrist: p.wrist, lRoll: p.roll, rRoll: p.roll,
+    lWrist: p.wrist, rWrist: p.wrist, lRoll: p.roll, rRoll: p.roll, lWext: p.wext, rWext: p.wext,
     lHip: p.hip, rHip: p.hip, lKnee: p.knee, rKnee: p.knee, lAnkle: p.ankle, rAnkle: p.ankle,
     lHipOut: p.hipOut, rHipOut: p.hipOut,
   };
@@ -258,9 +261,13 @@ const _v = new THREE.Vector3();
 const _qOut = new THREE.Quaternion();
 const _Y = new THREE.Vector3(0, 1, 0);
 export type FloorFn = (x: number, z: number) => number;
-/** تثبيت القدمين بمكانهما (بين الوضعيات ما تنزلق القدم): المرجع = منتصف القدم في الوضعية الأولى */
-export interface Plant { side: 'both' | 'L' | 'R'; key0: Pose; anchor?: { x: number; z: number } }
-export interface PoseOpts { ground?: boolean; flatFeet?: boolean; floor?: FloorFn; plant?: Plant }
+/**
+ * تثبيت القدمين بمكانهما (بين الوضعيات ما تنزلق القدم): المرجع = منتصف القدم في الوضعية الأولى.
+ * مع ground الارتفاع من الأرض، وبدونه (القدمين على لوح جهاز مثلاً) نثبّت الارتفاع كمان
+ */
+export interface Plant { side: 'both' | 'L' | 'R'; key0: Pose; anchor?: { x: number; y: number; z: number } }
+/** flatFeet: true (الافتراضي) = القدمين مسطحة نسبة للأرض، false = تتبع الساق، 'L'/'R' = هذي القدم بس مسطحة والثانية تتبع ساقها */
+export interface PoseOpts { ground?: boolean; flatFeet?: boolean | 'L' | 'R'; plant?: Plant }
 
 function midfoot(rig: Rig, side: Plant['side'], out: THREE.Vector3) {
   const pts = side === 'L' ? [rig.L.toe, rig.L.heel] : side === 'R' ? [rig.R.toe, rig.R.heel] : [rig.L.toe, rig.L.heel, rig.R.toe, rig.R.heel];
@@ -269,12 +276,17 @@ function midfoot(rig: Rig, side: Plant['side'], out: THREE.Vector3) {
   return out.multiplyScalar(1 / pts.length);
 }
 const _mf = new THREE.Vector3();
+const _U = new THREE.Vector3(); const _Lw = new THREE.Vector3(); const _Yw = new THREE.Vector3(); const _Fw = new THREE.Vector3();
+const _qf = new THREE.Quaternion(); const _qc = new THREE.Quaternion(); const _qk = new THREE.Quaternion();
+/** أقصى لفّ للقدم حول محورها الطولي (مدى مفصل تحت الكاحل تقريباً) */
+const MAX_FOOT_ROLL = D(25);
+const flatFoot = (opts: PoseOpts, s: 1 | -1) => opts.flatFeet === undefined || opts.flatFeet === true || opts.flatFeet === (s === 1 ? 'L' : 'R');
 
 export function applyPose(rig: Rig, p: Pose, opts: PoseOpts = {}) {
   if (opts.plant && !opts.plant.anchor) {
     applyPose(rig, opts.plant.key0, { ground: opts.ground, flatFeet: opts.flatFeet });
     midfoot(rig, opts.plant.side, _mf);
-    opts.plant.anchor = { x: _mf.x, z: _mf.z };
+    opts.plant.anchor = { x: _mf.x, y: _mf.y, z: _mf.z };
   }
   const r = p.root ?? {};
   rig.root.position.set(r.x ?? 0, r.y ?? 0.97, r.z ?? 0);
@@ -283,24 +295,47 @@ export function applyPose(rig: Rig, p: Pose, opts: PoseOpts = {}) {
   rig.chest.rotation.set(D(p.chest ?? 0), D((p.twist ?? 0) * 0.55), D((p.lean ?? 0) * 0.45));
   rig.neck.rotation.x = D(p.neck ?? 0);
 
-  const side = (S: Side, s: 1 | -1, sh?: Joint3, el?: number, wr?: number, hp?: Joint3, kn?: number, an?: number, out?: number, roll?: number) => {
+  const side = (S: Side, s: 1 | -1, sh?: Joint3, el?: number, wr?: number, hp?: Joint3, kn?: number, an?: number, out?: number, roll?: number, wext?: number) => {
     const a = sh ?? J0;
     S.shoulder.rotation.set(D(-a[0]), D(a[2] * s), D(a[1] * s));
     S.elbow.rotation.x = D(-(el ?? 0));
-    S.wrist.rotation.set(D(-(wr ?? 0)), D((roll ?? 0) * s), 0);
+    // ترتيب YXZ: لفّ الساعد، ثم ميلان الكف للجنب، ثم ثني الرسغ للخلف/للأمام (حول محور عرض الكف)
+    S.wrist.rotation.set(D(-(wr ?? 0)), D((roll ?? 0) * s), D((wext ?? 0) * s));
     const h = hp ?? J0;
     S.hip.rotation.set(D(-h[0]), D(h[2] * s), D(h[1] * s));
     if (out) S.hip.quaternion.premultiply(_qOut.setFromAxisAngle(_Y, D(out * s)));
     S.knee.rotation.x = D(kn ?? 0);
-    // القدم: بشكل افتراضي مسطحة بالنسبة للأرض (تعويض ميل الساق والحوض)
+    // القدم: بشكل افتراضي مسطحة بالنسبة للأرض (تعويض ميل الساق والحوض). القدم اللي بالهوا أو على ظهرها تتبع الساق
+    // (زاوية الكاحل نسبة للساق: 0 = عمودية عليها، موجب = مشدودة للأسفل)
     const chain = -(h[0]) + (kn ?? 0) + (r.pitch ?? 0);
-    S.ankle.rotation.x = opts.flatFeet === false ? D(an ?? 0) : D(-chain + (an ?? 0));
+    S.ankle.rotation.set(flatFoot(opts, s) ? D(-chain + (an ?? 0)) : D(an ?? 0), 0, 0);
   };
-  side(rig.L, 1, p.lShoulder, p.lElbow, p.lWrist, p.lHip, p.lKnee, p.lAnkle, p.lHipOut, p.lRoll);
-  side(rig.R, -1, p.rShoulder, p.rElbow, p.rWrist, p.rHip, p.rKnee, p.rAnkle, p.rHipOut, p.rRoll);
+  side(rig.L, 1, p.lShoulder, p.lElbow, p.lWrist, p.lHip, p.lKnee, p.lAnkle, p.lHipOut, p.lRoll, p.lWext);
+  side(rig.R, -1, p.rShoulder, p.rElbow, p.rWrist, p.rHip, p.rKnee, p.rAnkle, p.rHipOut, p.rRoll, p.rWext);
   if (p.q) {
     rig.L.shoulder.quaternion.copy(p.q.lShoulder); rig.R.shoulder.quaternion.copy(p.q.rShoulder);
     rig.L.wrist.quaternion.copy(p.q.lWrist); rig.R.wrist.quaternion.copy(p.q.rWrist);
+  }
+  // القدم المسطحة مسطحة بالعرض كمان (ما تميل على حافتها الداخلية أو الخارجية): إبعاد أو لفّ الفخذ مع ثني الحوض يميّل الساق
+  // للجنب، فنلفّ القدم حول محورها الطولي (مفصل تحت الكاحل) لين محورها الجانبي أفقي — بإطار ميلان الجذع للجنب
+  // (البلانك الجانبي: القدمين على جنبها مع الجسم)
+  const fl = flatFoot(opts, 1); const fr = flatFoot(opts, -1);
+  if (fl || fr) {
+    rig.object.updateMatrixWorld(true);
+    const rr = D(r.roll ?? 0); const ry = D(r.yaw ?? 0);
+    _U.set(-Math.sin(rr) * Math.cos(ry), Math.cos(rr), Math.sin(rr) * Math.sin(ry));
+    for (const [S, on] of [[rig.L, fl], [rig.R, fr]] as const) {
+      if (!on) continue;
+      S.ankle.getWorldQuaternion(_qf);
+      _Lw.set(1, 0, 0).applyQuaternion(_qf); _Yw.set(0, 1, 0).applyQuaternion(_qf); _Fw.set(0, 0, 1).applyQuaternion(_qf);
+      // أصغر لفّة تخلي المحور الجانبي أفقي (القدم ممكن تكون مقلوبة: ليق برس، بلانك)
+      const a = _Lw.dot(_U); const b = _Yw.dot(_U);
+      if (Math.abs(a) < 1e-4) continue;
+      const phi = THREE.MathUtils.clamp(Math.atan(-a / b), -MAX_FOOT_ROLL, MAX_FOOT_ROLL);
+      _qc.setFromAxisAngle(_Fw, phi).multiply(_qf);
+      S.knee.getWorldQuaternion(_qk).invert();
+      S.ankle.quaternion.copy(_qk.multiply(_qc));
+    }
   }
 
   if (opts.ground) {
@@ -311,21 +346,12 @@ export function applyPose(rig: Rig, p: Pose, opts: PoseOpts = {}) {
     }
     rig.root.position.y -= min;
   }
-  else if (opts.floor) {
-    // حماية: القدم ما تدخل الأرض أو الصندوق أثناء الانتقال بين الوضعيات (يرفع الجسم فقط، ما ينزّله)
-    rig.object.updateMatrixWorld(true);
-    let pen = 0;
-    for (const o of [rig.L.toe, rig.L.heel, rig.R.toe, rig.R.heel]) {
-      o.getWorldPosition(_v);
-      pen = Math.max(pen, opts.floor(_v.x, _v.z) - _v.y);
-    }
-    if (pen > 0) rig.root.position.y += pen;
-  }
   if (opts.plant?.anchor) {
     rig.object.updateMatrixWorld(true);
     midfoot(rig, opts.plant.side, _mf);
     rig.root.position.x += opts.plant.anchor.x - _mf.x;
     rig.root.position.z += opts.plant.anchor.z - _mf.z;
+    if (!opts.ground) rig.root.position.y += opts.plant.anchor.y - _mf.y;
   }
   rig.object.updateMatrixWorld(true);
 }
@@ -341,12 +367,12 @@ export type PropKind =
   | 'benchPress' | 'chestPress' | 'shoulderPress' | 'hipAbduction' | 'latMachine' | 'rowStation'
   | 'declineBench' | 'preacherBench' | 'hyperBench' | 'plyoBox' | 'smithBar' | 'lowBar' | 'band'
   | 'cableAnkle' | 'cableSide' | 'hipAdduction' | 'kettlebell' | 'medBall' | 'cableFlyLow' | 'rackPins'
-  | 'dumbbellPullover' | 'dumbbellOverhead';
+  | 'dumbbellPullover' | 'dumbbellOverhead' | 'reversePecDeck' | 'benchRear' | 'dumbbellHips';
 
 export interface PropSpec { kind: PropKind; pos?: [number, number, number]; }
 
 /** دور السطح: bench = بنش مستوي يتمدد عليه، seat = مقعد، back = مسند ظهر */
-export type SupportRole = 'bench' | 'seat' | 'back';
+export type SupportRole = 'bench' | 'seat' | 'back' | 'mat';
 /** سطح يرتكز عليه اللاعب (مستطيل): المركز، العمودي باتجاه اللاعب، محورا السطح ونصف الطول بكل اتجاه */
 export interface Support { role: SupportRole; c: THREE.Vector3; n: THREE.Vector3; u: THREE.Vector3; v: THREE.Vector3; hu: number; hv: number }
 

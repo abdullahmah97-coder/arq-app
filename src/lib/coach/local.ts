@@ -34,7 +34,7 @@ const NO_EQUIP = new Set(['split_squat', 'glute_bridge', 'plank', 'walking_lunge
   'push_up', 'knee_push_up', 'air_squat', 'reverse_lunge', 'donkey_kick', 'superman', 'crunch', 'lying_leg_raise', 'mountain_climber', 'dead_bug',
   'jumping_jack', 'high_knees', 'burpee', 'wall_sit',
   'diamond_push_up', 'wide_push_up', 'single_leg_bridge', 'side_plank', 'bicycle_crunch', 'reverse_crunch', 'sit_up', 'v_up', 'flutter_kicks', 'jump_squat']);
-const DUMBBELL_KINDS = new Set(['dumbbells', 'goblet', 'hammerDumbbells', 'dumbbellR', 'mat', 'bench', 'benchBehind', 'benchSideRow', 'inclineBench', 'seatBack']);
+const DUMBBELL_KINDS = new Set(['dumbbells', 'goblet', 'hammerDumbbells', 'dumbbellR', 'dumbbellHips', 'mat', 'bench', 'benchBehind', 'benchRear', 'benchSideRow', 'inclineBench', 'seatBack']);
 
 const ROUTES: [RegExp, CoachRoute][] = [
   [/برنامج|برامج|فل ?بدي|full ?body program|programs?/i, 'programs'],

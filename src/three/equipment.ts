@@ -59,11 +59,13 @@ function box(w: number, h: number, d: number, m: THREE.Material, pos: V3) {
 function tube(r: number, m: THREE.Material, seg = 12) {
   return new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1, seg), m);
 }
+const _tubeD = new THREE.Vector3();
 function setTube(mesh: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3) {
-  _c.copy(b).sub(a);
-  const len = Math.max(0.001, _c.length());
+  // متغير خاص (a أو b ممكن يكونون من المتغيرات المؤقتة المشتركة _a/_b/_c)
+  _tubeD.copy(b).sub(a);
+  const len = Math.max(0.001, _tubeD.length());
   mesh.position.copy(a).add(b).multiplyScalar(0.5);
-  mesh.quaternion.setFromUnitVectors(UP, _c.multiplyScalar(1 / len));
+  mesh.quaternion.setFromUnitVectors(UP, _tubeD.multiplyScalar(1 / len));
   mesh.scale.set(1, len, 1);
 }
 function tubeAB(a: V3, b: V3, r: number, m: THREE.Material) {
@@ -105,9 +107,9 @@ export function makeDumbbell(M: Mats, len = 0.34) {
 }
 
 // ------------------------------------------------------------------ مقاعد وبنشات
-function flatBench(M: Mats, w = 0.3, len = 1.15, h = 0.44) {
+function flatBench(M: Mats, w = 0.3, len = 1.15, h = 0.44, role: SupportRole = 'bench') {
   const g = new THREE.Group();
-  g.add(support(rbox(w, 0.08, len, M.pad, [0, h - 0.04, 0], 0.03), 'bench'));
+  g.add(support(rbox(w, 0.08, len, M.pad, [0, h - 0.04, 0], 0.03), role));
   g.add(tubeAB([0, h - 0.11, -len / 2 + 0.12], [0, h - 0.11, len / 2 - 0.12], 0.028, M.steel));
   for (const z of [-len / 2 + 0.12, len / 2 - 0.12]) {
     g.add(tubeAB([0, h - 0.11, z], [0, 0.03, z], 0.026, M.steel));
@@ -195,12 +197,12 @@ function seatUnit(M: Mats, o: { h?: number; back?: boolean; backH?: number; tilt
 
 // ------------------------------------------------------------------ برج الأوزان والكيبل
 /** برج أوزان (صفائح + قضبان توجيه) — facing: اتجاه وجه الصفائح */
-function weightStack(M: Mats, pos: V3, height = 2.1, rotY = 0) {
+function weightStack(M: Mats, pos: V3, height = 2.1, rotY = 0, halfW = 0.22) {
   const g = new THREE.Group();
   g.position.set(...pos); g.rotation.y = rotY;
-  for (const x of [-0.22, 0.22]) g.add(tubeAB([x, 0.02, 0], [x, height, 0], 0.03, M.steel));
-  g.add(tubeAB([-0.22, height, 0], [0.22, height, 0], 0.03, M.steel));
-  g.add(rbox(0.56, 0.05, 0.36, M.steelDark, [0, 0.025, 0], 0.015));
+  for (const x of [-halfW, halfW]) g.add(tubeAB([x, 0.02, 0], [x, height, 0], 0.03, M.steel));
+  g.add(tubeAB([-halfW, height, 0], [halfW, height, 0], 0.03, M.steel));
+  g.add(rbox(halfW * 2 + 0.12, 0.05, 0.36, M.steelDark, [0, 0.025, 0], 0.015));
   for (const x of [-0.08, 0.08]) g.add(tubeAB([x, 0.05, 0], [x, height - 0.05, 0], 0.008, M.chrome));
   const n = 12;
   for (let i = 0; i < n; i++) g.add(box(0.3, 0.036, 0.12, M.plate, [0, 0.09 + i * 0.042, 0]));
@@ -388,21 +390,42 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         });
         break;
       }
-      case 'dumbbellPullover': {
-        // دمبل واحد بالكفين (بول أوفر / ترايسبس فوق الرأس): الصحن العلوي بين الكفين والدمبل على امتداد الساعدين
+      case 'dumbbellHips': {
+        // دمبل على مفصل الحوض (هيب ثرست): بالعرض والكفين على رأسيه من فوق
         const db = makeDumbbell(M, 0.3); group.add(db);
+        const X1 = new THREE.Vector3(1, 0, 0);
+        updaters.push(() => {
+          grip(rig.L, _a); grip(rig.R, _b);
+          _c.copy(_a).sub(_b).normalize();
+          db.position.copy(_a).add(_b).multiplyScalar(0.5); db.position.y -= 0.08;
+          db.quaternion.setFromUnitVectors(X1, _c);
+        });
+        break;
+      }
+      case 'dumbbellPullover': {
+        // دمبل واحد بالكفين (بول أوفر / ترايسبس فوق الرأس): الكفين حول المقبض تحت الرأس العلوي مباشرة (يسندونه من تحت)،
+        // والدمبل على امتداد الساعدين. دمبل أقصر شوي: رأسه الثاني يعدّي فوق الوجه والرأس بدل ما يلمسها
+        const db = makeDumbbell(M, 0.25); group.add(db);
         const X1 = new THREE.Vector3(1, 0, 0);
         updaters.push(() => {
           midHands(_a);
           rig.L.elbow.getWorldPosition(_b); rig.R.elbow.getWorldPosition(_c);
           _b.add(_c).multiplyScalar(0.5).sub(_a).normalize();
-          db.position.copy(_a).addScaledVector(_b, 0.13);
+          db.position.copy(_a).addScaledVector(_b, 0.042);
           db.quaternion.setFromUnitVectors(X1, _b);
         });
         break;
       }
-      case 'bench': case 'benchBehind': case 'benchSideRow': {
+      case 'bench': case 'benchSideRow': {
         const b = flatBench(M); b.position.set(...pos); group.add(b); break;
+      }
+      case 'benchBehind': {
+        // بنش بالعرض ورا اللاعب (جنبه الطويل ورا ظهره): أعلى الظهر على حافته بالهيب ثرست، والكفين على حافته بالديبس
+        const b = flatBench(M); b.position.set(...pos); b.rotation.y = Math.PI / 2; group.add(b); break;
+      }
+      case 'benchRear': {
+        // بنش ورا اللاعب للقدم الخلفية (سكوات بلغاري): سطحه أرضية مرتفعة ينحط عليها ظهر القدم
+        const b = flatBench(M, 0.3, 1.15, 0.44, 'mat'); b.position.set(...pos); group.add(b); break;
       }
       case 'benchPress': {
         // بنش + حامل البار عند جهة الرأس
@@ -416,11 +439,12 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         break;
       }
       case 'step': {
-        group.add(rbox(0.5, 0.2, 0.42, M.pad, [pos[0], 0.1, pos[2]], 0.03)); break;
+        group.add(support(rbox(0.5, 0.2, 0.42, M.pad, [pos[0], 0.1, pos[2]], 0.03), 'mat')); break;
       }
       case 'inclineBench': { const { g } = adjustableBench(M); g.position.set(...pos); group.add(g); break; }
       case 'seat': case 'seatBack': {
-        const g = seatUnit(M, { back: s.kind === 'seatBack' }); g.position.set(...pos); group.add(g); break;
+        // pos[1] = رفع سطح المقعد (المقعد نفسه على الأرض)
+        const g = seatUnit(M, { back: s.kind === 'seatBack', h: 0.37 + pos[1] }); g.position.set(pos[0], 0, pos[2]); group.add(g); break;
       }
       case 'chestPress': case 'shoulderPress': {
         const g = seatUnit(M, { backH: 0.78, tilt: s.kind === 'chestPress' ? 12 : 6 }); g.position.set(...pos); group.add(g);
@@ -437,31 +461,79 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         leverArm(rig.R, new THREE.Vector3(pos[0] - 0.5, py, zb + 0.04));
         break;
       }
-      case 'hipAbduction': {
-        const g = seatUnit(M, { backH: 0.7, tilt: 14 }); g.position.set(...pos); group.add(g);
+      case 'hipAbduction': case 'hipAdduction': {
+        // المساند على جنب الركبة (برا للإبعاد، جوا للتقريب)، موازية للفخذ وتلف معه
+        // المقعد أعلى شوي: القدمين على مساند الجهاز فوق الأرض
+        const g = seatUnit(M, { h: 0.5, backH: 0.7, tilt: 14 }); g.position.set(...pos); group.add(g);
         group.add(weightStack(M, [pos[0], 0, pos[2] - 0.6], 1.6));
+        const inner = s.kind === 'hipAdduction';
+        // مقابض على جنب المقعد تحت الكفين
+        const grips = [tube(0.018, M.pad), tube(0.018, M.pad)]; const gripPosts = [tube(0.02, M.steel), tube(0.02, M.steel)];
+        group.add(...grips, ...gripPosts);
+        let gripsSet = false;
+        updaters.push(() => {
+          if (gripsSet) return;
+          gripsSet = true;
+          [rig.L, rig.R].forEach((S, i) => {
+            grip(S, _a);
+            setTube(grips[i], _a.clone().add(new THREE.Vector3(0, 0, -0.07)), _a.clone().add(new THREE.Vector3(0, 0, 0.07)));
+            setTube(gripPosts[i], _a.clone().add(new THREE.Vector3(0, -0.02, -0.06)), new THREE.Vector3(Math.sign(_a.x) * 0.17 + pos[0], 0.47, _a.z - 0.06));
+          });
+        });
         for (const S of [rig.L, rig.R]) {
-          const padM = rbox(0.07, 0.22, 0.26, M.pad, [0, 0, 0], 0.03); group.add(padM);
+          const padM = rbox(0.07, 0.18, 0.2, M.pad, [0, 0, 0], 0.03); group.add(padM);
           const arm = tube(0.025, M.steel); group.add(arm);
-          const piv = new THREE.Vector3(pos[0], 0.3, pos[2] + 0.1);
+          const piv = new THREE.Vector3(pos[0], 0.28, pos[2] + 0.1);
+          const dir = new THREE.Vector3(); const side = new THREE.Vector3();
           updaters.push(() => {
-            S.knee.getWorldPosition(_a);
+            S.knee.getWorldPosition(_a); S.hip.getWorldPosition(_b);
+            dir.copy(_a).sub(_b).setY(0).normalize();                    // الفخذ على الأرض (أفقي)
+            side.set(dir.z, 0, -dir.x);                                   // عمودي عليه أفقياً
             const out = Math.sign(_a.x - pos[0]) || 1;
-            padM.position.set(_a.x + out * 0.1, _a.y, _a.z - 0.05);
-            _b.set(padM.position.x, 0.3, padM.position.z);
-            setTube(arm, piv, _b);
+            if (Math.sign(side.x) !== out) side.negate();                 // برا الجسم
+            if (inner) side.negate();
+            // على جنب الركبة (أنحف مكان بالرجل): نص قطر الركبة + نص سماكة المسند
+            padM.position.copy(_a).addScaledVector(dir, -0.01).addScaledVector(side, 0.1);
+            padM.position.y += 0.03;
+            padM.rotation.set(0, Math.atan2(dir.x, dir.z), 0);
+            setTube(arm, piv, new THREE.Vector3(padM.position.x, 0.28, padM.position.z));
+          });
+          // مسند القدم على ذراع الجهاز (يتحرك مع الرجل): لوح تحت النعل وعمود من الذراع
+          const foot = rbox(0.11, 0.025, 0.26, M.steelDark, [0, 0, 0], 0.008); group.add(foot);
+          const footPost = tube(0.02, M.steel); const footLink = tube(0.02, M.steel); group.add(footPost, footLink);
+          updaters.push(() => {
+            S.toe.getWorldPosition(_a); S.heel.getWorldPosition(_b);
+            foot.position.copy(_a).add(_b).multiplyScalar(0.5);
+            S.ankle.getWorldQuaternion(_q);
+            foot.quaternion.copy(_q);
+            foot.position.add(_c.set(0, -0.0145, 0.02).applyQuaternion(_q));
+            // عمود من تحت المسند للأسفل، ووصلة قريبة من الأرض لمحور الجهاز تحت المقعد (تلف معه)
+            const under = foot.position.clone().add(_c.set(0, -0.012, -0.03).applyQuaternion(_q));
+            const low = new THREE.Vector3(under.x, 0.035, under.z);
+            setTube(footPost, under, low);
+            setTube(footLink, low, new THREE.Vector3(pos[0], 0.035, pos[2] + 0.1));
           });
         }
         break;
       }
       case 'latMachine': {
         const g = seatUnit(M, { back: false }); g.position.set(...pos); group.add(g);
-        // مساند الفخذ فوق الركب
-        for (const x of [-0.12, 0.12]) {
-          const roll = disc(0.055, 0.16, M.pad, 16); roll.position.set(pos[0] + x, 0.7, pos[2] + 0.2); group.add(roll);
-        }
-        group.add(tubeAB([pos[0], 0.7, pos[2] + 0.2], [pos[0], 0.04, pos[2] + 0.2], 0.026, M.steel));
-        group.add(tubeAB([pos[0] - 0.12, 0.7, pos[2] + 0.2], [pos[0] + 0.12, 0.7, pos[2] + 0.2], 0.018, M.steel));
+        // مساند الفخذ فوق الركب (على الفخذ نفسه)، وعمودها قدام الركب
+        const rolls = [disc(0.055, 0.16, M.pad, 16), disc(0.055, 0.16, M.pad, 16)]; group.add(...rolls);
+        const postT = tube(0.026, M.steel); const axle = tube(0.018, M.steel); group.add(postT, axle);
+        let setL = false;
+        updaters.push(() => {
+          if (setL) return;
+          setL = true;
+          [rig.L, rig.R].forEach((S, i) => {
+            S.knee.getWorldPosition(_a); S.hip.getWorldPosition(_b);
+            const along = _a.clone().sub(_b).normalize();
+            rolls[i].position.copy(_a).addScaledVector(along, -0.1).add(new THREE.Vector3(0, 0.135, 0));
+          });
+          const c = rolls[0].position.clone().add(rolls[1].position).multiplyScalar(0.5);
+          setTube(axle, rolls[0].position, rolls[1].position);
+          setTube(postT, new THREE.Vector3(c.x, 0.04, c.z + 0.16), new THREE.Vector3(c.x, c.y, c.z + 0.02));
+        });
         break;
       }
       case 'pullupBar': case 'dipBars': {
@@ -476,12 +548,19 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
             g.add(tubeAB([x, 2.38, 0], [x, 2.38, -0.3], 0.03, M.steel));
           }
         } else {
-          for (const x of [-0.27, 0.27]) {
-            const b = tube(0.024, M.chrome); b.rotation.x = Math.PI / 2; b.scale.set(1, 0.7, 1); b.position.set(x, 1.25, 0.1); g.add(b);
-            g.add(tubeAB([x, 0.03, -0.2], [x, 1.25, -0.2], 0.03, M.steel));
-            g.add(tubeAB([x, 0.03, 0.35], [x, 1.25, 0.35], 0.03, M.steel));
-            g.add(tubeAB([x, 0.03, -0.35], [x, 0.03, 0.5], 0.028, M.steelDark));
-          }
+          // بارين متوازيين تحت الكفين بالضبط (الكفين ثابتة عليها طول الحركة)، على عرض قبضة كل نموذج
+          [rig.L, rig.R].forEach((S, i) => {
+            const b = tube(0.024, M.chrome); b.rotation.x = Math.PI / 2; b.scale.set(1, 0.7, 1); g.add(b);
+            const posts = [tube(0.03, M.steel), tube(0.03, M.steel)]; const foot = tube(0.028, M.steelDark); g.add(...posts, foot);
+            updaters.push(() => {
+              grip(S, _a); _a.sub(g.position);
+              const x = _a.x + (i === 0 ? 0.004 : -0.004);
+              b.position.set(x, _a.y, 0.1);
+              setTube(posts[0], new THREE.Vector3(x, 0.03, -0.2), new THREE.Vector3(x, _a.y, -0.2));
+              setTube(posts[1], new THREE.Vector3(x, 0.03, 0.35), new THREE.Vector3(x, _a.y, 0.35));
+              setTube(foot, new THREE.Vector3(x, 0.03, -0.35), new THREE.Vector3(x, 0.03, 0.5));
+            });
+          });
         }
         group.add(g); break;
       }
@@ -499,9 +578,31 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         group.add(tubeAB([0, 0.36, z0 - 0.75], [0, 0.36, z0 + 0.15], 0.03, M.steel));
         for (const z of [z0 - 0.7, z0 + 0.05]) group.add(tubeAB([0, 0.36, z], [0, 0.03, z], 0.03, M.steel));
         group.add(rbox(0.16, 0.06, 2.1, M.steelDark, [0, 0.03, z0 + 0.1], 0.015));
-        const plate = rbox(0.46, 0.34, 0.05, M.steel, [0, 0.3, z0 + 0.62], 0.02); plate.rotation.x = D(-28); group.add(plate);
-        for (const x of [-0.12, 0.12]) group.add(rbox(0.1, 0.03, 0.16, M.pad, [x, 0.25, z0 + 0.57], 0.012));
-        group.add(tubeAB([0, 0.2, z0 + 0.66], [0, 0.03, z0 + 0.62], 0.028, M.steel));
+        // لوح القدمين على باطن القدمين (يتبع زاوية القدم)، وعموده للأرض
+        const plate = rbox(0.46, 0.34, 0.05, M.steel, [0, 0, 0], 0.02); group.add(plate);
+        const plateP = tube(0.028, M.steel); group.add(plateP);
+        let plateSet = false;
+        updaters.push(() => {
+          if (plateSet) return;
+          plateSet = true;
+          // اللوح متماثل بين القدمين: اتجاهه متوسط اتجاه باطن القدمين (لو الأصابع مفتوحة شوي ما يميل لجهة)،
+          // ومكانه قدّام أبعد نقطة من الكعبين والأصابع — ما تدخل أي قدم فيه
+          const sole = new THREE.Vector3(); const nrm = new THREE.Vector3(); const up = new THREE.Vector3();
+          const pts: THREE.Vector3[] = [];
+          for (const S of [rig.L, rig.R]) {
+            pts.push(S.toe.getWorldPosition(new THREE.Vector3()), S.heel.getWorldPosition(new THREE.Vector3()));
+            S.ankle.getWorldQuaternion(_q);
+            nrm.add(_a.set(0, -1, 0).applyQuaternion(_q)); up.add(_a.set(0, 0, 1).applyQuaternion(_q));
+          }
+          for (const p of pts) sole.add(p);
+          sole.multiplyScalar(1 / pts.length);
+          nrm.normalize(); up.addScaledVector(nrm, -up.dot(nrm)).normalize();
+          const side = new THREE.Vector3().crossVectors(up, nrm);
+          plate.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, nrm));
+          let reach = -Infinity; for (const p of pts) reach = Math.max(reach, _a.subVectors(p, sole).dot(nrm));
+          plate.position.copy(sole).addScaledVector(nrm, reach + 0.025 + 0.001);
+          setTube(plateP, new THREE.Vector3(0, 0.03, plate.position.z + 0.05), plate.position.clone().addScaledVector(nrm, 0.04));
+        });
         const anc = new THREE.Vector3(0, 0.36, z0 + 1.0);
         group.add(weightStack(M, [0, 0, z0 + 1.2], 1.75));
         const pul = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.015, 8, 18), M.steelDark); pul.position.copy(anc); pul.rotation.y = Math.PI / 2; group.add(pul);
@@ -522,15 +623,43 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         group.add(tubeAB([-0.3, 1.62, zb], [0.3, 1.62, zb], 0.03, M.steel));
         for (const x of [-0.3, 0.3]) group.add(tubeAB([x, 0.03, zb], [x, 1.62, zb], 0.03, M.steel));
         for (const S of [rig.L, rig.R]) {
+          // المسند قدام الساعد (جهة باطن الكف اللي يدفع)، موازي للساعد
           const padV = rbox(0.07, 0.3, 0.07, M.pad, [0, 0, 0], 0.025); group.add(padV);
           const arm = tube(0.024, M.steel); group.add(arm);
           const piv = new THREE.Vector3(0, 1.55, zb + 0.05);
+          const sgn = S === rig.L ? -1 : 1;
+          const fore = new THREE.Vector3(); const palm = new THREE.Vector3(); const top = new THREE.Vector3();
+          updaters.push(() => {
+            S.elbow.getWorldPosition(_a); S.wrist.getWorldPosition(_b);
+            fore.copy(_b).sub(_a).normalize();
+            S.wrist.getWorldQuaternion(_q); palm.set(sgn, 0, 0).applyQuaternion(_q);
+            padV.position.copy(_a).add(_b).multiplyScalar(0.5).addScaledVector(palm, 0.075);
+            padV.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), fore);
+            top.copy(padV.position).addScaledVector(fore, 0.15);
+            piv.x = pos[0] + Math.sign(top.x - pos[0]) * 0.2;
+            setTube(arm, piv, new THREE.Vector3(top.x, 1.55, top.z));
+          });
+        }
+        break;
+      }
+      case 'reversePecDeck': {
+        // ريفرس بيك ديك: مقعد بدون ظهر، ومسند صدر قدامه، ومقابض عمودية على أذرع من محور فوق المسند
+        const g = seatUnit(M, { back: false }); g.position.set(...pos); group.add(g);
+        const zc = pos[2] + 0.3;
+        // مسند الصدر تحت مستوى الذراعين (حافته العلوية عند الإبط) وأضيق من الكتفين، عشان الذراعين تمر فوقه وجنبه
+        const chest = rbox(0.3, 0.27, 0.08, M.pad, [pos[0], 0.75, zc], 0.03); chest.rotation.y = Math.PI; group.add(support(chest, 'back', 'z'));
+        // عمود المسند مايل للأمام (يمر بين الركبتين)، وبرج الأوزان قدام اللاعب ورا المقابض (ما يعترض الذراعين وهي مفتوحة)
+        group.add(tubeAB([pos[0], 0.64, zc + 0.05], [pos[0], 0.03, zc + 0.26], 0.034, M.steel));
+        group.add(tubeAB([pos[0], 0.84, zc + 0.06], [pos[0], 1.55, zc + 0.12], 0.034, M.steel));
+        group.add(weightStack(M, [pos[0], 0, zc + 0.87], 1.7));
+        group.add(tubeAB([pos[0], 1.55, zc + 0.12], [pos[0], 1.7, zc + 0.87], 0.03, M.steel));
+        for (const S of [rig.L, rig.R]) {
+          const h = tube(0.018, M.pad); const arm = tube(0.024, M.steel); group.add(h, arm);
+          const hub = new THREE.Vector3(pos[0] + (S === rig.L ? 0.06 : -0.06), 1.55, zc + 0.12);
           updaters.push(() => {
             grip(S, _a);
-            padV.position.set(_a.x, _a.y - 0.05, _a.z);
-            piv.x = pos[0] + Math.sign(_a.x - pos[0]) * 0.2;
-            _b.set(_a.x, 1.55, _a.z);
-            setTube(arm, piv, _b);
+            setTube(h, _a.clone().add(new THREE.Vector3(0, -0.07, 0)), _a.clone().add(new THREE.Vector3(0, 0.07, 0)));
+            setTube(arm, hub, _a.clone().add(new THREE.Vector3(0, 0.07, 0)));
           });
         }
         break;
@@ -539,71 +668,125 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         const g = seatUnit(M, { h: 0.52, backH: 0.62, tilt: 6 }); g.position.set(...pos); group.add(g);
         group.add(weightStack(M, [pos[0] + 0.55, 0, pos[2] - 0.1], 1.4, Math.PI / 2));
         const roller = disc(0.055, 0.38, M.pad, 16); group.add(roller);
-        const arm = tube(0.024, M.steel); group.add(arm);
-        const piv = new THREE.Vector3(pos[0] + 0.24, 0.5, pos[2] + 0.2);
-        const hub = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 8), M.steelDark); hub.position.copy(piv); group.add(hub);
+        const arm = tube(0.026, M.steel); group.add(arm);
+        const hub = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 8), M.steelDark); group.add(hub);
+        const post = tube(0.03, M.steel); group.add(post);
         const front = s.kind === 'legExtension';
+        // الكرل جلوس: مسند فوق الفخذين قرب الركبة يثبتها
+        const thighPad = front ? null : disc(0.05, 0.4, M.pad, 16);
+        if (thighPad) group.add(thighPad);
+        const piv = new THREE.Vector3(); let pivSet = false;
+        const up = new THREE.Vector3(); const fw = new THREE.Vector3();
         updaters.push(() => {
+          // محور الذراع على خط مفصل الركبة (جنب الركبة)، والأسطوانة على أسفل الساق: قدامها (فرد) أو ورا السمانة (كرل)
+          rig.L.knee.getWorldPosition(_a); rig.R.knee.getWorldPosition(_b);
+          const knee = _a.clone().add(_b).multiplyScalar(0.5);
+          if (!pivSet) {
+            pivSet = true;
+            piv.set(pos[0] + 0.36, knee.y, knee.z);
+            hub.position.copy(piv);
+            setTube(post, new THREE.Vector3(piv.x, 0.03, piv.z - 0.2), piv);
+          }
           rig.L.ankle.getWorldPosition(_a); rig.R.ankle.getWorldPosition(_b);
-          roller.position.copy(_a).add(_b).multiplyScalar(0.5);
+          const ank = _a.clone().add(_b).multiplyScalar(0.5);
           rig.L.knee.getWorldQuaternion(_q);
-          roller.position.add(new THREE.Vector3(0, 0.02, front ? 0.07 : -0.07).applyQuaternion(_q));
-          _c.set(pos[0] + 0.24, roller.position.y, roller.position.z);
-          setTube(arm, piv, _c);
+          up.set(0, 1, 0).applyQuaternion(_q); fw.set(0, 0, 1).applyQuaternion(_q);
+          roller.position.copy(ank).addScaledVector(up, front ? 0.105 : 0.1).addScaledVector(fw, front ? 0.088 : -0.103);
+          setTube(arm, piv, new THREE.Vector3(piv.x, roller.position.y, roller.position.z));
+          if (thighPad) {
+            rig.L.hip.getWorldPosition(_a); rig.R.hip.getWorldPosition(_b);
+            const hipC = _a.add(_b).multiplyScalar(0.5);
+            const along = knee.clone().sub(hipC).normalize();
+            thighPad.position.copy(knee).addScaledVector(along, -0.12).add(new THREE.Vector3(0, 0.142, 0));
+          }
         });
         break;
       }
       case 'legCurlLying': {
+        // مسند من الصدر لين فوق الركبة بشوي (الركبة برا الطرف عشان الساق تنثني)، والأسطوانة ورا الكاحل، ومقابض قدام
         const g = new THREE.Group(); g.position.set(...pos);
-        g.add(rbox(0.38, 0.08, 1.25, M.pad, [0, 0.62, -0.1], 0.03));
-        g.add(tubeAB([0, 0.55, -0.6], [0, 0.55, 0.45], 0.028, M.steel));
-        for (const z of [-0.6, 0.4]) { g.add(tubeAB([0, 0.55, z], [0, 0.03, z], 0.028, M.steel)); g.add(tubeAB([-0.24, 0.025, z], [0.24, 0.025, z], 0.025, M.steelDark)); }
+        g.add(support(rbox(0.38, 0.08, 1.08, M.pad, [0, 0.58, 0.56], 0.03), 'bench'));
+        g.add(tubeAB([0, 0.5, 0.1], [0, 0.5, 1.02], 0.028, M.steel));
+        for (const z of [0.12, 1.0]) { g.add(tubeAB([0, 0.5, z], [0, 0.03, z], 0.028, M.steel)); g.add(tubeAB([-0.24, 0.025, z], [0.24, 0.025, z], 0.025, M.steelDark)); }
         group.add(g);
-        group.add(weightStack(M, [pos[0] + 0.55, 0, pos[2] + 0.4], 1.3, Math.PI / 2));
+        group.add(weightStack(M, [pos[0] + 0.55, 0, pos[2] - 0.1], 1.3, Math.PI / 2));
         const roller = disc(0.055, 0.38, M.pad, 16); group.add(roller);
+        const arm = tube(0.024, M.steel); group.add(arm);
+        const handles = [tube(0.018, M.pad), tube(0.018, M.pad)]; group.add(...handles);
+        const up = new THREE.Vector3(); const back = new THREE.Vector3();
         updaters.push(() => {
           rig.L.ankle.getWorldPosition(_a); rig.R.ankle.getWorldPosition(_b);
           roller.position.copy(_a).add(_b).multiplyScalar(0.5);
           rig.L.knee.getWorldQuaternion(_q);
-          roller.position.add(new THREE.Vector3(0, 0, -0.07).applyQuaternion(_q));
+          up.set(0, 1, 0).applyQuaternion(_q); back.set(0, 0, -1).applyQuaternion(_q);
+          roller.position.addScaledVector(up, 0.12).addScaledVector(back, 0.11);
+          // ذراع الجهاز من محور جنب الركبة للأسطوانة
+          rig.L.knee.getWorldPosition(_a);
+          setTube(arm, new THREE.Vector3(pos[0] + 0.3, _a.y, _a.z), new THREE.Vector3(pos[0] + 0.3, roller.position.y, roller.position.z));
+          // مقابض تحت الكفين (عرض القبضة)
+          [rig.L, rig.R].forEach((S, i) => {
+            grip(S, _a);
+            setTube(handles[i], _a.clone().add(new THREE.Vector3(-0.06, 0, 0)), _a.clone().add(new THREE.Vector3(0.06, 0, 0)));
+          });
         });
         break;
       }
       case 'legPress': case 'hackSquat': {
+        // ليق برس ٤٥°: مقعد ومسند مائل (سطوح إسناد)، ولوح القدمين تحت باطن القدمين بالضبط، والمزلقة على قضبان ثابتة
         const g = new THREE.Group(); g.position.set(...pos);
-        g.add(rbox(0.46, 0.08, 0.5, M.pad, [0, 0.35, -0.2], 0.03));
-        const back = rbox(0.46, 0.08, 0.8, M.pad, [0, 0.7, -0.55], 0.03); back.rotation.x = D(s.kind === 'legPress' ? -55 : -70); g.add(back);
+        g.add(support(rbox(0.46, 0.08, 0.5, M.pad, [0, 0.35, -0.2], 0.03), 'seat'));
+        // المسند موازي للجذع المائل للخلف ٤٠°: وجهه (+Y المحلي) باتجاه ظهر اللاعب
+        const back = rbox(0.46, 0.08, 0.8, M.pad, [0, 0.62, -0.6], 0.03); back.rotation.x = D(s.kind === 'legPress' ? 38 : 20); g.add(support(back, 'back'));
         g.add(tubeAB([0, 0.3, -0.2], [0, 0.03, -0.2], 0.03, M.steel));
+        g.add(tubeAB([0, 0.4, -0.5], [0, 0.03, -0.62], 0.03, M.steel));
         g.add(rbox(0.7, 0.05, 1.9, M.steelDark, [0, 0.025, 0.25], 0.015));
         group.add(g);
         // المزلقة: لوح القدمين مع قرون الأوزان
         const sled = new THREE.Group(); group.add(sled);
-        sled.add(rbox(0.62, 0.55, 0.05, M.steel, [0, 0, 0], 0.02));
+        sled.add(rbox(0.62, 0.55, 0.05, M.steel, [0, 0.1, 0], 0.02));
         for (const x of [-0.42, 0.42]) {
-          const horn = tube(0.022, M.chrome); horn.rotation.z = Math.PI / 2; horn.scale.set(1, 0.22, 1); horn.position.set(x, 0, -0.08); sled.add(horn);
-          const p = disc(0.2, 0.05, M.plate, 28); p.position.set(x + Math.sign(x) * 0.03, 0, -0.08); sled.add(p);
+          const horn = tube(0.022, M.chrome); horn.rotation.z = Math.PI / 2; horn.scale.set(1, 0.22, 1); horn.position.set(x, 0.1, 0.08); sled.add(horn);
+          const p = disc(0.2, 0.05, M.plate, 28); p.position.set(x + Math.sign(x) * 0.03, 0.1, 0.08); sled.add(p);
         }
-        const rails: THREE.Mesh[] = [];
+        // العربة: وصلتين من أسفل اللوح لجلبتين تنزلق على القضبان
+        for (const x of [-0.2, 0.2]) {
+          sled.add(tubeAB([x, -0.15, 0.03], [x, -0.32, 0.03], 0.02, M.steel));
+          sled.add(tubeAB([x, -0.33, -0.06], [x, -0.33, 0.12], 0.036, M.steelDark));
+        }
+        // القضبان تحت العربة (بين اللوح والأرض) على خط حركته، من قاعدة الجهاز على الأرض لفوق أعلى نقطة، وعمود يسندها من فوق
+        const rails: THREE.Mesh[] = []; const posts: THREE.Mesh[] = [];
         for (let i = 0; i < 2; i++) { const r = tube(0.025, M.steelDark); rails.push(r); group.add(r); }
-        let railDir: THREE.Vector3 | null = null;
-        updaters.push(() => {
-          rig.L.toe.getWorldPosition(_a); rig.R.toe.getWorldPosition(_b);
-          const toe = _a.clone().add(_b).multiplyScalar(0.5);
-          rig.L.heel.getWorldPosition(_a);
-          const mid = toe.clone().add(_a).multiplyScalar(0.5);
-          const n = toe.clone().sub(_a).normalize();
-          sled.position.copy(mid).add(new THREE.Vector3(0, 0, 0.03));
-          sled.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
-          // القضبان: اتجاه ثابت (عمودي على لوح القدمين في أول إطار)
-          if (!railDir) {
-            railDir = new THREE.Vector3(0, 0, 1).applyQuaternion(sled.quaternion).normalize();
-            if (railDir.y < 0) railDir.negate();
-          }
+        for (let i = 0; i < 2; i++) { const q = tube(0.028, M.steel); posts.push(q); group.add(q); }
+        const toFoot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+        const sole = new THREE.Vector3(); const nrm = new THREE.Vector3();
+        let p0: THREE.Vector3 | null = null; const p1 = new THREE.Vector3(); let far = 0; const n0 = new THREE.Vector3();
+        const setRails = () => {
+          const dir = far > 0.08 ? p1.clone().sub(p0!).normalize() : n0.clone();
+          if (dir.y < 0) dir.negate();
+          if (dir.y < 0.2) dir.set(0, 0.7, 0.7).normalize();
+          const hi = far > 0.08 && p1.y > p0!.y ? p1 : p0!;
+          const below = new THREE.Vector3(1, 0, 0).cross(dir).normalize();                // عمودي على خط الحركة باتجاه الأرض
+          if (below.y > 0) below.negate();
           for (let i = 0; i < 2; i++) {
-            const x = i === 0 ? -0.36 : 0.36;
-            const c = mid.clone().add(new THREE.Vector3(x, 0, 0));
-            setTube(rails[i], c.clone().addScaledVector(railDir, -0.9), c.clone().addScaledVector(railDir, 0.5));
+            const b = hi.clone().addScaledVector(below, 0.33).add(new THREE.Vector3(i === 0 ? -0.2 : 0.2, 0, 0)).addScaledVector(dir, 0.25);
+            const a = b.clone().addScaledVector(dir, -(b.y - 0.05) / dir.y);
+            setTube(rails[i], a, b);
+            setTube(posts[i], b, new THREE.Vector3(b.x, 0.03, b.z));
           }
+        };
+        updaters.push(() => {
+          // منتصف باطن القدمين (نقاط الكعب والأصابع على مستوى النعل) + اتجاه النعل للخارج (−Y للقدم)
+          sole.set(0, 0, 0);
+          for (const S of [rig.L, rig.R]) { sole.add(S.toe.getWorldPosition(_a)); sole.add(S.heel.getWorldPosition(_a)); }
+          sole.multiplyScalar(0.25);
+          rig.L.ankle.getWorldQuaternion(_q);
+          nrm.set(0, -1, 0).applyQuaternion(_q);
+          // اللوح: سطحه على النعل (نص سماكته + فراغ بسيط للخارج)، وطوله على طول القدم
+          sled.quaternion.copy(_q).multiply(toFoot);
+          sled.position.copy(sole).addScaledVector(nrm, 0.03);
+          if (!p0) { p0 = sled.position.clone(); n0.copy(nrm); setRails(); return; }
+          const d = sled.position.distanceTo(p0);
+          if (d > far + 0.02) { far = d; p1.copy(sled.position); setRails(); }
         });
         break;
       }
@@ -612,13 +795,27 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         padG.add(rbox(0.42, 0.9, 0.07, M.pad, [0, 0.1, -0.16], 0.03));
         for (const x of [-0.16, 0.16]) padG.add(rbox(0.09, 0.07, 0.16, M.pad, [x, 0.52, -0.06], 0.025));
         const rail = tube(0.035, M.steel); group.add(rail);
-        group.add(rbox(0.7, 0.05, 0.6, M.steelDark, [0, 0.025, 0.1], 0.015));
+        const railFoot = rbox(0.34, 0.04, 0.3, M.steelDark, [0, 0.02, 0], 0.012); group.add(railFoot);
+        // لوح رفيع تحت القدمين (سطحه تقريباً على الأرض عشان النعل ما يدخل فيه)
+        group.add(rbox(0.7, 0.008, 0.6, M.steelDark, [0, 0.002, 0.1], 0.003));
+        // القضيب على خط حركة المسند نفسه (من أول وضعية لأبعد نقطة يوصلها)، فالمسند ينزلق عليه بدون ما يدخل الجسم فيه
+        let p0: THREE.Vector3 | null = null; const p1 = new THREE.Vector3(); let far = 0;
+        const setRail = (q: THREE.Quaternion) => {
+          const dir = far > 0.08 ? p1.clone().sub(p0!).normalize() : new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+          if (dir.y < 0) dir.negate();
+          if (dir.y < 0.3) dir.set(0, 1, 0);
+          _b.copy(p0!).add(new THREE.Vector3(0, 0.2, -0.3).applyQuaternion(q));
+          const lo = _b.clone().addScaledVector(dir, -(_b.y - 0.04) / dir.y);
+          const hi = _b.clone().addScaledVector(dir, (2.1 - _b.y) / dir.y);
+          setTube(rail, lo, hi);
+          railFoot.position.set(lo.x, 0.02, lo.z);
+        };
         updaters.push(() => {
           rig.spine.getWorldPosition(_a); padG.position.copy(_a);
           rig.spine.getWorldQuaternion(_q); padG.quaternion.copy(_q);
-          _b.copy(_a).add(new THREE.Vector3(0, 0.2, -0.24).applyQuaternion(_q));
-          const dir = new THREE.Vector3(0, 1, 0).applyQuaternion(_q);
-          setTube(rail, _b.clone().addScaledVector(dir, -1.1), _b.clone().addScaledVector(dir, 1.1));
+          if (!p0) { p0 = _a.clone(); setRail(_q); return; }
+          const d = _a.distanceTo(p0);
+          if (d > far + 0.02) { far = d; p1.copy(_a); setRail(_q); }
         });
         break;
       }
@@ -673,29 +870,92 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         const g = new THREE.Group(); g.position.set(...pos);
         g.add(support(rbox(0.36, 0.07, 0.34, M.pad, [0, 0.385, -0.05], 0.03), 'seat'));
         g.add(tubeAB([0, 0.345, -0.05], [0, 0.03, -0.05], 0.03, M.steel));
-        // المسند تحت العضد مباشرة (مائل 45°) والكوع عند طرفه
-        const armPad = rbox(0.46, 0.07, 0.25, M.pad, [0, 0.775, 0.12], 0.03); armPad.rotation.x = D(45); g.add(armPad);
-        g.add(tubeAB([0, 0.725, 0.17], [0, 0.03, 0.3], 0.03, M.steel));
+        // مسندين للعضدين (واحد تحت كل عضد) بنفس ميلانهم: الكوع عند طرفه والإبط فوق طرفه الثاني.
+        // مسند لكل ذراع بدل مسند عريض عشان ما يدخل في البطن (العضد قصير نسبة لعمق الجذع)
+        const armPads = [rbox(0.12, 0.06, 0.15, M.pad, [0, 0, 0], 0.025), rbox(0.12, 0.06, 0.15, M.pad, [0, 0, 0], 0.025)];
+        group.add(...armPads);
+        const padPost = tube(0.03, M.steel); const padBar = tube(0.022, M.steel); group.add(padPost, padBar);
+        let padSet = false;
+        updaters.push(() => {
+          if (padSet) return;
+          padSet = true;
+          const under: THREE.Vector3[] = [];
+          [rig.L, rig.R].forEach((S, i) => {
+            const sh = S.shoulder.getWorldPosition(new THREE.Vector3());
+            const el = S.elbow.getWorldPosition(new THREE.Vector3());
+            const dir = el.clone().sub(sh).normalize();
+            const down = new THREE.Vector3(1, 0, 0).cross(dir).normalize();
+            if (down.y > 0) down.negate();
+            // قريب من الكوع وبرا شوي عن الصدر (صدر المرأة أقرب للعضد)
+            armPads[i].position.copy(sh).lerp(el, 0.8).addScaledVector(down, 0.075);
+            armPads[i].position.x += Math.sign(sh.x) * 0.012;
+            armPads[i].quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+            under.push(armPads[i].position.clone().addScaledVector(down, 0.035));
+          });
+          setTube(padBar, under[0], under[1]);
+          const mid = under[0].clone().add(under[1]).multiplyScalar(0.5);
+          setTube(padPost, mid, new THREE.Vector3(mid.x, 0.03, mid.z + 0.25));
+        });
         g.add(rbox(0.1, 0.04, 0.8, M.steelDark, [0, 0.02, 0.15], 0.012));
         g.add(rbox(0.44, 0.04, 0.08, M.steelDark, [0, 0.02, -0.05], 0.012));
         group.add(g); break;
       }
       case 'hyperBench': {
-        // جهاز تمديد الظهر 45°: مسند للحوض ومسند للكاحل
-        const g = new THREE.Group(); g.position.set(...pos);
-        // مسند الحوض أمام أعلى الفخذ، ومسند الكاحل خلف أسفل الساق، ولوح للقدمين
-        const hipPad = rbox(0.36, 0.08, 0.34, M.pad, [0, 0.82, 0.32], 0.03); hipPad.rotation.x = D(-45); g.add(hipPad);
-        g.add(tubeAB([0, 0.03, -0.45], [0, 0.75, 0.27], 0.032, M.steel));
-        g.add(tubeAB([0, 0.75, 0.27], [0, 0.03, 0.45], 0.03, M.steel));
-        for (const x of [-0.1, 0.1]) { const r = disc(0.05, 0.12, M.pad, 14); r.position.set(x, 0.46, -0.39); g.add(r); }
-        g.add(tubeAB([0, 0.24, -0.34], [0, 0.46, -0.39], 0.022, M.steel));
-        g.add(tubeAB([0, 0.03, -0.3], [0, 0.23, -0.3], 0.026, M.steel));
-        g.add(tubeAB([0, 0.03, -0.65], [0, 0.03, 0.55], 0.03, M.steelDark));
-        const plate = rbox(0.46, 0.03, 0.3, M.steelDark, [0, 0.235, -0.29], 0.01); plate.rotation.x = D(-10); g.add(plate);
-        group.add(g); break;
+        // جهاز تمديد الظهر ٤٥°: مسند الحوض قدام أعلى الفخذين (حافته العليا عند مفصل الحوض عشان الجذع ينثني بحرية)،
+        // أسطوانتين ورا أسفل الساقين فوق الكاحل، ولوح القدمين عمودي على الرجلين تحت النعل.
+        // الرجلين ثابتة طول التمرين، فالجهاز يتركّب على مقاس اللاعب (رجل/امرأة) أول إطار
+        const hipPad = rbox(0.36, 0.08, 0.34, M.pad, [0, 0, 0], 0.03);
+        const hipPlate = box(0.08, 0.025, 0.28, M.steelDark, [0, 0, 0]);
+        const footPlate = rbox(0.46, 0.03, 0.3, M.steelDark, [0, 0, 0], 0.01);
+        const rollers = [disc(0.05, 0.13, M.pad, 14), disc(0.05, 0.13, M.pad, 14)];
+        const axle = tube(0.016, M.chrome);
+        const hipPost = tube(0.032, M.steel); const hipBrace = tube(0.028, M.steel); const rollPost = tube(0.024, M.steel); const platePost = tube(0.026, M.steel);
+        const base = tube(0.03, M.steelDark); const feet = [tube(0.028, M.steelDark), tube(0.028, M.steelDark)];
+        group.add(hipPad, hipPlate, footPlate, ...rollers, axle, hipPost, hipBrace, rollPost, platePost, base, ...feet);
+        let built = false;
+        updaters.push(() => {
+          if (built) return;
+          built = true;
+          const w = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3());
+          const hipL = w(rig.L.hip); const hipR = w(rig.R.hip);
+          const hip = hipL.clone().add(hipR).multiplyScalar(0.5);
+          const ankle = w(rig.L.ankle).add(w(rig.R.ankle)).multiplyScalar(0.5);
+          const leg = hip.clone().sub(ankle).setX(0).normalize();                       // من القدم للحوض
+          const front = new THREE.Vector3(1, 0, 0).cross(leg).normalize();               // قدام الفخذ (ولاتجاه الأصابع)
+          if (front.z < 0) front.negate();
+          const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), front.clone().negate(), leg));
+          // مسند الحوض: سطحه على أعرض نقطة بقدام الفخذ (سماكة الفخذ ≈ ١.١ × نص المسافة بين مفصلي الحوض)
+          const thigh = hipL.distanceTo(hipR) * 0.55 + 0.004;
+          hipPad.position.copy(hip).addScaledVector(leg, -0.28).addScaledVector(front, thigh + 0.04); hipPad.quaternion.copy(q);
+          hipPlate.position.copy(hipPad.position).addScaledVector(front, 0.052); hipPlate.quaternion.copy(q);
+          // الأسطوانتين: ورا الساق فوق الكاحل بـ ١٣ سم، وحدة على كل رجل
+          const back = front.clone().negate();
+          const roll = ankle.clone().addScaledVector(leg, 0.13).addScaledVector(back, 0.052 + 0.05 + 0.003);
+          [rig.L, rig.R].forEach((S, i) => { rollers[i].position.set(w(S.ankle).x, roll.y, roll.z); });
+          setTube(axle, rollers[0].position.clone().setX(rollers[0].position.x + 0.07), rollers[1].position.clone().setX(rollers[1].position.x - 0.07));
+          // لوح القدمين: سطحه تحت النعل (نقاط الكعب والأصابع) وعمودي على الرجلين
+          const sole = new THREE.Vector3();
+          for (const S of [rig.L, rig.R]) sole.add(w(S.toe)).add(w(S.heel));
+          sole.multiplyScalar(0.25);
+          footPlate.position.copy(sole).setX(0).addScaledVector(leg, -0.018);
+          footPlate.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), leg, front));
+          // الهيكل: قاعدة على الأرض، عمود لمسند الحوض، دعامة للأسطوانات، وعمود للوح
+          const zB = footPlate.position.z - 0.2; const zF = hipPad.position.z + 0.25;
+          setTube(base, new THREE.Vector3(0, 0.03, zB), new THREE.Vector3(0, 0.03, zF));
+          setTube(feet[0], new THREE.Vector3(-0.28, 0.028, zB + 0.03), new THREE.Vector3(0.28, 0.028, zB + 0.03));
+          setTube(feet[1], new THREE.Vector3(-0.28, 0.028, zF - 0.03), new THREE.Vector3(0.28, 0.028, zF - 0.03));
+          const padUnder = hipPlate.position.clone().addScaledVector(front, 0.01);
+          setTube(hipPost, new THREE.Vector3(0, 0.03, zF - 0.06), padUnder);
+          setTube(hipBrace, new THREE.Vector3(0, 0.03, zB + 0.12), padUnder.clone().addScaledVector(leg, -0.12));
+          const axleMid = rollers[0].position.clone().add(rollers[1].position).multiplyScalar(0.5);
+          setTube(rollPost, axleMid, new THREE.Vector3(0, 0.03, zB + 0.12).lerp(padUnder.clone().addScaledVector(leg, -0.12), 0.35));
+          setTube(platePost, footPlate.position.clone().addScaledVector(leg, -0.02), new THREE.Vector3(0, 0.03, footPlate.position.z - 0.02));
+        });
+        break;
       }
       case 'plyoBox': {
-        group.add(rbox(0.6, 0.5, 0.5, M.pad, [pos[0], 0.25, pos[2]], 0.035)); break;
+        // سطحه العلوي أرضية مرتفعة (القدمين عليه في الضغط المنحدر مثلاً)
+        group.add(support(rbox(0.6, 0.5, 0.5, M.pad, [pos[0], 0.25, pos[2]], 0.035), 'mat')); break;
       }
       case 'smithBar': {
         // سميث مشين: البار على الظهر يتحرك على قضبان ثابتة (pos[2] = موضع القضبان للأمام/الخلف)
@@ -705,7 +965,7 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
           group.add(tubeAB([x - 0.08, 0.03, zb], [x + 0.08, 0.03, zb], 0.03, M.steelDark));
         }
         group.add(tubeAB([-0.72, 2.25, zb], [0.72, 2.25, zb], 0.03, M.steel));
-        group.add(rbox(1.7, 0.04, 0.7, M.steelDark, [0, 0.02, zb + 0.07], 0.012));
+        group.add(rbox(1.7, 0.008, 0.7, M.steelDark, [0, 0.002, zb + 0.07], 0.003));
         const bar = makeBarbell(M, 1.6, 0.2); group.add(bar);
         const sleeves = [tube(0.03, M.steelDark), tube(0.03, M.steelDark)]; group.add(...sleeves);
         updaters.push(() => {
@@ -736,33 +996,43 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         break;
       }
       case 'cableAnkle': {
-        // كيبل من البكرة السفلية إلى سوار الكاحل
+        // كيك باك بالكيبل: البرج قدام اللاعب ويمسك بيديه بار أفقي عليه (قبضة من فوق)، والكيبل من البكرة السفلية
+        // لسوار الكاحل. البار والبرج يتحددون أول إطار من مكان اليدين (مقاس الرجل والمرأة يختلف).
+        // السوار يلف أسفل الساق (فوق الكاحل) وعمودي عليها، والسلك يشبك فيه من الجهة اللي تواجه البكرة
         const S = pos[0] >= 0 ? rig.L : rig.R;
-        const strap = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.018, 8, 16), M.pad); group.add(strap);
-        cable(new THREE.Vector3(pos[0], pos[1] || 0.12, pos[2] || 0.7), () => S.ankle.getWorldPosition(new THREE.Vector3()), { handle: false, offset: 0.45 });
-        updaters.push(() => { S.ankle.getWorldPosition(_a); strap.position.copy(_a); strap.rotation.set(Math.PI / 2, 0, 0); });
+        const strap = new THREE.Mesh(new THREE.TorusGeometry(0.063, 0.014, 8, 20), M.pad); group.add(strap);
+        const anchor = new THREE.Vector3(0, pos[1] || 0.12, pos[2] || 0.7);
+        const frame = new THREE.Group(); group.add(frame);
+        let frameSet = false;
+        updaters.push(() => {
+          if (frameSet) return;
+          frameSet = true;
+          grip(rig.L, _a); grip(rig.R, _b);
+          const y = (_a.y + _b.y) / 2; const z = (_a.z + _b.z) / 2;
+          const half = Math.max(0.26, Math.abs(_a.x - _b.x) / 2 + 0.07);
+          const zt = z + 0.12;
+          frame.add(weightStack(M, [0, 0, zt], 2.15, 0, half));
+          frame.add(tubeAB([-half - 0.03, y, z], [half + 0.03, y, z], 0.019, M.pad));
+          for (const x of [-half, half]) frame.add(tubeAB([x, y, z], [x, y, zt], 0.022, M.steel));
+          anchor.set(0, pos[1] || 0.12, zt - 0.09);
+          const pul = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.014, 8, 18), M.steelDark);
+          pul.position.copy(anchor); frame.add(pul);
+          frame.add(tubeAB([0, anchor.y, anchor.z], [0, anchor.y, zt], 0.025, M.steel));
+        });
+        const axis = new THREE.Vector3(); const hook = new THREE.Vector3(); const zAxis = new THREE.Vector3(0, 0, 1);
+        cable(anchor, () => {
+          S.ankle.getWorldPosition(_a); S.knee.getWorldPosition(_b);
+          axis.subVectors(_b, _a).normalize();
+          strap.position.copy(_a).addScaledVector(axis, 0.075);
+          strap.quaternion.setFromUnitVectors(zAxis, axis);
+          hook.subVectors(anchor, strap.position); hook.addScaledVector(axis, -hook.dot(axis)).normalize();
+          return hook.multiplyScalar(0.077).add(strap.position).clone();
+        }, { handle: false, station: false });
         break;
       }
       case 'cableSide': {
         // كيبل من الجنب على ارتفاع الصدر (بالوف برس / وود تشوب)
         cable(new THREE.Vector3(pos[0] || 0.9, pos[1] || 1.2, pos[2] || 0), () => midHands(new THREE.Vector3()), { side: (pos[0] || 0.9) > 0 ? 1 : -1, offset: 0.12 });
-        break;
-      }
-      case 'hipAdduction': {
-        const g = seatUnit(M, { backH: 0.7, tilt: 14 }); g.position.set(...pos); group.add(g);
-        group.add(weightStack(M, [pos[0], 0, pos[2] - 0.6], 1.6));
-        for (const S of [rig.L, rig.R]) {
-          const padM = rbox(0.07, 0.22, 0.26, M.pad, [0, 0, 0], 0.03); group.add(padM);
-          const arm = tube(0.025, M.steel); group.add(arm);
-          const piv = new THREE.Vector3(pos[0], 0.3, pos[2] + 0.1);
-          updaters.push(() => {
-            S.knee.getWorldPosition(_a);
-            const out = Math.sign(_a.x - pos[0]) || 1;
-            padM.position.set(_a.x - out * 0.09, _a.y, _a.z - 0.05);
-            _b.set(padM.position.x, 0.3, padM.position.z);
-            setTube(arm, piv, _b);
-          });
-        }
         break;
       }
       case 'kettlebell': {
@@ -776,7 +1046,13 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
       case 'medBall': {
         const ball = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 14), new THREE.MeshStandardMaterial({ color: '#2B3A35', roughness: 0.8 }));
         group.add(ball);
-        updaters.push(() => { midHands(_a); ball.position.copy(_a); ball.position.addScaledVector(new THREE.Vector3(0, 0, 1), 0.06); });
+        // الكرة بين الكفين بالضبط: حجمها يتبع المسافة بين الكفين (مقاس يدين الرجل والمرأة يختلف)
+        updaters.push(() => {
+          grip(rig.L, _a); grip(rig.R, _b);
+          const r = Math.min(0.14, Math.max(0.09, _a.distanceTo(_b) / 2 - 0.012));
+          ball.position.copy(_a).add(_b).multiplyScalar(0.5);
+          ball.scale.setScalar(r / 0.12);
+        });
         break;
       }
       case 'cableFlyLow': {
@@ -795,11 +1071,11 @@ export function createProps(rig: Rig, specs: PropSpec[]): PropsRuntime {
         break;
       }
       case 'mat': {
-        group.add(rbox(0.7, 0.018, 1.9, M.pad, [pos[0], 0.009, pos[2]], 0.008)); break;
+        group.add(support(rbox(0.7, 0.018, 1.9, M.pad, [pos[0], 0.009, pos[2]], 0.008), 'mat')); break;
       }
       case 'matSide': {
         // مات بالعرض (للتمارين على الجنب مثل البلانك الجانبي)
-        group.add(rbox(1.9, 0.018, 0.7, M.pad, [pos[0], 0.009, pos[2]], 0.008)); break;
+        group.add(support(rbox(1.9, 0.018, 0.7, M.pad, [pos[0], 0.009, pos[2]], 0.008), 'mat')); break;
       }
     }
   }

@@ -25,7 +25,7 @@ const HOME = new Set(['split_squat', 'glute_bridge', 'plank', 'walking_lunge', '
 ok(!!home.workout && home.workout.exercises.every((e) => HOME.has(e.exercise_id)), 'home = no-equipment only');
 
 const legsEn = localCoach('45 min legs and glutes with dumbbells', en);
-ok(!!legsEn.workout && legsEn.workout.minutes === 45 && legsEn.workout.exercises.every((e) => mo(e.exercise_id).props.every((p) => ['dumbbells', 'goblet', 'hammerDumbbells', 'dumbbellR', 'mat', 'bench', 'benchBehind', 'benchSideRow', 'inclineBench', 'seatBack'].includes(p.kind))), 'english legs+glutes with dumbbells');
+ok(!!legsEn.workout && legsEn.workout.minutes === 45 && legsEn.workout.exercises.every((e) => mo(e.exercise_id).props.every((p) => ['dumbbells', 'goblet', 'hammerDumbbells', 'dumbbellR', 'dumbbellHips', 'mat', 'bench', 'benchBehind', 'benchRear', 'benchSideRow', 'inclineBench', 'seatBack'].includes(p.kind))), 'english legs+glutes with dumbbells');
 ok(legsEn.text.includes('Legs'), 'english reply');
 
 const red = localCoach('تمرين ظهر', { ...ar, zone: 'red' });

@@ -28,9 +28,15 @@ const findBone = (root: THREE.Object3D, name: string) => {
 type Pair = { bone: THREE.Bone; driver: THREE.Object3D; offset: THREE.Quaternion; roll?: THREE.Object3D };
 type SkinLayer = { mesh: THREE.SkinnedMesh; base: Float32Array; colors: Float32Array; cloth: boolean };
 
-/** رؤوس الجسم اللي تلمس الأجهزة: back = الجذع والرأس (الظهر على المسند/البنش)، seat = الحوض والفخذ (الجلوس) */
-export type ContactRegion = 'back' | 'seat';
-export type ContactVerts = { mesh: THREE.SkinnedMesh; idx: Uint32Array }[];
+/**
+ * رؤوس الجسم اللي تلمس الأجهزة: back = الجذع والرأس (الظهر على المسند/البنش)، seat = الحوض والفخذ (الجلوس)،
+ * ground = عينة من كل الجسم (التمارين الأرضية)، footL/footR = كل قدم لحالها (قدم على ظهرها فوق بنش مثلاً)
+ */
+export type ContactRegion = 'back' | 'seat' | 'ground' | 'footL' | 'footR';
+/** أجزاء الجسم اللي تلمس الأرض بالتمارين الأرضية (رقم الجزء لكل رأس بمنطقة ground) */
+export const GroundPart = { other: 0, hands: 1, feet: 2, knees: 3, forearms: 4 } as const;
+export type GroundPartName = Exclude<keyof typeof GroundPart, 'other'>;
+export type ContactVerts = { mesh: THREE.SkinnedMesh; idx: Uint32Array; part?: Uint8Array }[];
 
 export interface Human {
   object: THREE.Group;
@@ -105,26 +111,51 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
   try { shoes = makeSneakers(model, template); } catch { shoes = null; }
 
   // رؤوس الملامسة حسب العظمة المسيطرة (نص الرؤوس يكفي للدقة ويخفف الحساب)
-  const REGION: Record<ContactRegion, RegExp> = {
+  const REGION: Record<'back' | 'seat', RegExp> = {
     back: /^(Hips|Spine|Spine1|Spine2|Neck|Head|LeftShoulder|RightShoulder)$/,
     seat: /^(Hips|LeftUpLeg|RightUpLeg)$/,
   };
-  const contact: Record<ContactRegion, ContactVerts> = { back: [], seat: [] };
+  const contact: Record<ContactRegion, ContactVerts> = { back: [], seat: [], ground: [], footL: [], footR: [] };
+  // الأرض: عينة من كل الجسم الظاهر، وكل رأس معلّم بجزئه (للتمارين الأرضية: الكفين، القدمين، الركب، الساعدين)
+  // الأجزاء الصغيرة بعينة أكثف عشان نقطة الملامسة تكون دقيقة
+  const PART: [number, RegExp][] = [[GroundPart.hands, /Hand/], [GroundPart.feet, /Foot|Toe/], [GroundPart.knees, /^(Left|Right)(Up)?Leg$/], [GroundPart.forearms, /ForeArm/]];
   for (const l of skins) {
     const g = l.mesh.geometry;
     const si = g.attributes.skinIndex as THREE.BufferAttribute;
     const sw = g.attributes.skinWeight as THREE.BufferAttribute;
     const names = l.mesh.skeleton.bones.map((b) => b.name.replace(/[:_]/g, '').replace('mixamorig', ''));
-    const lists: Record<ContactRegion, number[]> = { back: [], seat: [] };
+    const lists = { back: [] as number[], seat: [] as number[], ground: [] as number[], footL: [] as number[], footR: [] as number[] };
+    const parts: number[] = [];
     for (let i = 0; i < g.attributes.position.count; i += 2) {
       let best = 0; let bi = 0;
       for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > best) { best = w; bi = si.getComponent(i, k); } }
       const n = names[bi] ?? '';
       if (REGION.back.test(n)) lists.back.push(i);
       if (REGION.seat.test(n)) lists.seat.push(i);
+      if (!l.mesh.visible) continue;
+      if (i % 4 === 0 && /^(Left|Right)(Foot|Toe)/.test(n)) lists[n.startsWith('Left') ? 'footL' : 'footR'].push(i);
+      let part: number = GroundPart.other;
+      for (const [pt, re] of PART) if (re.test(n)) { part = pt; break; }
+      // ركبة وساعد: كل رابع رأس، الكف: كل ثامن (أصابع كثيرة الرؤوس)، الباقي (جذع، رأس...): كل ١٦
+      const every = part === GroundPart.other ? 16 : part === GroundPart.hands ? 8 : 4;
+      if (i % every === 0) { lists.ground.push(i); parts.push(part); }
     }
-    for (const r of ['back', 'seat'] as const) if (lists[r].length) contact[r].push({ mesh: l.mesh, idx: Uint32Array.from(lists[r]) });
+    if (lists.back.length) contact.back.push({ mesh: l.mesh, idx: Uint32Array.from(lists.back) });
+    if (lists.seat.length) contact.seat.push({ mesh: l.mesh, idx: Uint32Array.from(lists.seat) });
+    if (lists.ground.length) contact.ground.push({ mesh: l.mesh, idx: Uint32Array.from(lists.ground), part: Uint8Array.from(parts) });
+    for (const f of ['footL', 'footR'] as const) if (lists[f].length) contact[f].push({ mesh: l.mesh, idx: Uint32Array.from(lists[f]) });
   }
+  // الحذاء الجديد (مو ضمن طبقات الجلد): كله قدم
+  model.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh || !/^ARQ_Sneaker_/.test(m.name)) return;
+    const idx: number[] = [];
+    const every = /_sole$/.test(m.name) ? 6 : 8;
+    for (let i = 0; i < m.geometry.attributes.position.count; i += every) idx.push(i);
+    const list = Uint32Array.from(idx);
+    contact.ground.push({ mesh: m, idx: list, part: new Uint8Array(idx.length).fill(GroundPart.feet) });
+    contact[/_Left_/.test(m.name) ? 'footL' : 'footR'].push({ mesh: m, idx: list });
+  });
 
   const bone = (n: string) => {
     const b = findBone(model, n);
@@ -176,6 +207,36 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
   const hipsOffset = hips.getWorldPosition(new THREE.Vector3())
     .sub(driver.root.getWorldPosition(new THREE.Vector3()))
     .applyQuaternion(rootQ.clone().invert());
+
+  // النعل: لما قدم السائق مسطحة لازم نعل الحذاء نفسه مسطح على الأرض (حذاء نموذج المرأة مايل ٣° للأعلى عند الأصابع):
+  // نقيس ميله بوضعية المعايرة ونعوّضه بفرق محاور القدم، ونحفظ عمق النعل وطوله (نقاط الكعب والأصابع عليه بالضبط)
+  const soleOf = (side: 'Left' | 'Right') => {
+    const foot = bone(`${side}Foot`);
+    const a = foot.getWorldPosition(new THREE.Vector3());
+    const pts: THREE.Vector3[] = [];
+    const v = new THREE.Vector3();
+    model.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh || !m.name.startsWith(`ARQ_Sneaker_${side}_`)) return;
+      for (let i = 0; i < m.geometry.attributes.position.count; i += 2) { m.getVertexPosition(i, v); pts.push(v.applyMatrix4(m.matrixWorld).clone().sub(a)); }
+    });
+    if (pts.length < 20) return null;
+    const low = (z0: number, z1: number) => { let y = Infinity; for (const p of pts) if (p.z >= z0 && p.z <= z1) y = Math.min(y, p.y); return y; };
+    const hy = low(-0.05, -0.01); const by = low(0.11, 0.15);
+    if (!Number.isFinite(hy) || !Number.isFinite(by)) return null;
+    const tilt = Math.max(-0.15, Math.min(0.15, Math.atan2(by - hy, 0.16)));   // موجب = الأصابع أعلى من الكعب
+    const c = Math.cos(tilt); const s = Math.sin(tilt);
+    for (const p of pts) { const y = p.y * c - p.z * s; p.z = p.y * s + p.z * c; p.y = y; }   // بعد التعويض (ثني للأسفل بزاوية الميل)
+    let zMin = Infinity; let zMax = -Infinity;
+    for (const p of pts) { zMin = Math.min(zMin, p.z); zMax = Math.max(zMax, p.z); }
+    const heelZ = zMin + 0.012; const toeZ = zMax - 0.035;
+    return { tilt, heel: [0, low(heelZ - 0.01, heelZ + 0.02), heelZ] as const, toe: [0, low(toeZ - 0.02, toeZ + 0.01), toeZ] as const };
+  };
+  const soles = { L: soleOf('Left'), R: soleOf('Right') };
+  for (const [n, sole] of [['LeftFoot', soles.L], ['RightFoot', soles.R]] as const) {
+    const p = pairs.find((q) => q.bone.name.replace(/[:_]/g, '') === B(n));
+    if (p && sole && Math.abs(sole.tilt) > 0.005) p.offset.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), sole.tilt));
+  }
 
   // قبضة اليد: نثني كل إصبع باتجاه باطن الكف (المحور يُحسب من اتجاه الإصبع ونورمال الكف في وضعية T)
   model.updateMatrixWorld(true);
@@ -255,6 +316,12 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
     L: sideProxy('Left'),
     R: sideProxy('Right'),
   } as unknown as Rig;
+  // نقاط الكعب وأطراف الأصابع على نعل حذاء هذا النموذج (بعد تعويض ميله)
+  for (const [S, sole] of [[propRig.L, soles.L], [propRig.R, soles.R]] as const) {
+    if (!sole) continue;
+    S.heel.position.set(...sole.heel);
+    S.toe.position.set(...sole.toe);
+  }
 
   // ------------------------------------------------------------------ مناطق العضلات (على الجلد والملابس)
   const layers = skins.map((l) => ({ ...l, regions: paintRegions(l.mesh), adj: adjacency(l.mesh.geometry) }));
@@ -329,12 +396,14 @@ export function createHuman(template: THREE.Object3D, driver: Rig, tposeClip?: T
       for (const o of [propRig.L.toe, propRig.L.heel, propRig.R.toe, propRig.R.heel]) min = Math.min(min, o.getWorldPosition(_v).y);
       object.position.y = -min;
       object.updateMatrixWorld(true);
-    } else if (floor) {
-      let pen = 0;
-      for (const o of [propRig.L.toe, propRig.L.heel, propRig.R.toe, propRig.R.heel]) { o.getWorldPosition(_v); pen = Math.max(pen, floor(_v.x, _v.z) - _v.y); }
-      if (pen > 0) { object.position.y = pen; object.updateMatrixWorld(true); }
     }
     if (extra) { object.position.add(extra); object.updateMatrixWorld(true); }
+    if (!ground && floor) {
+      // حماية أخيرة (بعد إزاحة الملاءمة): القدم ما تدخل الأرض أو سطح الصندوق — نرفع الجسم بس، ما ننزّله
+      let pen = 0;
+      for (const o of [propRig.L.toe, propRig.L.heel, propRig.R.toe, propRig.R.heel]) { o.getWorldPosition(_v); pen = Math.max(pen, floor(_v.x, _v.z) - _v.y); }
+      if (pen > 0) { object.position.y += pen; object.updateMatrixWorld(true); }
+    }
   };
 
   return { object, propRig, sync, setHighlight, setGrip, setStyle, contact };
