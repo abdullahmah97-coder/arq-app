@@ -8,7 +8,9 @@ import { Component, useCallback, useEffect, useRef, useState, type ReactNode } f
 import { useTranslation } from 'react-i18next';
 import { Linking, Modal, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Button, T } from '@/components/ui';
+import { useUser } from '@/lib/auth';
 import { adMediaUrl, launchAdEvent, launchAdToShow, markAdShown, type AdMediaType, type LaunchAd } from '@/lib/launchAds';
+import { knownSleep, loadOpenSleep } from '@/lib/timeline';
 import { brand } from '@/theme';
 
 /** مرة وحدة لكل تشغيل للتطبيق */
@@ -29,6 +31,7 @@ export function LaunchAdGate() {
 
 /** يجيب الإعلان الحالي بعد ما تفتح الرئيسية، ويعرضه بعد ما يتحمّل الملف (عشان ما تطلع شاشة فاضية) */
 function Gate() {
+  const { userId } = useUser();
   const [ad, setAd] = useState<LaunchAd | null>(null);
   const done = useCallback(() => setAd(null), []);
   useEffect(() => {
@@ -36,6 +39,9 @@ function Gate() {
     checkedThisLaunch = true;
     let dead = false;
     const timer = setTimeout(async () => {
+      // نايم (شاشة النوم مقفلة التطبيق): ما نطلع إعلان فوقها
+      const asleep = knownSleep(userId) ?? await loadOpenSleep(userId).catch(() => null);
+      if (asleep || dead) return;
       const a = await launchAdToShow().catch(() => null);
       const url = a ? adMediaUrl(a.media_path) : undefined;
       if (!a || !url || dead) return;
@@ -47,7 +53,7 @@ function Gate() {
       setAd(a);
     }, 700);
     return () => { dead = true; clearTimeout(timer); };
-  }, []);
+  }, [userId]);
   if (!ad) return null;
   if (ad.media_type === 'video') return <VideoGate ad={ad} onDone={done} />;
   return <LaunchAdView ad={ad} onClose={done} />;
