@@ -398,7 +398,7 @@ export function buildMealDays(options: MealOption[], calories: number) {
 export function trainingPrompt(daysPerWeek: number, place: 'gym' | 'home') {
   return `You are a certified strength & conditioning coach writing the TRAINING part of a weekly plan for a gym app used mainly in Saudi Arabia.
 
-Return ONLY one JSON object (no markdown, no commentary):
+Return ONLY one minified JSON object on a single line (no markdown, no commentary, no indentation or line breaks):
 {"summary":{"ar":"...","en":"..."},
  "days":[{"day":0,"rest":false,"focus":{"ar":"...","en":"..."},"ex":[{"id":"bench_bb","sets":4,"reps":"6-8","rest":120,"rir":"1-2"}],"cardio":{"ar":"...","en":"..."}}],
  "tips":[{"ar":"...","en":"..."}],
@@ -427,7 +427,7 @@ export function mealsPrompt(targets: Record<string, number>, goal: string) {
 
 Daily target: ${c} kcal, protein ${targets.protein_g} g, carbs ${targets.carbs_g} g, fat ${targets.fat_g} g. Goal: ${goal}.
 
-Return ONLY one JSON object (no markdown):
+Return ONLY one minified JSON object on a single line (no markdown, no indentation or line breaks):
 {"meals":[{"slot":"breakfast","name":{"ar":"...","en":"..."},"items":[{"ar":"شوفان","en":"Oats","q":60,"u":"g"}],"kcal":450,"p":30}]}
 
 Rules:
@@ -544,7 +544,8 @@ Deno.serve(async (req) => {
 
     const [tr, ml] = await Promise.allSettled([
       askClaude(apiKey, trainingPrompt(r.days, r.place), trainingContent, 4000),
-      askClaude(apiKey, mealsPrompt(r.targets, String(r.input.goal ?? 'fit')), `Notes from the user: ${JSON.stringify(r.notes || '')}\nWrite the meals JSON now.`, 3500),
+      // ١٢ وجبة بالعربي والإنجليزي: ٣٥٠٠ ما كانت تكفي أحياناً (تنقطع ونرجع للوجبات الجاهزة) — ٤٠٠٠ والرد مضغوط بسطر واحد
+      askClaude(apiKey, mealsPrompt(r.targets, String(r.input.goal ?? 'fit')), `Notes from the user: ${JSON.stringify(r.notes || '')}\nWrite the meals JSON now.`, 4000),
     ]);
     if (tr.status === 'rejected') {
       console.error('training_failed', String(tr.reason));
