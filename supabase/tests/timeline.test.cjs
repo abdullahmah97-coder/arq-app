@@ -83,12 +83,14 @@ const { setup } = require('./_harness.cjs');
   await as(U.A, `insert into post_likes (post_id, user_id) values ($1, $2)`, [pB, U.A]);
   check('old app versions (no emoji) → ❤️ on posts', (await q(`select emoji from post_likes where post_id = $1 and user_id = $2`, [pB, U.A]))[0].emoji === 'love');
   await as(U.A, `insert into checkin_likes (check_in_id, user_id) values ($1, $2)`, [ciB, U.A]);
-  const cB = (await tl(U.A)).find((r) => r.id === ciB);
+  const cB = (await tl(U.A)).find((r) => r.id === ciB && r.item_type === 'checkin');
   check('…and 👏 on check-ins; check-in reactions show in the timeline', cB.my_reaction === 'clap' && Number(cB.like_count) === 1 && cB.reactors[0].e === 'clap');
   await as(U.A, `update checkin_likes set emoji = 'fire' where check_in_id = $1 and user_id = $2`, [ciB, U.A]);
-  check('check-in reaction can change too', (await tl(U.A)).find((r) => r.id === ciB).my_reaction === 'fire');
+  check('check-in reaction can change too', (await tl(U.A)).find((r) => r.id === ciB && r.item_type === 'checkin').my_reaction === 'fire');
   const both = (await tl(U.A)).filter((r) => r.id === ciB);
-  check('the check-in and its «workout done» share the same reactions', both.length === 2 && both.every((r) => r.my_reaction === 'fire' && Number(r.like_count) === 1));
+  check('the check-in and its «workout done» have separate reactions (not repeated on both)', both.length === 2
+    && both.find((r) => r.item_type === 'checkin').my_reaction === 'fire' && both.find((r) => r.item_type === 'checkout').my_reaction === null
+    && Number(both.find((r) => r.item_type === 'checkout').like_count) === 0);
   await expectErr('a stranger cannot react to my friend\'s check-in', () => as(U.C, `insert into checkin_likes (check_in_id, user_id) values ($1, $2)`, [ciA, U.C]), /row-level security/);
   const who = await as(U.A, `select user_id, emoji, full_name from reactions_of('post', $1)`, [pA]);
   check('«who reacted» list for friends', who.length === 1 && who[0].user_id === U.B && who[0].emoji === 'strong', JSON.stringify(who));

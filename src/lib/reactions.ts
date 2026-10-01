@@ -5,17 +5,23 @@ import { supabase } from './supabase';
 
 export * from './reactionsCore';
 
-const TABLE = { post: ['post_likes', 'post_id'], checkin: ['checkin_likes', 'check_in_id'] } as const;
+// الجدول والعمود، وبطاقة الزيارة: in = «في النادي»، out = «انتهى التمرين» (كل بطاقة بتفاعلها)
+const TABLE = {
+  post: ['post_likes', 'post_id', null],
+  checkin: ['checkin_likes', 'check_in_id', 'in'],
+  checkout: ['checkin_likes', 'check_in_id', 'out'],
+} as const;
 
 /**
  * يحفظ تفاعلي: null يشيله، أول مرة يضيفه (ويوصل تنبيه لصاحبه)، وبعدها يغيّر الإيموجي بس (بدون تنبيه ثاني).
  * لو الحالة عندنا قديمة (تفاعلت من جهاز ثاني) يصلّح نفسه: تعديل ما لقى شي ← إضافة، وإضافة مكررة ← تعديل.
  */
 export async function saveReaction(target: ReactTarget, me: string, prev: ReactionKey | null, next: ReactionKey | null) {
-  const [table, col] = TABLE[target.type];
-  const update = () => supabase.from(table).update({ emoji: next }).eq(col, target.id).eq('user_id', me).select('user_id');
-  const insert = () => supabase.from(table).insert({ [col]: target.id, user_id: me, emoji: next });
-  if (!next) return supabase.from(table).delete().eq(col, target.id).eq('user_id', me);
+  const [table, col, phase] = TABLE[target.type];
+  const mine: Record<string, string> = phase ? { [col]: target.id, user_id: me, phase } : { [col]: target.id, user_id: me };
+  const update = () => supabase.from(table).update({ emoji: next }).match(mine).select('user_id');
+  const insert = () => supabase.from(table).insert({ ...mine, emoji: next });
+  if (!next) return supabase.from(table).delete().match(mine);
   if (prev) {
     const up = await update();
     if (up.error || up.data?.length) return up;

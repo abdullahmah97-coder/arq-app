@@ -137,7 +137,7 @@ export const MomentRow = memo(function MomentRow({ it, mine, pickerOpen, last, o
   const { headline, sub } = momentText(it, t, lng, now);
   const open = () => {
     onPicker(null);
-    if (isVisit(it.item_type)) router.push({ pathname: '/checkin/[id]', params: { id: it.id, name } });
+    if (isVisit(it.item_type)) router.push({ pathname: '/checkin/[id]', params: { id: it.id, name, ...(it.item_type === 'checkout' ? { phase: 'out' } : {}) } });
     else router.push({ pathname: '/post/[id]', params: { id: it.id } });
   };
   // الحضور ينشال من صفحة الحضور، مو من هنا

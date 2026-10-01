@@ -75,8 +75,9 @@ export function notifHref(n: Pick<NotifRow, 'kind' | 'target_id' | 'actor_id' | 
     case 'post_comment': return n.target_id ? `/post/${n.target_id}` : null;
     case 'friend_here': if (typeof n.data?.gym_id === 'string') return `/gym/${n.data.gym_id}`;
       return n.target_id ? `/checkin/${n.target_id}` : null;
+    // على بطاقة «انتهى التمرين» أو «في النادي» (كل وحدة بتعليقاتها)
     case 'checkin_like':
-    case 'checkin_comment': return n.target_id ? `/checkin/${n.target_id}` : null;
+    case 'checkin_comment': return n.target_id ? `/checkin/${n.target_id}${n.data?.phase === 'out' ? '?phase=out' : ''}` : null;
     case 'challenge_invite':
     case 'challenge_win': return n.target_id ? `/challenge/${n.target_id}` : null;
     case 'rank_up': return '/ranks';

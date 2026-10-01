@@ -935,6 +935,8 @@
     "comment": "Comment",
     "comments": "Comments",
     "commentsOn": "{{name}}'s session",
+    "commentsOnOut": "{{name}} finished a workout 💪",
+    "commentsOut": "Workout done 💪",
     "noComments": "No comments yet — cheer them on",
     "commentPh": "Write a comment… e.g. Keep it up 💪",
     "send": "Send",

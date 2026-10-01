@@ -1,4 +1,4 @@
-// تعليقات على حضور شخص في النادي
+// تعليقات على حضور شخص في النادي: بطاقة «في النادي» أو «انتهى التمرين» (phase=out) — كل وحدة بتعليقاتها
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
@@ -10,12 +10,13 @@ import { Avatar, Empty, Row, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { timeAgo } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
-import { addCheckinComment, deleteCheckinComment, loadCheckinComments, type CheckinComment } from '@/lib/presence';
+import { addCheckinComment, deleteCheckinComment, loadCheckinComments, type CheckinComment, type VisitPhase } from '@/lib/presence';
 import { errorKey, publicUrl } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
 
 export default function CheckinComments() {
-  const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
+  const { id, name, phase: phaseParam } = useLocalSearchParams<{ id: string; name?: string; phase?: string }>();
+  const phase: VisitPhase = phaseParam === 'out' ? 'out' : 'in';
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const { userId } = useUser();
@@ -24,13 +25,13 @@ export default function CheckinComments() {
   const [busy, setBusy] = useState(false);
   // ارتفاع الشريط العلوي الفعلي عشان خانة التعليق تطلع فوق الكيبورد بالضبط
   const headerHeight = useHeaderHeight();
-  const load = useCallback(() => loadCheckinComments(String(id)).then(setList), [id]);
+  const load = useCallback(() => loadCheckinComments(String(id), phase).then(setList), [id, phase]);
   useEffect(() => { load(); }, [load]);
 
   const send = async () => {
     if (!text.trim()) return;
     setBusy(true);
-    const { error } = await addCheckinComment(String(id), userId, text);
+    const { error } = await addCheckinComment(String(id), userId, text, phase);
     setBusy(false);
     if (error) return Alert.alert(t(errorKey(error)));
     setText(''); load();
@@ -38,7 +39,9 @@ export default function CheckinComments() {
 
   return (
     <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Stack.Screen options={{ title: name ? t('presence.commentsOn', { name }) : t('presence.comments') }} />
+      <Stack.Screen options={{ title: phase === 'out'
+        ? (name ? t('presence.commentsOnOut', { name }) : t('presence.commentsOut'))
+        : (name ? t('presence.commentsOn', { name }) : t('presence.comments')) }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={headerHeight}>
         <FlatList data={list ?? []} keyExtractor={(c) => c.id} contentContainerStyle={{ padding: space.lg, gap: space.md }}
           ListEmptyComponent={list ? <Empty icon="chatbubbles-outline" text={t('presence.noComments')} /> : null}

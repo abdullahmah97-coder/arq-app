@@ -27,9 +27,9 @@ import type { FeedPost } from '@/lib/types';
 import { colors, space, TAB_BAR_SPACE } from '@/theme';
 
 const PAGE = 20;
-// دخول النادي و«انتهى التمرين» نفس الزيارة: التفاعل على الحضور
-const target = (it: TimelineItem): ReactTarget => ({ type: isVisit(it.item_type) ? 'checkin' : 'post', id: it.id });
-const sameTarget = (a: TimelineItem, b: TimelineItem) => a.id === b.id && isVisit(a.item_type) === isVisit(b.item_type);
+// دخول النادي و«انتهى التمرين» نفس الزيارة، بس كل بطاقة بتفاعلها وتعليقاتها (ما يتكرر على الثنتين)
+const target = (it: TimelineItem): ReactTarget => ({ type: it.item_type === 'checkout' ? 'checkout' : isVisit(it.item_type) ? 'checkin' : 'post', id: it.id });
+const sameTarget = (a: TimelineItem, b: TimelineItem) => a.id === b.id && a.item_type === b.item_type;
 
 export default function Community() {
   const { t } = useTranslation();

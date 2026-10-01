@@ -30,11 +30,15 @@ export async function loadPresence(gymId: string): Promise<{ rows: PresenceRow[]
 
 export const isHere = (r: Pick<PresenceRow, 'checked_out_at'>) => !r.checked_out_at;
 
+// صفحة النادي تشجّع على الدخول (بطاقة «في النادي»)، و«انتهى التمرين» له تفاعله وتعليقاته
 export function toggleHighFive(r: PresenceRow, me: string) {
   return r.liked_by_me
-    ? supabase.from('checkin_likes').delete().eq('check_in_id', r.check_in_id).eq('user_id', me)
-    : supabase.from('checkin_likes').insert({ check_in_id: r.check_in_id, user_id: me });
+    ? supabase.from('checkin_likes').delete().eq('check_in_id', r.check_in_id).eq('user_id', me).eq('phase', 'in')
+    : supabase.from('checkin_likes').insert({ check_in_id: r.check_in_id, user_id: me, phase: 'in' });
 }
+
+/** بطاقة الزيارة: in = «في النادي»، out = «انتهى التمرين» */
+export type VisitPhase = 'in' | 'out';
 
 export interface CheckinComment {
   id: string;
@@ -44,15 +48,15 @@ export interface CheckinComment {
   profiles?: { username: string; full_name: string | null; avatar_url: string | null };
 }
 
-export async function loadCheckinComments(checkInId: string): Promise<CheckinComment[]> {
+export async function loadCheckinComments(checkInId: string, phase: VisitPhase = 'in'): Promise<CheckinComment[]> {
   const { data } = await supabase.from('checkin_comments')
     .select('id, user_id, body, created_at, profiles(username, full_name, avatar_url)')
-    .eq('check_in_id', checkInId).order('created_at', { ascending: true }).limit(200);
+    .eq('check_in_id', checkInId).eq('phase', phase).order('created_at', { ascending: true }).limit(200);
   return (data ?? []) as any;
 }
 
-export const addCheckinComment = (checkInId: string, me: string, body: string) =>
-  supabase.from('checkin_comments').insert({ check_in_id: checkInId, user_id: me, body: body.trim() });
+export const addCheckinComment = (checkInId: string, me: string, body: string, phase: VisitPhase = 'in') =>
+  supabase.from('checkin_comments').insert({ check_in_id: checkInId, user_id: me, body: body.trim(), phase });
 export const deleteCheckinComment = (id: string) => supabase.from('checkin_comments').delete().eq('id', id);
 
 export const setPresenceVisibility = (me: string, v: PresenceVisibility) =>

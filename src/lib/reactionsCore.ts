@@ -8,7 +8,8 @@ export const isReaction = (x: unknown): x is ReactionKey => typeof x === 'string
 export interface Reactor { u: string; n: string; a: string | null; e: ReactionKey }
 export interface Reactable { like_count: number; my_reaction: ReactionKey | null; reactors: Reactor[] }
 export interface Me { id: string; name: string; avatar: string | null }
-export type ReactTarget = { type: 'post' | 'checkin'; id: string };
+/** checkin = بطاقة «في النادي»، checkout = بطاقة «انتهى التمرين» (نفس الزيارة، بس كل بطاقة بتفاعلها) */
+export type ReactTarget = { type: 'post' | 'checkin' | 'checkout'; id: string };
 
 export function normalizeReactors(v: unknown): Reactor[] {
   if (!Array.isArray(v)) return [];

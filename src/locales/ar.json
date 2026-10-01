@@ -985,6 +985,8 @@
     "comment": "تعليق",
     "comments": "التعليقات",
     "commentsOn": "تمرين {{name}}",
+    "commentsOnOut": "{{name}} خلّص تمرينه 💪",
+    "commentsOut": "انتهى التمرين 💪",
     "noComments": "ما فيه تعليقات — شجعه بكلمة",
     "commentPh": "اكتب تعليق… مثل: الله يقويك 💪",
     "send": "إرسال",
