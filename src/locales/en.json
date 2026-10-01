@@ -1015,7 +1015,9 @@
     "videoShort": "Video",
     "camera": "Camera",
     "toLatest": "Latest messages",
-    "openChat": "Open chat"
+    "openChat": "Open chat",
+    "copy": "Copy",
+    "copied": "Copied"
   },
   "owner": {
     "title": "App management",

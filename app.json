@@ -56,7 +56,15 @@
     },
     "plugins": [
       "expo-router",
-      "expo-localization",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": ["ar", "en"],
+            "android": ["ar", "en"]
+          }
+        }
+      ],
       [
         "expo-location",
         {

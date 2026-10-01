@@ -3,6 +3,7 @@
 // ⋮ فوق: عرض الملف أو حذف المحادثة من عندي. مفتوحة بين الأصدقاء (بعد قبول الطلب) أو المدرب ومتدربه —
 // لو مقفلة: زر طلب الصداقة (أو قبوله). وفيها صور وفيديو (دقيقة كحد أقصى).
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
@@ -69,6 +70,8 @@ export default function Chat() {
   const setSheet = useCallback((x: Sheet | null) => { if (x) Keyboard.dismiss(); setSheetState(x); }, []);
   const [editing, setEditing] = useState<UIMessage | null>(null);
   const [showDown, setShowDown] = useState(false);
+  /** «تم النسخ» تحت المحادثة لثانية ونص */
+  const [copied, setCopied] = useState(false);
   const list = useRef<FlatList<UIMessage>>(null);
   const input = useRef<TextInput>(null);
   /** اللي كان مكتوب قبل ما تبدأ تعدّل رسالة (يرجع بعد التعديل) */
@@ -225,6 +228,21 @@ export default function Chat() {
     } finally { setBusy(false); }
   };
 
+  // ---------- نسخ نص الرسالة ----------
+  // (الحافظة من النسخة ١٠ وفوق: نحمّلها وقت الضغط بس، عشان أي نسخة أقدم ما تتأثر)
+  const copyMsg = async (m: UIMessage) => {
+    setSheet(null);
+    try {
+      const Clipboard = await import('expo-clipboard');
+      await Clipboard.setStringAsync(m.body);
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      later(() => Alert.alert(t('errors.generic')));
+    }
+  };
+
   // ---------- حذف رسالة (لدي / لدى الجميع) ----------
   const removeMsg = async (m: UIMessage, everyone: boolean) => {
     setSheet(null);
@@ -300,6 +318,7 @@ export default function Chat() {
           mediaUri={m.media_path ? urls[m.media_path] : undefined} preview />
       ),
       actions: [
+        ...(!m.deleted_at && m.body.trim() ? [{ key: 'copy', label: t('chat.copy'), icon: 'copy-outline' as const, onPress: () => copyMsg(m) }] : []),
         ...(canEditMessage(m, userId) && m.body.trim() ? [{ key: 'edit', label: t('chat.edit'), icon: 'create-outline' as const, onPress: () => startEdit(m) }] : []),
         { key: 'delete', label: t('chat.delete'), icon: 'trash-outline', destructive: true, onPress: () => setSheet({ kind: 'del', m }) },
       ],
@@ -384,6 +403,15 @@ export default function Chat() {
               style={{ position: 'absolute', bottom: 10, end: 12, width: 40, height: 40, borderRadius: 20, backgroundColor: colors.bubbleTheirs, alignItems: 'center', justifyContent: 'center', boxShadow: '0px 1px 3px rgba(11,20,26,0.25)' }}>
               <Ionicons name="chevron-down" size={22} color={colors.bubbleMeta} />
             </Pressable>
+          ) : null}
+
+          {copied ? (
+            <View pointerEvents="none" style={{ position: 'absolute', bottom: 12, left: 0, right: 0, alignItems: 'center' }} accessibilityLiveRegion="polite">
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: brand.deepGreen, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, boxShadow: '0px 2px 6px rgba(10,51,45,0.25)' }}>
+                <Ionicons name="checkmark-circle" size={16} color={brand.amber} />
+                <T size="sm" semibold color={brand.cream}>{t('chat.copied')}</T>
+              </View>
+            </View>
           ) : null}
         </View>
 
