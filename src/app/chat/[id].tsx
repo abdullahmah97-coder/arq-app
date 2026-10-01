@@ -193,7 +193,11 @@ export default function Chat() {
     setSheet(null);
     if (!editing) draft.current = text;
     setEditing(m); setText(m.body);
-    later(() => input.current?.focus());
+    // الكيبورد يطلع بعد ما تنقفل القائمة (والآيفون أحياناً يتأخر: نحاول مرة ثانية)
+    later(() => {
+      input.current?.focus();
+      setTimeout(() => { if (!input.current?.isFocused()) input.current?.focus(); }, 350);
+    });
   };
   const cancelEdit = () => { setEditing(null); setText(draft.current); draft.current = ''; };
   const saveEdit = async () => {
@@ -201,15 +205,23 @@ export default function Chat() {
     const body = text.trim();
     if (!m || !body) return;
     if (body === m.body.trim()) { cancelEdit(); return; }
+    // تبان معدّلة على طول (ولو فشل نرجّعها زي ما كانت)
+    const before = { body: m.body, edited_at: m.edited_at ?? null };
+    const prevDraft = draft.current;
+    const patch = (b: string, at: string | null) => setMsgs((x) => x.map((y) => (y.id === m.id ? { ...y, body: b, edited_at: at } : y)));
+    patch(body, new Date().toISOString());
+    setEditing(null); setText(prevDraft); draft.current = '';
     setBusy(true);
     try {
       const up = await editMessage(m.id, body);
-      setMsgs((x) => x.map((y) => (y.id === up.id ? { ...y, ...up } : y)));
-      setEditing(null); setText(draft.current); draft.current = '';
+      // الرد من الخادم (نطابق برقم الرسالة اللي عدّلناها، مو باللي رجع)
+      if (up && typeof up === 'object') setMsgs((x) => x.map((y) => (y.id === m.id ? { ...y, ...up, id: m.id } : y)));
     } catch (e) {
+      patch(before.body, before.edited_at);
       const k = errorKey(e);
       Alert.alert(t(k));
-      if (k === 'srv.edit_window_passed' || k === 'srv.message_deleted') cancelEdit();
+      // يقدر يرجع يعدّلها لو ما انتهى الوقت
+      if (k !== 'srv.edit_window_passed' && k !== 'srv.message_deleted') { draft.current = prevDraft; setEditing(m); setText(body); }
     } finally { setBusy(false); }
   };
 

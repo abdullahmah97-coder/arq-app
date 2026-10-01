@@ -3528,7 +3528,12 @@
     "undoSleepNo": "No",
     "wokeToast": "Good morning ☀️ You slept {{d}} — your friends can see it",
     "wokeToastShort": "Good morning ☀️ — your friends can see you're up",
-    "sleepLockedApp": "ARQ is locked while you sleep 😴 When you wake up, tap “Good morning” and your friends will see you’re up and how long you slept."
+    "sleepLockedApp": "ARQ is locked while you sleep 😴 When you wake up, tap “Good morning” and your friends will see you’re up and how long you slept.",
+    "sleepSoFarLabel": "Asleep for",
+    "justSlept": "Just fell asleep 🌙",
+    "sinceTime": "since {{time}}",
+    "hShort": "h",
+    "mShort": "m"
   },
   "ownerParts": {
     "hiddenTag": "Hidden for everyone",

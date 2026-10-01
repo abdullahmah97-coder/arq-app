@@ -74,7 +74,8 @@ export async function sendMessage(me: string, other: string, body: string, media
 export async function editMessage(id: string, body: string): Promise<Message> {
   const { data, error } = await supabase.rpc('edit_message', { p_id: id, p_body: body.trim() });
   if (error) throw error;
-  return data as Message;
+  // الصف يرجع كائن (وبعض النسخ ترجعه داخل مصفوفة)
+  return (Array.isArray(data) ? data[0] : data) as Message;
 }
 
 /** حذف رسالة: لي بس، أو للجميع (رسالتي خلال يومين) — وملف الصورة/الفيديو ينشال من الحاوية */
