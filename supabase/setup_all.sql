@@ -1,6 +1,6 @@
 -- ARQ — إعداد قاعدة البيانات كاملة (مرة وحدة)
 -- الصق هذا الملف كله في Supabase > SQL Editor > New query ثم Run.
--- مولّد تلقائياً من supabase/migrations (54 ملف) — لا تعدّله يدوياً: npm run db:bundle
+-- مولّد تلقائياً من supabase/migrations (61 ملف) — لا تعدّله يدوياً: npm run db:bundle
 
 -- ===================== 20260926000000_init.sql =====================
 -- =====================================================================
@@ -9713,3 +9713,389 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function public.leaderboard(text, timestamptz, integer) from public, anon;
 grant execute on function public.leaderboard(text, timestamptz, integer) to authenticated;
+
+
+-- ===================== 20260930000780_chat_edit_delete.sql =====================
+-- =====================================================================
+-- المحادثات مثل الواتساب: تعديل الرسالة، حذفها (لي أو للجميع)، وحذف المحادثة من صندوقي
+--   * التعديل: المرسل بس، خلال ١٥ دقيقة من الإرسال، والرسالة ما تكون محذوفة. تطلع عليها «معدّلة».
+--   * الحذف للجميع: المرسل بس، خلال يومين. النص والصورة ينشالون من القاعدة وتبقى «🚫 انحذفت هذي الرسالة».
+--     ملف الصورة/الفيديو يشيله التطبيق من الحاوية (الدالة ترجع مساره).
+--   * الحذف لي: أي طرف، تختفي عنده بس (والطرف الثاني تبقى عنده).
+--   * حذف المحادثة: تختفي من صندوقي ورسائلها تنمسح عندي بس. لو وصلت رسالة جديدة ترجع المحادثة بالجديد بس.
+--   * الإخفاء في سياسة القراءة نفسها (RLS): المحادثة والرسائل الحيّة وعدّاد غير المقروء كلها تحترمه.
+-- =====================================================================
+
+alter table public.messages
+  add column if not exists edited_at  timestamptz,
+  add column if not exists deleted_at timestamptz;
+
+-- الرسالة المحذوفة للجميع ما يبقى فيها نص ولا ملف
+alter table public.messages drop constraint if exists messages_body_or_media;
+alter table public.messages add constraint messages_body_or_media check (
+  char_length(body) <= 1000 and (deleted_at is not null or char_length(btrim(body)) >= 1 or media_path is not null));
+alter table public.messages drop constraint if exists messages_deleted_empty;
+alter table public.messages add constraint messages_deleted_empty check (
+  deleted_at is null or (body = '' and media_path is null and media_type is null and media_dur is null));
+
+-- ---------- الحذف لي ----------
+create table if not exists public.message_hides (
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  message_id uuid not null references public.messages(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, message_id)
+);
+alter table public.message_hides enable row level security;
+drop policy if exists message_hides_own on public.message_hides;
+create policy message_hides_own on public.message_hides for select to authenticated using (user_id = auth.uid());
+
+-- ---------- حذف المحادثة (لي) ----------
+create table if not exists public.chat_clears (
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  other_id   uuid not null references public.profiles(id) on delete cascade,
+  cleared_at timestamptz not null default now(),
+  primary key (user_id, other_id),
+  check (user_id <> other_id)
+);
+alter table public.chat_clears enable row level security;
+drop policy if exists chat_clears_own on public.chat_clears;
+create policy chat_clears_own on public.chat_clears for select to authenticated using (user_id = auth.uid());
+
+-- هل الرسالة ظاهرة لهالمستخدم؟ (طرف فيها، وما أخفاها، وبعد آخر حذف للمحادثة عنده)
+create or replace function public._msg_visible(p_user uuid, p_id uuid, p_sender uuid, p_recipient uuid, p_at timestamptz)
+returns boolean language sql stable security definer set search_path = public as $$
+  select p_user is not null and p_user in (p_sender, p_recipient)
+     and not exists (select 1 from message_hides h where h.user_id = p_user and h.message_id = p_id)
+     and not exists (select 1 from chat_clears c
+                     where c.user_id = p_user
+                       and c.other_id = case when p_sender = p_user then p_recipient else p_sender end
+                       and p_at <= c.cleared_at);
+$$;
+revoke all on function public._msg_visible(uuid, uuid, uuid, uuid, timestamptz) from public, anon;
+grant execute on function public._msg_visible(uuid, uuid, uuid, uuid, timestamptz) to authenticated;
+
+drop policy if exists msg_read on public.messages;
+create policy msg_read on public.messages for select to authenticated
+  using (_msg_visible(auth.uid(), id, sender, recipient, created_at));
+
+-- الإرسال: نفس الشروط، والرسالة الجديدة ما تنرسل «معدّلة» أو «محذوفة»
+drop policy if exists msg_send on public.messages;
+create policy msg_send on public.messages for insert to authenticated
+  with check (sender = auth.uid() and mutual_follow(sender, recipient)
+              and edited_at is null and deleted_at is null
+              and (media_path is null or media_path like sender::text || '/' || recipient::text || '/%'));
+
+-- الحذف للجميع من الدالة بس (نافذة اليومين، وتبقى «انحذفت هذي الرسالة»، ويتشال الملف) بدل الحذف المباشر القديم
+drop policy if exists msg_delete_own on public.messages;
+
+-- المستلم لا يغيّر إلا وقت القراءة. التعديل والحذف من الدوال تحت بس
+create or replace function public._msg_guard()
+returns trigger language plpgsql as $$
+begin
+  if current_user in ('authenticated','anon') and (new.body is distinct from old.body or new.sender is distinct from old.sender
+      or new.recipient is distinct from old.recipient or new.created_at is distinct from old.created_at
+      or new.media_path is distinct from old.media_path or new.media_type is distinct from old.media_type
+      or new.media_w is distinct from old.media_w or new.media_h is distinct from old.media_h
+      or new.media_dur is distinct from old.media_dur
+      or new.edited_at is distinct from old.edited_at or new.deleted_at is distinct from old.deleted_at) then
+    raise exception 'read_only_message';
+  end if;
+  return new;
+end $$;
+
+-- ---------- تعديل رسالة (المرسل، خلال ١٥ دقيقة) ----------
+create or replace function public.edit_message(p_id uuid, p_body text)
+returns public.messages language plpgsql security definer set search_path = public as $$
+declare v messages; v_body text := btrim(coalesce(p_body, ''));
+begin
+  select * into v from messages where id = p_id for update;
+  if not found or auth.uid() is null or v.sender <> auth.uid() then raise exception 'not_allowed'; end if;
+  if v.deleted_at is not null then raise exception 'message_deleted'; end if;
+  if v.created_at < now() - interval '15 minutes' then raise exception 'edit_window_passed'; end if;
+  if char_length(v_body) > 1000 then raise exception 'message_too_long'; end if;
+  if v_body = '' and v.media_path is null then raise exception 'empty_message'; end if;
+  if v_body = v.body then return v; end if;
+  update messages set body = v_body, edited_at = now() where id = p_id returning * into v;
+  return v;
+end $$;
+revoke all on function public.edit_message(uuid, text) from public, anon;
+grant execute on function public.edit_message(uuid, text) to authenticated;
+
+-- ---------- حذف رسالة: لي، أو للجميع (المرسل، خلال يومين) ----------
+-- ترجع مسار الملف لو انحذفت للجميع وكان فيها صورة/فيديو (التطبيق يشيله من الحاوية)
+create or replace function public.delete_message(p_id uuid, p_everyone boolean default false)
+returns text language plpgsql security definer set search_path = public as $$
+declare v messages;
+begin
+  select * into v from messages where id = p_id for update;
+  if not found or auth.uid() is null or auth.uid() not in (v.sender, v.recipient) then raise exception 'not_allowed'; end if;
+  if coalesce(p_everyone, false) then
+    if v.sender <> auth.uid() then raise exception 'not_allowed'; end if;
+    if v.deleted_at is not null then return null; end if;
+    if v.created_at < now() - interval '2 days' then raise exception 'delete_window_passed'; end if;
+    update messages set body = '', media_path = null, media_type = null, media_w = null, media_h = null, media_dur = null,
+                        edited_at = null, deleted_at = now()
+     where id = p_id;
+    return v.media_path;
+  end if;
+  insert into message_hides (user_id, message_id) values (auth.uid(), p_id) on conflict do nothing;
+  -- اللي انحذفت عندك ما تبقى «غير مقروءة» (العدّاد ورقم الأيقونة)
+  if v.recipient = auth.uid() and v.read_at is null then update messages set read_at = now() where id = p_id; end if;
+  return null;
+end $$;
+revoke all on function public.delete_message(uuid, boolean) from public, anon;
+grant execute on function public.delete_message(uuid, boolean) to authenticated;
+
+-- ---------- حذف المحادثة من عندي ----------
+create or replace function public.clear_chat(p_other uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null or p_other is null or p_other = auth.uid() then raise exception 'not_allowed'; end if;
+  insert into chat_clears (user_id, other_id, cleared_at) values (auth.uid(), p_other, now())
+  on conflict (user_id, other_id) do update set cleared_at = excluded.cleared_at;
+  update messages set read_at = now() where recipient = auth.uid() and sender = p_other and read_at is null;
+  -- الإخفاءات القديمة ما لها داعي بعد المسح
+  delete from message_hides h using messages m
+   where h.user_id = auth.uid() and h.message_id = m.id
+     and ((m.sender = auth.uid() and m.recipient = p_other) or (m.sender = p_other and m.recipient = auth.uid()));
+end $$;
+revoke all on function public.clear_chat(uuid) from public, anon;
+grant execute on function public.clear_chat(uuid) to authenticated;
+
+-- ---------- صندوق الرسائل ----------
+-- يتجاهل المخفي والممسوح عندي، و«🚫» للمحذوفة للجميع، ومعه حالة آخر رسالة (مقروءة؟ نوعها)
+-- (أعمدة زيادة في الآخر: النسخ القديمة من التطبيق تقرأ الأعمدة اللي تعرفها بس)
+drop function if exists public.inbox();
+create function public.inbox()
+returns table (other_id uuid, username text, full_name text, avatar_url text, points integer, is_coach boolean,
+               last_body text, last_at timestamptz, last_from_me boolean, unread bigint, can_message boolean,
+               last_read boolean, last_deleted boolean, last_type text)
+language sql stable security definer set search_path = public as $$
+  with vis as (
+    select case when m.sender = auth.uid() then m.recipient else m.sender end as other, m.*
+    from messages m
+    where auth.uid() in (m.sender, m.recipient)
+      and _msg_visible(auth.uid(), m.id, m.sender, m.recipient, m.created_at)
+  ), last as (
+    select distinct on (other) other,
+           case when deleted_at is not null then '🚫'
+                when btrim(body) = '' and media_path is not null
+                then case when media_type = 'video' then '🎥' else '📷' end
+                else body end as body,
+           created_at, sender = auth.uid() as from_me, read_at is not null as is_read,
+           deleted_at is not null as is_deleted, coalesce(media_type, 'text') as mtype
+    from vis order by other, created_at desc
+  )
+  select p.id, p.username, p.full_name, p.avatar_url, p.points, p.is_coach, l.body, l.created_at, l.from_me,
+         (select count(*) from vis u where u.other = p.id and u.sender = p.id and u.read_at is null),
+         mutual_follow(auth.uid(), p.id), l.is_read, l.is_deleted, l.mtype
+  from last l join profiles p on p.id = l.other
+  order by l.created_at desc
+  limit 100;
+$$;
+revoke all on function public.inbox() from public, anon;
+grant execute on function public.inbox() to authenticated;
+
+
+-- ===================== 20260930000790_launch_ad_video.sql =====================
+-- =====================================================================
+-- إعلان البداية بالفيديو: نسخة التطبيق الحالية فيها مشغّل الفيديو، فنفتح النوع 'video'
+--   * فيديو قصير (لين ٣٠ ثانية و٢٠ ميقا من اللوحة)، يشتغل بدون صوت وفيه زر للصوت
+--   * لو «يقفل تلقائياً» مفعّل: يقفل بعد ما يخلص الفيديو، وإلا يبقى لين يضغط تخطي
+--   * النسخ القديمة من التطبيق ما تعرف الفيديو: تتخطاه بصمت (ما تقدر تحمّله كصورة)
+-- =====================================================================
+
+-- نشيل قيد نوع الملف القديم (أياً كان اسمه) ونحط الجديد
+do $$
+declare c record;
+begin
+  for c in select conname from pg_constraint
+           where conrelid = 'public.launch_ads'::regclass and contype = 'c'
+             and pg_get_constraintdef(oid) ilike '%media_type%'
+  loop
+    execute format('alter table public.launch_ads drop constraint %I', c.conname);
+  end loop;
+end $$;
+alter table public.launch_ads add constraint launch_ads_media_type_check
+  check (media_type in ('image','gif','video'));
+
+
+-- ===================== 20260930000800_owner_powers.sql =====================
+-- =====================================================================
+-- مالك التطبيق (هو بس، مو كل مشرف):
+--   * شارة «المالك» بدل الرتبة
+--   * كل صلاحيات النشر: النصائح وجداول التمارين بدون شرط الرتبة
+--   * يضغط مطوّل على أي جزء في التطبيق ويخفيه عن الكل أو يرجّعه (app_hidden)
+-- =====================================================================
+
+alter table public.profiles add column if not exists is_owner boolean not null default false;
+-- (ما ينعدّل من التطبيق: تعديل profiles مسموح بس للأعمدة اللي لها صلاحية، وهذا مو منها)
+
+-- صاحب التطبيق
+update public.profiles set is_owner = true where id = 'c152b11b-8139-4553-811f-226935f18c3f';
+
+create or replace function public.is_owner(p_uid uuid default auth.uid())
+returns boolean language sql stable security definer set search_path = public as $$
+  select p_uid is not null and coalesce((select is_owner from profiles where id = p_uid), false);
+$$;
+revoke all on function public.is_owner(uuid) from public, anon;
+grant execute on function public.is_owner(uuid) to authenticated;
+
+-- النشر: المالك مفتوح له كل شي (مثل المدرب الموثّق)
+create or replace function public.can_publish(p_kind text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((
+    select p.is_owner or p.is_coach or rank_level(p.points) >= case p_kind when 'tip' then 2 when 'program' then 3 else 99 end
+    from profiles p where p.id = auth.uid()
+  ), false);
+$$;
+revoke all on function public.can_publish(text) from public, anon;
+grant execute on function public.can_publish(text) to authenticated;
+
+-- ---------- أجزاء التطبيق المخفية (يخفيها المالك بالضغط المطوّل) ----------
+-- key = اسم الجزء في التطبيق (مثل home.sleep). الكل يقرأ القائمة، والمالك بس يضيف ويشيل.
+create table if not exists public.app_hidden (
+  key        text primary key check (key ~ '^[a-z][a-zA-Z0-9_.:-]{1,80}$'),
+  label      text check (label is null or char_length(label) <= 120),
+  hidden_by  uuid references public.profiles(id) on delete set null default auth.uid(),
+  hidden_at  timestamptz not null default now()
+);
+alter table public.app_hidden enable row level security;
+drop policy if exists app_hidden_read on public.app_hidden;
+create policy app_hidden_read on public.app_hidden for select to authenticated using (true);
+drop policy if exists app_hidden_owner on public.app_hidden;
+create policy app_hidden_owner on public.app_hidden for all to authenticated using (is_owner()) with check (is_owner());
+grant select, insert, update, delete on public.app_hidden to authenticated;
+revoke all on public.app_hidden from anon;
+
+
+-- ===================== 20261001000810_relation_privacy.sql =====================
+-- =====================================================================
+-- خصوصية العلاقات: are_friends(a, b) و mutual_follow(a, b) كانت تنادى مباشرة من التطبيق لأي شخصين،
+-- فأي أحد يقدر يعرف مين صديق مين ومين مدرب مين (والجداول نفسها خاصة بأطرافها).
+-- الحين: لو انادت مباشرة (rpc) لازم تكون أنت أحد الطرفين (أو المشرف). داخل القاعدة (السياسات والتنبيهات والمهام)
+-- ما تغيّر شي. والنسخ الحالية من التطبيق تسأل عن نفسها بس (أنا وهو) فتشتغل زي ما هي.
+-- =====================================================================
+
+-- نادى المستخدم الدالة مباشرة من التطبيق؟ (مسار الطلب في PostgREST)
+create or replace function public._called_as_rpc(p_name text)
+returns boolean language sql stable set search_path = public as $$
+  select coalesce(current_setting('request.path', true), '') like '%/rpc/' || p_name;
+$$;
+
+create or replace function public.are_friends(a uuid, b uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select (not _called_as_rpc('are_friends') or coalesce(auth.uid() in (a, b), false) or is_admin())
+     and exists (
+       select 1 from friendships
+       where status = 'accepted'
+         and ((requester = a and addressee = b) or (requester = b and addressee = a))
+     );
+$$;
+
+create or replace function public.mutual_follow(a uuid, b uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select (not _called_as_rpc('mutual_follow') or coalesce(auth.uid() in (a, b), false) or is_admin())
+     and a <> b and (
+       exists (select 1 from friendships f where f.status = 'accepted'
+               and ((f.requester = a and f.addressee = b) or (f.requester = b and f.addressee = a)))
+       or exists (select 1 from coach_links l where l.status = 'active'
+                  and ((l.coach_id = a and l.client_id = b) or (l.coach_id = b and l.client_id = a))));
+$$;
+revoke all on function public.mutual_follow(uuid, uuid) from public, anon;
+grant execute on function public.mutual_follow(uuid, uuid) to authenticated;
+
+
+-- ===================== 20261001000820_plan_swap_video_cap.sql =====================
+-- =====================================================================
+-- مراجعة الليلة ٢ (من اللي طلع أمس):
+--   * تبديل الخطة الفعّالة بخطوة وحدة: قبل كان «وقّف القديمة» ثم «فعّل الجديدة» بطلبين،
+--     ولو انقطع الاتصال بينهم يبقى الشخص بدون خطة فعّالة. الحين الاثنين مع بعض أو ولا وحدة.
+--   * فيديو المحادثة: القاعدة تمشي على نفس حد التطبيق (دقيقة) للرسائل الجديدة، بدل ١٠ دقايق.
+-- =====================================================================
+
+create or replace function public.activate_plan(p_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null or not exists (select 1 from plans where id = p_id and user_id = auth.uid()) then
+    raise exception 'not_allowed';
+  end if;
+  update plans set active = false where user_id = auth.uid() and active and id <> p_id;
+  update plans set active = true where id = p_id and not active;
+end $$;
+revoke all on function public.activate_plan(uuid) from public, anon;
+grant execute on function public.activate_plan(uuid) to authenticated;
+
+alter table public.messages drop constraint if exists messages_video_minute;
+alter table public.messages add constraint messages_video_minute check (media_dur is null or media_dur <= 61) not valid;
+
+
+-- ===================== 20261002000830_kcal_goal_private.sql =====================
+-- =====================================================================
+-- هدف السعرات صار خاص: ينتقل من profiles (يقرأها أي مستخدم مسجّل) إلى health_profiles (صاحبها بس)
+--   * ننسخ الأهداف الموجودة ونفرّغها من profiles
+--   * نسخ التطبيق القديمة اللي تكتب profiles.kcal_goal: الكتابة تنتقل تلقائياً لـ health_profiles
+--     و profiles.kcal_goal يبقى فاضي دايماً (العمود باقي عشان الكتابة القديمة ما تفشل)
+-- يتشغّل أكثر من مرة بدون مشاكل. الترتيب مهم: نشيل المحوّل أول عشان تفريغ profiles ما يمسح النسخة
+-- =====================================================================
+drop trigger if exists kcal_goal_private on public.profiles;
+
+alter table public.health_profiles add column if not exists kcal_goal integer
+  check (kcal_goal is null or kcal_goal between 800 and 6000);
+
+-- نسخ الأهداف الحالية (ولو ما عنده صف صحي، ننشئه) ثم تفريغها من الجدول العام
+insert into public.health_profiles (user_id, kcal_goal)
+select p.id, p.kcal_goal from public.profiles p where p.kcal_goal is not null
+on conflict (user_id) do update set kcal_goal = excluded.kcal_goal;
+update public.profiles set kcal_goal = null where kcal_goal is not null;
+
+-- أي كتابة على profiles.kcal_goal (نسخ قديمة، وتشمل «رجّع هدف الخطة» = null) تروح للجدول الخاص
+create or replace function public._kcal_goal_private()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into health_profiles (user_id, kcal_goal) values (new.id, new.kcal_goal)
+  on conflict (user_id) do update set kcal_goal = excluded.kcal_goal;
+  new.kcal_goal := null;
+  return new;
+end $$;
+revoke all on function public._kcal_goal_private() from public, anon, authenticated;
+
+create trigger kcal_goal_private before update of kcal_goal on public.profiles
+  for each row execute function public._kcal_goal_private();
+
+
+-- ===================== 20261002000840_ai_plan_attempts.sql =====================
+-- =====================================================================
+-- خطط الذكاء الاصطناعي: حد يومي «ذرّي» لعدد المحاولات (٨ باليوم لكل مستخدم)
+--   حد الخطط المحفوظة (٥ باليوم) يتحقق بالدالة قبل ما تبدأ، بس الطلبات المتزامنة كانت تعدّيه
+--   (كلها تشيّك قبل ما تنحفظ أي خطة). الحين كل محاولة تحجز مكانها قبل استدعاء الذكاء الاصطناعي،
+--   بقفل لكل مستخدم، فما يقدر يتعدى الحد ولو أرسل طلبات كثير بنفس اللحظة.
+--   المحاولة اللي تفشل تنحسب (لأنها تكلّف)، والزيادة عن ٥ تعطي مجال لو فشلت محاولة أو ثنتين.
+-- =====================================================================
+alter table public.ai_usage drop constraint if exists ai_usage_kind_check;
+alter table public.ai_usage add constraint ai_usage_kind_check check (kind in ('meal_photo', 'barcode', 'plan'));
+
+-- يحجز استخدام واحد إذا ما وصل المستخدم حده اليومي، ويرجع كم باقي
+create or replace function public.ai_take(p_kind text)
+returns integer
+language plpgsql volatile security definer set search_path = public as $$
+declare
+  s jsonb := (select value from app_settings where key = 'ai_limits');
+  cap int;
+  used int;
+begin
+  if auth.uid() is null then raise exception 'not_authenticated'; end if;
+  cap := case p_kind
+    when 'meal_photo' then coalesce((s->>'meal_photos_per_day')::int, 25)
+    when 'barcode' then coalesce((s->>'barcode_per_day')::int, 2)
+    when 'plan' then 8
+  end;
+  if cap is null then raise exception 'bad_status'; end if;
+  perform pg_advisory_xact_lock(hashtext('ai_take:' || auth.uid()::text || ':' || p_kind));
+  select count(*) into used from ai_usage where user_id = auth.uid() and kind = p_kind and created_at > now() - interval '1 day';
+  if used >= cap then raise exception 'rate_limited'; end if;
+  insert into ai_usage (user_id, kind) values (auth.uid(), p_kind);
+  return cap - used - 1;
+end $$;
+revoke all on function public.ai_take(text) from public, anon;
+grant execute on function public.ai_take(text) to authenticated;
