@@ -5,7 +5,7 @@ import { Alert, Linking } from 'react-native';
 import { parseAuthLink } from './authLink';
 import i18n from './i18n';
 import { setCalorieGoal } from './nutrition/calorieAlert';
-import { effectiveTargets } from './nutrition/goal';
+import { effectiveTargets, myKcalGoal } from './nutrition/goal';
 import { supabase } from './supabase';
 import type { HealthProfile, Profile } from './types';
 import type { WeeklyPlan } from './plan/types';
@@ -23,6 +23,8 @@ interface AuthState {
   profile: Profile | null;
   health: HealthProfile | null;
   plan: ActivePlan | null;
+  /** هدف السعرات اللي حطّه بنفسه (خاص، null = هدف الخطة) */
+  kcalGoal: number | null;
   refreshProfile: () => Promise<void>;
   refreshPlan: () => Promise<void>;
 }
@@ -100,10 +102,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [uid, refreshProfile, refreshPlan]);
 
   // هدف السعرات لتنبيه «باقي لك ٢٠٠ سعرة» بعد تسجيل الأكل
-  useEffect(() => { setCalorieGoal(effectiveTargets(plan?.data.targets, profile?.kcal_goal)?.calories ?? null); }, [plan, profile?.kcal_goal]);
+  const kcalGoal = myKcalGoal(health, profile);
+  useEffect(() => { setCalorieGoal(effectiveTargets(plan?.data.targets, kcalGoal)?.calories ?? null); }, [plan, kcalGoal]);
 
   return (
-    <Ctx.Provider value={{ session, loading, profile, health, plan, refreshProfile, refreshPlan }}>
+    <Ctx.Provider value={{ session, loading, profile, health, plan, kcalGoal, refreshProfile, refreshPlan }}>
       {children}
     </Ctx.Provider>
   );

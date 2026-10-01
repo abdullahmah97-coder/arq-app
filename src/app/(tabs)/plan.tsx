@@ -24,7 +24,7 @@ import { brand, colors, radius, space } from '@/theme';
 export default function PlanScreen() {
   const { t } = useTranslation();
   const { L } = useLocalized();
-  const { userId, plan, profile, refreshProfile } = useUser();
+  const { userId, plan, kcalGoal, refreshProfile } = useUser();
   const zone = useHealth().scores?.zone ?? null;
   const [tab, setTab] = useState<'workouts' | 'meals'>('workouts');
   const [day, setDay] = useState(todayIndex());
@@ -186,7 +186,7 @@ export default function PlanScreen() {
           }).catch((e) => Alert.alert(t(errorKey(e))))} />
       ) : null}
       {tab === 'meals' && day === todayIndex() ? (
-        <CalorieCard entries={food} targets={effectiveTargets(p.targets, profile?.kcal_goal)} onDelete={removeFood} />
+        <CalorieCard entries={food} targets={effectiveTargets(p.targets, kcalGoal)} onDelete={removeFood} />
       ) : null}
       {tab === 'meals' ? (
         <SubscriptionMeals date={dateOfDay(day)} today={day === todayIndex()} food={food} onLogged={loadFood} />

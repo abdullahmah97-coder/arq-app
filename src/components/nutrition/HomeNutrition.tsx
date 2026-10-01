@@ -19,7 +19,7 @@ import { brand, night, pulse } from '@/theme';
 export function HomeNutrition() {
   const { t } = useTranslation();
   const { num } = useLocalized();
-  const { userId, plan, profile } = useUser();
+  const { userId, plan, kcalGoal } = useUser();
   const longPress = useHomeLongPress();
   const [food, setFood] = useState<FoodEntry[]>([]);
   // زر تنبيه «باقي لك ٢٠٠ سعرة»: المستخدم يختار الرقم أو يطفيه (النص والرقم الافتراضي من لوحة إدارة التطبيق)
@@ -43,7 +43,7 @@ export function HomeNutrition() {
   };
 
   const sum = totals(food);
-  const tg = effectiveTargets(plan?.data.targets, profile?.kcal_goal);
+  const tg = effectiveTargets(plan?.data.targets, kcalGoal);
   const goal = tg?.calories ?? null;
   const left = goal != null ? goal - sum.kcal : null;
   const macros = [

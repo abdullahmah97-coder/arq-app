@@ -41,7 +41,11 @@ function GoalModal({ goal, planCalories, custom, onClose }: { goal: number | nul
     }
     setBusy(true);
     try {
-      const { error } = await supabase.from('profiles').update({ kcal_goal: kcal }).eq('id', userId);
+      // الهدف خاص: ينحفظ في health_profiles. لو القاعدة قبل الترحيل (ما فيها العمود) نحفظه بالمكان القديم
+      let { error } = await supabase.from('health_profiles').upsert({ user_id: userId, kcal_goal: kcal }, { onConflict: 'user_id' });
+      if (error && (error.code === 'PGRST204' || error.code === '42703')) {
+        ({ error } = await supabase.from('profiles').update({ kcal_goal: kcal }).eq('id', userId));
+      }
       if (error) throw error;
       await refreshProfile();
       onClose();

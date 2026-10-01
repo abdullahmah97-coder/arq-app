@@ -1,8 +1,19 @@
-// هدف السعرات اليومي: من الخطة، أو الهدف اللي حطّه المستخدم بنفسه (profiles.kcal_goal)
+// هدف السعرات اليومي: من الخطة، أو الهدف اللي حطّه المستخدم بنفسه (health_profiles.kcal_goal — خاص فيه)
 // لو غيّر الهدف: البروتين يبقى (يعتمد على وزنه)، والكارب والدهون تتعدّل بنفس النسبة عشان يطابق المجموع
 export interface GoalTargets { calories: number; protein_g: number | null; carbs_g: number | null; fat_g: number | null }
 export const KCAL_GOAL_MIN = 800;
 export const KCAL_GOAL_MAX = 6000;
+
+type WithGoal = { kcal_goal?: number | null } | null | undefined;
+
+/**
+ * هدفي الشخصي: من health_profiles (ما يشوفه غيري). قبل ترحيل القاعدة كان في profiles،
+ * فلو الجدول الخاص ما فيه العمود بعد (undefined) نقرأ القديم.
+ */
+export function myKcalGoal(health: WithGoal, profile: WithGoal): number | null {
+  if (health && health.kcal_goal !== undefined) return health.kcal_goal ?? null;
+  return profile?.kcal_goal ?? null;
+}
 
 type Base = { calories?: number | null; protein_g?: number | null; carbs_g?: number | null; fat_g?: number | null } | null | undefined;
 

@@ -35,7 +35,7 @@ export interface Profile {
   cover_url?: string | null;
   /** نوع الحساب يتحدد أول التسجيل: متدرب أو شريك (نادي، مدرب، متجر، مطعم، مركز) */
   account_type?: 'trainee' | 'club' | 'coach' | 'store' | 'restaurant' | 'center' | 'venue';
-  /** هدف السعرات اليومي اللي حطّه بنفسه (null = هدف الخطة) */
+  /** قديم: هدف السعرات انتقل لـ HealthProfile (خاص). بعد ترحيل القاعدة يبقى فاضي دايماً */
   kcal_goal?: number | null;
   /** التايم لاين: يطلع لأصدقائي لما أصحى ☀️ ولما أدخل النادي 🏋️ */
   share_wake?: boolean;
@@ -55,6 +55,8 @@ export interface HealthProfile {
   goal: Goal | null;
   level: Level | null;
   days_per_week: number | null;
+  /** هدف السعرات اليومي اللي حطّه بنفسه (null = هدف الخطة). خاص: صاحبه بس يشوفه */
+  kcal_goal?: number | null;
 }
 
 export interface Gym {
