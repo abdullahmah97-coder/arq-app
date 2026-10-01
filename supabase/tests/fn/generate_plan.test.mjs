@@ -19,7 +19,7 @@ let reply = { training: null, meals: null };
 globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body);
   const kind = body.system.includes('TRAINING part') ? 'training' : 'meals';
-  const entry = { kind, body, start: Date.now(), end: null };
+  const entry = { kind, body, start: Date.now(), end: null, seq: (globalThis.__seq = (globalThis.__seq ?? 0) + 1) };
   calls.push(entry);
   const r = reply[kind];
   await new Promise((res) => setTimeout(res, 60));
@@ -74,8 +74,31 @@ ok(JSON.stringify(db.countFilters.at(-1)).includes('"is","data->program",null'),
 db.countError = 'db down';
 r = await call({ input, targets });
 ok(r.status === 503 && r.body.error === 'busy', 'limit check fails → stop (the limit is never skipped)');
+ok(db.rpcCalls.length === 0, 'refused requests do not use up an attempt');
 db.countError = null;
 db.aiCount = 1;
+
+// حجز المحاولة بالقاعدة (ai_take 'plan'): الطلبات المتزامنة ما تعدّي الحد
+reply = { training: TRAINING, meals: MEALS };
+calls.length = 0;
+db.takeError = 'rate_limited';
+r = await call({ input, targets, save: true });
+ok(r.status === 429 && r.body.error === 'rate_limited' && calls.length === 0, 'no attempts left today → rate_limited, AI never called');
+db.takeError = 'TypeError: fetch failed';
+r = await call({ input, targets, save: true });
+ok(r.status === 503 && r.body.error === 'busy' && calls.length === 0, 'attempt check fails → stop (the limit is never skipped)');
+db.takeError = 'bad_status';
+r = await call({ input, targets, save: true });
+ok(r.status === 200 && r.body.plan_id, 'database not migrated yet (unknown kind) → falls back to the saved-plans limit');
+db.takeError = null;
+calls.length = 0;
+const takesBefore = db.rpcCalls.length;
+r = await call({ input, targets, save: true });
+const take = db.rpcCalls.at(-1);
+ok(r.status === 200 && db.rpcCalls.length === takesBefore + 1 && take.fn === 'ai_take' && take.args.p_kind === 'plan', 'every request reserves one plan attempt');
+ok(calls.length === 2 && calls.every((c) => c.seq > take.seq), 'the attempt is reserved before any AI call');
+for (const x of db.rows) x.active = false;
+db.rows.length = 0;
 
 // ---- خطة كاملة (نسخة التطبيق القديمة: بدون حفظ) ----
 reply = { training: TRAINING, meals: MEALS };

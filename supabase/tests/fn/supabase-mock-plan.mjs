@@ -1,7 +1,9 @@
-// بديل supabase-js لاختبار دالة generate-plan: الخطط (صفوف حقيقية بالذاكرة)، تقارير InBody، وصورة الجسم
+// بديل supabase-js لاختبار دالة generate-plan: الخطط (صفوف حقيقية بالذاكرة)، تقارير InBody، وصورة الجسم،
+// وحجز محاولة الذكاء الاصطناعي (ai_take) — takeError يحاكي رد القاعدة (rate_limited / bad_status / عطل)
 export const plan = (globalThis.__sbPlan ??= {
   aiCount: 0, countError: null, countFilters: [], updates: [], inserts: [], rows: [],
   failInsert: 0, commitThenFail: 0, failActivate: 0, inbody: new Set(), photo: null, nextId: 1,
+  rpcCalls: [], takeError: null,
 });
 
 const field = (row, col) => (col === 'data->>request_id' ? row.data?.request_id : row[col]);
@@ -22,6 +24,10 @@ export function createClient(url, key, opts = {}) {
   const user = auth === 'Bearer good' ? { id: 'u1' } : null;
   return {
     auth: { getUser: async () => ({ data: { user } }) },
+    rpc: async (fn, args) => {
+      plan.rpcCalls.push({ fn, args, seq: (globalThis.__seq = (globalThis.__seq ?? 0) + 1) });
+      return plan.takeError ? { data: null, error: { message: plan.takeError } } : { data: 7, error: null };
+    },
     storage: { from: () => ({ download: async (p) => ({ data: plan.photo && p === 'u1/body.jpg' ? plan.photo : null, error: null }) }) },
     from: (table) => {
       const q = { table, op: 'select', filters: [], row: null, opts: null, limit: null, single: false };

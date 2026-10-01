@@ -10,6 +10,9 @@
 // الحفظ: لو الطلب فيه save: true الدالة تحفظ الخطة بنفسها (وتكمّل حتى لو التطبيق انقفل أو انقطع الاتصال)،
 // والتطبيق يلقاها بـ request_id. النسخ القديمة من التطبيق (بدون save) تستلم الخطة وتحفظها بنفسها مثل قبل.
 //
+// الحدود اليومية: ٥ خطط ذكية محفوظة، و٨ محاولات (تنحجز بالقاعدة قبل استدعاء الذكاء الاصطناعي: ai_take('plan'),
+// ترحيل 20261002000840). لو القاعدة قبل الترحيل، الدالة تكمّل على حد الخطط المحفوظة بس.
+//
 // النشر:
 //   supabase functions deploy generate-plan
 //   (ANTHROPIC_API_KEY، و ANTHROPIC_PLAN_MODEL أو ANTHROPIC_MODEL اختياري)
@@ -525,6 +528,17 @@ Deno.serve(async (req) => {
   // ما قدرنا نتأكد من الحد؟ ما نكمل (عشان الحد ما يتعدّى)
   if (countError) { console.error('rate_check_failed', countError.message); return json({ error: 'busy' }, 503); }
   if ((count ?? 0) >= MAX_AI_PLANS_PER_DAY) return json({ error: 'rate_limited' }, 429);
+
+  // كل محاولة تحجز مكانها قبل الذكاء الاصطناعي (٨ باليوم، بقفل في القاعدة): الطلبات المتزامنة
+  // كانت كلها تعدّي فحص الخطط المحفوظة فوق قبل ما تنحفظ أي خطة. المحاولة اللي تفشل تنحسب (لأنها تكلّف)
+  const { error: takeError } = await supabase.rpc('ai_take', { p_kind: 'plan' });
+  if (takeError) {
+    const m = String(takeError.message ?? '');
+    if (/rate_limited/.test(m)) return json({ error: 'rate_limited' }, 429);
+    // القاعدة قبل الترحيل (ما تعرف 'plan'): نكمل على حد الخطط المحفوظة. غير كذا ما نكمل (الحد ما يتعدّى)
+    if (!/bad_status|ai_usage_kind_check/.test(m)) { console.error('attempt_check_failed', m); return json({ error: 'busy' }, 503); }
+    console.warn('attempt_cap_missing', m);
+  }
 
   // الشغل كله هنا: يكمل حتى لو التطبيق قطع الاتصال (waitUntil) ويحفظ الخطة لو طلبنا
   const startedIso = new Date().toISOString();
