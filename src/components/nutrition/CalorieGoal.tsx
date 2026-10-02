@@ -8,20 +8,25 @@ import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
 import { KCAL_GOAL_MAX, KCAL_GOAL_MIN, parseKcal } from '@/lib/nutrition/goal';
 import { supabase } from '@/lib/supabase';
-import { colors, radius, space } from '@/theme';
+import { colors, radius, space, withAlpha } from '@/theme';
 
 const STEPS = [-250, -100, 100, 250];
 
+/** زر واضح: دائرة بلون التطبيق وقلم بنفس اللون (على الكرت الداكن كهرماني مثل زر الإطالة) */
 export function EditGoalButton({ goal, planCalories, custom, color }: {
   goal: number | null; planCalories: number | null; custom: boolean; color?: string;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const c = color ?? colors.primary;
   return (
     <>
       <Pressable onPress={() => setOpen(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('food.editGoal')}
-        style={({ pressed }) => ({ padding: 4, opacity: pressed ? 0.6 : 1 })}>
-        <Ionicons name="pencil" size={14} color={color ?? colors.muted} />
+        style={({ pressed }) => ({
+          width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: withAlpha(c, 0.16), borderWidth: 1, borderColor: withAlpha(c, 0.5), opacity: pressed ? 0.6 : 1,
+        })}>
+        <Ionicons name="pencil" size={16} color={c} />
       </Pressable>
       {open ? <GoalModal goal={goal} planCalories={planCalories} custom={custom} onClose={() => setOpen(false)} /> : null}
     </>

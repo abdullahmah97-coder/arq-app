@@ -60,9 +60,9 @@ export function HomeNutrition() {
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
             <Num size={38}>{num(sum.kcal)}</Num>
             <NT size={12} faint style={{ marginBottom: 6 }}>{goal != null ? `/ ${num(goal)} ${t('common.kcal')}` : t('common.kcal')}</NT>
-            {/* تعديل هدف السعرات اليومي */}
-            <View style={{ marginBottom: 4 }}>
-              <EditGoalButton goal={goal} planCalories={tg?.planCalories ?? null} custom={!!tg?.custom} color={night.muted} />
+            {/* تعديل هدف السعرات اليومي: بلون الكهرماني مثل زر الإطالة عشان يبان */}
+            <View style={{ marginBottom: 2, marginStart: 2 }}>
+              <EditGoalButton goal={goal} planCalories={tg?.planCalories ?? null} custom={!!tg?.custom} color={brand.amber} />
             </View>
           </View>
         </View>
