@@ -7,6 +7,7 @@ import { ClubLogo } from '@/components/clubs/parts';
 import { gymName } from '@/components/GymPicker';
 import { Button, Empty, Input, Row, Screen, T } from '@/components/ui';
 import { canManageChain, canManageGym, deleteOffer, loadChains, loadClubs, saveOffer, type Chain, type Club } from '@/lib/clubs';
+import { todayIso } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import { errorKey, supabase } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
@@ -14,7 +15,7 @@ import { goBackOrHome } from '@/lib/nav';
 
 const MONTHS = [0, 1, 3, 6, 12];
 const toNum = (s: string) => { const v = Number(s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(',', '.')); return Number.isFinite(v) ? v : NaN; };
-const plusDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const plusDays = (n: number) => todayIso(n);
 
 export default function OfferForm() {
   const { gym, chain, id } = useLocalSearchParams<{ gym?: string; chain?: string; id?: string }>();

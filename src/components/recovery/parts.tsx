@@ -9,7 +9,7 @@ import { PromptModal } from '@/components/PromptModal';
 import { ExerciseThumb } from '@/components/exercise/ExercisePhotos';
 import { Row, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
-import { todayIndex } from '@/lib/dates';
+import { todayIndex, todayIso } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import {
   callCenter, isPartner, openCenterInstagram, openCenterSite, requestAppointment, stretchRoutine, takesAppointments, whatsappCenter, type RecoveryCenter, type RoutineItem,
@@ -83,7 +83,7 @@ export function CenterCard({ c }: { c: RecoveryCenter }) {
   const [asking, setAsking] = useState(false);
   const partner = isPartner(c);
   const canBook = takesAppointments(c) && c.owner !== userId;
-  const offerLive = !!c.offer_text && (!c.offer_ends || c.offer_ends >= new Date().toISOString().slice(0, 10));
+  const offerLive = !!c.offer_text && (!c.offer_ends || c.offer_ends >= todayIso());
   const name = lng === 'en' && c.name_en ? c.name_en : c.name;
   return (
     <View style={{ gap: space.sm, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: partner ? brand.orange : colors.border, padding: space.md }}>

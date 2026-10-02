@@ -7,11 +7,11 @@ import { Button, Card, Empty, Input, Row, Screen, Segmented, T } from '@/compone
 import { deleteMembership, loadMembership, normDate, saveMembership } from '@/lib/gymops';
 import { canManageGymOrChain } from '@/lib/services';
 import { goBackOrHome } from '@/lib/nav';
+import { isoDate as iso } from '@/lib/dates';
 import { toLatinDigits } from '@/lib/digits';
 import { errorKey } from '@/lib/supabase';
 import { colors, space } from '@/theme';
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
 const addMonths = (from: string, n: number) => { const d = new Date(`${from}T12:00:00`); d.setMonth(d.getMonth() + n); d.setDate(d.getDate() - 1); return iso(d); };
 const addDays = (from: string, n: number) => { const d = new Date(`${from}T12:00:00`); d.setDate(d.getDate() + n - 1); return iso(d); };
 

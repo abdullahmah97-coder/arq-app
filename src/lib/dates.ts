@@ -18,6 +18,20 @@ export function isoDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * أول يوم في الشهر بتوقيت الجهاز (0 = هذا الشهر، -1 = اللي قبله).
+ * ما نستخدم toISOString: من نص الليل لين ٣ الفجر (بتوقيت السعودية) يعطي تاريخ أمس بتوقيت غرينتش،
+ * فكان تقرير «هذا الشهر» يطلع الشهر اللي قبله في هالساعات.
+ */
+export function monthStartIso(offset = 0, now = new Date()): string {
+  return isoDate(new Date(now.getFullYear(), now.getMonth() + offset, 1));
+}
+
+/** تاريخ اليوم (أو بعد n يوم) بتوقيت الجهاز: «YYYY-MM-DD» */
+export function todayIso(plusDays = 0, now = new Date()): string {
+  return isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + plusDays));
+}
+
 export function addDays(d: Date, n: number): Date {
   const x = new Date(d);
   x.setDate(x.getDate() + n);

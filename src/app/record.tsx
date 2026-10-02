@@ -7,9 +7,8 @@ import { MonthReportCard, Timeline } from '@/components/coaching/Timeline';
 import { Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { loadMonthReport, loadTimeline, type MonthReport, type TimelineItem } from '@/lib/coaching';
+import { monthStartIso as monthStart } from '@/lib/dates';
 import { colors, space } from '@/theme';
-
-const monthStart = (offset: number) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + offset); return d.toISOString().slice(0, 10); };
 
 export default function MyRecord() {
   const { t } = useTranslation();

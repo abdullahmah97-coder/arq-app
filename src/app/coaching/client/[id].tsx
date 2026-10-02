@@ -10,13 +10,13 @@ import { Button, Card, Empty, Input, Loading, Row, Screen, Segmented, T } from '
 import { useUser } from '@/lib/auth';
 import { addNote, assignProgram, bookSession, deleteNote, endLink, fmtRiyadh, loadCoachClients, loadMonthReport, loadMyPrograms, loadNotes, loadSessions,
   loadTimeline, parseRiyadh, setSessionStatus, type CoachClient, type CoachNote, type CoachSession, type MonthReport, type MyProgram, type TimelineItem } from '@/lib/coaching';
+import { monthStartIso as monthStart } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import { goBackOrHome } from '@/lib/nav';
 import { errorKey } from '@/lib/supabase';
 import { colors, radius, space } from '@/theme';
 
 type Tab = 'record' | 'report' | 'program' | 'sessions' | 'notes';
-const monthStart = (offset: number) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + offset); return d.toISOString().slice(0, 10); };
 
 export default function ClientRecord() {
   const { id } = useLocalSearchParams<{ id: string }>();

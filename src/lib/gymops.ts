@@ -1,5 +1,6 @@
 // تشغيل النادي: الاشتراكات، بطاقة الدخول (QR)، الاستقبال، البوابات، الطلبات، الملاحظات، الدعوات، الإعلانات، والحصص
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { todayIso } from './dates';
 import { supabase } from './supabase';
 
 export type MemState = 'active' | 'upcoming' | 'frozen' | 'expired' | 'cancelled';
@@ -233,7 +234,7 @@ export function parseMembersCsv(text: string): ParsedImport {
     const cells = splitCsvLine(l, sep);
     const r: any = { name: '', contact: '', plan: '', start: '', end: '', price: '' };
     head.forEach((h, j) => { if (h) r[h] = cells[j] ?? ''; });
-    const start = r.start ? normDate(r.start) : new Date().toISOString().slice(0, 10);
+    const start = r.start ? normDate(r.start) : todayIso();
     const end = normDate(r.end);
     if (!r.name) errors.push({ line: i + 2, msg: 'no_name' });
     else if (!end || !start) errors.push({ line: i + 2, msg: 'bad_date' });

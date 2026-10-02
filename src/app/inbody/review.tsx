@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
 import { Button, Card, Input, Row, Screen, SectionTitle, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
+import { todayIso } from '@/lib/dates';
 import { getDraft, saveReport } from '@/lib/inbody';
 import { hasEssentials, normalizeMetrics } from '@/lib/inbody/normalize';
 import type { InBodyMetrics, Segment } from '@/lib/inbody/types';
@@ -33,7 +34,7 @@ export default function ReviewReport() {
     [...ESSENTIAL, ...MORE].forEach((k) => { o[k] = str(initial[k] as number | null); });
     return o;
   });
-  const [date, setDate] = useState(initial.test_date ?? new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(initial.test_date ?? todayIso());
   const [seg, setSeg] = useState<Record<string, { kg: string; pct: string }>>(() => {
     const o: Record<string, { kg: string; pct: string }> = {};
     SEGS.forEach((s) => { o[s] = { kg: str(initial.segmental_lean?.[s].kg), pct: str(initial.segmental_lean?.[s].pct) }; });

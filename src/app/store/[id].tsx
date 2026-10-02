@@ -10,7 +10,7 @@ import { useUser } from '@/lib/auth';
 import {
   hasMacros, isFollowingStore, loadAnnouncements, loadBrand, loadBrandOffers, offerEvent, setFollowStore, type Announcement, type Brand, type BrandOffer, type Product,
 } from '@/lib/brands';
-import { timeAgo } from '@/lib/dates';
+import { timeAgo, todayIso } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import { endSubscription, mySubscriptionWith, type MealSub } from '@/lib/mealSubs';
 import { logFood, slotForHour } from '@/lib/nutrition';
@@ -33,7 +33,8 @@ export default function BrandPage() {
       setB(x);
       if (!x) return;
       loadBrandOffers(x.id).then((list) => {
-        const live = list.filter((o) => o.active && (!o.ends_on || o.ends_on >= new Date().toISOString().slice(0, 10)));
+        const today = todayIso();
+        const live = list.filter((o) => o.active && (!o.ends_on || o.ends_on >= today));
         setOffers(live);
         if (x.owner !== userId) live.forEach((o) => { offerEvent(o.id, 'view').catch(() => {}); });
       }).catch(() => {});
