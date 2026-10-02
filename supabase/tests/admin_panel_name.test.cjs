@@ -11,7 +11,8 @@ const { setup } = require('./_harness.cjs');
   check('no function still says the old panel name', old.length === 0, old.map((r) => r.proname).join(','));
 
   // طلب نادي جديد: التنبيه للإدارة بالاسم الجديد
-  await as(U.C, `select request_club_partner(null, null, 'نادي الاختبار', 'owner', null, '0551112222')`);
+  await q(`insert into storage.objects (bucket_id, name, owner) values ('partner_docs', $1, $3), ('partner_docs', $2, $3)`, [`${U.C}/cr.jpg`, `${U.C}/license.jpg`, U.C]);
+  await as(U.C, `select request_club_partner(null, null, 'نادي الاختبار', 'owner', '1010123456', '0551112222', null, null, null, null, 'LIC-1', $1, $2)`, [`${U.C}/cr.jpg`, `${U.C}/license.jpg`]);
   const n = (await q(`select data from notifications where user_id = $1 and data->>'url' = '/owner' order by id desc limit 1`, [U.E]))[0]?.data;
   check('club request notice uses the new Arabic name', /لوحة إدارة التطبيق/.test(n?.body_ar ?? ''), n?.body_ar);
   check('club request notice uses the new English name', /App management/.test(n?.body_en ?? ''), n?.body_en);

@@ -35,7 +35,7 @@ import { HomeLongPress, LONG_PRESS_MS, SECTION_META, useHomeLayout, type HomeSec
 import { useLocalized } from '@/lib/i18n';
 import { isBeta } from '@/lib/appInfo';
 import { useRingStyle } from '@/lib/ringStyle';
-import { kindOf, loadHomeMode, saveHomeMode, type HomeMode } from '@/lib/partners';
+import { loadHomeMode, partnerKind, saveHomeMode, type HomeMode } from '@/lib/partners';
 import { getActiveWorkout, type ActiveWorkout } from '@/lib/training';
 import { publicUrl, supabase } from '@/lib/supabase';
 import type { LeaderboardRow } from '@/lib/types';
@@ -50,7 +50,8 @@ const IMG = {
 /** الرئيسية: للمتدرب «النبض». وللشريك لوحة التحكم أولاً، ويقدر يبدّل لوضع المتدرب */
 export default function Home() {
   const { userId, profile } = useUser();
-  const partner = !!kindOf(profile.account_type);
+  // شريك معتمد، أو اختار يصير شريك وللحين ما كمّل طلبه (تطلع له لوحة «كمّل انضمامك»)
+  const partner = !!partnerKind(profile);
   const [saved, setSaved] = useState<HomeMode | null>(null);
   useEffect(() => {
     if (partner) loadHomeMode(userId).then(setSaved);

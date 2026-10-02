@@ -7,7 +7,7 @@ import { View } from 'react-native';
 import { DashLink, StatusPill } from '@/components/partners/parts';
 import { Card, Loading, Row, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
-import { kindOf, loadPartnerState, type AccountType, type PartnerKind, type PartnerState } from '@/lib/partners';
+import { loadPartnerState, partnerKind, type PartnerKind, type PartnerState } from '@/lib/partners';
 import { brand, colors, space } from '@/theme';
 
 type Icon = keyof typeof Ionicons.glyphMap;
@@ -26,7 +26,8 @@ export function PartnerHub({ compact }: { compact?: boolean }) {
   useFocusEffect(useCallback(() => { loadPartnerState(userId).then(setS).catch(() => {}); }, [userId]));
   if (!s) return <Loading />;
 
-  const chosen = kindOf(profile.account_type as AccountType | undefined);
+  // نوعه المعتمد، أو اللي اختاره وقت التسجيل وللحين ما انعتمد
+  const chosen = partnerKind(profile);
   const has: Record<PartnerKind, boolean> = {
     club: !!(s.chains.length || s.gyms.length || s.clubRequest), store: !!s.store, coach: !!s.coach, center: !!s.center, venue: !!s.venue,
   };

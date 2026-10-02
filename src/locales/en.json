@@ -1881,7 +1881,8 @@
     "delete_window_passed": "Delete for everyone works within 2 days. You can still delete it for you.",
     "message_deleted": "This message was deleted.",
     "empty_message": "The message is empty.",
-    "message_too_long": "That message is too long (1000 characters max)."
+    "message_too_long": "That message is too long (1000 characters max).",
+    "docs_required": "Add the commercial registration and club license with their photos. Update the app if you don't see these fields."
   },
   "trust": {
     "liveNow_one": "1 person here now",
@@ -2655,7 +2656,7 @@
     "noCenterYet": "You don't have a center yet",
     "joinClubTitle": "Join as a gym",
     "joinClubHow": "How does your gym become an ARQ partner?",
-    "clubJoin1": "Pick your gym from the list or type its name, then fill in your details",
+    "clubJoin1": "Pick your gym from the list or type its name, and attach the commercial registration and club license",
     "clubJoin2": "The ARQ team reviews the request and contacts you if needed",
     "clubJoin3": "Once approved, your dashboard opens: gym page, offers, branches and member alerts",
     "findYourClub": "Find your gym",
@@ -2669,7 +2670,7 @@
     "role_marketing": "Marketing",
     "role_other": "Other",
     "crNumber": "Commercial registration no.",
-    "crHint": "Optional, speeds up review",
+    "crHint": "10 digits — required",
     "phone": "Mobile number",
     "branches": "Branches",
     "branchesN": "{{n}} branches",
@@ -2838,7 +2839,21 @@
     "assignMsg_venue": "Enter the owner's username. They become a partner and take bookings through ARQ.",
     "deleteMsg_venue": "The venue, its courts, classes and bookings are deleted. This can't be undone.",
     "manageHint_venue": "Football, padel and tennis courts, and yoga and Pilates studios. In-app booking works only when a venue is linked to its owner's account; the rest are booked on their own sites.",
-    "add_venue": "New venue"
+    "add_venue": "New venue",
+    "licenseNumber": "Club license no.",
+    "licenseHint": "The gym's official license number — required",
+    "docsTitle": "Document photos (required)",
+    "crPhoto": "Commercial registration photo",
+    "licensePhoto": "Club license photo",
+    "docsPrivate": "Photos are private: only the ARQ team sees them to review your request.",
+    "docCamera": "Take photo",
+    "docLibrary": "Choose from photos",
+    "docAdd": "Tap to add a photo",
+    "err_cr": "The commercial registration number must be 10 digits",
+    "err_license": "Enter the club license number",
+    "err_docs": "Attach photos of the commercial registration and the club license",
+    "noDocs": "No document photos (request from an old app version)",
+    "wantsToBe": "wants to be a {{type}} (not approved)"
   },
   "ads": {
     "label": "Ad",

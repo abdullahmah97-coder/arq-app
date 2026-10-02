@@ -70,7 +70,7 @@ export const SERVER_CODES = new Set([
   'review_needs_visit', 'already_replied', 'not_a_client', 'not_enough_points', 'out_of_stock', 'reward_ended', 'reward_not_found', 'code_ended',
   'consent_required', 'scope_not_granted', 'link_not_found', 'already_linked', 'slot_full', 'no_sessions_left', 'package_expired',
   'payments_disabled', 'order_not_found', 'amount_mismatch', 'kind_not_available', 'not_a_coach', 'coach_pending_review', 'not_verified', 'brand_not_approved',
-  'note_required', 'status_locked',
+  'note_required', 'status_locked', 'docs_required',
   'too_late', 'bad_slot', 'slot_taken', 'class_full', 'venue_unavailable', 'too_many_bookings', 'too_early', 'bad_sport',
   'bad_username', 'name_too_long', 'username_taken', 'cannot_delete_self', 'cannot_delete_admin', 'not_trainee',
   'quiet_hours', 'nudge_not_found',

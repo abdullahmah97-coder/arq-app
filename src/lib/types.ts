@@ -35,6 +35,8 @@ export interface Profile {
   cover_url?: string | null;
   /** نوع الحساب يتحدد أول التسجيل: متدرب أو شريك (نادي، مدرب، متجر، مطعم، مركز) */
   account_type?: 'trainee' | 'club' | 'coach' | 'store' | 'restaurant' | 'center' | 'venue';
+  /** اختار يصير شريك وقت التسجيل وللحين ما وافق المالك (نوع الحساب يبقى متدرب) */
+  partner_intent?: 'club' | 'store' | 'coach' | 'center' | 'venue' | null;
   /** قديم: هدف السعرات انتقل لـ HealthProfile (خاص). بعد ترحيل القاعدة يبقى فاضي دايماً */
   kcal_goal?: number | null;
   /** التايم لاين: يطلع لأصدقائي لما أصحى ☀️ ولما أدخل النادي 🏋️ */

@@ -4,20 +4,29 @@ const { setup } = require('./_harness.cjs');
 (async () => {
   const { q, as, check, expectErr, U, gym, visit } = await setup();
   const notes = async (uid, url) => (await q(`select count(*)::int n from notifications where user_id = $1 and data->>'url' = $2`, [uid, url]))[0].n;
+  // صور السجل التجاري والرخصة مرفوعة في مجلد صاحب الطلب
+  let nDoc = 0;
+  const docs = async (uid) => {
+    const a = `${uid}/cr-${++nDoc}.jpg`, b = `${uid}/license-${nDoc}.jpg`;
+    await q(`insert into storage.objects (bucket_id, name, owner) values ('partner_docs', $1, $3), ('partner_docs', $2, $3)`, [a, b, uid]);
+    return [a, b];
+  };
 
   // ---------- نوع الحساب ----------
   await as(U.C, `update profiles set account_type = 'club' where id = $1`, [U.C]);
-  check('user can pick an account type at signup', (await q(`select account_type from profiles where id = $1`, [U.C]))[0].account_type === 'club');
+  const picked = (await q(`select account_type, partner_intent from profiles where id = $1`, [U.C]))[0];
+  check('picking «club» at signup is only a wish: still a trainee until approved', picked.account_type === 'trainee' && picked.partner_intent === 'club', JSON.stringify(picked));
   await expectErr('unknown account type rejected', () => as(U.C, `update profiles set account_type = 'boss' where id = $1`, [U.C]), /check constraint/);
 
   // ---------- طلب انضمام نادي ----------
   const chain = (await q(`select id, name from gym_chains order by name limit 1`))[0];
-  const [{ request_club_partner: rid }] = await as(U.C, `select request_club_partner($1, null, 'نادي خالد', 'owner', '1010123456', '0551234567', 'club@example.com', 'الرياض', 3, 'نبي نصير شركاء')`, [chain.id]);
+  const [crC, licC] = await docs(U.C);
+  const [{ request_club_partner: rid }] = await as(U.C, `select request_club_partner($1, null, 'نادي خالد', 'owner', '1010123456', '0551234567', 'club@example.com', 'الرياض', 3, 'نبي نصير شركاء', 'MS-2024-118', $2, $3)`, [chain.id, crC, licC]);
   check('club can request to join as a partner', !!rid);
   const req = (await q(`select * from club_requests where id = $1`, [rid]))[0];
   check('phone normalized to international format', req.phone === '966551234567', req.phone);
   check('admins notified about the club request', (await notes(U.E, '/owner')) >= 1);
-  await expectErr('one open request at a time', () => as(U.C, `select request_club_partner(null, null, 'نادي ثاني', 'owner', null, '0550000000')`), /request_pending/);
+  await expectErr('one open request at a time', () => as(U.C, `select request_club_partner(null, null, 'نادي ثاني', 'owner', '1010999999', '0550000000', null, null, null, null, 'LIC-2', $1, $2)`, [crC, licC]), /request_pending/);
   await expectErr('users cannot insert requests directly', () => as(U.A, `insert into club_requests (user_id, club_name, role, phone) values ($1, 'x', 'owner', '966500000000')`, [U.A]), /row-level security|permission denied/);
   check('others cannot read club requests', (await as(U.A, `select 1 from club_requests`)).length === 0);
   check('requester sees own request', (await as(U.C, `select 1 from club_requests where id = $1`, [rid])).length === 1);
@@ -26,6 +35,8 @@ const { setup } = require('./_harness.cjs');
   await expectErr('non-admin cannot review', () => as(U.A, `select review_club_request($1, 'approved')`, [rid]), /not_allowed/);
   await expectErr('rejecting needs a reason', () => as(U.E, `select review_club_request($1, 'rejected')`, [rid]), /note_required/);
   await as(U.E, `select review_club_request($1, 'approved')`, [rid]);
+  const approved = (await q(`select account_type, partner_intent from profiles where id = $1`, [U.C]))[0];
+  check('approval makes the account a club (and clears the wish)', approved.account_type === 'club' && approved.partner_intent === null, JSON.stringify(approved));
   check('approval makes the requester a chain manager', (await q(`select 1 from chain_managers where chain_id = $1 and user_id = $2`, [chain.id, U.C])).length === 1);
   check('chain marked as ARQ partner', (await q(`select partner from gym_chains where id = $1`, [chain.id]))[0].partner === true);
   check('club told the dashboard is ready', (await notes(U.C, '/partners')) === 1);
@@ -33,11 +44,13 @@ const { setup } = require('./_harness.cjs');
   await expectErr('a decided request cannot be decided again', () => as(U.E, `select review_club_request($1, 'approved')`, [rid]), /bad_status/);
 
   // نادي جديد مو موجود: الاعتماد ينشئ سلسلة
-  const [{ request_club_partner: rid2 }] = await as(U.A, `select request_club_partner(null, null, 'Iron Box', 'manager', null, '966500000001')`);
+  const [crA, licA] = await docs(U.A);
+  const [{ request_club_partner: rid2 }] = await as(U.A, `select request_club_partner(null, null, 'Iron Box', 'manager', '4030111222', '966500000001', null, null, null, null, 'LIC-IRON', $1, $2)`, [crA, licA]);
   const [{ review_club_request: newChain }] = await as(U.E, `select review_club_request($1, 'approved')`, [rid2]);
   const nc = (await q(`select name, partner, slug from gym_chains where id = $1`, [newChain]))[0];
   check('approving an unknown club creates its chain as a partner', nc?.name === 'Iron Box' && nc.partner && /^club-/.test(nc.slug));
-  const [{ request_club_partner: rid3 }] = await as(U.B, `select request_club_partner(null, null, 'Sara Gym', 'owner', null, '966500000002')`);
+  const [crB, licB] = await docs(U.B);
+  const [{ request_club_partner: rid3 }] = await as(U.B, `select request_club_partner(null, null, 'Sara Gym', 'owner', '1010555666', '966500000002', null, null, null, null, 'LIC-SARA', $1, $2)`, [crB, licB]);
   await as(U.E, `select review_club_request($1, 'rejected', 'أرسل السجل التجاري')`, [rid3]);
   check('rejected club told what to fix', (await notes(U.B, '/clubs/join')) === 1);
 

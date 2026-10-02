@@ -178,7 +178,7 @@ function UserCard({ u, onChanged, onDeleted }: { u: AdminUser; onChanged: (u: Ad
             {u.is_admin ? <Badge text={t('adminUsers.admin')} bg={brand.deepGreen} fg={brand.cream} /> : null}
             {me ? <Badge text={t('adminUsers.you')} bg={brand.sand} fg={brand.deepGreen} /> : null}
           </Row>
-          <T size="xs" muted numberOfLines={1}>@{u.username}{!trainee ? ` · ${t(`partners.acct_${u.account_type}`, { defaultValue: u.account_type })}` : ''}</T>
+          <T size="xs" muted numberOfLines={1}>@{u.username}{!trainee ? ` · ${t(`partners.acct_${u.account_type}`, { defaultValue: u.account_type })}` : ''}{trainee && u.partner_intent ? ` · ${t('partners.wantsToBe', { type: t(`partners.acct_${u.partner_intent}`, { defaultValue: u.partner_intent }) })}` : ''}</T>
           <T size="sm" numberOfLines={1} style={{ writingDirection: 'ltr', textAlign: lng === 'ar' ? 'right' : 'left' }}>{u.email}</T>
         </View>
       </Row>

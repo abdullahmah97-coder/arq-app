@@ -20,6 +20,15 @@ export const KIND_ICON: Record<PartnerKind, string> = { club: 'business-outline'
 export const kindOf = (a: AccountType | null | undefined): PartnerKind | null =>
   !a || a === 'trainee' ? null : a === 'restaurant' ? 'store' : a;
 
+/**
+ * فئة الشريك للعرض: نوع الحساب (بعد موافقة المالك)، أو اللي اختاره وقت التسجيل وللحين ما انعتمد (partner_intent)
+ * — عشان يطلع له «كمّل انضمامك». نوع الحساب نفسه ما يصير شريك إلا من المالك.
+ */
+export const partnerKind = (p: { account_type?: string | null; partner_intent?: string | null } | null | undefined): PartnerKind | null =>
+  kindOf(p?.account_type as AccountType | undefined)
+  ?? ((PARTNER_KINDS as string[]).includes(p?.partner_intent ?? '') ? (p!.partner_intent as PartnerKind) : null);
+
+/** يختار نوع الحساب. نوع شريك يوصل للمالك كطلب (يبقى متدرب لين يوافق)، و«متدرب» يمسح الطلب */
 export async function setAccountType(me: string, type: AccountType) {
   const { error } = await supabase.from('profiles').update({ account_type: type }).eq('id', me);
   if (error) throw error;
@@ -39,16 +48,42 @@ export interface ClubRequest {
   id: string; user_id: string; chain_id: string | null; gym_id: string | null; club_name: string; role: ClubRole; cr_number: string | null;
   phone: string; email: string | null; city: string | null; branches: number | null; note: string | null;
   status: 'pending' | 'approved' | 'rejected'; review_note: string | null; created_at: string;
+  /** رقم رخصة النادي وصور السجل التجاري والرخصة (مجلد partner_docs الخاص: صاحبها والمالك بس) */
+  license_number?: string | null; cr_doc_path?: string | null; license_doc_path?: string | null;
 }
+/** صورة مستند قبل الرفع */
+export interface DocPhoto { uri: string; mimeType: string }
 export interface ClubRequestInput {
   chainId: string | null; name: string; role: ClubRole; cr: string; phone: string; email: string; city: string; branches: string; note: string;
+  license: string; crPhoto: DocPhoto; licensePhoto: DocPhoto;
 }
 
-export async function requestClubPartner(i: ClubRequestInput): Promise<string> {
+/** السجل التجاري السعودي ١٠ أرقام (يقبل الأرقام العربية والمسافات) */
+export const CR_DIGITS = 10;
+
+/** يرفع صورة مستند في مجلدي الخاص ويرجع مسارها */
+export async function uploadPartnerDoc(me: string, kind: 'cr' | 'license', photo: DocPhoto): Promise<string> {
+  const ext = photo.mimeType.includes('png') ? 'png' : photo.mimeType.includes('heic') ? 'heic' : 'jpg';
+  const path = `${me}/${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const body = await (await fetch(photo.uri)).arrayBuffer();
+  const { error } = await supabase.storage.from('partner_docs').upload(path, body, { contentType: photo.mimeType, upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+/** رابط مؤقت (نص ساعة) لصورة مستند — للمالك أو صاحبها */
+export async function partnerDocUrl(path: string): Promise<string | null> {
+  const { data } = await supabase.storage.from('partner_docs').createSignedUrl(path, 60 * 30);
+  return data?.signedUrl ?? null;
+}
+
+export async function requestClubPartner(me: string, i: ClubRequestInput): Promise<string> {
   const branches = parseInt(i.branches, 10);
+  const [crDoc, licenseDoc] = await Promise.all([uploadPartnerDoc(me, 'cr', i.crPhoto), uploadPartnerDoc(me, 'license', i.licensePhoto)]);
   const { data, error } = await supabase.rpc('request_club_partner', {
     p_chain: i.chainId, p_gym: null, p_name: i.name.trim(), p_role: i.role, p_cr: i.cr.trim() || null, p_phone: i.phone,
     p_email: i.email.trim() || null, p_city: i.city.trim() || null, p_branches: Number.isFinite(branches) && branches > 0 ? branches : null, p_note: i.note.trim() || null,
+    p_license: i.license.trim() || null, p_cr_doc: crDoc, p_license_doc: licenseDoc,
   });
   if (error) throw error;
   return data as string;

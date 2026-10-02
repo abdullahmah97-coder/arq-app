@@ -1,14 +1,17 @@
-// انضم كنادي شريك: صاحب النادي أو مديره يطلب من داخل التطبيق، وإدارة أرك تراجع وتعتمد، وبعدها تفتح له لوحة التحكم
+// انضم كنادي شريك: صاحب النادي أو مديره يطلب من داخل التطبيق مع السجل التجاري ورخصة النادي وصورهم،
+// وإدارة أرك تراجع وتعتمد، وبعدها تفتح له لوحة التحكم. الصور خاصة: صاحبها والمالك بس يشوفونها
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { ClubLogo } from '@/components/clubs/parts';
 import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { loadChains, type Chain } from '@/lib/clubs';
-import { CLUB_ROLES, myClubRequest, requestClubPartner, type ClubRequest, type ClubRole } from '@/lib/partners';
+import { pickImage } from '@/lib/images';
+import { CLUB_ROLES, CR_DIGITS, myClubRequest, requestClubPartner, type ClubRequest, type ClubRole, type DocPhoto } from '@/lib/partners';
 import { onlyDigits } from '@/lib/digits';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
@@ -23,6 +26,9 @@ export default function JoinClub() {
   const [name, setName] = useState('');
   const [role, setRole] = useState<ClubRole>('owner');
   const [cr, setCr] = useState('');
+  const [license, setLicense] = useState('');
+  const [crPhoto, setCrPhoto] = useState<DocPhoto | null>(null);
+  const [licensePhoto, setLicensePhoto] = useState<DocPhoto | null>(null);
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('');
@@ -44,11 +50,14 @@ export default function JoinClub() {
 
   const submit = async () => {
     if (name.trim().length < 2) return Alert.alert(t('partners.err_clubName'));
+    if (onlyDigits(cr).length !== CR_DIGITS) return Alert.alert(t('partners.err_cr'));
+    if (license.trim().length < 3) return Alert.alert(t('partners.err_license'));
+    if (!crPhoto || !licensePhoto) return Alert.alert(t('partners.err_docs'));
     if (onlyDigits(phone).length < 9) return Alert.alert(t('partners.err_phone'));
     if (!agree) return Alert.alert(t('store.err_agree'));
     setBusy(true);
     try {
-      await requestClubPartner({ chainId, name, role, cr, phone, email, city, branches, note });
+      await requestClubPartner(userId, { chainId, name, role, cr: onlyDigits(cr), phone, email, city, branches, note, license, crPhoto, licensePhoto });
       Alert.alert(t('partners.requestSent'), t('partners.requestSentBody'));
       setReq(await myClubRequest(userId));
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
@@ -117,7 +126,19 @@ export default function JoinClub() {
         <T size="sm" semibold>{t('partners.yourRole')}</T>
         <Segmented<ClubRole> wrap value={role} onChange={setRole} options={CLUB_ROLES.map((r) => ({ value: r, label: t(`partners.role_${r}`) }))} />
       </View>
-      <Input label={t('partners.crNumber')} hint={t('partners.crHint')} value={cr} onChangeText={setCr} keyboardType="number-pad" maxLength={15} />
+      <Input label={t('partners.crNumber')} hint={t('partners.crHint')} value={cr} onChangeText={setCr} keyboardType="number-pad" maxLength={14} placeholder="1010xxxxxx" />
+      <Input label={t('partners.licenseNumber')} hint={t('partners.licenseHint')} value={license} onChangeText={setLicense} maxLength={40} autoCapitalize="characters" />
+      <View style={{ gap: 6 }}>
+        <T size="sm" semibold>{t('partners.docsTitle')}</T>
+        <Row gap={space.sm}>
+          <DocTile label={t('partners.crPhoto')} photo={crPhoto} onPick={setCrPhoto} />
+          <DocTile label={t('partners.licensePhoto')} photo={licensePhoto} onPick={setLicensePhoto} />
+        </Row>
+        <Row gap={6}>
+          <Ionicons name="lock-closed-outline" size={13} color={colors.muted} />
+          <T size="xs" muted style={{ flex: 1, lineHeight: 18 }}>{t('partners.docsPrivate')}</T>
+        </Row>
+      </View>
       <Row gap={space.sm}>
         <View style={{ flex: 1 }}><Input label={t('partners.phone')} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="05xxxxxxxx" /></View>
         <View style={{ flex: 1 }}><Input label={t('partners.branches')} value={branches} onChangeText={setBranches} keyboardType="number-pad" maxLength={3} placeholder="1" /></View>
@@ -134,5 +155,40 @@ export default function JoinClub() {
       </Pressable>
       <Button title={t('store.submit')} icon="paper-plane-outline" loading={busy} onPress={submit} />
     </Screen>
+  );
+}
+
+/** خانة صورة مستند: تصوير أو من الصور، وتبيّن الصورة بعد الاختيار */
+function DocTile({ label, photo, onPick }: { label: string; photo: DocPhoto | null; onPick: (p: DocPhoto) => void }) {
+  const { t } = useTranslation();
+  const take = (src: 'camera' | 'library') => { pickImage(src).then((i) => { if (i) onPick({ uri: i.uri, mimeType: i.mimeType }); }, () => {}); };
+  const choose = () => Alert.alert(label, undefined, [
+    { text: t('partners.docCamera'), onPress: () => take('camera') },
+    { text: t('partners.docLibrary'), onPress: () => take('library') },
+    { text: t('common.cancel'), style: 'cancel' },
+  ]);
+  return (
+    <Pressable onPress={choose} accessibilityRole="button" accessibilityLabel={label}
+      style={({ pressed }) => ({
+        flex: 1, height: 118, borderRadius: radius.md, borderWidth: 1.5, borderStyle: photo ? 'solid' : 'dashed',
+        borderColor: photo ? brand.orange : colors.border, backgroundColor: colors.card, overflow: 'hidden',
+        alignItems: 'center', justifyContent: 'center', gap: 6, opacity: pressed ? 0.8 : 1,
+      })}>
+      {photo ? (
+        <>
+          <Image source={{ uri: photo.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: 'rgba(10,51,45,0.72)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            <Ionicons name="checkmark-circle" size={14} color={brand.cream} />
+            <T size="xs" semibold color={brand.cream} numberOfLines={1}>{label}</T>
+          </View>
+        </>
+      ) : (
+        <>
+          <Ionicons name="camera-outline" size={24} color={colors.muted} />
+          <T size="xs" semibold center style={{ paddingHorizontal: 8 }}>{label}</T>
+          <T size="xs" muted>{t('partners.docAdd')}</T>
+        </>
+      )}
+    </Pressable>
   );
 }
