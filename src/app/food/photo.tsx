@@ -1,4 +1,5 @@
 // صوّر وجبتك: الذكاء الاصطناعي يتعرف على الأكل ويقدّر السعرات والبروتين والكارب والدهون، وأنت تراجع وتعدّل الكمية قبل التسجيل
+// بعد الصورة تقدر تكتب وش فيها (مثلاً «شاورما جبن») عشان يحسب اللي ما يبان بالصورة، وتقدر تصحّح الوصف بعد التحليل
 // أو امسح باركود منتج معلّب: نجيب قيمه من Open Food Facts وتختار الكمية
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -27,7 +28,7 @@ const ERR: Record<string, string> = {
 /** عدد الحصص/العبوات للمنتج الممسوح */
 const COUNTS = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
 
-type Phase = 'pick' | 'analyzing' | 'review' | 'error' | 'saved' | 'lookup' | 'product' | 'unknown';
+type Phase = 'pick' | 'describe' | 'analyzing' | 'review' | 'error' | 'saved' | 'lookup' | 'product' | 'unknown';
 
 export default function MealPhotoScreen() {
   const { t } = useTranslation();
@@ -36,7 +37,12 @@ export default function MealPhotoScreen() {
   const { auto, scan } = useLocalSearchParams<{ auto?: string; scan?: string }>();
   const [slot, setSlot] = useState<MealSlot>(slotForHour(new Date().getHours()));
   const [photo, setPhoto] = useState<MealPhoto | null>(null);
+  /** وصف المستخدم للصورة (اختياري) */
   const [hint, setHint] = useState('');
+  /** صورة ملصق القيم الغذائية (من الباركود): وصفها جاهز وتتحلل على طول بدون خطوة الوصف */
+  const [labelHint, setLabelHint] = useState('');
+  /** الوصف اللي انحسبت عليه النتيجة المعروضة */
+  const [usedNote, setUsedNote] = useState('');
   const [phase, setPhase] = useState<Phase>('pick');
   const [err, setErr] = useState('');
   const [res, setRes] = useState<MealAnalysis | null>(null);
@@ -63,18 +69,23 @@ export default function MealPhotoScreen() {
     const { result, error } = await analyzeMeal(p, h);
     if (!result) { setErr(error ?? 'ai_failed'); setPhase('error'); return; }
     setRes(result);
+    setUsedNote(h);
     setFactor(result.items.map(() => 1));
     setRemoved(new Set());
     setPhase('review');
   };
 
-  const take = async (source: 'camera' | 'library', h = hint) => {
+  /** بعد الصورة نسألك وش فيها (اختياري) قبل التحليل، عشان يعرف المكونات اللي ما تبان مثل الجبن داخل الشاورما */
+  const take = async (source: 'camera' | 'library', label = '') => {
     try {
       const p = await pickMealPhoto(source);
       if (!p) return;
       setMode('photo');
       setPhoto(p);
-      await run(p, h);
+      setRes(null);
+      setLabelHint(label);
+      if (label) await run(p, label);
+      else setPhase('describe');
     } catch (e) {
       setErr(e instanceof Error && e.message === 'permission_denied' ? 'permission_denied' : 'ai_failed');
       setPhase('error');
@@ -165,10 +176,11 @@ export default function MealPhotoScreen() {
   /** المنتج مو موجود: نصوّر ملصق القيم الغذائية والذكاء الاصطناعي يقراه */
   const photoLabel = () => {
     const name = product ? productName(product, lng === 'ar' ? 'ar' : 'en') : '';
-    const h = t('meal.bcLabelHint', { name: name ? ` (${name})` : '' });
-    setHint(h);
-    void take('camera', h);
+    void take('camera', t('meal.bcLabelHint', { name: name ? ` (${name})` : '' }));
   };
+  /** الوصف اللي ينرسل مع الصورة */
+  const note = labelHint || hint.trim();
+  const analyze = () => { if (photo) void run(photo, note); };
 
   const items = (res?.items ?? []).map((it, i) => ({ it: scaleItem(it, factor[i] ?? 1), i })).filter((x) => !removed.has(x.i));
   const sum = totals(items.map((x) => x.it));
@@ -186,7 +198,9 @@ export default function MealPhotoScreen() {
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
   };
 
-  const reset = () => { setPhoto(null); setRes(null); setErr(''); setProduct(null); setCode(null); setPhase('pick'); };
+  const reset = () => {
+    setPhoto(null); setHint(''); setLabelHint(''); setUsedNote(''); setRes(null); setErr(''); setProduct(null); setCode(null); setPhase('pick');
+  };
   const again = () => {
     reset();
     if (mode === 'barcode') setScanOpen(true);
@@ -202,7 +216,9 @@ export default function MealPhotoScreen() {
       <Stack.Screen options={{ title: t('meal.title') }} />
       <Screen edges={['bottom']}>
         {photo ? (
-          <Image source={{ uri: photo.uri }} style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: radius.lg, backgroundColor: colors.cardAlt }} contentFit="cover" />
+          // وقت الوصف الصورة أقصر شوي عشان خانة الكتابة وزر التحليل يبانون فوق الكيبورد
+          <Image source={{ uri: photo.uri }} style={{ width: '100%', aspectRatio: phase === 'describe' ? 16 / 9 : 4 / 3, borderRadius: radius.lg, backgroundColor: colors.cardAlt }}
+            contentFit="cover" />
         ) : null}
 
         {phase === 'pick' ? (
@@ -214,11 +230,28 @@ export default function MealPhotoScreen() {
               <T bold size="lg" center>{t('meal.headline')}</T>
               <T muted center>{t('meal.intro')}</T>
             </Card>
-            <Input label={t('meal.hintLabel')} value={hint} onChangeText={setHint} placeholder={t('meal.hintPh')} maxLength={200} />
             <Button title={t('meal.takePhoto')} icon="camera" onPress={() => take('camera')} />
             <Button title={t('meal.scanBarcode')} icon="barcode-outline" variant="dark" onPress={() => setScanOpen(true)} />
             <Button title={t('meal.fromLibrary')} icon="images-outline" variant="secondary" onPress={() => take('library')} />
             <T size="xs" muted center>{t('meal.privacy')}</T>
+          </>
+        ) : null}
+
+        {phase === 'describe' && photo ? (
+          <>
+            <Card style={{ gap: space.sm }}>
+              <Row gap={space.sm}>
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.primary} />
+                <T bold size="lg" style={{ flex: 1 }}>{t('meal.describeTitle')}</T>
+              </Row>
+              <T size="sm" muted style={{ lineHeight: 21 }}>{t('meal.describeSub')}</T>
+              <Input value={hint} onChangeText={setHint} placeholder={t('meal.hintPh')} maxLength={200} returnKeyType="done"
+                accessibilityLabel={t('meal.describeTitle')} accessibilityHint={t('meal.describeSub')} />
+            </Card>
+            <Button title={t(res ? 'meal.analyzeAgain' : 'meal.analyze')} icon="sparkles" onPress={analyze} />
+            {/* جيت من النتيجة وغيّرت رأيك؟ ترجع لها بدون تحليل جديد */}
+            {res ? <Button title={t('meal.backToResult')} variant="secondary" onPress={() => setPhase('review')} /> : null}
+            <Button title={t('meal.another')} icon="camera-outline" variant="ghost" onPress={reset} />
           </>
         ) : null}
 
@@ -233,8 +266,11 @@ export default function MealPhotoScreen() {
         {phase === 'error' ? (
           <Card style={{ gap: space.md }}>
             <Row><Ionicons name="alert-circle-outline" size={20} color={colors.danger} /><T bold style={{ flex: 1 }}>{t(ERR[err] ?? 'meal.errFailed')}</T></Row>
-            {photo && err !== 'ai_not_configured' && err !== 'rate_limited' ? (
-              <Button title={t('meal.retry')} icon="refresh" onPress={() => run(photo, hint)} />
+            {/* «ما فيها أكل»: غالباً يحتاج وصف، فنرجعك لخانة الوصف بدل ما نعيد نفس الطلب */}
+            {photo && err === 'not_food' && !labelHint ? (
+              <Button title={t(hint.trim() ? 'meal.editNote' : 'meal.notFoodDescribe')} icon="create-outline" onPress={() => setPhase('describe')} />
+            ) : photo && err !== 'ai_not_configured' && err !== 'rate_limited' ? (
+              <Button title={t('meal.retry')} icon="refresh" onPress={analyze} />
             ) : null}
             <Button title={t('meal.another')} icon="camera-outline" variant="secondary" onPress={reset} />
             <Button title={t('meal.manual')} icon="create-outline" variant="ghost" onPress={() => router.replace('/food/add')} />
@@ -262,6 +298,12 @@ export default function MealPhotoScreen() {
                 <Macro label={t('plan.fat')} v={sum.fat_g} color={colors.muted} />
               </Row>
               {res.note?.[lng] ? <T size="xs" muted>{res.note[lng]}</T> : null}
+              {usedNote && !labelHint ? (
+                <Row gap={6} style={{ alignItems: 'flex-start' }}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.muted} style={{ marginTop: 2 }} />
+                  <T size="xs" muted style={{ flex: 1 }}>{t('meal.yourNote', { note: usedNote })}</T>
+                </Row>
+              ) : null}
             </Card>
 
             <T size="sm" bold muted>{t('meal.items')}</T>
@@ -297,6 +339,11 @@ export default function MealPhotoScreen() {
               <Button style={{ flex: 1 }} small title={t('meal.another')} icon="camera-outline" variant="secondary" onPress={reset} />
               <Button style={{ flex: 1 }} small title={t('meal.addMissing')} icon="add" variant="ghost" onPress={() => router.push('/food/add')} />
             </Row>
+            {/* التحليل مو دقيق؟ اكتب (أو صحّح) وش في الصورة ونحلل نفس الصورة من جديد */}
+            {!labelHint ? (
+              <Button small title={t(usedNote ? 'meal.editNote' : 'meal.addNote')} icon="create-outline" variant="ghost"
+                onPress={() => { setHint(usedNote); setPhase('describe'); }} />
+            ) : null}
             <T size="xs" muted center>{t('meal.estimate')}</T>
           </>
         ) : null}
