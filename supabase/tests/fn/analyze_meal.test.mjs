@@ -41,6 +41,9 @@ let r = await call({ image: IMG, media_type: 'image/png' });
 ok(r.status === 200 && r.body.items?.length === 1, 'no hint → 200 with items', JSON.stringify(r.body).slice(0, 120));
 ok(parts().length === 2 && parts()[0].type === 'image' && parts()[1].type === 'text', 'no hint → image + rules only');
 ok(!JSON.stringify(last()).includes('user_note'), 'no hint → no user_note');
+// صورة ملصق القيم الغذائية (من «صوّر الملصق» بعد الباركود) تنحسب أكل، مو «ما فيها أكل»
+ok(/nutrition facts label or the packaging .* counts as food/.test(parts()[1].text) && /neither food, drink nor a food label/.test(parts()[1].text),
+  'rules: a nutrition label photo counts as food');
 ok(r.body.remaining === 7, 'remaining comes from ai_take');
 ok(db.rpcCalls.at(-1)?.fn === 'ai_take' && db.rpcCalls.at(-1)?.args?.p_kind === 'meal_photo', 'daily cap reserved as meal_photo');
 

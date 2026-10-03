@@ -10,6 +10,7 @@
 //   hint: وصف المستخدم للوجبة (مثلاً «شاورما دجاج بالجبن») يساعد يتعرف على الأكل والمكونات اللي ما تبان بالصورة.
 //   الكميات من الصورة إلا إذا الوصف حدّدها (مثلاً «نص صحن»). ينرسل للذكاء الاصطناعي كملاحظة داخل وسم
 //   <user_note> بعد ما نشيل منه < و > ورموز التحكم، فما يقدر يغيّر القواعد أو شكل الرد.
+//   صورة ملصق القيم الغذائية أو علبة المنتج (من «صوّر الملصق» بعد الباركود) تنحسب أكل: يقرا الأرقام المكتوبة لحصة وحدة.
 // الرد: { items: MealItem[], confidence, note: {ar, en}, remaining }
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -34,6 +35,7 @@ Method:
 2. Estimate each item's portion in grams (drinks in ml ≈ grams) from visual cues: a dinner plate is ~26 cm, a spoon, a hand, a cup, can or packaging size.
 3. Estimate calories, protein, carbohydrates and fat for THAT portion using standard references (USDA, Saudi food composition tables). Include visible cooking oil, ghee, butter, sauces and dressings. Never double count.
 4. If the food is on a large shared platter, estimate ONE person's normal portion and say so in the note.
+5. A nutrition facts label or the packaging of a food or drink counts as food: read the printed values for ONE serving (or the whole small pack if no serving is printed) instead of estimating.
 
 Return ONLY one JSON object, no markdown:
 {"items":[{"name_ar":"اسم عربي قصير","name_en":"Short English name","grams":0,"kcal":0,"protein_g":0,"carbs_g":0,"fat_g":0}],
@@ -42,7 +44,7 @@ Return ONLY one JSON object, no markdown:
  "note_en":"Short note in English"}
 
 Rules: at most 8 items; kcal is an integer; macros have one decimal; numbers are for the portion shown.
-If the photo does not show food or drink, return exactly {"error":"not_food"}.`;
+If the photo shows neither food, drink nor a food label, return exactly {"error":"not_food"}.`;
 
 const num = (v: unknown, max: number, dp = 1) => {
   const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
