@@ -3731,5 +3731,59 @@
     ],
     "contact": "Questions about your privacy, or want a copy of your data? Message us from inside ARQ.",
     "link": "Privacy Policy"
+  },
+  "tour": {
+    "replay": "App tour",
+    "start": "Let's go",
+    "hint": "You can replay this tour anytime from your Profile.",
+    "traineeTour": "Tour of trainee mode",
+    "trainee": {
+      "welcome": {
+        "title": "Welcome to ARQ",
+        "body": "Your training, food, sleep and friends in one place. Take a quick tour to see where everything is."
+      },
+      "home": {
+        "title": "Home: your day at a glance",
+        "body": "Readiness, sleep, steps, today's calories and your daily mission. Connect your watch and phone to complete your numbers, and rearrange sections from “Customize home”."
+      },
+      "plan": {
+        "title": "My plan: workouts and meals",
+        "body": "Your plan for every day of the week. When it's time to train, tap “Start & log workout”, and the “Exercise library” shows every move with photos and instructions."
+      },
+      "coach": {
+        "title": "AI Coach: the button in the middle",
+        "body": "Ask for a workout by muscle, time and place, or ask about any exercise or meal. And “Snap your meal” from Home to get its calories and protein."
+      },
+      "social": {
+        "title": "Community and Compete",
+        "body": "Share your workouts and photos, follow friends, check in at your gym to earn points, and compete on the leaderboard and in challenges."
+      },
+      "more": {
+        "title": "Your profile and ARQ services",
+        "body": "Tap your photo at the top of Home to open your profile: entry card, points, privacy and language. “My shortcuts” takes you to gyms, stores, court booking and recovery centers."
+      }
+    },
+    "partner": {
+      "welcome": {
+        "title": "Welcome to ARQ for partners",
+        "body": "Show your business to ARQ users and receive their requests here. Take a quick tour before you start."
+      },
+      "join": {
+        "title": "Finish your join request",
+        "body": "On Home, tap “Finish joining”, pick your business type, fill in its details and documents, and accept the Partner Registration Policy."
+      },
+      "review": {
+        "title": "We review and activate",
+        "body": "The ARQ team reviews your request and tells you in notifications. Once approved, your page goes live as a partner and your dashboard opens: offers, prices, customer requests and announcements."
+      },
+      "trial": {
+        "title": "3 months free",
+        "body": "Starting the day you're approved, with no commission. After that, just 10% on orders that reach you through ARQ. Full details are in the Partner Registration Policy."
+      },
+      "switch": {
+        "title": "Train with the same account",
+        "body": "On Home, tap “Switch to trainee mode” to use ARQ like any trainee, and come back with “Partner mode” whenever you like."
+      }
+    }
   }
 }

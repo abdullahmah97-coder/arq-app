@@ -8,6 +8,7 @@ import { useUser } from '@/lib/auth';
 import { pickImage, type PickedImage } from '@/lib/images';
 import { ACCOUNT_ICON, ACCOUNT_TYPES, type AccountType } from '@/lib/partners';
 import { createPlanWithFallback } from '@/lib/plan';
+import { markTourPending } from '@/lib/tour';
 import { validateInput } from '@/lib/plan/rules';
 import type { PlanInput } from '@/lib/plan/types';
 import { errorKey, supabase, uploadImage } from '@/lib/supabase';
@@ -80,6 +81,8 @@ export default function Onboarding() {
 
       const { error: pErr } = await supabase.from('profiles').update({ gym_id: gymId, onboarded: true }).eq('id', userId);
       if (pErr) throw pErr;
+      // أول ما يدخل التطبيق تطلع له جولة التعريف
+      await markTourPending(userId);
       await refreshPlan();
       await refreshProfile(); // يغيّر الحارس وينقل المستخدم للتبويبات
     } catch (e) {
@@ -94,6 +97,7 @@ export default function Onboarding() {
     try {
       const { error } = await supabase.from('profiles').update({ account_type: chosen, onboarded: true }).eq('id', userId);
       if (error) throw error;
+      await markTourPending(userId); // جولة الشركاء أول ما يدخل
       await refreshProfile(); // الحارس ينقله للرئيسية، ولوحة الشريك تطلب منه يكمل طلب الانضمام
     } catch (e) {
       Alert.alert(t(errorKey(e)));

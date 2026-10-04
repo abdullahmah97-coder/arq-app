@@ -114,6 +114,8 @@ function RootNavigator() {
         {/* نافذة من تحت: تنسحب لتحت للإغلاق، وفيها زر إغلاق واضح */}
         <Stack.Screen name="coach" options={{ headerShown: false, presentation: 'modal', gestureEnabled: true }} />
         <Stack.Screen name="workout/log" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
+        {/* جولة التعريف للحساب الجديد: ملء الشاشة وتنقفل من أزرارها */}
+        <Stack.Screen name="tour" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false, animation: 'fade' }} />
         <Stack.Screen name="workout/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="workout/history" options={{ title: t('workout.history') }} />
         <Stack.Screen name="programs" options={{ title: t('programs.title') }} />

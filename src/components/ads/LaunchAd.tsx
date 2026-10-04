@@ -11,6 +11,7 @@ import { Button, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { adMediaUrl, launchAdEvent, launchAdToShow, markAdShown, type AdMediaType, type LaunchAd } from '@/lib/launchAds';
 import { knownSleep, loadOpenSleep } from '@/lib/timeline';
+import { isTourPending } from '@/lib/tour';
 import { brand } from '@/theme';
 
 /** مرة وحدة لكل تشغيل للتطبيق */
@@ -39,6 +40,8 @@ function Gate() {
     checkedThisLaunch = true;
     let dead = false;
     const timer = setTimeout(async () => {
+      // حساب جديد: جولة التعريف أول، والإعلان يطلع من الفتحة الجاية
+      if (await isTourPending(userId)) return;
       // نايم (شاشة النوم مقفلة التطبيق): ما نطلع إعلان فوقها
       const asleep = knownSleep(userId) ?? await loadOpenSleep(userId).catch(() => null);
       if (asleep || dead) return;

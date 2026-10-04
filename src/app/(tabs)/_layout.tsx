@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PulseTabBar } from '@/components/pulse/TabBar';
 import { ScreenErrorBoundary } from '@/components/ScreenErrorBoundary';
 import { LaunchAdGate } from '@/components/ads/LaunchAd';
+import { TourGate } from '@/components/tour/TourGate';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { WakeWatcher } from '@/components/timeline/Timeline';
 
@@ -24,7 +25,9 @@ export default function TabsLayout() {
     </Tabs>
     {/* تحديث فوري جاهز: زر «حدّث الحين» بدل إعادة فتح التطبيق مرتين */}
     <UpdateBanner />
-    {/* إعلان البداية: يظهر مرة بعد فتح التطبيق حسب إعدادات إدارة التطبيق */}
+    {/* جولة التعريف: أول دخول بعد إنشاء الحساب */}
+    <TourGate />
+    {/* إعلان البداية: يظهر مرة بعد فتح التطبيق حسب إعدادات إدارة التطبيق (وما يطلع فوق جولة التعريف) */}
     <LaunchAdGate />
     {/* «صحى ☀️» في التايم لاين: مرة باليوم لما تفتح التطبيق الصبح */}
     <WakeWatcher />
