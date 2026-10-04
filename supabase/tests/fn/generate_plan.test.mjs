@@ -13,18 +13,21 @@ const waited = [];
 globalThis.Deno = { serve: (h) => { handler = h; }, env: { get: (k) => env[k] } };
 globalThis.EdgeRuntime = { waitUntil: (p) => waited.push(p) };
 
-// Anthropic البديل: يرد حسب البرومبت (تمارين أو وجبات)، ونسجّل متى بدأ كل طلب ومتى خلص
+// Anthropic البديل: يرد حسب البرومبت (تمارين أو دفعة وجبات)، ونسجّل متى بدأ كل طلب ومتى خلص
+// الوجبات على دفعتين: mealsA = الفطور والسناك، mealsB = الغداء والعشاء (لو ما حددناهم يرد meals للثنتين)
 const calls = [];
 let reply = { training: null, meals: null };
 globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body);
   const kind = body.system.includes('TRAINING part') ? 'training' : 'meals';
-  const entry = { kind, body, start: Date.now(), end: null, seq: (globalThis.__seq = (globalThis.__seq ?? 0) + 1) };
+  const group = kind === 'meals' ? (body.system.includes('for each slot: breakfast, snack') ? 'mealsA' : 'mealsB') : null;
+  const entry = { kind, group, body, start: Date.now(), end: null, seq: (globalThis.__seq = (globalThis.__seq ?? 0) + 1) };
   calls.push(entry);
-  const r = reply[kind];
+  const r = group && reply[group] !== undefined ? reply[group] : reply[kind];
   await new Promise((res) => setTimeout(res, 60));
   entry.end = Date.now();
   if (!r) return new Response('{"error":"down"}', { status: 529 });
+  if (r === 'TRUNCATED') return new Response(JSON.stringify({ stop_reason: 'max_tokens', usage: { output_tokens: body.max_tokens }, content: [{ type: 'text', text: '{"meals":[{"slot":"lunch","name":{"ar":"كب' }] }), { status: 200 });
   return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: typeof r === 'string' ? r : 'Here:\n' + JSON.stringify(r) }] }), { status: 200 });
 };
 
@@ -96,7 +99,7 @@ const takesBefore = db.rpcCalls.length;
 r = await call({ input, targets, save: true });
 const take = db.rpcCalls.at(-1);
 ok(r.status === 200 && db.rpcCalls.length === takesBefore + 1 && take.fn === 'ai_take' && take.args.p_kind === 'plan', 'every request reserves one plan attempt');
-ok(calls.length === 2 && calls.every((c) => c.seq > take.seq), 'the attempt is reserved before any AI call');
+ok(calls.length === 3 && calls.every((c) => c.seq > take.seq), 'the attempt is reserved before any AI call');
 for (const x of db.rows) x.active = false;
 db.rows.length = 0;
 
@@ -107,8 +110,14 @@ r = await call({ input, targets, photo_path: 'someone-else/x.jpg' });
 ok(r.status === 200 && r.body.plan && !r.body.plan_id, 'old clients get the plan without saving', r.status + ' ' + JSON.stringify(r.body).slice(0, 80));
 const p = r.body.plan;
 ok(isWeeklyPlan(p), 'passes the app’s plan validator (old and new app versions)');
-ok(calls.length === 2 && calls[1].start < calls[0].end, 'training and meals are requested in parallel');
-ok(calls.every((c) => c.body.max_tokens <= 4000), 'short outputs (≤ 4000 tokens each)');
+ok(calls.length === 3 && calls.every((c) => c.start < Math.min(...calls.map((x) => x.end))), 'training and both meal batches are requested in parallel');
+ok(calls.find((c) => c.kind === 'training').body.max_tokens <= 4000 && calls.filter((c) => c.kind === 'meals').every((c) => c.body.max_tokens <= 5000), 'short outputs (training ≤ 4000, each meal batch ≤ 5000)');
+// الوجبات على دفعتين: كل دفعة تطلب وجباتها بس وبسعرات حصتها
+const mA = calls.find((c) => c.group === 'mealsA')?.body.system ?? '';
+const mB = calls.find((c) => c.group === 'mealsB')?.body.system ?? '';
+ok(/for each slot: breakfast, snack \(6 meals in total\)/.test(mA) && /breakfast about 600 kcal, snack about 360 kcal/.test(mA) && !/lunch about/.test(mA), 'batch A asks for breakfast + snack only (6 meals, their share of 2400 kcal)');
+ok(/for each slot: lunch, dinner \(6 meals in total\)/.test(mB) && /lunch about 840 kcal, dinner about 600 kcal/.test(mB) && !/snack about/.test(mB), 'batch B asks for lunch + dinner only');
+ok(calls.filter((c) => c.kind === 'meals').every((c) => JSON.stringify(c.body.messages).includes('Notes from the user')), 'both meal batches get the user notes (as data)');
 ok(p.days.length === 7 && p.days.filter((d) => !d.rest).length === 4, '7 days, 4 training days');
 const d0 = p.days[0];
 ok(d0.exercises.length === 3 && !d0.exercises.some((e) => e.exercise_id === 'made_up_move'), 'unknown exercise ids are dropped');
@@ -136,6 +145,22 @@ reply = { training: TRAINING, meals: null };
 r = await call({ input, targets });
 ok(r.status === 200 && r.body.meals_source === 'templates' && isWeeklyPlan(r.body.plan), 'meals AI down → local meal templates, plan still ready');
 ok(r.body.plan.meals[0].meals[1].name.en === 'Healthy chicken kabsa' || r.body.plan.meals.some((d) => d.meals.some((m) => m.name.en.includes('kabsa'))), 'templates are the Saudi meal set');
+
+// ---- دفعة وحدة انقطعت: وجباتها من القوالب والباقي من الذكاء الاصطناعي ----
+reply = { training: TRAINING, meals: MEALS, mealsB: 'TRUNCATED' };
+r = await call({ input, targets });
+const aiNames = new Set(MEALS.meals.map((m) => m.name.en));
+const bySlot = (slot) => r.body.plan.meals.flatMap((d) => d.meals.filter((m) => m.slot === slot).map((m) => m.name.en));
+ok(r.status === 200 && r.body.meals_source === 'mixed' && isWeeklyPlan(r.body.plan), 'one batch cut off → plan still ready, meals_source mixed');
+ok(bySlot('breakfast').every((n) => aiNames.has(n)) && bySlot('snack').every((n) => aiNames.has(n)), 'breakfast and snack still come from the AI');
+ok(bySlot('lunch').every((n) => !aiNames.has(n)) && bySlot('dinner').every((n) => !aiNames.has(n)), 'lunch and dinner fall back to the local templates');
+const dayKcalMixed = r.body.plan.meals[0].meals.reduce((a, m) => a + m.kcal, 0);
+ok(Math.abs(dayKcalMixed - targets.calories) <= 60, 'mixed days still add up to the calorie target', String(dayKcalMixed));
+// دفعة رجّعت وجبات غير اللي طلبناها: وجباتها من القوالب
+reply = { training: TRAINING, meals: MEALS, mealsA: { meals: MEALS.meals.filter((m) => m.slot === 'lunch' || m.slot === 'dinner') } };
+r = await call({ input, targets });
+ok(r.status === 200 && r.body.meals_source === 'mixed', 'a batch that returns the wrong slots falls back for its own slots');
+reply = { training: TRAINING, meals: MEALS };
 
 // ---- التمارين فشلت ----
 reply = { training: 'sorry, cannot help', meals: MEALS };
