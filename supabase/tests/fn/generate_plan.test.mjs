@@ -115,8 +115,8 @@ ok(calls.find((c) => c.kind === 'training').body.max_tokens <= 4000 && calls.fil
 // الوجبات على دفعتين: كل دفعة تطلب وجباتها بس وبسعرات حصتها
 const mA = calls.find((c) => c.group === 'mealsA')?.body.system ?? '';
 const mB = calls.find((c) => c.group === 'mealsB')?.body.system ?? '';
-ok(/for each slot: breakfast, snack \(6 meals in total\)/.test(mA) && /breakfast about 600 kcal, snack about 360 kcal/.test(mA) && !/lunch about/.test(mA), 'batch A asks for breakfast + snack only (6 meals, their share of 2400 kcal)');
-ok(/for each slot: lunch, dinner \(6 meals in total\)/.test(mB) && /lunch about 840 kcal, dinner about 600 kcal/.test(mB) && !/snack about/.test(mB), 'batch B asks for lunch + dinner only');
+ok(/for each slot: breakfast, snack \(6 meals in total\)/.test(mA) && /breakfast about 600 kcal and \d+ g protein, snack about 360 kcal and \d+ g protein/.test(mA) && !/lunch about/.test(mA), 'batch A asks for breakfast + snack only (6 meals, their share of 2400 kcal)');
+ok(/for each slot: lunch, dinner \(6 meals in total\)/.test(mB) && /lunch about 840 kcal and \d+ g protein, dinner about 600 kcal and \d+ g protein/.test(mB) && !/snack about/.test(mB), 'batch B asks for lunch + dinner only');
 ok(calls.filter((c) => c.kind === 'meals').every((c) => JSON.stringify(c.body.messages).includes('Notes from the user')), 'both meal batches get the user notes (as data)');
 ok(p.days.length === 7 && p.days.filter((d) => !d.rest).length === 4, '7 days, 4 training days');
 const d0 = p.days[0];
