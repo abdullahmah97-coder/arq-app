@@ -1,18 +1,18 @@
 // انضم كملعب أو استوديو: البيانات، الرياضات، ساعات العمل ومدة الحجز والسعر، والصورة. يظهر بعد موافقة إدارة أرك
-import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
 import { SportIcon, VenueArt } from '@/components/bookings/parts';
+import { PartnerAgree } from '@/components/partners/parts';
 import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import {
   clockLabel, COURT_SPORTS, loadMyVenue, saveMyVenue, SPORTS, uploadVenueImage, type Sport, type Venue, type VenueInput,
 } from '@/lib/bookings';
 import { useLocalized } from '@/lib/i18n';
-import { setAccountType } from '@/lib/partners';
+import { acceptPartnerTerms, setAccountType } from '@/lib/partners';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 
@@ -73,6 +73,7 @@ export default function VenueJoin() {
     setBusy(true);
     try {
       await saveMyVenue({ ...f, phone: f.phone ? toLatin(f.phone) : null, price_sar: p }, existing?.id);
+      if (!existing) await acceptPartnerTerms('venue');
       if (profile.account_type === 'trainee') { await setAccountType(userId, 'venue').catch(() => {}); refreshProfile(); }
       router.replace('/venues/manage');
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
@@ -156,10 +157,7 @@ export default function VenueJoin() {
         <T size="xs" muted>{t('venue.imageHint')}</T>
       </Card>
 
-      <Pressable onPress={() => setConsent((c) => !c)} accessibilityRole="checkbox" accessibilityState={{ checked: consent }} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-        <Ionicons name={consent ? 'checkbox' : 'square-outline'} size={22} color={consent ? brand.orange : colors.muted} />
-        <T size="sm" style={{ flex: 1, lineHeight: 22 }}>{t('venue.consent')}</T>
-      </Pressable>
+      <PartnerAgree checked={consent} onToggle={() => setConsent((c) => !c)} pledge={t('venue.consent')} />
       <Button icon="paper-plane-outline" title={existing ? t('common.save') : t('venue.submit')} loading={busy} onPress={submit} />
       {!existing ? <T size="xs" muted center>{t('venue.reviewNote')}</T> : null}
     </Screen>

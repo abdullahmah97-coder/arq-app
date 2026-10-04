@@ -77,6 +77,15 @@ export async function partnerDocUrl(path: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
+// ---------- موافقة سياسة تسجيل الشركاء ----------
+/** نسخة سياسة تسجيل الشركاء الحالية (تتغير مع أي تعديل جوهري على partnerPolicy في ملفات اللغة) */
+export const PARTNER_TERMS_VERSION = '1.0';
+export type TermsKind = 'club' | 'store' | 'venue' | 'center';
+/** يسجّل موافقة الشريك على السياسة مع إرسال طلبه (صاحبها ووقتها تحددهم القاعدة). لو فشل ما يوقف التسجيل */
+export async function acceptPartnerTerms(kind: TermsKind): Promise<void> {
+  try { await supabase.from('partner_terms').insert({ kind, version: PARTNER_TERMS_VERSION }); } catch { /* نكمل التسجيل */ }
+}
+
 export async function requestClubPartner(me: string, i: ClubRequestInput): Promise<string> {
   const branches = parseInt(i.branches, 10);
   const [crDoc, licenseDoc] = await Promise.all([uploadPartnerDoc(me, 'cr', i.crPhoto), uploadPartnerDoc(me, 'license', i.licensePhoto)]);

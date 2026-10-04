@@ -85,6 +85,11 @@ export default function SignUp() {
         <Input label={t('auth.email')} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
         <Input label={t('auth.password')} hint={t('auth.passwordHint')} value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" />
         <Button title={t('auth.signUp')} onPress={submit} loading={busy} />
+        <Pressable onPress={() => router.push('/policy/privacy')} accessibilityRole="link" hitSlop={6}>
+          <T size="xs" muted center style={{ lineHeight: 19 }}>
+            {t('auth.privacyAgree')} <T size="xs" semibold color={colors.primary}>{t('privacyPolicy.link')}</T>
+          </T>
+        </Pressable>
         <Button title={`${t('auth.haveAccount')} ${t('auth.signIn')}`} variant="ghost" onPress={() => router.back()} />
       </Screen>
     </KeyboardAvoidingView>

@@ -53,6 +53,7 @@
   "auth": {
     "signIn": "Sign in",
     "signUp": "Create account",
+    "privacyAgree": "By creating an account you agree to the",
     "email": "Email",
     "password": "Password",
     "fullName": "Name",
@@ -576,7 +577,7 @@
     "submittedBody": "We'll review it within 48 hours. You can add products now; they go live after approval.",
     "err_name": "Enter the store name",
     "err_link": "Add your website or Instagram",
-    "err_agree": "Please accept the declaration first",
+    "err_agree": "Please accept the declaration and the partner policy first",
     "status_pending": "Under review — visible to everyone once approved",
     "status_approved": "Your store is live for all users",
     "status_rejected": "Not approved — update your details and contact us",
@@ -664,6 +665,7 @@
     "badge": "Beta",
     "feedback": "Send feedback",
     "intro": "You're one of our first testers 🙌 Report any bug, idea or design note here — it reaches us directly with your app version and device.",
+    "introContact": "Write your question or note and it goes straight to the ARQ team. We’ll reply here under “My reports & status”.",
     "cat_bug": "Bug or something isn't working",
     "cat_idea": "Idea or new feature",
     "cat_design": "Design note",
@@ -2685,7 +2687,7 @@
     "workEmail": "Work email (optional)",
     "noteOptional": "Note (optional)",
     "clubNotePh": "Anything we should know about your gym",
-    "clubAgree": "I confirm I'm authorized to represent this gym, and that alerts reach only members linked to it",
+    "clubAgree": "I confirm I'm authorized to represent this gym, and that alerts reach only members linked to it.",
     "err_clubName": "Enter the gym name",
     "err_phone": "Enter a valid mobile number",
     "requestSent": "Request received",
@@ -3260,7 +3262,7 @@
     "err_phone": "The phone number isn't valid",
     "err_link": "The maps link must start with https://",
     "err_price": "The price isn't valid",
-    "err_consent": "Please agree to the declaration",
+    "err_consent": "Please agree to the declaration and the partner policy",
     "noVenue": "You don't have a venue yet",
     "st_pending": "Under review",
     "st_approved": "Approved",
@@ -3573,5 +3575,161 @@
     "listHint": "Long-press any section in the app (or a tab at the bottom) to hide it for everyone. Everything hidden is listed here to bring back.",
     "listEmpty": "Nothing is hidden right now.",
     "library": "Exercise library"
+  },
+  "partnerPolicy": {
+    "title": "Partner Registration Policy",
+    "intro": "This policy covers how gyms, stores, restaurants, courts, studios and recovery centers register as partners on the ARQ app: what we commit to and what we ask of you. By sending your registration request you agree to it.",
+    "version": "Version 1.0 · Last updated 4 October 2026",
+    "sections": [
+      {
+        "icon": "people-outline",
+        "title": "Who can register",
+        "body": "• Gyms and fitness centers.\n• Sports stores, supplement stores and healthy restaurants.\n• Courts and studios: padel, football, tennis, yoga, pilates and more.\n• Physiotherapy, sports medicine and recovery centers.\nThe business must be operating and licensed in Saudi Arabia, and the applicant must be its owner or authorized to represent it."
+      },
+      {
+        "icon": "document-text-outline",
+        "title": "Registration and documents",
+        "body": "• Gyms: commercial registration number and photo, and club license number and photo. These are required with the request.\n• Stores, restaurants, courts and studios: a valid commercial registration and accurate contact details.\n• Health centers: a valid Ministry of Health facility license, with practitioners registered with the Saudi Commission for Health Specialties. Non-medical recovery centers need the license their activity requires from the competent authority.\nARQ may ask for document photos or other proof at any time, before or after approval. Documents are private and only the ARQ team sees them, for verification."
+      },
+      {
+        "icon": "shield-checkmark-outline",
+        "title": "Review and approval",
+        "body": "The ARQ team reviews every request before the page is shown to users. We aim to finish within 48 hours and may contact you to complete or correct details. ARQ may approve, reject or ask for changes; we explain a rejection where possible, and you can apply again after fixing it. Approval doesn’t mean ARQ guarantees your services or products."
+      },
+      {
+        "icon": "create-outline",
+        "title": "Your page content",
+        "body": "• Information is accurate and up to date: name, location, hours, prices, services and nutrition values.\n• You own the logo, photos and text you upload or have permission to use them, and you allow ARQ to show them in the app and when presenting ARQ and its partners. You can ask us to stop using them in marketing at any time.\n• No misleading health or treatment claims (like “guaranteed 10 kg loss” or “permanent cure”), and nothing that breaks the law or public decency.\n• Supplements and food or health products are registered or cleared by the Saudi Food and Drug Authority where required.\nARQ may adjust how content is displayed or hide anything that breaks this policy."
+      },
+      {
+        "icon": "pricetag-outline",
+        "title": "Prices, offers and codes",
+        "body": "• Prices shown are final and include VAT, with any registration fee and minimum commitment made clear.\n• No made-up “before” prices.\n• You honor the offer or discount code you add for ARQ users until it ends.\n• You can stop an offer at any time; anyone who used it before you stopped it gets it on the same terms."
+      },
+      {
+        "icon": "calendar-outline",
+        "title": "Bookings, subscriptions and payment",
+        "body": "• ARQ is a platform that shows your services and connects you with users. For now, payment happens directly between you and the customer. Once in-app payment is live, ARQ collects the payment and transfers your share after deducting the commission.\n• Providing the service or product, delivery, cancellations and refunds are your responsibility, under your published policy, the E-Commerce Law and consumer protection rules.\n• Courts and studios reply to booking requests in good time, and give the customer a reason in the app when they cancel a confirmed booking.\n• Restaurants agree meal subscriptions with the customer and build them on the nutrition targets the customer shared with them."
+      },
+      {
+        "icon": "star-outline",
+        "title": "Reviews and customer alerts",
+        "body": "• Reviews come from real users. You can’t delete or edit them, but you can reply publicly and respectfully.\n• Buying or rewarding reviews, reviewing your own business or a competitor, or any other manipulation is not allowed.\n• Alerts you send your customers are about your business only (offers, schedule changes, closures), without spam or repetition, and reach only people linked to you.\n• You can report a review that breaks the rules, and the ARQ team reviews it under the integrity policy."
+      },
+      {
+        "icon": "lock-closed-outline",
+        "title": "Users’ data",
+        "body": "• You receive only what you need to serve the customer, such as their name and booking time, or the nutrition targets a subscriber chose to share.\n• You use it only to provide the service: you don’t sell it, share it or use it for marketing without the person’s consent, and you protect it and delete it when it’s no longer needed.\n• You comply with the Saudi Personal Data Protection Law.\n• We don’t share users’ weight, measurements, health data or workouts with you, except what a user explicitly chooses to share."
+      },
+      {
+        "icon": "cash-outline",
+        "title": "Free trial and fees",
+        "body": "• Your first 3 months from the date your page is approved are completely free, with no commission.\n• After that, ARQ’s commission is 10% of the value of each order that reaches you through ARQ: a booking, subscription or purchase made in the app or with an ARQ code or link. Customers who reach you outside ARQ carry no commission.\n• Customers pay a 2.5% service fee on orders paid inside ARQ. It is shown to them before they pay and is not deducted from you.\n• We send you a monthly statement of orders and commission, payable within 15 days of its date. Once in-app payment is live, the commission is deducted automatically.\n• We remind you at least 30 days before the trial ends, and you can pause your page before commission starts with no obligation.\n• Any change to the rates is announced at least 30 days before it applies. Amounts exclude VAT, which is added where due."
+      },
+      {
+        "icon": "ban-outline",
+        "title": "Pausing and removal",
+        "body": "• You can ask to pause or delete your page at any time, after settling any commission already due.\n• ARQ may pause or hide a page if its details are wrong, its documents expire, complaints repeat, or it breaks this policy or the law.\n• We tell you why and give you a chance to fix it where possible; serious violations are suspended immediately."
+      },
+      {
+        "icon": "information-circle-outline",
+        "title": "Responsibility and law",
+        "body": "ARQ is a technology platform that shows partners’ services. It is not a party to the service or sale agreement between you and the customer. You are responsible for your services, products and content, and for following the Saudi regulations that apply to your business. This policy is governed by the laws of the Kingdom of Saudi Arabia."
+      },
+      {
+        "icon": "refresh-outline",
+        "title": "Policy updates",
+        "body": "We may update this policy and will tell you about material changes in the app at least 14 days before they apply (30 days for any fee change). Continuing after that means you accept them; if you don’t, you can pause your page."
+      }
+    ],
+    "contact": "Questions about the policy or registration? Message us from inside ARQ and we’ll get back to you.",
+    "contactBtn": "Message us",
+    "agree": "I also agree to the Partner Registration Policy and the Privacy Policy.",
+    "read": "Partner Registration Policy",
+    "privacyLink": "Privacy Policy"
+  },
+  "privacyPolicy": {
+    "title": "Privacy Policy",
+    "intro": "Your privacy is central to ARQ. This policy explains what data we collect and why, who we share it with, how we protect it and your rights over it, under the Personal Data Protection Law of the Kingdom of Saudi Arabia.",
+    "version": "Version 1.0 · Last updated 4 October 2026",
+    "sections": [
+      {
+        "icon": "person-circle-outline",
+        "title": "Data you give us",
+        "body": "• Account: email, username, name and profile photo.\n• Your profile: gender, birth year, height, weight, goal, level and training days, to work out your calories and build your plan.\n• What you log: workouts, meals, weight, progress photos, measurements, InBody reports and check-ins, plus posts, comments, messages and reviews.\n• What you send us: feedback, reports and screenshots, with the app version and device model."
+      },
+      {
+        "icon": "pulse-outline",
+        "title": "Health and watch (optional)",
+        "body": "If you connect Apple Health or Health Connect, we read, with your permission, steps, active calories, distance, heart rate and its variability, sleep and workouts. We keep a daily summary to show your progress and recommendations, and save ARQ workouts to the Health app if you allow it. You can withdraw permission in your device settings at any time. Your health data is never used for ads and never sold."
+      },
+      {
+        "icon": "location-outline",
+        "title": "Location",
+        "body": "We use your location only while you use the feature: to suggest nearby gyms, show distances and confirm you’re at the gym. When you check in, we save your location at that moment and your distance from the gym to verify the visit. We don’t track your location in the background."
+      },
+      {
+        "icon": "camera-outline",
+        "title": "Photos",
+        "body": "• Meal photos are sent for analysis only and are not stored.\n• Progress photos and InBody reports are stored privately; nobody sees them except your coach, if you allow it.\n• Photos in posts and chats are seen by the people you share them with."
+      },
+      {
+        "icon": "sparkles-outline",
+        "title": "Artificial intelligence",
+        "body": "We use Anthropic’s Claude to analyse meal photos and nutrition labels, read InBody reports, build training and meal plans and answer in the AI coach. We send only what each request needs, such as the photo or your goals, level and activity summary, never your email or login details, and Anthropic does not use it to train its models."
+      },
+      {
+        "icon": "eye-outline",
+        "title": "What others can see",
+        "body": "• Your public profile: name, username, photo, posts and achievements.\n• Your presence at the gym according to your visibility setting, your steps to friends in step challenges, and your leaderboard rank if you turn it on.\n• Your coach sees only what you allow, and a restaurant in a meal subscription sees your daily calories and macros with your consent, until the subscription ends.\n• Your weight, measurements, private photos and health data are seen by no one else."
+      },
+      {
+        "icon": "business-outline",
+        "title": "Partners",
+        "body": "• When you book or subscribe through ARQ, the partner (gym, court, restaurant or center) receives only what it needs to serve you, such as your name and booking time, and must use it only for that, under the Partner Registration Policy.\n• Partners’ own details and documents (commercial registration and licenses) are used only for verification and contact, and only the ARQ team sees the documents.\n• Once in-app payment is live, card details are handled by a licensed payment provider; we don’t store your card details."
+      },
+      {
+        "icon": "server-outline",
+        "title": "Service providers and transfers",
+        "body": "ARQ runs on trusted providers: Supabase for data hosting and sign-in, Anthropic for AI, Expo, Apple and Google for notifications and updates, Google Places, Foursquare and OpenStreetMap for finding gyms, and Open Food Facts for barcodes. Some data may be processed outside the Kingdom by these providers, only as far as needed and with appropriate safeguards. We don’t sell your data and don’t use outside ad networks."
+      },
+      {
+        "icon": "megaphone-outline",
+        "title": "Ads",
+        "body": "Ads in ARQ are run by the ARQ team and labelled “Ad”. We don’t share your data with advertisers; we measure views to give advertisers aggregate numbers only."
+      },
+      {
+        "icon": "notifications-outline",
+        "title": "Notifications",
+        "body": "We send notifications about your activity, friends and bookings, and reminders that help you keep going. You can turn them off in settings or in your device settings."
+      },
+      {
+        "icon": "time-outline",
+        "title": "Retention and deletion",
+        "body": "We keep your data while your account exists. You can delete your account from your profile under “Delete account”; your data and photos are then permanently deleted, except what the law requires us to keep for a set period, such as financial transaction records."
+      },
+      {
+        "icon": "hand-left-outline",
+        "title": "Your rights",
+        "body": "Under the law you can know how we process your data, ask for a copy, correct it, delete it, and withdraw your consent to optional processing (such as connecting Health or sharing your targets with a restaurant) at any time. You can also complain to the Saudi Data and AI Authority (SDAIA)."
+      },
+      {
+        "icon": "shield-checkmark-outline",
+        "title": "Protecting your data",
+        "body": "We encrypt data in transit, apply access rules that stop any user from reaching anyone else’s data, and review security regularly. If a breach affects your data, we notify you and the competent authority as the law requires."
+      },
+      {
+        "icon": "happy-outline",
+        "title": "Young users",
+        "body": "If you are under 18, use ARQ with your guardian’s consent and supervision."
+      },
+      {
+        "icon": "refresh-outline",
+        "title": "Policy updates",
+        "body": "We tell you in the app about any material change before it applies, and the last-updated date appears at the top of this page."
+      }
+    ],
+    "contact": "Questions about your privacy, or want a copy of your data? Message us from inside ARQ.",
+    "link": "Privacy Policy"
   }
 }

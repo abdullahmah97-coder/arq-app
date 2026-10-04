@@ -69,6 +69,7 @@ export default function ProfileTab() {
         {owner ? <MenuItem icon="shield-checkmark-outline" label={`${t('owner.title')}${owner.reports + owner.brands ? ` · ${owner.reports + owner.brands}` : ''}`} onPress={() => router.push('/owner')} /> : null}
         {isBeta ? <MenuItem icon="chatbubble-ellipses-outline" label={t('beta.feedback')} onPress={() => router.push('/feedback')} /> : null}
         <ShortcutMenu />
+        <MenuItem icon="lock-closed-outline" label={t('privacyPolicy.link')} onPress={() => router.push('/policy/privacy')} />
       </Card>
 
       {/* الخصوصية: مين يشوفني في المنافسة */}

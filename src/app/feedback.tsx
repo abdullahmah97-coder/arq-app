@@ -1,7 +1,7 @@
 // أرسل ملاحظة / تقرير: يوصل لمالك التطبيق فقط مع رقم النسخة والجهاز وصورة اختيارية، وتشوف حالة تقاريرك
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
@@ -18,13 +18,17 @@ import { goBackOrHome } from '@/lib/nav';
 
 type Category = 'bug' | 'idea' | 'design' | 'other';
 const ICONS = { bug: 'bug-outline', idea: 'bulb-outline', design: 'color-palette-outline', other: 'chatbubble-ellipses-outline' } as const;
+const isCategory = (c?: string): c is Category => !!c && c in ICONS;
 
 export default function Feedback() {
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const { userId } = useUser();
-  const { screen } = useLocalSearchParams<{ screen?: string }>();
-  const [category, setCategory] = useState<Category>('bug');
+  // ?from= الصفحة اللي جا منها (ينحفظ مع البلاغ؛ «screen» اسم محجوز في التنقّل وكان يضيع)، ?cat= يختار النوع
+  // و from=policy:… يعني «راسلنا» من صفحة سياسة (سؤال لفريق أرك، مو بلاغ تجربة)
+  const { from, cat } = useLocalSearchParams<{ from?: string; cat?: string }>();
+  const contact = !!from?.startsWith('policy:');
+  const [category, setCategory] = useState<Category>(isCategory(cat) ? cat : 'bug');
   const [message, setMessage] = useState('');
   const [shot, setShot] = useState<{ uri: string; mimeType: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,7 +41,7 @@ export default function Feedback() {
     try {
       const screenshot_path = shot ? await uploadReportShot(userId, shot.uri, shot.mimeType) : null;
       const { error } = await supabase.from('beta_feedback').insert({
-        user_id: userId, category, message: message.trim(), screen: screen ?? null, screenshot_path, ...appMeta(),
+        user_id: userId, category, message: message.trim(), screen: from ?? null, screenshot_path, ...appMeta(),
       });
       if (error) throw error;
       Alert.alert(t('beta.thanks'));
@@ -49,7 +53,8 @@ export default function Feedback() {
 
   return (
     <Screen edges={['bottom']}>
-      <T muted style={{ lineHeight: 24 }}>{t('beta.intro')}</T>
+      {contact ? <Stack.Screen options={{ title: t('partnerPolicy.contactBtn') }} /> : null}
+      <T muted style={{ lineHeight: 24 }}>{t(contact ? 'beta.introContact' : 'beta.intro')}</T>
       <Row gap={6} style={{ backgroundColor: colors.cardAlt, borderRadius: 12, padding: space.md }}>
         <Ionicons name="lock-closed-outline" size={16} color={colors.primary} />
         <T size="xs" style={{ flex: 1, lineHeight: 19 }}>{t('beta.privateNote')}</T>

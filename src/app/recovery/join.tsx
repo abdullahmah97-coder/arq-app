@@ -8,13 +8,14 @@ import { Alert, Pressable, View } from 'react-native';
 import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { pickImage } from '@/lib/images';
-import { AdminBanner } from '@/components/partners/parts';
+import { AdminBanner, PartnerAgree } from '@/components/partners/parts';
+import { acceptPartnerTerms } from '@/lib/partners';
 import { goBackOrHome } from '@/lib/nav';
 import {
   CENTER_CITIES, CENTER_KINDS, CENTER_SERVICES, loadCenter, loadMyCenter, saveCenter, type CenterKind, type CenterService, type RecoveryCenter,
 } from '@/lib/recovery';
 import { errorKey, publicUrl, uploadImage } from '@/lib/supabase';
-import { brand, colors, radius, space } from '@/theme';
+import { brand, colors, space } from '@/theme';
 
 export default function JoinCenter() {
   // ?id= المالك يعدّل أي مركز، ?new=1 المالك يضيف مركز من موقعه الرسمي
@@ -80,6 +81,7 @@ export default function JoinCenter() {
         offer_text: offerText, offer_code: offerCode, offer_ends: ends || null,
       }, existing?.id, adminNew === '1');
       if (admin) { goBackOrHome(); return; }
+      if (!existing) await acceptPartnerTerms('center');
       Alert.alert(existing && existing.status === 'approved' ? t('recovery.saved') : t('recovery.submitted'), existing?.status === 'approved' ? undefined : t('recovery.submittedBody'));
       router.back();
     } catch (e) {
@@ -161,14 +163,7 @@ export default function JoinCenter() {
         </Row>
       </Card>
 
-      {!existing && !admin ? (
-        <Pressable onPress={() => setAgree(!agree)} accessibilityRole="checkbox" accessibilityState={{ checked: agree }}>
-          <Row style={{ alignItems: 'flex-start', backgroundColor: colors.card, borderRadius: radius.md, padding: space.sm }}>
-            <Ionicons name={agree ? 'checkbox' : 'square-outline'} size={22} color={agree ? brand.orange : colors.muted} />
-            <T size="sm" style={{ flex: 1, lineHeight: 22 }}>{t('recovery.agree')}</T>
-          </Row>
-        </Pressable>
-      ) : null}
+      {!existing && !admin ? <PartnerAgree boxed checked={agree} onToggle={() => setAgree(!agree)} pledge={t('recovery.agree')} /> : null}
 
       <Button title={existing ? t('store.save') : t('store.submit')} icon={existing ? 'checkmark' : 'paper-plane-outline'} loading={busy} onPress={submit} />
     </Screen>

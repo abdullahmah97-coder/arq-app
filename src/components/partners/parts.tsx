@@ -1,5 +1,6 @@
 // عناصر مشتركة للوحات الشركاء ولوحة المالك
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { I18nManager, Pressable, View } from 'react-native';
 import { Row, T } from '@/components/ui';
@@ -59,6 +60,36 @@ export function DashLink({ icon, title, sub, onPress, badge }: { icon: Icon; tit
         <T size="xs" bold color={brand.cream}>{badge}</T>
       </View> : null}
       <Ionicons name={I18nManager.isRTL ? 'chevron-back' : 'chevron-forward'} size={16} color={colors.muted} />
+    </Pressable>
+  );
+}
+
+/** إقرار التسجيل كشريك: تعهد نوع الشريك + الموافقة على سياسة تسجيل الشركاء وسياسة الخصوصية (مربع واحد)، وتحته رابطين للسياستين */
+export function PartnerAgree({ checked, onToggle, pledge, boxed }: { checked: boolean; onToggle: () => void; pledge: string; boxed?: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <View style={{ gap: 6 }}>
+      <Pressable onPress={onToggle} accessibilityRole="checkbox" accessibilityState={{ checked }}>
+        <Row style={[{ alignItems: 'flex-start' }, boxed ? { backgroundColor: colors.card, borderRadius: radius.md, padding: space.sm } : null]}>
+          <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={22} color={checked ? brand.orange : colors.muted} />
+          <T size="sm" style={{ flex: 1, lineHeight: 22 }}>{pledge}{'\n'}{t('partnerPolicy.agree')}</T>
+        </Row>
+      </Pressable>
+      <Row gap={space.md} style={{ flexWrap: 'wrap', paddingStart: boxed ? 38 : 30 }}>
+        <PolicyLink icon="document-text-outline" label={t('partnerPolicy.read')} to="/policy/partners" />
+        <PolicyLink icon="lock-closed-outline" label={t('partnerPolicy.privacyLink')} to="/policy/privacy" />
+      </Row>
+    </View>
+  );
+}
+
+function PolicyLink({ icon, label, to }: { icon: Icon; label: string; to: '/policy/partners' | '/policy/privacy' }) {
+  return (
+    <Pressable onPress={() => router.push(to)} accessibilityRole="link" hitSlop={8} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+      <Row gap={4}>
+        <Ionicons name={icon} size={14} color={colors.primary} />
+        <T size="xs" semibold color={colors.primary} style={{ textDecorationLine: 'underline' }}>{label}</T>
+      </Row>
     </Pressable>
   );
 }

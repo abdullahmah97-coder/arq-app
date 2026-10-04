@@ -7,7 +7,8 @@ import { Alert, Pressable, View } from 'react-native';
 import { BrandLogo } from '@/components/store/parts';
 import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
-import { AdminBanner } from '@/components/partners/parts';
+import { AdminBanner, PartnerAgree } from '@/components/partners/parts';
+import { acceptPartnerTerms } from '@/lib/partners';
 import { BRAND_CATEGORIES, loadBrand, loadMyBrand, saveBrand, type Brand, type BrandCategory } from '@/lib/brands';
 import { goBackOrHome } from '@/lib/nav';
 import { pickImage } from '@/lib/images';
@@ -59,7 +60,10 @@ export default function JoinStore() {
     try {
       await saveBrand(userId, { name, tagline, description, category, website, instagram, city, logo_path: logo }, existing?.id, adminNew === '1');
       if (admin) { goBackOrHome(); return; }
-      if (!existing) Alert.alert(t('store.submitted'), t('store.submittedBody'));
+      if (!existing) {
+        await acceptPartnerTerms('store');
+        Alert.alert(t('store.submitted'), t('store.submittedBody'));
+      }
       router.dismissTo('/store/manage');
     } catch (e) {
       Alert.alert(t(errorKey(e)));
@@ -98,14 +102,7 @@ export default function JoinStore() {
       <Input label={t('store.website')} value={website} onChangeText={setWebsite} autoCapitalize="none" keyboardType="url" placeholder="yourbrand.sa" />
       <Input label={t('store.instagram')} value={instagram} onChangeText={setInstagram} autoCapitalize="none" placeholder="@yourbrand" />
 
-      {!existing && !admin ? (
-        <Pressable onPress={() => setAgree(!agree)} accessibilityRole="checkbox" accessibilityState={{ checked: agree }}>
-          <Row style={{ alignItems: 'flex-start' }}>
-            <Ionicons name={agree ? 'checkbox' : 'square-outline'} size={22} color={agree ? brand.orange : colors.muted} />
-            <T size="sm" style={{ flex: 1, lineHeight: 22 }}>{t('store.agree')}</T>
-          </Row>
-        </Pressable>
-      ) : null}
+      {!existing && !admin ? <PartnerAgree checked={agree} onToggle={() => setAgree(!agree)} pledge={t('store.agree')} /> : null}
 
       <Button title={existing || admin ? t('store.save') : t('store.submit')} icon={existing || admin ? 'checkmark' : 'paper-plane-outline'} loading={busy} onPress={submit} />
     </Screen>

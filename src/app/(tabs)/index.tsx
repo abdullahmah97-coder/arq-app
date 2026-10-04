@@ -318,7 +318,7 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <NT size={17} bold>{t('home.hello', { name: firstName })}</NT>
                   {isBeta ? (
-                    <Pressable onPress={() => router.push({ pathname: '/feedback', params: { screen: 'home' } })} style={styles.beta}>
+                    <Pressable onPress={() => router.push({ pathname: '/feedback', params: { from: 'home' } })} style={styles.beta}>
                       <NT size={10} bold color={brand.deepGreen}>{t('beta.badge')}</NT>
                     </Pressable>
                   ) : null}

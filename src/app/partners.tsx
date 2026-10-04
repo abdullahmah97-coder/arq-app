@@ -1,10 +1,10 @@
 // بوابة الشركاء: لوحات التحكم لكل فئة عندك، وحالة طلبات الانضمام، وطريق الانضمام كنادي أو متجر أو مطعم أو مدرب أو مركز
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { PartnerHub } from '@/components/partners/PartnerHub';
-import { Row, Screen, T } from '@/components/ui';
+import { Button, Row, Screen, T } from '@/components/ui';
 import { brand, radius, space } from '@/theme';
 
 export default function Partners() {
@@ -21,6 +21,10 @@ export default function Partners() {
         <T size="sm" color={brand.sand} style={{ lineHeight: 22 }}>{t('partners.hubBody')}</T>
       </View>
       <PartnerHub />
+      <Row gap={space.xs} style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
+        <Button small variant="ghost" icon="document-text-outline" title={t('partnerPolicy.read')} onPress={() => router.push('/policy/partners')} />
+        <Button small variant="ghost" icon="lock-closed-outline" title={t('partnerPolicy.privacyLink')} onPress={() => router.push('/policy/privacy')} />
+      </Row>
     </Screen>
   );
 }

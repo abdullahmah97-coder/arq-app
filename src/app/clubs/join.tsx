@@ -7,11 +7,12 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { ClubLogo } from '@/components/clubs/parts';
+import { PartnerAgree } from '@/components/partners/parts';
 import { Button, Card, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { loadChains, type Chain } from '@/lib/clubs';
 import { pickImage } from '@/lib/images';
-import { CLUB_ROLES, CR_DIGITS, myClubRequest, requestClubPartner, type ClubRequest, type ClubRole, type DocPhoto } from '@/lib/partners';
+import { acceptPartnerTerms, CLUB_ROLES, CR_DIGITS, myClubRequest, requestClubPartner, type ClubRequest, type ClubRole, type DocPhoto } from '@/lib/partners';
 import { onlyDigits } from '@/lib/digits';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
@@ -58,6 +59,7 @@ export default function JoinClub() {
     setBusy(true);
     try {
       await requestClubPartner(userId, { chainId, name, role, cr: onlyDigits(cr), phone, email, city, branches, note, license, crPhoto, licensePhoto });
+      await acceptPartnerTerms('club');
       Alert.alert(t('partners.requestSent'), t('partners.requestSentBody'));
       setReq(await myClubRequest(userId));
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }
@@ -147,12 +149,7 @@ export default function JoinClub() {
       <Input label={t('store.city')} value={city} onChangeText={setCity} maxLength={40} placeholder={t('store.cityPh')} />
       <Input label={t('partners.noteOptional')} value={note} onChangeText={setNote} maxLength={400} multiline style={{ minHeight: 80, textAlignVertical: 'top' }}
         placeholder={t('partners.clubNotePh')} />
-      <Pressable onPress={() => setAgree(!agree)} accessibilityRole="checkbox" accessibilityState={{ checked: agree }}>
-        <Row style={{ alignItems: 'flex-start', backgroundColor: colors.card, borderRadius: radius.md, padding: space.sm }}>
-          <Ionicons name={agree ? 'checkbox' : 'square-outline'} size={22} color={agree ? brand.orange : colors.muted} />
-          <T size="sm" style={{ flex: 1, lineHeight: 22 }}>{t('partners.clubAgree')}</T>
-        </Row>
-      </Pressable>
+      <PartnerAgree boxed checked={agree} onToggle={() => setAgree(!agree)} pledge={t('partners.clubAgree')} />
       <Button title={t('store.submit')} icon="paper-plane-outline" loading={busy} onPress={submit} />
     </Screen>
   );
