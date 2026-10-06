@@ -12,7 +12,7 @@ import { useUser } from '@/lib/auth';
 import { todayIndex, todayIso } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import {
-  callCenter, isPartner, openCenterInstagram, openCenterSite, requestAppointment, stretchRoutine, takesAppointments, whatsappCenter, type RecoveryCenter, type RoutineItem,
+  callCenter, cityLabel, isPartner, openCenterInstagram, openCenterSite, requestAppointment, stretchRoutine, takesAppointments, whatsappCenter, type RecoveryCenter, type RoutineItem,
 } from '@/lib/recovery';
 import { errorKey, publicUrl } from '@/lib/supabase';
 import { loadHistory } from '@/lib/training';
@@ -94,7 +94,7 @@ export function CenterCard({ c }: { c: RecoveryCenter }) {
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <T bold numberOfLines={2}>{name}</T>
-          <T size="xs" muted numberOfLines={1}>{t(`recovery.kind_${c.kind}`)} · {c.cities.slice(0, 3).join('، ')}{c.cities.length > 3 ? ` +${c.cities.length - 3}` : ''}</T>
+          <T size="xs" muted numberOfLines={1}>{t(`recovery.kind_${c.kind}`)} · {c.cities.slice(0, 3).map((x) => cityLabel(x, lng)).join(lng === 'en' ? ', ' : '، ')}{c.cities.length > 3 ? ` +${c.cities.length - 3}` : ''}</T>
           <Row gap={4}>
             <Ionicons name={partner ? 'checkmark-circle' : 'globe-outline'} size={13} color={partner ? colors.success : colors.muted} />
             <T size="xs" color={partner ? colors.success : colors.muted}>{t(partner ? 'recovery.partner' : 'recovery.fromSite')}</T>

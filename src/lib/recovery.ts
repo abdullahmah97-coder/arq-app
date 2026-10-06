@@ -13,6 +13,15 @@ export const CENTER_SERVICES = [
 ] as const;
 export type CenterService = (typeof CENTER_SERVICES)[number];
 export const CENTER_CITIES = ['الرياض', 'جدة', 'مكة', 'المدينة', 'الدمام', 'الخبر', 'الظهران', 'الأحساء', 'الجبيل', 'القصيم', 'أبها', 'خميس مشيط', 'الطائف', 'تبوك', 'حائل', 'جازان', 'نجران', 'ينبع', 'الباحة', 'الجوف'];
+// أسماء المدن بالإنجليزي للعرض بس؛ القيمة المحفوظة تبقى بالعربي
+const CITY_EN: Record<string, string> = {
+  'الرياض': 'Riyadh', 'جدة': 'Jeddah', 'مكة': 'Makkah', 'المدينة': 'Madinah', 'الدمام': 'Dammam', 'الخبر': 'Khobar',
+  'الظهران': 'Dhahran', 'الأحساء': 'Al-Ahsa', 'الجبيل': 'Jubail', 'القصيم': 'Qassim', 'أبها': 'Abha', 'خميس مشيط': 'Khamis Mushait',
+  'الطائف': 'Taif', 'تبوك': 'Tabuk', 'حائل': 'Hail', 'جازان': 'Jazan', 'نجران': 'Najran', 'ينبع': 'Yanbu', 'الباحة': 'Al Baha', 'الجوف': 'Al Jouf',
+};
+export function cityLabel(city: string, lng: string): string {
+  return lng === 'en' ? CITY_EN[city] ?? city : city;
+}
 
 export interface RecoveryCenter {
   id: string;

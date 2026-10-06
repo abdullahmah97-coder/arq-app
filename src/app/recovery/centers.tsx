@@ -7,11 +7,11 @@ import { I18nManager, Pressable, ScrollView, View } from 'react-native';
 import { CenterCard } from '@/components/recovery/parts';
 import { Empty, Loading, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
-import { CENTER_KINDS, loadCenters, loadMyCenter, type CenterKind, type RecoveryCenter } from '@/lib/recovery';
+import { CENTER_KINDS, cityLabel, loadCenters, loadMyCenter, type CenterKind, type RecoveryCenter } from '@/lib/recovery';
 import { brand, colors, radius, space } from '@/theme';
 
 export default function Centers() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { userId } = useUser();
   // ?focus=<id>: جاي من إعلان أو رابط لمركز معيّن → نعرضه أول
   const { focus } = useLocalSearchParams<{ focus?: string }>();
@@ -51,7 +51,7 @@ export default function Centers() {
       </Pressable>
 
       <Chips value={kind} onChange={setKind} all={t('recovery.allKinds')} options={CENTER_KINDS.map((k) => ({ value: k, label: t(`recovery.kind_${k}`) }))} />
-      {cities.length > 1 ? <Chips value={city} onChange={setCity} all={t('recovery.allCities')} options={cities.map((c) => ({ value: c, label: c }))} /> : null}
+      {cities.length > 1 ? <Chips value={city} onChange={setCity} all={t('recovery.allCities')} options={cities.map((c) => ({ value: c, label: cityLabel(c, i18n.language) }))} /> : null}
 
       {list === null ? <Loading /> : shown.length ? shown.map((c) => <CenterCard key={c.id} c={c} />) : <Empty icon="medkit-outline" text={t('recovery.noCenters')} />}
       <T size="xs" muted center>{t('recovery.centersNote')}</T>

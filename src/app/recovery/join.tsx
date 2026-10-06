@@ -12,7 +12,7 @@ import { AdminBanner, PartnerAgree } from '@/components/partners/parts';
 import { acceptPartnerTerms } from '@/lib/partners';
 import { goBackOrHome } from '@/lib/nav';
 import {
-  CENTER_CITIES, CENTER_KINDS, CENTER_SERVICES, loadCenter, loadMyCenter, saveCenter, type CenterKind, type CenterService, type RecoveryCenter,
+  CENTER_CITIES, CENTER_KINDS, CENTER_SERVICES, cityLabel, loadCenter, loadMyCenter, saveCenter, type CenterKind, type CenterService, type RecoveryCenter,
 } from '@/lib/recovery';
 import { errorKey, publicUrl, uploadImage } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
@@ -21,7 +21,7 @@ export default function JoinCenter() {
   // ?id= المالك يعدّل أي مركز، ?new=1 المالك يضيف مركز من موقعه الرسمي
   const { id: adminId, new: adminNew } = useLocalSearchParams<{ id?: string; new?: string }>();
   const admin = !!adminId || adminNew === '1';
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { userId } = useUser();
   const [existing, setExisting] = useState<RecoveryCenter | null | undefined>(adminNew === '1' ? null : undefined);
   const [name, setName] = useState('');
@@ -133,7 +133,7 @@ export default function JoinCenter() {
       <View style={{ gap: 6 }}>
         <T size="sm" semibold>{t('recovery.cities')}</T>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {CENTER_CITIES.map((c) => chip(c, cities.includes(c), () => toggle(cities, c, setCities, 12), c))}
+          {CENTER_CITIES.map((c) => chip(cityLabel(c, i18n.language), cities.includes(c), () => toggle(cities, c, setCities, 12), c))}
         </View>
       </View>
       <View style={{ gap: 6 }}>
