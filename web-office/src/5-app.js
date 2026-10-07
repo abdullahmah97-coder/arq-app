@@ -10,8 +10,17 @@ const CCR_TAGS = ['arq-office-request'];
 const SESSION_RE = /^session_[A-Za-z0-9]{8,80}$/;
 const SESSION_URL_RE = /^https:\/\/claude\.ai\/code\/session_[A-Za-z0-9]{8,80}$/;
 const PR_URL_RE = /^https:\/\/github\.com\/[^\s"'<>\\]{3,200}$/;
-// روابط طلبات الدمج اللي نقبلها من رد الجلسة: نفس المستودع بس (ما ناخذ رابط كتبه أحد داخل نص)
-const PR_FIND_RE = /https:\/\/github\.com\/abdullahmah97-coder\/arq-app\/pull\/\d{1,7}/i;
+// روابط طلبات الدمج اللي نقبلها من رد الجلسة: نفس المستودع بس، ومن حقول الرد مو من العنوان أو نص الطلب
+// (والرابط اللي مكتوب في طلبك نفسه ما ناخذه أبد). أكثر من واحد = الأحدث (أكبر رقم)
+const PR_ALL_RE = /https:\/\/github\.com\/abdullahmah97-coder\/arq-app\/pull\/(\d{1,7})(?!\d)/gi;
+const PR_SKIP_KEYS = /^(title|prompt|initial_prompt)$/i; // الحقول اللي كتبتها الصفحة نفسها للجلسة
+/** ردود ما ندري وش صار فيها (طوّل، انقطع، 5xx): الكتابة يمكن انطبقت، فما نقول «ما صار شي» ولا نعيد بدون ما تشيّك */
+const OUTCOME_UNKNOWN = ['server_unavailable', 'upstream_error', 'cancelled'];
+const unknownOutcome = (e) => !!e && OUTCOME_UNKNOWN.includes(e.code);
+/** أخطاء القاعدة اللي معناها الطلب ما راح ينحفظ مهما أعدت (الإرسال يوقف قبل ما تنفتح جلسة) */
+const REQ_DB_BLOCK = ['not_installed', 'permission_denied', 'read_only', 'choose_admin'];
+/** طول النص بالحروف (code points) مثل char_length بالقاعدة — .length يعدّ الإيموجي حرفين */
+const cpLen = (s) => [...str(s)].length;
 const REQ_AREAS = ['app', 'lead', 'clubs', 'stores', 'coaches', 'care', 'reports', 'marketing', 'ai', 'activity', 'bookings', 'orders', 'community'];
 const REQ_AREAS_DB = REQ_AREAS.concat('users');
 const REQ_STATUSES = ['sent', 'working', 'needs_you', 'review', 'done', 'failed', 'cancelled'];
@@ -81,7 +90,9 @@ const app = {
   users: { q: '', qDraft: '', kind: 'all', offset: 0, rows: null, total: 0, err: null, loading: false, key: null, seq: 0 },
   ccr: null, // null = ما ندري | ok | missing | needs_reauth | denied | policy | selection | disabled
   ccrProbed: false,
-  form: { title: '', area: 'app', body: '', errs: {}, confirm: false, busy: null, err: null, notice: null, pending: null },
+  // pending = الجلسة انفتحت والحفظ فشل (ينحفظ بالمتصفح لين ينحفظ الطلب)، unknown = create_session ما ردّ (يمكن انفتحت)
+  form: Object.assign({ title: '', area: 'app', body: '', errs: {}, confirm: false, busy: null, err: null, notice: null, pending: null, unknown: false, closeAsk: false }, pendingRestore()),
+  ctNotice: null, // ملاحظة فوق قائمة المحتوى: { sub, msg }
   rq: {}, // حالة كل صف طلب: { open, note, busy, msg, err, cancelAsk }
   checking: false, checkedAt: 0,
   ask: null, // تأكيد داخل صف: { key, msg, yes, danger, withNote, note, run, ctx, busy, err }
@@ -113,7 +124,7 @@ function appSyncMode() {
 }
 /** نمسح كل بيانات التبويب (أول بيانات حية، أو تغيّر الحساب) */
 function appWipe(stop) {
-  Object.assign(app, { isSample: false, db: null, requests: null, reqErr: null, reqAt: 0, content: null, contentErr: null, checkedAt: 0, ask: null, rq: {} });
+  Object.assign(app, { isSample: false, db: null, requests: null, reqErr: null, reqAt: 0, content: null, contentErr: null, checkedAt: 0, ask: null, rq: {}, ctNotice: null });
   Object.assign(app.partners, { rows: null, err: null, key: null });
   Object.assign(app.users, { rows: null, err: null, key: null, total: 0 });
   app.set = { ai: null, cal: null, dirty: {}, errs: {}, confirm: null, busy: null, err: {} };
@@ -142,7 +153,36 @@ function newUuid() {
   const x = [...b].map((v) => v.toString(16).padStart(2, '0')).join('');
   return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}`;
 }
-const randAlnum = (n) => Array.from({ length: n }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[Math.floor(Math.random() * 56)]).join('');
+/** الجلسة اللي انفتحت وطلبها ما انحفظ: تنحفظ بالمتصفح (لو التخزين متاح) عشان رابطها ما يضيع لو انقفلت الصفحة */
+function pendingRestore() {
+  try {
+    const p = JSON.parse(store('reqPending') || 'null');
+    if (!isObj(p) || typeof p.title !== 'string' || typeof p.body !== 'string' || !REQ_AREAS.includes(p.area)) return {};
+    const sid = p.sid === null || SESSION_RE.test(str(p.sid)) ? p.sid : undefined;
+    const url = p.url === null || SESSION_URL_RE.test(str(p.url)) ? p.url : undefined;
+    if (sid === undefined || url === undefined || cpLen(p.title) > 120 || cpLen(p.body) > 4000) return {};
+    const pending = { title: p.title, body: p.body, area: p.area, sid, url };
+    return { pending, title: p.title, body: p.body, area: p.area };
+  } catch (e) { return {}; }
+}
+function pendingStore(p) { store('reqPending', p ? JSON.stringify(p) : null); }
+/** القاعدة تقدر تحفظ الطلب؟ (الطلبات انقرت من القاعدة الحية وما فيه خطأ دائم) — غير كذا ما نفتح جلسة ما تنحفظ */
+function reqDbReady() {
+  if (app.isSample) return true;
+  return Array.isArray(app.requests) && !state.readOnly && !(app.reqErr && REQ_DB_BLOCK.includes(app.reqErr.code));
+}
+/** نحدّث صف طلب محلياً بالرد (عشان فحص الحالات اللي شغّال يشوف آخر حالة حتى لو التحديث فشل) */
+function patchReq(row) {
+  if (!isObj(row) || !UUID_RE.test(str(row.id)) || !Array.isArray(app.requests)) return;
+  app.requests = app.requests.map((x) => (x.id === row.id ? Object.assign({}, x, row) : x));
+}
+/** مكان القائمة قبل ما توصل: «نحمّل…»، أو لو التحميل مو ممكن (الاتصال مقطوع) نقول ليش بدل ما ننتظر للأبد */
+function waitBox() {
+  if (app.isSample || appCanLoad()) return h('div', { class: 'empty', text: t('loading') });
+  const k = (state.conn && state.conn.kind) || 'other';
+  return errBox({ code: k, msg: t('app_no_conn'), raw: '' }, connTitle(k));
+}
+const randAlnum = (n) =>Array.from({ length: n }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[Math.floor(Math.random() * 56)]).join('');
 const sampleErr = (code) => { const e = new Error(t(`err_${code}`)); e.info = { code, msg: t(`err_${code}`), raw: '' }; return e; };
 /** رسالة مفهومة لخطأ إجراء: bad_value مع اسم الحقل، وحالة الشريك */
 function friendly(e, ctx) {
@@ -198,16 +238,35 @@ function sessionIdFrom(res) {
   }
   return null;
 }
-/** حالة الجلسة من رد get_session: status_bucket (بأي عمق، أو بالنص) + رابط طلب الدمج لو موجود */
-function sessionInfo(res) {
+/** رابط طلب الدمج من رد get_session: من قيم الحقول (بدون العنوان/النص اللي كتبناه للجلسة)، والنص العادي لو الرد نص.
+ * أي رقم طلب دمج مكتوب في طلبك نفسه (own = العنوان والتفاصيل) ما ناخذه. أكثر من واحد = الأكبر رقم (الأحدث) */
+function prFrom(cands, own) {
+  const nums = (s) => [...str(s).matchAll(PR_ALL_RE)];
+  const mine = new Set(nums(own).map((m) => Number(m[1])));
+  const found = new Map();
+  let budget = 5000;
+  const scan = (s) => { for (const m of nums(s)) if (!mine.has(Number(m[1]))) found.set(Number(m[1]), m[0]); };
+  const walk = (v, depth) => {
+    if (--budget < 0 || depth > 16) return;
+    if (typeof v === 'string') { scan(v); return; }
+    if (!v || typeof v !== 'object') return;
+    for (const [k, x] of Object.entries(v)) if (!PR_SKIP_KEYS.test(k)) walk(x, depth + 1);
+  };
+  const isJsonObj = (s) => { try { const v = JSON.parse(s); return !!v && typeof v === 'object'; } catch (e) { return false; } };
+  // نص هو JSON = نفسه موجود كمرشّح مفكوك (نمشي على حقوله بدل ما ندوّر في النص كله)
+  for (const c of cands) { if (typeof c === 'string') { if (!isJsonObj(c)) scan(c); } else walk(c, 0); }
+  if (!found.size) return null;
+  const url = found.get(Math.max(...found.keys()));
+  return PR_URL_RE.test(url) ? url : null;
+}
+/** حالة الجلسة من رد get_session: status_bucket (بأي عمق، أو بالنص) + رابط طلب الدمج لو موجود (own = نص الطلب نفسه) */
+function sessionInfo(res, own) {
   const cands = ccrCands(res);
   let raw = null;
   for (const c of cands) { const v = bfs(c, (k, x) => k === 'status_bucket' && typeof x === 'string'); if (v) { raw = v; break; } }
   if (!raw) for (const c of cands) { const m = /status_bucket\W{0,6}([A-Za-z_]{3,60})/.exec(typeof c === 'string' ? c : safeJson(c)); if (m) { raw = m[1]; break; } }
   const bucket = raw ? raw.toLowerCase().replace(/^session_status_bucket_/, '').replace(/^status_bucket_/, '') : null;
-  let pr = null;
-  for (const c of cands) { const m = PR_FIND_RE.exec(typeof c === 'string' ? c : safeJson(c)); if (m) { pr = m[0]; break; } }
-  return { bucket, status: bucket && Object.prototype.hasOwnProperty.call(BUCKETS, bucket) ? BUCKETS[bucket] : null, pr: pr && PR_URL_RE.test(pr) ? pr : null };
+  return { bucket, status: bucket && Object.prototype.hasOwnProperty.call(BUCKETS, bucket) ? BUCKETS[bucket] : null, pr: prFrom(cands, own) };
 }
 
 /** نوع مشكلة الموصّل (على مستوى الموصّل كله) — tool_error = الأداة نفسها رفضت (مو مشكلة اتصال) */
@@ -418,23 +477,27 @@ function validateRequest() {
   const f = app.form;
   const errs = {};
   const title = collapse(f.title), body = str(f.body).trim();
-  if (title.length < 2 || title.length > 120) errs.title = t('req_err_title');
-  if (body.length < 3 || body.length > 4000) errs.body = t('req_err_body');
+  // نفس عدّ القاعدة (char_length): الإيموجي حرف واحد، وإلا الجلسة تنفتح والحفظ يرفض
+  const tl = cpLen(title), bl = cpLen(body);
+  if (tl < 2 || tl > 120) errs.title = t('req_err_title');
+  if (bl < 3 || bl > 4000) errs.body = t('req_err_body');
   f.errs = errs;
   return Object.keys(errs).length ? null : { title, body, area: REQ_AREAS.includes(f.area) ? f.area : 'app' };
 }
 function reqAsk() {
   const f = app.form;
-  if (f.busy || !canAct()) return;
+  if (f.busy || !canAct() || !reqDbReady()) return;
   f.err = null; f.notice = null;
   if (!validateRequest()) { renderApp(); const el = $(f.errs.title ? 'reqFTitle' : 'reqFBody'); if (el) el.focus(); return; }
   f.confirm = true; renderApp();
   const b = $('reqGo'); if (b) b.focus();
 }
-/** «ابدأ الجلسة»: create_session ثم add_request. فشل الجلسة = ما ينحفظ شي؛ فشل الحفظ = نعرض رابط الجلسة */
+/** «ابدأ الجلسة»: create_session ثم add_request. فشل الجلسة = ما ينحفظ شي؛ فشل الحفظ = نعرض رابط الجلسة.
+ * create_session ما ردّ (طوّل/انقطع) = يمكن انفتحت: نقول كذا ونطلب تشيّك قبل أي إرسال ثاني */
 async function reqSubmit() {
   const f = app.form;
   if (f.busy) return;
+  if (!app.isSample && (!canAct() || !reqDbReady())) { f.confirm = false; renderApp(); return; }
   const v = validateRequest();
   if (!v) { f.confirm = false; renderApp(); return; }
   f.busy = 'create'; f.err = null; f.notice = null; renderApp();
@@ -443,7 +506,7 @@ async function reqSubmit() {
     const now = new Date(clock()).toISOString();
     app.db.requests.unshift({ id: newUuid(), title: v.title, request: v.body, area: v.area, session_id: sid, session_url: `https://claude.ai/code/${sid}`, pr_url: null, status: 'working', created_by: null, created_at: now, updated_at: now });
     app.requests = rowsOk(app.db.requests);
-    Object.assign(f, { title: '', body: '', area: 'app', confirm: false, busy: null });
+    Object.assign(f, { title: '', body: '', area: 'app', confirm: false, busy: null, unknown: false });
     toast(t('sample_action'));
     renderApp();
     return;
@@ -456,26 +519,42 @@ async function reqSubmit() {
     });
     sid = sessionIdFrom(res);
   } catch (e) {
-    Object.assign(f, { busy: null, confirm: false, err: `${t('req_err_create')} ${ccrMsg(e)}` });
+    // ما وصل رد: الجلسة يمكن انفتحت. النموذج يبقى، والإرسال الثاني يحتاج تأكيد صريح بعد ما تشيّك claude.ai/code
+    if (unknownOutcome(e)) Object.assign(f, { busy: null, confirm: false, err: null, unknown: true });
+    else Object.assign(f, { busy: null, confirm: false, err: `${t('req_err_create')} ${ccrMsg(e)}` });
     renderApp();
     return;
   }
   f.pending = { title: v.title, body: v.body, area: v.area, sid, url: sid ? `https://claude.ai/code/${sid}` : null };
+  f.unknown = false; f.closeAsk = false;
+  pendingStore(f.pending);
   await reqSave();
 }
 async function reqSave() {
   const f = app.form, p = f.pending;
-  if (!p) return;
-  f.busy = 'save'; f.err = null; renderApp();
+  if (!p || f.busy === 'save') return;
+  f.busy = 'save'; f.err = null; f.saveFatal = false; f.closeAsk = false; renderApp();
   try {
     await write(QA.addRequest(p.title, p.body, p.area, p.sid, p.url));
-    Object.assign(f, { title: '', body: '', area: 'app', confirm: false, busy: null, pending: null, saveErr: null, errs: {}, notice: p.sid ? null : t('req_no_sid') });
+    Object.assign(f, { title: '', body: '', area: 'app', confirm: false, busy: null, pending: null, saveErr: null, saveFatal: false, unknown: false, errs: {}, notice: p.sid ? null : t('req_no_sid') });
+    pendingStore(null);
     toast(t('req_sent_ok'));
     await loadRequests();
   } catch (e) {
-    Object.assign(f, { busy: null, confirm: false, err: t('req_err_save'), saveErr: friendly(e, 'request') });
+    const info = (e && e.info) || errInfo(e);
+    // القاعدة رفضت قيم الطلب نفسها: إعادة الحفظ بنفس القيم ما تفيد، فما نعرض «أعد الحفظ» (الرابط يبقى)
+    const fatal = info.code === 'bad_input';
+    Object.assign(f, { busy: null, confirm: false, err: t(fatal ? 'req_err_save_bad' : 'req_err_save'), saveErr: friendly(e, 'request'), saveFatal: fatal });
     renderApp();
   }
+}
+/** إغلاق صندوق «الجلسة انفتحت والحفظ فشل» بعد التأكيد: الجلسة تكمل بدون متابعة، والنموذج ينمسح عشان ما ينرسل نفس الطلب مرة ثانية */
+function reqDropPending() {
+  const f = app.form;
+  Object.assign(f, { pending: null, closeAsk: false, err: null, saveErr: null, saveFatal: false, title: '', body: '', area: 'app', errs: {}, confirm: false });
+  pendingStore(null);
+  renderApp();
+  const el = $('reqFTitle'); if (el) el.focus();
 }
 /** يفحص حالة الجلسات: المفتوحة (≤10، الأحدث أول) أو صف واحد (only). يحفظ اللي تغيّر بـ update_request */
 async function checkStatuses({ only = null, manual = false } = {}) {
@@ -506,16 +585,22 @@ async function checkStatuses({ only = null, manual = false } = {}) {
     }
     if (res) {
       if (!only) rs.err = null;
-      const info = sessionInfo(res);
+      const info = sessionInfo(res, `${str(r.title)}\n${str(r.request)}`);
+      // وقت ما ننتظر الرد ممكن الطلب تغيّر (ألغيته، أو فحص ثاني حدّثه): نقارن بآخر نسخة، وما نكتب فوق إلغاء أبد
+      const cur = arr(app.requests).find((x) => x.id === r.id);
+      const moved = !cur || cur.status !== r.status || cur.status === 'cancelled' || rs.busy === 'cancel';
       const status = info.status || r.status;
-      const pr = info.pr && info.pr !== r.pr_url ? info.pr : null;
-      if (status !== r.status || pr) {
+      const pr = info.pr && info.pr !== (cur || r).pr_url ? info.pr : null;
+      if (!moved && (status !== r.status || pr)) {
+        // وقت الحفظ: أزرار الصف (ومنها «إلغاء») موقفة لين يخلص
+        const mine = !rs.busy;
+        if (mine) { rs.busy = 'status'; renderApp(); }
         try {
-          await write(QA.updateRequest(r.id, status, pr));
+          patchReq(await write(QA.updateRequest(r.id, status, pr)));
           changed++;
           if (only) rs.msg = t('req_status_new', { s: t(`rs_${status}`) });
-        } catch (e) { rs.err = friendly(e, 'request'); }
-      } else if (only) rs.msg = info.status ? t('req_status_same') : t('req_status_unknown');
+        } catch (e) { rs.err = friendly(e, 'request'); } finally { if (mine) rs.busy = null; }
+      } else if (only && !moved) rs.msg = info.status ? t('req_status_same') : t('req_status_unknown');
     }
     if (only) rs.busy = null;
     if (stop) break;
@@ -534,11 +619,16 @@ async function reqNote(r) {
       await ccrCall('send_message', { session_id: r.session_id, message: `${t('req_note_prefix')}\n${note.slice(0, 4000)}` });
       toast(t('req_note_ok'));
     }
-    rs.note = null; rs.msg = t('req_note_ok');
-  } catch (e) { rs.err = ccrMsg(e); } finally { rs.busy = null; renderApp(); }
+    rs.note = null; rs.msg = t('req_note_ok'); rs.noteUnknown = false;
+  } catch (e) {
+    // ما وصل رد: الملاحظة يمكن وصلت — نقول كذا، والإرسال الثاني بزر واضح إنه «مرة ثانية»
+    rs.noteUnknown = unknownOutcome(e);
+    rs.err = rs.noteUnknown ? t('req_note_unknown') : ccrMsg(e);
+  } finally { rs.busy = null; renderApp(); }
 }
 async function reqCancel(r) {
   const rs = rowState(r.id);
+  if (rs.busy) return;
   rs.busy = 'cancel'; rs.err = null; renderApp();
   try {
     if (app.isSample) {
@@ -547,7 +637,9 @@ async function reqCancel(r) {
       app.requests = rowsOk(app.db.requests);
       toast(t('sample_action'));
     } else {
-      await write(QA.updateRequest(r.id, 'cancelled', null));
+      const saved = await write(QA.updateRequest(r.id, 'cancelled', null));
+      // الحالة الجديدة محلياً على طول (فحص الحالات الشغّال ما يكتب فوقها حتى لو تحديث القائمة فشل)
+      patchReq(isObj(saved) && saved.id === r.id ? saved : { id: r.id, status: 'cancelled' });
       toast(t('req_cancel_ok'));
       await loadRequests();
     }
@@ -686,6 +778,7 @@ function draftOf(kind, row) {
 }
 function openAppSheet(kind, row) {
   const isNew = !row;
+  app.ctNotice = null;
   const base = row || (kind === 'event' ? { category: 'other', active: true, featured: false } : kind === 'nudge' ? { category: app.nd.cat !== 'all' ? app.nd.cat : 'gym', gender: 'all', friend_gender: 'all', locale: app.nd.locale !== 'all' ? app.nd.locale : state.lang } : {});
   app.sheet = { kind, id: isNew ? null : row.id, row: row || null, orig: draftOf(kind, base), draft: draftOf(kind, base), errs: {}, confirm: null, busy: false, err: null };
   if (isNew) app.sheet.orig = draftOf(kind, kind === 'event' ? { category: 'other', active: true } : kind === 'nudge' ? {} : {});
@@ -807,6 +900,14 @@ async function sheetConfirm() {
   } catch (e) {
     sh.busy = false; sh.confirm = null;
     const info = (e && e.info) || errInfo(e);
+    if (info.unknown && sh.id === null && !app.isSample) {
+      // إضافة جديدة وما وصل رد: يمكن انحفظت (والفعالية الجديدة ظاهرة على طول). ما نخلي «حفظ» ثاني يضيفها مرتين:
+      // نقفل الورقة ونحدّث القائمة ونقول تشيّك قبل ما تضيفها من جديد
+      if (app.sheet === sh) closeAppSheet();
+      app.ctNotice = { sub: sh.kind === 'event' ? 'events' : 'nudges', msg: t('err_new_unknown') };
+      await loadContent();
+      return;
+    }
     sh.err = friendly(e, sh.kind);
     if (info.code === 'bad_value' && info.field && sheetSpec(sh.kind, sh).some((f) => f.key === info.field)) sh.errs = { [info.field]: sh.err };
     if (info.code === 'bad_nudge') sh.errs = { body: t('v_vars') };
@@ -910,10 +1011,14 @@ async function setSave(which) {
     : { enabled: !!d.enabled, threshold: toNum(d.threshold), title_ar: str(d.title_ar).trim(), body_ar: str(d.body_ar).trim(), title_en: str(d.title_en).trim() || null, body_en: str(d.body_en).trim() || null };
   S.busy = which; renderApp();
   try {
-    if (app.isSample) { app.content.settings[key] = value; toast(t('sample_action')); }
-    else { await write(QA.saveSetting(key, value)); toast(t('saved_ok')); }
+    let saved = value;
+    if (app.isSample) toast(t('sample_action'));
+    else { const res = await write(QA.saveSetting(key, value)); if (isObj(res) && isObj(res.value)) saved = res.value; toast(t('saved_ok')); }
+    // البطاقة اللي انحفظت بس تاخذ القيمة المحفوظة (حتى لو إعادة القراءة فشلت)؛ البطاقة الثانية تحتفظ بتعديلاتك اللي ما حفظتها
+    if (app.content && isObj(app.content.settings)) app.content.settings[key] = saved;
     S.confirm = null; S.dirty[which] = false;
-    if (app.isSample) setDrafts(true); else { await loadContent(); setDrafts(true); }
+    setDrafts(false);
+    if (!app.isSample) await loadContent();
   } catch (e) {
     S.confirm = null; S.err[which] = friendly(e, key);
     const info = (e && e.info) || errInfo(e);
@@ -968,7 +1073,8 @@ function selectEl(id, options, value, onPick, extra) {
 function reqForm() {
   const f = app.form;
   const busy = !!f.busy;
-  const can = canAct();
+  const dbReady = reqDbReady();
+  const can = canAct() && dbReady;
   const body = h('div', { class: 'req-form' });
   body.append(h('h3', { class: 'block-title', text: t('req_new') }));
   body.append(h('div', { class: 'field' }, h('label', { for: 'reqFTitle', text: t('req_f_title') }),
@@ -976,31 +1082,45 @@ function reqForm() {
       'aria-describedby': f.errs.title ? 'reqFTitle-err' : null, oninput: (e) => { f.title = e.target.value; } }), fieldErr('reqFTitle', f.errs.title)));
   body.append(h('div', { class: 'field' }, h('label', { for: 'reqFArea', text: t('req_f_area') }),
     selectEl('reqFArea', REQ_AREAS.map((a) => ({ value: a, label: areaLabel(a) })), f.area, (v) => { f.area = v; }, { disabled: busy || null })));
-  const count = h('span', { class: 'count', dir: 'ltr', text: t('req_f_count', { n: fmt(str(f.body).length) }) });
+  const count = h('span', { class: 'count', dir: 'ltr', text: t('req_f_count', { n: fmt(cpLen(f.body)) }) });
   body.append(h('div', { class: 'field' }, h('label', { for: 'reqFBody', text: t('req_f_body') }),
     h('textarea', { id: 'reqFBody', class: 'input', maxlength: 4000, rows: 5, value: f.body, placeholder: t('req_f_body_ph'), disabled: busy || null, 'aria-invalid': f.errs.body ? 'true' : null,
-      'aria-describedby': f.errs.body ? 'reqFBody-err' : null, oninput: (e) => { f.body = e.target.value; count.textContent = t('req_f_count', { n: fmt(f.body.length) }); } }),
+      'aria-describedby': f.errs.body ? 'reqFBody-err' : null, oninput: (e) => { f.body = e.target.value; count.textContent = t('req_f_count', { n: fmt(cpLen(f.body)) }); } }),
     h('div', { class: 'field-foot' }, fieldErr('reqFBody', f.errs.body) || h('span'), count)));
-  if (f.pending && !busy) {
-    // الجلسة انفتحت والحفظ فشل: الرابط ما يضيع
+  if (f.pending && !busy && !app.isSample) {
+    // الجلسة انفتحت والحفظ فشل: الرابط ما يضيع (ينحفظ بالمتصفح لين ينحفظ الطلب)، والإغلاق يحتاج تأكيد
+    const close = f.closeAsk
+      ? h('div', { class: 'confirm', role: 'group', 'aria-labelledby': 'reqCloseT' }, h('span', { class: 'small', id: 'reqCloseT', text: t('req_close_confirm') }),
+        h('div', { class: 'item-actions' },
+          h('button', { type: 'button', id: 'reqCloseYes', class: 'btn sm danger', onclick: reqDropPending }, icon('x', 'sm'), t('req_close_btn')),
+          h('button', { type: 'button', id: 'reqCloseNo', class: 'btn sm ghost', onclick: () => { f.closeAsk = false; renderApp(); const el = $('reqCloseP'); if (el) el.focus(); } }, t('back'))))
+      : null;
     body.append(h('div', { class: 'err-box', role: 'alert' }, h('strong', { text: f.err || t('req_err_save') }),
       f.saveErr ? h('span', { text: f.saveErr }) : null,
-      f.pending.url ? xlink(f.pending.url, f.pending.url, 'branch') : null,
-      h('div', { class: 'item-actions' },
-        h('button', { type: 'button', id: 'reqRetrySave', class: 'btn sm primary', onclick: reqSave }, icon('refresh', 'sm'), t('req_retry_save')),
-        h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { f.pending = null; f.err = null; f.saveErr = null; renderApp(); } }, t('close')))));
+      f.pending.url ? xlink(f.pending.url, f.pending.url, 'branch') : h('span', { text: t('req_find_session') }),
+      close || h('div', { class: 'item-actions' },
+        f.saveFatal ? null : h('button', { type: 'button', id: 'reqRetrySave', class: 'btn sm primary', disabled: !canAct() || null, onclick: reqSave }, icon('refresh', 'sm'), t('req_retry_save')),
+        h('button', { type: 'button', id: 'reqCloseP', class: 'btn sm ghost', onclick: () => { f.closeAsk = true; renderApp(); const el = $('reqCloseNo'); if (el) el.focus(); } }, t('close')))));
   } else if (busy) {
     body.append(h('div', { class: 'run-state', role: 'status' }, h('span', { class: 'spin' }), t(f.busy === 'save' ? 'req_saving' : 'req_sending')));
   } else if (f.confirm) {
+    // بعد create_session ما ردّ: التأكيد يذكّرك إن الأولى يمكن انفتحت، والزر يقول «جلسة ثانية»
     body.append(h('div', { class: 'confirm', role: 'group', 'aria-labelledby': 'reqConfirmT' },
-      h('strong', { id: 'reqConfirmT', text: t('req_confirm_t') }), h('span', { class: 'small', text: t('req_confirm') }),
+      h('strong', { id: 'reqConfirmT', text: t(f.unknown ? 'req_unknown_confirm_t' : 'req_confirm_t') }), h('span', { class: 'small', text: t(f.unknown ? 'req_unknown_confirm' : 'req_confirm') }),
       h('div', { class: 'item-actions' },
-        h('button', { type: 'button', id: 'reqGo', class: 'btn sm primary', disabled: !can || null, onclick: reqSubmit }, icon('send', 'sm'), t('req_confirm_btn')),
+        h('button', { type: 'button', id: 'reqGo', class: `btn sm ${f.unknown ? 'danger' : 'primary'}`, disabled: !can || null, onclick: reqSubmit }, icon('send', 'sm'), t(f.unknown ? 'req_unknown_go' : 'req_confirm_btn')),
         h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { f.confirm = false; renderApp(); $('reqSend') && $('reqSend').focus(); } }, t('cancel')))));
   } else {
+    if (f.unknown) {
+      body.append(h('div', { class: 'err-box', role: 'alert', id: 'reqUnknown' }, h('strong', { text: t('req_unknown_t') }), h('span', { text: t('req_unknown') }),
+        xlink('https://claude.ai/code', 'claude.ai/code', 'code'),
+        h('div', { class: 'item-actions' }, h('button', { type: 'button', id: 'reqClear', class: 'btn sm ghost', onclick: () => { Object.assign(f, { unknown: false, title: '', body: '', area: 'app', errs: {} }); renderApp(); const el = $('reqFTitle'); if (el) el.focus(); } }, t('req_clear')))));
+    }
     if (f.err) body.append(h('div', { class: 'err-box', role: 'alert', text: f.err }));
     if (f.notice) body.append(h('div', { class: 'note-box', role: 'status', text: f.notice }));
-    body.append(h('div', { class: 'item-actions' }, h('button', { type: 'button', id: 'reqSend', class: 'btn primary', disabled: !can || null, onclick: reqAsk }, icon('send', 'sm'), t('req_send'))));
+    // القاعدة ما تقدر تحفظ الطلب (الدوال ناقصة، صلاحيات، للقراءة بس…): ما نفتح جلسة ما تنحفظ
+    if (canAct() && !dbReady && (app.reqErr || state.readOnly)) body.append(h('div', { class: 'note-box', role: 'status', id: 'reqDbNote', text: t('req_db_block') }));
+    body.append(h('div', { class: 'item-actions' }, h('button', { type: 'button', id: 'reqSend', class: 'btn primary', disabled: !can || null, onclick: reqAsk }, icon('send', 'sm'), t(f.unknown ? 'req_send_again' : 'req_send'))));
   }
   return body;
 }
@@ -1017,7 +1137,7 @@ function reqList() {
   if (app.checkErr) out.push(h('div', { class: 'inline-err', role: 'alert', text: app.checkErr }));
   if (app.reqErr) out.push(errBox(app.reqErr, app.requests ? t('dash_stale') : null));
   if (state.needAdmin && !app.requests) out.push(adminPicker('A'));
-  if (!list) { if (!app.reqErr) out.push(h('div', { class: 'empty', text: t('loading') })); }
+  if (!list) { if (!app.reqErr) out.push(waitBox()); }
   else if (!list.length) out.push(h('div', { class: 'empty', text: t('req_empty') }));
   else out.push(h('div', { class: 'reqs' }, list.map(reqRow)));
   return h('div', { class: 'block req-list' }, out);
@@ -1039,7 +1159,7 @@ function reqRow(r) {
     actions.push(h('button', { type: 'button', id: `${id}-status`, class: `btn sm${rs.busy === 'status' ? ' busy' : ''}`, disabled: !can || null, onclick: () => checkStatuses({ only: r.id }) },
       rs.busy === 'status' ? h('span', { class: 'spin' }) : icon('refresh', 'sm'), t('req_refresh')));
     actions.push(h('button', { type: 'button', id: `${id}-noteBtn`, class: 'btn sm', 'aria-expanded': String(typeof rs.note === 'string'), disabled: !can || null,
-      onclick: () => { const x = rowState(r.id); x.note = typeof x.note === 'string' ? null : ''; x.err = null; x.msg = null; renderApp(); const el = $(`${id}-note`); if (el) el.focus(); } }, icon('send', 'sm'), t('req_note')));
+      onclick: () => { const x = rowState(r.id); x.note = typeof x.note === 'string' ? null : ''; x.err = null; x.msg = null; x.noteUnknown = false; renderApp(); const el = $(`${id}-note`); if (el) el.focus(); } }, icon('send', 'sm'), t('req_note')));
   }
   if (REQ_OPEN.includes(st)) {
     actions.push(h('button', { type: 'button', id: `${id}-cancel`, class: 'btn sm ghost', disabled: !can || null, onclick: () => { const x = rowState(r.id); x.cancelAsk = true; x.err = null; renderApp(); const el = $(`${id}-cancelYes`); if (el) el.focus(); } }, icon('x', 'sm'), t('req_cancel')));
@@ -1058,7 +1178,7 @@ function reqRow(r) {
       h('div', { class: 'field' }, h('label', { for: `${id}-note`, text: t('req_note_label') }),
         h('textarea', { id: `${id}-note`, class: 'input', maxlength: 4000, rows: 3, value: rs.note, placeholder: t('req_note_ph'), disabled: rs.busy === 'note' || null, oninput: (e) => { rowState(r.id).note = e.target.value; } })),
       h('div', { class: 'item-actions' },
-        h('button', { type: 'button', id: `${id}-noteSend`, class: `btn sm primary${rs.busy === 'note' ? ' busy' : ''}`, disabled: !!rs.busy || null, onclick: () => reqNote(r) }, rs.busy === 'note' ? h('span', { class: 'spin' }) : icon('send', 'sm'), t('req_note_send')),
+        h('button', { type: 'button', id: `${id}-noteSend`, class: `btn sm primary${rs.busy === 'note' ? ' busy' : ''}`, disabled: !!rs.busy || null, onclick: () => reqNote(r) }, rs.busy === 'note' ? h('span', { class: 'spin' }) : icon('send', 'sm'), t(rs.noteUnknown ? 'req_note_again' : 'req_note_send')),
         h('button', { type: 'button', class: 'btn sm ghost', disabled: !!rs.busy || null, onclick: () => { rowState(r.id).note = null; renderApp(); } }, t('cancel')))));
   }
   if (rs.cancelAsk) {
@@ -1097,14 +1217,15 @@ function tabKeys(e, list, cur, pick, idOf) {
 }
 function selectSub(s) {
   if (!APP_SUBS.includes(s)) return;
-  app.sub = s; store('appSub', s); app.ask = null;
+  app.sub = s; store('appSub', s); app.ask = null; app.ctNotice = null;
   renderApp();
   ensureSub(false);
 }
 function subBody(s) {
   if (CONTENT_SUBS.includes(s)) {
-    if (!app.content) return [app.contentErr ? errBox(app.contentErr) : h('div', { class: 'empty', text: t('loading') }), state.needAdmin && app.requests ? adminPicker('B') : null];
-    const stale = app.contentErr ? errBox(app.contentErr, t('dash_stale')) : null;
+    if (!app.content) return [app.contentErr ? errBox(app.contentErr) : waitBox(), state.needAdmin && app.requests ? adminPicker('B') : null];
+    const stale = [app.contentErr ? errBox(app.contentErr, t('dash_stale')) : null,
+      app.ctNotice && app.ctNotice.sub === s ? h('div', { class: 'note-box', role: 'status', id: 'ctNotice', text: app.ctNotice.msg }) : null];
     if (s === 'ads') return [stale, adsBody()];
     if (s === 'events') return [stale, eventsBody()];
     if (s === 'nudges') return [stale, nudgesBody()];
@@ -1284,7 +1405,7 @@ function partnersBody() {
       h('button', { type: 'button', class: 'chip', id: `pk-${k}`, 'aria-pressed': String(P.kind === k), onclick: () => { if (P.kind === k) return; P.kind = k; app.ask = null; if (!app.isSample) P.rows = null; loadPartners(); } }, t(`pk_${k}`)))),
     searchBar('pSearch', P.qDraft, t('p_search_ph'), (v) => { P.qDraft = v; }, go),
     P.err ? errBox(P.err, rows ? t('dash_stale') : null) : null,
-    !rows ? (P.err ? null : h('div', { class: 'empty', text: t('loading') })) : !rows.length ? h('div', { class: 'empty', text: t('p_empty') })
+    !rows ? (P.err ? null : waitBox()) : !rows.length ? h('div', { class: 'empty', text: t('p_empty') })
       : [h('div', { class: 'small muted', text: t('p_count', { n: fmt(rows.length) }) }), h('div', { class: 'crows' }, rows.map(partnerRow))],
   ];
 }
@@ -1344,7 +1465,7 @@ function usersBody() {
     searchBar('uSearch', U.qDraft, t('u_search_ph'), (v) => { U.qDraft = v; }, go, kindSel),
     h('div', { class: 'small muted', text: t('u_no_email') }),
     U.err ? errBox(U.err, rows ? t('dash_stale') : null) : null,
-    !rows ? (U.err ? null : h('div', { class: 'empty', text: t('loading') })) : !rows.length ? h('div', { class: 'empty', text: t('u_empty') })
+    !rows ? (U.err ? null : waitBox()) : !rows.length ? h('div', { class: 'empty', text: t('u_empty') })
       : [rows.length && U.total <= USERS_PAGE ? h('div', { class: 'small muted', text: t('p_count', { n: fmt(U.total) }) }) : null, h('div', { class: 'crows' }, rows.map(userRow)), pager],
   ];
 }

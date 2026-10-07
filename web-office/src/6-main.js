@@ -96,7 +96,7 @@ async function write(query) {
     if (info.code === 'read_only') { state.readOnly = true; renderBanner(); }
     if (info.code === 'choose_admin') { state.needAdmin = true; }
     // ما وصل رد (انقطع أو طوّل): الإجراء يمكن انطبق، فنطلب تحديث قبل الإعادة
-    if (e && (e.code === 'server_unavailable' || e.code === 'upstream_error' || e.code === 'cancelled')) info.msg = t('err_outcome_unknown');
+    if (e && (e.code === 'server_unavailable' || e.code === 'upstream_error' || e.code === 'cancelled')) { info.msg = t('err_outcome_unknown'); info.unknown = true; }
     const err = new Error(info.msg);
     err.info = info;
     throw err;
