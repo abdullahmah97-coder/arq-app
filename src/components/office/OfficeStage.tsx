@@ -94,16 +94,19 @@ export function OfficeStage({ states, selected, onPick, label, paused }: Props) 
   // كائن جديد مع كل تغيير: المشهد يقارن بالمرجع ويحدّث الشاشات والعلامات مرة وحدة
   if (live.current.states !== states || live.current.selected !== selected) live.current = { states, selected };
 
+  // الشاشة لسا مفتوحة؟ (للتحميل الأول وزر "جرّب 3D")
+  const alive = useRef(true);
+
   useEffect(() => {
-    let alive = true;
+    alive.current = true;
     initial3DMode(SCOPE).then(async (m) => {
       // طلع من الشاشة قبل ما نبدأ: لا نكتب علامة "محاولة جارية" ما أحد بيمسحها
-      if (!alive) return;
+      if (!alive.current) return;
       if (m === '3d' && !loadR3F()) { mark3DFailed({ where: 'import' }, SCOPE); m = '2d'; }
       if (m === '3d') await mark3DStart({ screen: 'office' }, SCOPE);
-      if (alive) { started.current = Date.now(); setMode(m); }
+      if (alive.current) { started.current = Date.now(); setMode(m); }
     });
-    return () => { alive = false; };
+    return () => { alive.current = false; };
   }, []);
 
   const fail = useCallback((where: string, e: unknown) => {
@@ -138,6 +141,8 @@ export function OfficeStage({ states, selected, onPick, label, paused }: Props) 
   const retry3D = async () => {
     if (!loadR3F()) return;
     await reset3D(SCOPE);
+    // طلع أثناء مسح الحظر: المسح عند الخروج سبق، فلو كتبنا العلامة الحين بتبقى
+    if (!alive.current) return;
     failed.current = false; frames.current = 0;
     await mark3DStart({ screen: 'office', retry: true }, SCOPE);
     started.current = Date.now();
