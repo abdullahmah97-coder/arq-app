@@ -116,6 +116,11 @@ const { setup } = require('./_harness.cjs');
     values ($1, 'owner', 'Recovery One', 'physio', '{الرياض}', '0551234567', 'pending', now() - interval '4 days') returning id`, [U.A])).id;
   const pendingVenue = (await one(`insert into venues (owner, listed_by, sports, name, city, status, phone, created_at)
     values ($1, 'owner', '{football}', 'Court Club', 'جدة', 'pending', '0551234567', now() - interval '5 days') returning id`, [U.C])).id;
+  // اللي اختاروا نوع شريك وقت التسجيل: فهد (ما قدّم شي) وسارة (ملف مدربها ينتظر) ينحسبون،
+  // وأحمد (متجره معتمد) ومدير النادي (ملعبه معتمد) لا — حتى لو بقى عندهم partner_intent
+  await q(`update profiles set partner_intent = 'coach' where id = $1`, [U.B]);
+  await q(`update profiles set partner_intent = 'store' where id = $1`, [U.A]);
+  await q(`update profiles set partner_intent = 'venue' where id = $1`, [U.D]);
 
   // بلاغات المختبرين
   const longMsg = 'Tester says the meals screen freezes ' + 'when I open it after a workout and scroll fast; '.repeat(6);
@@ -222,7 +227,9 @@ const { setup } = require('./_harness.cjs');
     JSON.stringify(a.workouts));
   check('app errors: current, previous and top kinds', a.errors.cur === 3 && a.errors.prev === 1 && a.errors.today === 2 && a.errors.users_cur === 2
     && a.errors.top[0].kind === 'screen_error' && a.errors.top[0].n === 2 && a.errors.top.length === 2, JSON.stringify(a.errors));
-  check('partner sign-ups still waiting', a.partner_intent.total === 1 && a.partner_intent.no_submission === 1 && a.partner_intent.by_kind.club === 1,
+  check('partner sign-ups still waiting (people with an approved store or venue are left out)', a.partner_intent.total === 2
+    && a.partner_intent.no_submission === 1 && a.partner_intent.by_kind.club === 1 && a.partner_intent.by_kind.coach === 1
+    && a.partner_intent.by_kind.store === 0 && a.partner_intent.by_kind.venue === 0 && a.partner_intent.by_kind.center === 0,
     JSON.stringify(a.partner_intent));
 
   const b = o.bookings;
@@ -273,10 +280,13 @@ const { setup } = require('./_harness.cjs');
   check('partners: the desk items, oldest first, with name/city/username', p.items.map((x) => x.kind).join() === 'venue,center,club,store,coach'
     && p.items[0].name === 'Court Club' && p.items[0].city === 'جدة' && p.items[2].name === 'Club One' && p.items[2].username === 'khalid'
     && p.items[1].city === 'الرياض' && p.items[4].name === 'Sara' && p.items.every((x) => x.agent_task === null), JSON.stringify(p.items));
+  check('partners: pending_covered has every kind, all 0 before any agent task', Object.keys(p.pending_covered).sort().join() === 'center,club,coach,store,venue'
+    && Object.values(p.pending_covered).every((v) => v === 0), JSON.stringify(p.pending_covered));
 
   const r = o.reports;
   check('reports: by status, received, newest new ones', r.by_status.new === 2 && r.by_status.seen === 1 && r.received.cur === 2
     && r.latest_new.length === 2 && r.latest_new[0].id === repA && r.latest_new[0].username === 'ahmed' && r.latest_new[0].category === 'bug', JSON.stringify(r.by_status));
+  check('reports: new_covered is 0 before any agent task', r.new_covered === 0, JSON.stringify(r.new_covered));
 
   const m = o.marketing;
   check('marketing: the live ad and ad states', m.live_ad && m.live_ad.id === ad && m.live_ad.title === 'Promo' && m.ads.live === 1
@@ -373,6 +383,9 @@ const { setup } = require('./_harness.cjs');
   check('overview: desk items point at their open agent task', withTasks.partners.items.find((x) => x.kind === 'club').agent_task.id === tClub
     && withTasks.partners.items.find((x) => x.kind === 'club').agent_task.status === 'waiting_approval'
     && withTasks.reports.latest_new.find((x) => x.id === repA).agent_task.id === tReport);
+  check('overview: covered = new reports / pending items with an open agent task (the task on the approved venue doesn’t count)',
+    withTasks.reports.new_covered === 2 && ['club', 'store', 'coach', 'center', 'venue'].every((k) => withTasks.partners.pending_covered[k] === 1),
+    JSON.stringify([withTasks.reports.new_covered, withTasks.partners.pending_covered]));
   if (process.env.OFFICE_WEB_SAMPLE) {
     fs.mkdirSync(path.dirname(process.env.OFFICE_WEB_SAMPLE), { recursive: true });
     fs.writeFileSync(process.env.OFFICE_WEB_SAMPLE, `${JSON.stringify(withTasks, null, 2)}\n`);
@@ -468,6 +481,11 @@ const { setup } = require('./_harness.cjs');
   const st2 = await one(`select status, review_note from brands where id = $1`, [store2]);
   check('review store approve', st2.status === 'approved' && st2.review_note === null
     && (await one(`select count(*)::int n from admin_log where kind = 'store' and target = $1 and action = 'approve' and admin_id = $2`, [store2, U.E])).n === 1);
+  // اعتماد المدرب يحط is_coach بس، واعتماد المتجر يغيّر حالته بس: partner_intent يبقى، بس ما يطلعون «ينتظرون»
+  const piAfter = (await ov(7)).activity.partner_intent;
+  check('partner_intent: approved through the office → no longer waiting (coach Sara, store owner Fahad), though partner_intent stays',
+    (await one(`select count(*)::int as n from profiles where id in ($1, $2) and partner_intent is not null`, [U.B, F])).n === 2
+    && piAfter.total === 0 && piAfter.no_submission === 0 && Object.values(piAfter.by_kind).every((v) => v === 0), JSON.stringify(piAfter));
 
   // ---------- حالة بلاغ ----------
   await q(`select office_admin.report($1, 'fixed', '  Fixed now  ')`, [repC]);
@@ -481,6 +499,80 @@ const { setup } = require('./_harness.cjs');
   await expectErr('report: unknown status', () => q(`select office_admin.report($1, 'closed')`, [repC]), /bad_status/);
   await expectErr('report: note too long', () => q(`select office_admin.report($1, 'seen', $2)`, [repC, 'x'.repeat(1001)]), /bad_input/);
   await expectErr('report: unknown report', () => q(`select office_admin.report($1, 'seen')`, ['99999999-0000-4000-8000-000000000000']), /report_not_found/);
+
+  // ===================================================================
+  // partner_intent: كل سبب لحاله (ناس جدد) — أي شي معتمد أو موقوف بعد اعتماد يطلّعه، والمرفوض لا
+  // ===================================================================
+  const piBase = (await ov(7)).activity.partner_intent;
+  const NU = (i) => `77777777-0000-4000-8000-00000000000${i}`;
+  for (let i = 1; i <= 7; i++) await q(`insert into auth.users (id, raw_user_meta_data) values ($1, $2::jsonb)`, [NU(i), JSON.stringify({ username: `intent${i}` })]);
+  await q(`update profiles set is_coach = true, partner_intent = 'coach' where id = $1`, [NU(1)]);
+  await q(`update profiles set partner_intent = 'coach' where id = $1`, [NU(2)]);
+  await q(`insert into coach_profiles (user_id, status) values ($1, 'suspended')`, [NU(2)]);
+  await q(`update profiles set partner_intent = 'club' where id = $1`, [NU(3)]);
+  await q(`insert into club_requests (user_id, club_name, role, phone, status) values ($1, 'Intent Club', 'owner', '0550000003', 'approved')`, [NU(3)]);
+  await q(`update profiles set partner_intent = 'venue' where id = $1`, [NU(4)]);
+  await q(`insert into venues (owner, listed_by, sports, name, city, status) values ($1, 'owner', '{padel}', 'Intent Venue', 'الرياض', 'suspended')`, [NU(4)]);
+  await q(`update profiles set partner_intent = 'center' where id = $1`, [NU(5)]);
+  await q(`insert into recovery_centers (owner, listed_by, name, kind, cities, status) values ($1, 'owner', 'Intent Center', 'physio', '{الرياض}', 'approved')`, [NU(5)]);
+  await q(`update profiles set partner_intent = 'store' where id = $1`, [NU(6)]);
+  await q(`insert into brands (owner, name, category, status, review_note) values ($1, 'Intent Store', 'apparel', 'rejected', 'No logo')`, [NU(6)]);
+  await q(`update profiles set partner_intent = 'venue' where id = $1`, [NU(7)]);
+  const pi = (await ov(7)).activity.partner_intent;
+  const dk = (k) => pi.by_kind[k] - piBase.by_kind[k];
+  check('partner_intent: verified coach, suspended coach profile, approved club request, suspended venue and approved center are left out',
+    dk('coach') === 0 && dk('club') === 0 && dk('center') === 0, JSON.stringify([piBase, pi]));
+  check('…a rejected store still counts (with a submission), and so does someone who sent nothing', pi.total - piBase.total === 2
+    && pi.no_submission - piBase.no_submission === 1 && dk('store') === 1 && dk('venue') === 1, JSON.stringify([piBase, pi]));
+
+  // ===================================================================
+  // التغطية: كم من الجديد/المعلّق عليه مهمة وكيل مفتوحة — على الكل، مو بس القوائم المقصوصة (٢٠ بلاغ، ٢٥ طلب)
+  // ===================================================================
+  const cov0 = await ov(7);
+  const covTasks = [];
+  const covTask = async (...args) => { const id = await addTask(...args); covTasks.push(id); return id; };
+  // ٢٢ بلاغ جديد (Cover 1 الأحدث): القائمة تعرض أحدث ٢٠ بس
+  const covReps = (await q(`insert into beta_feedback (user_id, category, message, created_at)
+    select $1, 'bug', 'Cover ' || i, now() - make_interval(mins => i) from generate_series(1, 22) i returning id, message`, [U.A]))
+    .sort((x, y) => Number(x.message.slice(6)) - Number(y.message.slice(6))).map((x) => x.id);
+  const TRIAGE_OUT = { summary: bi('s'), severity: 'low', category_guess: 'bug', status: 'seen', reply: '', reply_locale: 'ar' };
+  await covTask('reports', 'triage_report', 'report', covReps[21], 'waiting_approval', TRIAGE_OUT); // الأقدم: برا القائمة
+  await covTask('reports', 'triage_report', 'report', covReps[20], 'in_progress', null); // برا القائمة
+  await covTask('reports', 'triage_report', 'report', covReps[0], 'scheduled', null); // الأحدث: بالقائمة
+  await covTask('reports', 'triage_report', 'report', covReps[1], 'done', TRIAGE_OUT); // خلصت: ما تنحسب
+  await covTask('reports', 'triage_report', 'report', covReps[2], 'failed', null); // فشلت: ما تنحسب
+  await covTask('reports', 'triage_report', 'report', repC, 'waiting_approval', TRIAGE_OUT); // بلاغ مو جديد: ما ينحسب
+  // ٢٦ متجر معلّق (الأحدث برا أول ٢٥ في items) + طلب معلّق من كل نوع ثاني
+  const covStores = (await q(`insert into brands (owner, name, category, status, created_at)
+    select null, 'Cover Store ' || i, 'apparel', 'pending', now() - make_interval(mins => i) from generate_series(1, 26) i returning id, name`))
+    .sort((x, y) => Number(x.name.slice(12)) - Number(y.name.slice(12))).map((x) => x.id);
+  const covClub = (await one(`insert into club_requests (user_id, club_name, role, phone) values ($1, 'Cover Club', 'owner', '0550000009') returning id`, [NU(6)])).id;
+  await q(`insert into coach_profiles (user_id, status, submitted_at) values ($1, 'pending', now())`, [U.C]);
+  const covCenter = (await one(`insert into recovery_centers (owner, listed_by, name, kind, cities, status)
+    values ($1, 'owner', 'Cover Center', 'physio', '{الرياض}', 'pending') returning id`, [U.B])).id;
+  const covVenue = (await one(`insert into venues (owner, listed_by, sports, name, city, status) values ($1, 'owner', '{padel}', 'Cover Venue', 'جدة', 'pending') returning id`, [NU(7)])).id;
+  await covTask('stores', 'review_partner', 'store', covStores[0], 'waiting_approval', PARTNER_OUT); // الأحدث: برا items
+  await covTask('stores', 'review_partner', 'store', covStores[25], 'in_progress', null); // الأقدم: داخل items
+  await covTask('stores', 'review_partner', 'store', covStores[1], 'done', PARTNER_OUT); // خلصت: ما تنحسب
+  await covTask('clubs', 'review_partner', 'club', covClub, 'scheduled', null);
+  await covTask('coaches', 'review_partner', 'coach', U.C, 'waiting_approval', PARTNER_OUT);
+  await covTask('care', 'review_partner', 'center', covCenter, 'waiting_approval', PARTNER_OUT);
+  await covTask('care', 'review_partner', 'venue', covVenue, 'waiting_approval', PARTNER_OUT);
+  await covTask('care', 'review_partner', 'center', pendingCenter, 'waiting_approval', PARTNER_OUT); // مركز مرفوض: ما ينحسب
+  const cov = await ov(7);
+  check('new_covered counts every new report with an open task, not just the 20 listed', cov.reports.by_status.new - cov0.reports.by_status.new === 22
+    && cov.reports.latest_new.length === 20 && cov.reports.latest_new.filter((x) => x.agent_task).length === 1
+    && cov.reports.new_covered - cov0.reports.new_covered === 3, JSON.stringify([cov0.reports.new_covered, cov.reports.new_covered]));
+  const dc = (k) => cov.partners.pending_covered[k] - cov0.partners.pending_covered[k];
+  check('pending_covered counts every pending item with an open task, per kind, not just the 25 listed', cov.partners.items.length === 25
+    && cov.partners.items.filter((x) => x.kind === 'store' && x.agent_task).length === 1
+    && dc('store') === 2 && dc('club') === 1 && dc('coach') === 1 && dc('center') === 1 && dc('venue') === 1
+    && ['club', 'store', 'coach', 'center', 'venue'].every((k) => cov.partners.pending_covered[k] <= cov.partners.pending[k]),
+    JSON.stringify([cov0.partners.pending_covered, cov.partners.pending_covered]));
+  // ننظّف عشان ما تأثر على حد التشغيل تحت
+  await q(`delete from office_tasks where id = any($1::uuid[])`, [covTasks]);
+  await q(`delete from beta_feedback where id = any($1::uuid[])`, [covReps]);
+  await q(`delete from brands where id = any($1::uuid[])`, [covStores]);
 
   // ===================================================================
   // تشغيل وكيل من الويب: vault و pg_net

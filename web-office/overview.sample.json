@@ -43,7 +43,7 @@
     "cur_from": "2026-10-01",
     "timezone": "Asia/Riyadh",
     "prev_from": "2026-09-24",
-    "generated_at": "2026-10-07T03:41:47.055+00:00"
+    "generated_at": "2026-10-07T05:02:15.968+00:00"
   },
   "store": {
     "brands": {
@@ -107,15 +107,15 @@
           "brand": "Fit Wear",
           "stock": 0,
           "product": "Shirt",
-          "brand_id": "36cda199-c746-4c79-ae76-03f5e7d94834",
-          "product_id": "db4acc15-1b78-4292-afcd-926dd6cddd8a"
+          "brand_id": "a335274c-bea0-46e7-b448-ac0cf70af9ad",
+          "product_id": "956ef4cc-67fd-456e-b59f-827f306be1b4"
         },
         {
           "brand": "Fit Wear",
           "stock": 3,
           "product": "Shorts",
-          "brand_id": "36cda199-c746-4c79-ae76-03f5e7d94834",
-          "product_id": "5f5d30c0-849c-4834-940f-d6f359bc248a"
+          "brand_id": "a335274c-bea0-46e7-b448-ac0cf70af9ad",
+          "product_id": "0b64a1cd-8a9e-49c9-ac32-8503ae831adb"
         }
       ],
       "stock_untracked": 1
@@ -129,7 +129,7 @@
     },
     "top_brands": [
       {
-        "id": "36cda199-c746-4c79-ae76-03f5e7d94834",
+        "id": "a335274c-bea0-46e7-b448-ac0cf70af9ad",
         "city": null,
         "name": "Fit Wear",
         "category": "apparel",
@@ -143,7 +143,7 @@
         "live_products": 3
       },
       {
-        "id": "b3720c58-1018-4ba2-a8c6-67a78d2b2f4f",
+        "id": "c5cd9c78-055f-4719-a7ba-9b30567f7d90",
         "city": "الرياض",
         "name": "Green Bowl",
         "category": "restaurant",
@@ -252,28 +252,29 @@
     },
     "latest_new": [
       {
-        "id": "71310eb9-cd50-490f-b4e6-3109ccbfb194",
+        "id": "469716e6-e2af-4855-bef2-35985c508469",
         "message": "Tester says the meals screen freezes when I open it after a workout and scroll fast; when I open it after a workout and scroll fast; when I ",
         "category": "bug",
         "username": "ahmed",
         "agent_task": {
-          "id": "a5b01ff4-fd4a-4263-816a-05008a34e957",
+          "id": "ad0a0ecd-23ac-48af-9aac-cc14731882d4",
           "status": "waiting_approval"
         },
-        "created_at": "2026-10-07T03:41:46.708+00:00"
+        "created_at": "2026-10-07T05:02:15.574+00:00"
       },
       {
-        "id": "6c032631-e503-453a-a31c-16de3e4accc2",
+        "id": "e629d3b9-70ae-4c20-b6f8-11802bdd0a46",
         "message": "Second report",
         "category": "idea",
         "username": "sara",
         "agent_task": {
-          "id": "33e3e9d0-d3fb-4086-ba46-e22b4cd5b5fa",
+          "id": "c5b7cd6e-67bd-4e66-82e5-a8310c0bcaf9",
           "status": "waiting_approval"
         },
-        "created_at": "2026-10-07T02:41:46.71+00:00"
+        "created_at": "2026-10-07T04:02:15.576+00:00"
       }
-    ]
+    ],
+    "new_covered": 2
   },
   "activity": {
     "users": {
@@ -383,7 +384,7 @@
     "top_gyms": [
       {
         "n": 3,
-        "id": "0c4213f8-9d44-424f-9d31-5bf3357581b1",
+        "id": "611440d1-47b6-4e64-9353-15b0226b3709",
         "name": "نادي تجريبي - الخبر",
         "users": 3,
         "name_en": "Demo Gym - Khobar"
@@ -434,10 +435,10 @@
       "today": 3
     },
     "partner_intent": {
-      "total": 1,
+      "total": 2,
       "by_kind": {
         "club": 1,
-        "coach": 0,
+        "coach": 1,
         "store": 0,
         "venue": 0,
         "center": 0
@@ -488,28 +489,28 @@
     "attention": [
       {
         "n": 1,
-        "id": "b3720c58-1018-4ba2-a8c6-67a78d2b2f4f",
+        "id": "c5cd9c78-055f-4719-a7ba-9b30567f7d90",
         "kind": "restaurant_requests_waiting",
         "name": "Green Bowl",
-        "since": "2026-10-04T03:41:46.648+00:00",
+        "since": "2026-10-04T05:02:15.509+00:00",
         "target": "store",
         "priority": 1
       },
       {
         "n": 1,
-        "id": "10a2bd4a-b6ac-48c2-81f5-1d6aa308208f",
+        "id": "170d8913-f123-4160-b425-5d7a9237643d",
         "kind": "center_requests_waiting",
         "name": "السعودي الألماني الصحية - العلاج الطبيعي",
-        "since": "2026-10-05T03:41:46.644+00:00",
+        "since": "2026-10-05T05:02:15.505+00:00",
         "target": "center",
         "priority": 1
       },
       {
         "n": 1,
-        "id": "5f9876f8-4bed-4cc4-a667-51a1c38096ba",
+        "id": "ee79a17a-ec93-4aa7-9506-43897bc8ac77",
         "kind": "venue_unanswered_bookings",
         "name": "Padel Hub",
-        "since": "2026-10-06T20:41:46.615+00:00",
+        "since": "2026-10-06T22:02:15.477+00:00",
         "target": "venue",
         "priority": 1
       },
@@ -518,16 +519,16 @@
         "id": "44444444-4444-4444-4444-444444444444",
         "kind": "coach_requests_waiting",
         "name": "Coach Dana",
-        "since": "2026-10-03T03:41:46.637+00:00",
+        "since": "2026-10-03T05:02:15.497+00:00",
         "target": "coach",
         "priority": 2
       },
       {
         "n": 1,
-        "id": "b3720c58-1018-4ba2-a8c6-67a78d2b2f4f",
+        "id": "c5cd9c78-055f-4719-a7ba-9b30567f7d90",
         "kind": "restaurant_no_meals_planned",
         "name": "Green Bowl",
-        "since": "2026-10-06T03:41:46.648+00:00",
+        "since": "2026-10-06T05:02:15.509+00:00",
         "target": "store",
         "priority": 2
       },
@@ -536,7 +537,7 @@
         "id": "44444444-4444-4444-4444-444444444444",
         "kind": "coach_sessions_unclosed",
         "name": "Coach Dana",
-        "since": "2026-10-05T03:41:46.638+00:00",
+        "since": "2026-10-05T05:02:15.499+00:00",
         "target": "coach",
         "priority": 3
       }
@@ -593,7 +594,7 @@
       "created": {
         "cur": 3,
         "prev": 0,
-        "today": 1
+        "today": 2
       },
       "unclosed": 0,
       "cancelled": {
@@ -642,52 +643,52 @@
   "partners": {
     "items": [
       {
-        "id": "c1e1afd3-665a-47f6-bcfc-151743883cd6",
+        "id": "2a95a3b4-db99-4cfd-9281-f156ff3d3bc5",
         "city": "جدة",
         "kind": "venue",
         "name": "Court Club",
         "username": "khalid",
         "agent_task": {
-          "id": "f5164b93-ea2c-4c14-b13a-3acadbb10095",
+          "id": "1374e8b6-fddc-4068-9b1f-ca0758cf06e8",
           "status": "waiting_approval"
         },
-        "created_at": "2026-10-02T03:41:46.706+00:00"
+        "created_at": "2026-10-02T05:02:15.569+00:00"
       },
       {
-        "id": "62a14786-1920-48c9-83f6-0bf55afa81d2",
+        "id": "4cf9eede-e7fb-4fe2-9ddc-4a81cad7013d",
         "city": "الرياض",
         "kind": "center",
         "name": "Recovery One",
         "username": "ahmed",
         "agent_task": {
-          "id": "96b0cc3b-c6e8-464a-82fd-3fb05bf3e24e",
+          "id": "f333c389-0819-41fa-b53c-177fc39b06f5",
           "status": "waiting_approval"
         },
-        "created_at": "2026-10-03T03:41:46.702+00:00"
+        "created_at": "2026-10-03T05:02:15.566+00:00"
       },
       {
-        "id": "df4af8b4-8ce2-4f8d-a7cb-1b355600d2fc",
+        "id": "d900d85f-826d-4f11-b48f-1081f30905b3",
         "city": "الرياض",
         "kind": "club",
         "name": "Club One",
         "username": "khalid",
         "agent_task": {
-          "id": "864eb2e6-59a8-49e8-a2d0-2b32f8acad63",
+          "id": "5464f2b3-397b-48ad-a8e9-093d2f936256",
           "status": "waiting_approval"
         },
-        "created_at": "2026-10-04T03:41:46.697+00:00"
+        "created_at": "2026-10-04T05:02:15.561+00:00"
       },
       {
-        "id": "17d8fdab-34c5-4bcb-a7b8-332742e594f9",
+        "id": "c09984cb-9016-406b-a600-6e3e0d746668",
         "city": "جدة",
         "kind": "store",
         "name": "Pending Co",
         "username": "manager1",
         "agent_task": {
-          "id": "188744cb-51d0-4b79-a19b-dba830c76095",
+          "id": "4031f6f4-93ee-400e-b656-50f779cd8776",
           "status": "waiting_approval"
         },
-        "created_at": "2026-10-05T03:41:46.699+00:00"
+        "created_at": "2026-10-05T05:02:15.563+00:00"
       },
       {
         "id": "22222222-2222-2222-2222-222222222222",
@@ -696,10 +697,10 @@
         "name": "Sara",
         "username": "sara",
         "agent_task": {
-          "id": "4895ab90-0802-4ee6-8fa7-bb9151d11c82",
+          "id": "1fb29793-9e07-4eb8-bf77-69227e764c5e",
           "status": "waiting_approval"
         },
-        "created_at": "2026-10-06T03:41:46.629+00:00"
+        "created_at": "2026-10-06T05:02:15.49+00:00"
       }
     ],
     "pending": {
@@ -709,7 +710,14 @@
       "venue": 1,
       "center": 1
     },
-    "pending_total": 5
+    "pending_total": 5,
+    "pending_covered": {
+      "club": 1,
+      "coach": 1,
+      "store": 1,
+      "venue": 1,
+      "center": 1
+    }
   },
   "community": {
     "tips": {
@@ -853,12 +861,12 @@
       "kept": 0,
       "latest": [
         {
-          "id": "dca6f91a-215e-4671-a6e1-4570ce0e7b5f",
+          "id": "b57f1975-6eaf-48da-a290-4873c1da2b16",
           "kind": "gym_review",
           "reason": "fake",
           "status": "new",
-          "target_id": "0c4213f8-9d44-424f-9d31-5bf3357581b1",
-          "created_at": "2026-10-07T03:41:46.691+00:00",
+          "target_id": "611440d1-47b6-4e64-9353-15b0226b3709",
+          "created_at": "2026-10-07T05:02:15.555+00:00",
           "target_name": "نادي تجريبي - الخبر",
           "author_username": "khalid"
         }
@@ -902,7 +910,7 @@
           "starts_on": "2026-10-01"
         },
         {
-          "id": "9025ba54-0eb1-403b-9f85-911dd3b317d9",
+          "id": "b816713d-cf18-490e-9d04-e7f579c87699",
           "city": "الرياض",
           "title": "سباق الرياض",
           "ends_on": null,
@@ -1000,11 +1008,11 @@
       "templates_paused": 0
     },
     "live_ad": {
-      "id": "471aadc7-59ac-41f2-a114-1d5e5040de05",
+      "id": "adacbefb-6363-4322-b8b3-6d8e91266d63",
       "kind": "ad",
       "title": "Promo",
-      "ends_at": "2026-10-09T03:41:46.712+00:00",
-      "starts_at": "2026-10-06T03:41:46.712+00:00"
+      "ends_at": "2026-10-09T05:02:15.578+00:00",
+      "starts_at": "2026-10-06T05:02:15.578+00:00"
     },
     "ad_stats": {
       "cur": {

@@ -166,9 +166,9 @@ member names or contacts; who chats with whom. The only free text is the first 1
 | `errors.today` / `.cur` / `.prev` | int | app error events (kinds containing `error`, `fatal`, `crashed` or `fail`), **all users incl. admins** |
 | `errors.users_cur` | int | distinct users who hit one in cur |
 | `errors.top` | `[{kind: string, n: int, users: int}]` | ≤ 5 error kinds in cur, most frequent first (e.g. `screen_error`, `js_fatal`, `js_fatal_prev`, `checkin_locate_fail`, `office3d_error`). One crash usually logs both `js_fatal` and `js_fatal_prev`. |
-| `partner_intent.total` | int | people who chose a partner kind at sign-up and are still waiting (still trainees) |
+| `partner_intent.total` | int | people who chose a partner kind at sign-up and are still waiting: **nothing of theirs is approved** — no approved club request, no approved or suspended store, coach profile, center or venue, and not a verified coach (`is_coach`). Approvals don't always clear `partner_intent` (a coach approval only sets `is_coach`, a store approval only its status), so this filter is what keeps approved partners out. A rejected or pending submission still counts. |
 | `partner_intent.no_submission` | int | …of those, how many never submitted anything (no club request, store, coach profile, center or venue) |
-| `partner_intent.by_kind` | object | `{club, store, coach, center, venue}`: int each |
+| `partner_intent.by_kind` | object | `{club, store, coach, center, venue}`: int each, same people as `total` |
 
 ### 3.3 `bookings` (no payments: `*_sar` = booked value)
 **`venue_bookings`** — courts and classes booked at partner venues (`venue_bookings`):
@@ -349,6 +349,7 @@ Names are businesses or coaches only, never members.
 |---|---|---|
 | `pending.club` / `.store` / `.coach` / `.center` / `.venue` | int | items waiting for review (same numbers as the app's partner overview; `center` counts every pending center, while `items` lists the partner-submitted ones like the desks do) |
 | `pending_total` | int | sum of the five |
+| `pending_covered` | object | `{club, store, coach, center, venue}`: int each — of `pending.<kind>`, how many have an open agent task (`kind = 'review_partner'`, same `target_kind`, status `scheduled`, `in_progress` or `waiting_approval`). Counted over **every** pending item, not just the 25 in `items`; always ≤ `pending.<kind>`. `pending.<kind> - pending_covered.<kind>` = items no agent is on yet. |
 | `items` | array | ≤ 25 pending items across all kinds, **oldest first** — the same items the office desks show |
 
 `items[]`:
@@ -366,6 +367,7 @@ Names are businesses or coaches only, never members.
 | key | type | meaning |
 |---|---|---|
 | `by_status.new` / `.seen` / `.fixed` / `.wontfix` | int | all reports by status |
+| `new_covered` | int | of `by_status.new`, how many have an open agent task (`target_kind = 'report'`, status `scheduled`, `in_progress` or `waiting_approval`). Counted over **every** new report, not just the 20 in `latest_new`; always ≤ `by_status.new`. |
 | `received.today` / `.cur` / `.prev` | int | reports sent |
 | `latest_new` | array | ≤ 20 newest reports with status `new`, newest first |
 
