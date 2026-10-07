@@ -170,10 +170,13 @@ function overview(D, tasks) {
     },
     partners: {
       pending: { club: 2, store: 2, coach: 1, center: 1, venue: 1 }, pending_total: 7,
+      // كل الطلبات المعلّقة ظاهرة بالقائمة هنا، فالمغطّى بوكيل نعدّه منها (القاعدة تعدّه على كل الطلبات)
+      pending_covered: Object.fromEntries(['club', 'store', 'coach', 'center', 'venue'].map((k) => [k, PARTNER_ITEMS.filter((p) => p.kind === k && agentOf(tasks, k, p.id)).length])),
       items: PARTNER_ITEMS.map((p) => ({ ...p, agent_task: agentOf(tasks, p.kind, p.id) })),
     },
     reports: {
       by_status: { new: 4, seen: 7, fixed: 23, wontfix: 3 }, received: { today: 2, cur: w(9), prev: w(6) },
+      new_covered: REPORTS.filter((r) => agentOf(tasks, 'report', r.id)).length,
       latest_new: REPORTS.map((r) => ({ ...r, agent_task: agentOf(tasks, 'report', r.id) })),
     },
     marketing: {

@@ -906,6 +906,13 @@
     "venue": 1
    },
    "pending_total": 7,
+   "pending_covered": {
+    "club": 1,
+    "store": 2,
+    "coach": 1,
+    "center": 1,
+    "venue": 0
+   },
    "items": [
     {
      "kind": "venue",
@@ -999,6 +1006,7 @@
     "cur": 9,
     "prev": 6
    },
+   "new_covered": 3,
    "latest_new": [
     {
      "id": "5a3e0000-0000-4000-8000-000000000801",
@@ -2692,6 +2700,13 @@
     "venue": 1
    },
    "pending_total": 7,
+   "pending_covered": {
+    "club": 1,
+    "store": 2,
+    "coach": 1,
+    "center": 1,
+    "venue": 0
+   },
    "items": [
     {
      "kind": "venue",
@@ -2785,6 +2800,7 @@
     "cur": 36,
     "prev": 27
    },
+   "new_covered": 3,
    "latest_new": [
     {
      "id": "5a3e0000-0000-4000-8000-000000000801",

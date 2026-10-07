@@ -137,8 +137,10 @@ function renderTop() {
   const stale = state.mode === 'live' && state.conn && state.conn.kind === 'unavailable';
   const m = stale ? 'stale' : state.mode;
   conn.className = `conn ${m}`;
-  $('connText').textContent = t(`conn_${m}`);
-  $('updated').textContent = state.mode === 'live' ? (state.updatedAt ? t('updated', { t: ago(new Date(state.updatedAt).toISOString()) }) : t('updated_never')) : '';
+  $('connText').textContent = t(m === 'error' && state.isSample ? 'conn_error_sample' : `conn_${m}`);
+  // «آخر تحديث» = آخر مرة وصلت نتيجة office_overview (حتى لو الاتصال انقطع بعدها)، وما نعرضه أبد مع بيانات تجريبية
+  const liveShown = !state.isSample && (state.mode === 'live' || state.mode === 'error') && (state.data || state.tasks);
+  $('updated').textContent = liveShown ? (state.updatedAt ? t('updated', { t: ago(new Date(state.updatedAt).toISOString()) }) : t('updated_never')) : '';
   $('period').setAttribute('aria-label', t('period'));
   for (const b of [$('days7'), $('days30')]) {
     b.textContent = t(`days_${b.dataset.days}`);
@@ -146,7 +148,7 @@ function renderTop() {
   }
   const rb = $('refreshBtn');
   rb.replaceChildren(state.busyRefresh ? h('span', { class: 'spin' }) : icon('refresh', 'sm'), h('span', { text: state.busyRefresh ? t('refreshing') : t('refresh') }));
-  rb.disabled = state.mode === 'connecting' || state.busyRefresh;
+  rb.disabled = state.mode === 'connecting' || state.busyRefresh || !!(state.conn && state.conn.kind === 'user_changed');
   const lb = $('langBtn');
   lb.textContent = t('lang_switch');
   lb.setAttribute('lang', state.lang === 'ar' ? 'en' : 'ar');
@@ -168,9 +170,14 @@ function renderBanner() {
   else if (state.mode === 'connecting') { kind = 'connecting'; title = t('b_connecting_t'); body = t('b_connecting'); ic = 'db'; }
   else if (state.conn) {
     const k = state.conn.kind;
+    // ما وصلت ولا مرة بيانات حية: نسخة ثانية للنص (ما فيه «آخر بيانات وصلت»)
+    const ck = k === 'unavailable' && state.isSample ? 'unavailable_first' : k;
     kind = 'error'; ic = 'alert';
-    title = t(`c_${k}_t`) !== `c_${k}_t` ? t(`c_${k}_t`) : t('c_other_t');
-    body = t(`c_${k}`) !== `c_${k}` ? t(`c_${k}`) : state.conn.raw || '';
+    title = connTitle(ck);
+    body = t(`c_${ck}`) !== `c_${ck}` ? t(`c_${ck}`) : state.conn.raw || '';
+    // وش اللي تحت الشريط: تجريبي (نقولها صريح) ولا آخر بيانات حية (والإجراءات موقفة)
+    if (state.isSample) body = `${body} ${t('err_sample')}`.trim();
+    else if (state.mode === 'error' && k !== 'unavailable' && (state.data || state.tasks)) body = `${body} ${t('err_last_data')}`.trim();
     if (k !== 'user_changed' && k !== 'policy' && k !== 'disabled') action = h('button', { type: 'button', class: 'btn sm', onclick: () => refresh(true) }, icon('refresh', 'sm'), t('try_again'));
   } else if (state.readOnly) { kind = 'error'; title = t('read_only_t'); body = t('read_only'); ic = 'alert'; }
   b.hidden = !kind;
@@ -178,6 +185,17 @@ function renderBanner() {
   b.className = `banner ${kind}`;
   b.setAttribute('role', kind === 'error' ? 'alert' : 'status');
   put(b, h('span', { class: 'b-ic' }, icon(ic)), h('div', { class: 'b-body' }, h('strong', { text: title }), body ? h('p', { text: body }) : null), action ? h('div', { class: 'b-act' }, action) : null);
+}
+
+const connTitle = (k) => (t(`c_${k}_t`) !== `c_${k}_t` ? t(`c_${k}_t`) : t('c_other_t'));
+
+/** يبدّل محتوى اللوحة ويحافظ على مكان التمرير لو نفس العرض (التحديث كل دقيقة ما يرجّعك لفوق)، ويرجع لفوق لو العرض تغيّر */
+function swapPanel(panel, head, body, view) {
+  const old = panel.querySelector('.panel-body');
+  const top = old && panel.dataset.view === view ? old.scrollTop : 0;
+  panel.dataset.view = view;
+  panel.replaceChildren(head, body);
+  if (top) body.scrollTop = top;
 }
 
 // ===================== لوحة المكتب المختار =====================
@@ -207,7 +225,7 @@ function deskMetrics(id, o) {
       k('k_today', n(o, 'bookings.coaching.sessions.today')),
     ];
     case 'care': return [
-      k('k_pending_total', pend(['center', 'venue'])), k('k_recovery', n(o, 'bookings.recovery.open_requests'), { s: t('s_recovery', { a: fmt(n(o, 'bookings.recovery.requests_over_24h')) }) }),
+      k('k_pending_total', pend(['center', 'venue'])), k('k_recovery', n(o, 'bookings.recovery.open_requests'), { s: t('s_recovery_old', { a: fmt(n(o, 'bookings.recovery.requests_over_24h')) }), warn: n(o, 'bookings.recovery.requests_over_24h') > 0 }),
       k('k_upcoming', n(o, 'bookings.venue_bookings.upcoming_7d')), k('k_vbookings', n(o, 'bookings.venue_bookings.created.cur'), { prev: n(o, 'bookings.venue_bookings.created.prev') }),
     ];
     case 'reports': return [
@@ -470,7 +488,7 @@ function renderDeskPanel() {
     const area = AREA_OF[id];
     if (area) body.append(h('div', null, h('button', { type: 'button', class: 'link', onclick: () => goArea(area) }, t('details'), icon('arrowEnd', 'xs flip'))));
   }
-  panel.replaceChildren(head, body);
+  swapPanel(panel, head, body, id);
   restoreFocus(keep);
 }
 
@@ -558,7 +576,7 @@ function renderTasks() {
   items.push(...list.map(taskRow));
   if (items.length) body.append(h('div', { class: 'tasks' }, items));
   else if (state.tasks) body.append(h('div', { class: 'empty', text: state.tab === 'waiting' ? t('empty_waiting') : t('empty_tasks') }));
-  panel.replaceChildren(head, body);
+  swapPanel(panel, head, body, `${state.tab}:${state.deskOnly ? state.desk : '*'}`);
   restoreFocus(keep);
 }
 
@@ -780,6 +798,9 @@ function renderDash() {
   $('dashTitle').textContent = t('dash_title');
   $('dashSub').textContent = t('dash_sub', { d: fmt(num(get(state.data, 'meta.days')) || state.days) });
   const o = state.data;
+  // آخر office_overview فشل والأرقام اللي تحت من قبل: تنبيه واحد فوق اللوحات
+  const note = $('dashNote');
+  if (o && state.errs.overview) { note.hidden = false; put(note, errBox(state.errs.overview, t('dash_stale'))); } else { note.hidden = true; note.replaceChildren(); }
   const sel = AREA_OF[state.desk];
   const areas = ['activity', 'bookings', 'orders', 'community', 'partners', 'reports', 'marketing', 'ai'];
   $('dash').replaceChildren(...areas.map((id) => {
@@ -854,7 +875,7 @@ function sheetProposal(task, sh, editable) {
   } else if (task.kind === 'draft_nudge') {
     const tp = (value && value.template) || o.template || {};
     const cat = NUDGE_CATS.includes(tp.category) ? tp.category : 'gym';
-    const patch = (x) => set({ template: Object.assign({}, tp, x) });
+    const patch = (x) => set({ template: Object.assign({}, sh.draft && sh.draft.template, x) });
     if (isObj(task.input) && task.input.brief) out.push(h('div', { class: 'small muted', text: t('sh_brief', { v: str(task.input.brief) }) }));
     out.push(h('div', { class: 'chips' }, pill(t('sh_nudgeCat', { v: t(`ncat_${cat}`) }), 'wait')));
     if (editable) {
@@ -903,7 +924,7 @@ function renderSheet() {
     h('div', { class: 'item-main' }, h('h2', { id: 'sheetTitle', text: kindLabel(task) }),
       h('div', { class: 'meta' }, [t(`sign_${deskOf(task.desk)}`), ago(taskWhen(task))].join(' · '))),
     statusPill(task),
-    h('button', { type: 'button', class: 'btn icon ghost', 'aria-label': t('close'), onclick: closeSheet }, icon('x')));
+    h('button', { type: 'button', class: 'btn icon ghost', 'aria-label': t('close'), disabled: !!sh.busy || null, onclick: closeSheet }, icon('x')));
   const body = h('div', { class: 'sh-body' });
   if (task.title && task.kind !== 'daily_brief') body.append(h('div', { class: 'item-name', dir: 'auto', text: str(task.title) }));
   if (p === 'working') body.append(h('div', { class: 'note-box', style: { display: 'flex', gap: '8px', alignItems: 'center' } }, h('span', { class: 'spin', style: { color: 'var(--work-ink)' } }), t('sh_working')));
@@ -937,7 +958,7 @@ function renderSheet() {
       if (editable) foot.append(h('button', { type: 'button', id: 'shApprove', class: `btn primary wide${sh.busy === 'approve' ? ' busy' : ''}`, disabled: !!sh.busy || null, onclick: sheetApprove }, sh.busy === 'approve' ? h('span', { class: 'spin' }) : icon('check', 'sm'), t('sh_approve')));
       foot.append(h('div', { class: 'row' },
         h('button', { type: 'button', class: 'btn', disabled: !!sh.busy || null, onclick: () => { sh.rejecting = true; renderSheet(); const el = $('shRejectNote'); if (el) el.focus(); } }, t('sh_reject')),
-        h('button', { type: 'button', class: 'btn ghost', onclick: closeSheet }, t('close'))));
+        h('button', { type: 'button', class: 'btn ghost', disabled: !!sh.busy || null, onclick: closeSheet }, t('close'))));
     }
   } else foot.append(h('button', { type: 'button', class: 'btn wide', onclick: closeSheet }, t('close')));
   dlg.replaceChildren(head, body, foot);

@@ -30,8 +30,26 @@ async function loadTasks() {
   }
 }
 
+/** مشكلة اتصال على مستوى الصفحة. القاعدة: ما نبدّل بيانات حية ببيانات تجريبية أبد.
+ * - الحساب تغيّر: نمسح بيانات الحساب الأول ونوقف كل شي (sql يرفض بعدها بدون ما يتصل)
+ * - انقطاع مؤقت (unavailable) وعندنا بيانات حية: نبقى «مباشر/متأخر» ونحاول مع التحديث الجاي
+ * - غير كذا: وضع «غير متصل» والإجراءات موقفة؛ اللي على الشاشة يبقى (حي = آخر بيانات وصلت، تجريبي = بشريط واضح إنه تجريبي) */
+function connFail(e, kind) {
+  state.conn = { kind, raw: str(e && e.message).slice(0, 200) };
+  if (kind === 'user_changed') {
+    stopTimers();
+    const info = { code: kind, msg: t('c_user_changed'), raw: '' };
+    Object.assign(state, { mode: 'error', data: null, tasks: null, isSample: false, updatedAt: null, errs: { overview: info, tasks: info }, drafts: {}, itemErr: {} });
+    state.fresh.clear();
+  } else if (kind !== 'unavailable' || state.isSample) state.mode = 'error';
+  // متابعة الوكيل ما تكمل بدون اتصال: نوقفها ونقول ليش
+  const run = state.run;
+  if (state.mode === 'error' && run && (run.phase === 'queued' || run.phase === 'waiting')) { run.phase = 'error'; run.err = connTitle(kind); clearTimeout(pollTimer); }
+}
+
 /** يقرا الاثنين (كل واحد لحاله: لو واحد فشل الثاني يبقى). user = ضغطة من المستخدم */
 let refreshAgain = false;
+let lastTry = 0;
 async function refresh(user) {
   if (state.busyRefresh) { refreshAgain = true; return; }
   if (!mcp) {
@@ -39,31 +57,19 @@ async function refresh(user) {
     return;
   }
   state.busyRefresh = true;
+  lastTry = Date.now();
   renderTop();
-  const wasLive = state.mode === 'live';
   try {
     const [a, b] = await Promise.allSettled([loadOverview(), loadTasks()]);
     const conn = [a, b].find((r) => r.status === 'rejected');
-    if (conn) {
-      const e = conn.reason;
-      const kind = connKind(e) || 'unavailable';
-      state.conn = { kind, raw: str(e && e.message).slice(0, 200) };
-      // انقطاع مؤقت وعندنا بيانات حية: نخليها ظاهرة مع «متأخر». غير كذا (رفض، ربط منتهي…) ما نعرض بيانات ما عاد مسموح نشوفها:
-      // نرجع للبيانات التجريبية مع شرح الحل
-      if (!(kind === 'unavailable' && wasLive)) {
-        state.mode = 'error';
-        state.data = sampleData();
-        state.tasks = SAMPLE ? clone(SAMPLE.tasks) : [];
-        state.errs = { overview: null, tasks: null };
-        recountOffice();
-      }
-      if (kind === 'user_changed') stopTimers();
-    } else {
+    if (conn) connFail(conn.reason, connKind(conn.reason) || 'unavailable');
+    else {
       state.conn = null;
-      // أول رد حي: اللي فشل منهم (خطأ من القاعدة) ما نخلي مكانه بيانات تجريبية
-      if (!wasLive) { if (!a.value) state.data = null; if (!b.value) state.tasks = null; state.fresh.clear(); }
+      // أول رد حي بعد التجريبية: اللي فشل منهم (خطأ من القاعدة) ما نخلي مكانه بيانات تجريبية
+      if (state.isSample) { if (!a.value) state.data = null; if (!b.value) state.tasks = null; state.fresh.clear(); state.isSample = false; }
       state.mode = 'live';
-      if (a.value || b.value) state.updatedAt = Date.now();
+      // «آخر تحديث» يوصف أرقام اللوحات والمكتب: يتقدّم بس لو office_overview نفسها نجحت
+      if (a.value) state.updatedAt = Date.now();
     }
   } finally {
     state.busyRefresh = false;
@@ -80,7 +86,7 @@ async function write(query) {
     return cell(rows, 'r');
   } catch (e) {
     const ck = connKind(e);
-    if (ck && ck !== 'unavailable') { state.conn = { kind: ck, raw: str(e.message) }; renderBanner(); }
+    if (ck && ck !== 'unavailable') { connFail(e, ck); renderAll(); }
     const info = errInfo(e);
     if (info.code === 'read_only') { state.readOnly = true; renderBanner(); }
     if (info.code === 'choose_admin') { state.needAdmin = true; }
@@ -154,6 +160,13 @@ async function reportAction(r) {
   }
 }
 
+/** نتيجة اعتماد/رفض من الورقة تخص الورقة اللي بدأته (sh) بس: لو انقفلت أو انفتحت ورقة مهمة ثانية بالنص،
+ * الخطأ يطلع رسالة باسم المهمة الأولى (ما ينحط على ورقة ثانية ولا زر «اقفل المهمة» فيها يقفل مهمة غلط) */
+function sheetFailed(sh, task, e) {
+  sh.busy = null; sh.err = e.message; sh.errCode = e.info ? e.info.code : null;
+  if (state.sheet === sh) renderSheet();
+  else { toast(`${taskName(task)} — ${e.message}`); if (state.mode === 'live') refresh(); }
+}
 async function sheetApprove() {
   const sh = state.sheet;
   const task = sh && arr(state.tasks).find((x) => x.id === sh.id);
@@ -164,11 +177,9 @@ async function sheetApprove() {
   try {
     if (state.mode === 'sample') { simulate('apply', { id: task.id, final: ready.final }); toast(t('sample_action')); }
     else { await write(Q.apply(task.id, ready.final)); toast(t('done_ok')); }
-    closeSheet();
+    if (state.sheet === sh) closeSheet();
     if (state.mode === 'live') await refresh(); else renderAll();
-  } catch (e) {
-    if (state.sheet) { state.sheet.busy = null; state.sheet.err = e.message; state.sheet.errCode = e.info ? e.info.code : null; renderSheet(); }
-  }
+  } catch (e) { sheetFailed(sh, task, e); }
 }
 async function sheetReject(note) {
   const sh = state.sheet;
@@ -179,11 +190,9 @@ async function sheetReject(note) {
   try {
     if (state.mode === 'sample') { simulate('reject', { id: task.id, note: clean }); toast(t('sample_action')); }
     else { await write(Q.reject(task.id, clean || null)); toast(t('done_ok')); }
-    closeSheet();
+    if (state.sheet === sh) closeSheet();
     if (state.mode === 'live') await refresh(); else renderAll();
-  } catch (e) {
-    if (state.sheet) { state.sheet.busy = null; state.sheet.err = e.message; state.sheet.errCode = e.info ? e.info.code : null; renderSheet(); }
-  }
+  } catch (e) { sheetFailed(sh, task, e); }
 }
 
 /** يشغّل وكيل المكتب (office_admin.run_agent) ويتابع المهام كل ٤ ثواني لمدة دقيقتين */
@@ -212,8 +221,19 @@ async function runAgent(desk) {
   const tickPoll = async () => {
     const run = state.run;
     if (!run || run.desk !== desk || run.phase !== 'waiting') return;
+    // الاتصال راح (غير متصل): ما نكمل نسأل كل ٤ ثواني
+    if (state.mode !== 'live') { run.phase = 'error'; run.err = state.conn ? connTitle(state.conn.kind) : t('err_generic'); renderAll(); return; }
     if (!document.hidden) {
-      try { await loadTasks(); } catch (e) { /* مشكلة اتصال: نكمل المحاولة بالدورة الجاية */ }
+      let got = false;
+      try { got = await loadTasks(); } catch (e) {
+        const k = connKind(e);
+        // انقطاع مؤقت: نكمل بالدورة الجاية. غير كذا (ربط منتهي، رفض، حساب ثاني…): نوقف ونعرض السبب
+        if (k && k !== 'unavailable') { connFail(e, k); renderAll(); return; }
+      }
+      // خطأ معروف من القاعدة (مثلاً choose_admin أو الصلاحيات) ما يتصلّح بالإعادة: نوقف ونعرضه
+      const te = state.errs.tasks;
+      if (!got && te && te.code && te.code !== 'unknown_result') { run.phase = 'error'; run.err = te.msg; renderAll(); return; }
+      if (state.run !== run || run.phase !== 'waiting') return;
       const news = arr(state.tasks).filter((x) => !run.known.has(x.id));
       run.newIds = news.map((x) => x.id);
       news.forEach((x) => state.fresh.add(x.id));
@@ -303,11 +323,14 @@ function init3d() {
 let refreshTimer = 0, clockTimer = 0;
 function startTimers() {
   clearInterval(refreshTimer); clearInterval(clockTimer);
-  refreshTimer = setInterval(() => { if (!document.hidden && state.mode === 'live' && !state.sheet) refresh(); }, REFRESH_MS);
+  refreshTimer = setInterval(() => { if (!document.hidden && autoRefreshOk() && !state.sheet) refresh(); }, REFRESH_MS);
   // الأوقات النسبية («قبل دقيقة») تتحدّث كل ٣٠ ثانية بدون استعلام
   clockTimer = setInterval(() => { if (!document.hidden) { renderTop(); renderTasks(); renderStageMeta(); } }, 30_000);
 }
 function stopTimers() { clearInterval(refreshTimer); clearInterval(clockTimer); clearTimeout(pollTimer); }
+/** التحديث التلقائي: مع الاتصال الحي، أو لو Supabase ما ردّ (حتى لو ما وصلت بيانات للحين) — مرة وحدة كل دقيقة بالكثير.
+ * باقي المشاكل (ربط منتهي، رفض…) تحتاج منك تصلّحها وتضغط «حاول مرة ثانية» */
+const autoRefreshOk = () => !!mcp && (state.mode === 'live' || (state.mode === 'error' && !!state.conn && state.conn.kind === 'unavailable'));
 
 // ===================== البداية =====================
 function bind() {
@@ -325,12 +348,15 @@ function bind() {
     });
   }
   const dlg = $('sheet');
+  // وقت الاعتماد/الرفض الورقة ما تنقفل (Esc أو برّا الورقة) لين يوصل الرد
+  const sheetBusy = () => !!(state.sheet && state.sheet.busy);
+  dlg.addEventListener('cancel', (e) => { if (sheetBusy()) e.preventDefault(); });
   dlg.addEventListener('close', () => { state.sheet = null; });
-  dlg.addEventListener('click', (e) => { if (e.target === dlg) closeSheet(); });
+  dlg.addEventListener('click', (e) => { if (e.target === dlg && !sheetBusy()) closeSheet(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     kick();
-    if (state.mode === 'live' && (!state.updatedAt || Date.now() - state.updatedAt > REFRESH_MS)) refresh();
+    if (autoRefreshOk() && Date.now() - lastTry > REFRESH_MS) refresh();
   });
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderTop()); } catch (e) { /* متصفح قديم */ }
 }
@@ -338,16 +364,18 @@ function setDays(d) {
   if (state.days === d) return;
   state.days = d;
   store('days', String(d));
-  if (state.mode === 'live') refresh(true);
+  // بيانات حية على الشاشة (ولو الاتصال مقطوع): نطلب الفترة الجديدة؛ التجريبية نبدّلها محلياً
+  if (!state.isSample) refresh(true);
   else { state.data = sampleData(); recountOffice(); renderAll(); }
 }
 
 function start() {
   applyLang();
   applyTheme();
-  // أول رسمة: بيانات تجريبية مع شريط «نتصل…» (ما تطلع صفحة فاضية أبد)
+  // أول رسمة: بيانات تجريبية مع شريط «نتصل… تشوف بيانات تجريبية» (ما تطلع صفحة فاضية أبد)
   state.data = sampleData();
   state.tasks = SAMPLE ? clone(SAMPLE.tasks) : [];
+  state.isSample = true;
   recountOffice();
   const hasClaude = typeof window.claude === 'object' && window.claude && typeof window.claude.use === 'function';
   state.mode = hasClaude ? 'connecting' : 'sample';

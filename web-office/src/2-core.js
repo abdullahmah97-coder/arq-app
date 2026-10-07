@@ -145,6 +145,7 @@ const state = {
   /** connecting | live | sample | error */
   mode: 'connecting',
   conn: null, // { kind, raw } لما يكون فيه مشكلة اتصال
+  isSample: true, // البيانات اللي على الشاشة تجريبية (SAMPLE) مو من القاعدة — ما نقدّمها أبد كبيانات حية
   readOnly: false,
   data: null, // نتيجة office_overview
   tasks: null, // صفوف office_tasks
@@ -163,9 +164,9 @@ const state = {
 };
 let mcp = null;
 
-/** «الحين»: بالمعاينة الوقت هو وقت إنشاء البيانات التجريبية (عشان «قبل كم دقيقة» تطلع منطقية) */
+/** «الحين»: مع البيانات التجريبية الوقت هو وقت إنشائها (عشان «قبل كم دقيقة» تطلع منطقية) */
 function clock() {
-  if (state.mode === 'live' || !SAMPLE) return Date.now();
+  if (!state.isSample || !SAMPLE) return Date.now();
   const base = Date.parse(get(SAMPLE, 'overview.meta.generated_at')) || Date.now();
   return base + (Date.now() - state.sampleStart);
 }
@@ -266,24 +267,26 @@ function asAdmin(q) {
 }
 
 // ===================== الموصّل =====================
-/** يطلّع مصفوفة الصفوف من رد execute_sql: النص بين <untrusted-data-…> و </untrusted-data-…>.
- * المقدمة نفسها تذكر الوسم («within the below <untrusted-data-…> boundaries»)، فنجرب كل وسم فتح لين نلقى واحد بعده JSON مصفوفة */
+/** يطلّع مصفوفة الصفوف من رد execute_sql: النص بين <untrusted-data-ID> و </untrusted-data-ID>.
+ * أول وسم بالنص يجي من المقدمة («within the below <untrusted-data-ID> boundaries») قبل أي بيانات، فناخذ منه المعرّف
+ * (uuid عشوائي ما يعرفه أحد) ونقبل بس البلوك اللي بنفس المعرّف: من وسم الفتح اللي بعده لين آخر وسم قفل (البلوك الخارجي).
+ * أي وسوم مزيّفة داخل نصوص القاعدة تبقى جزء من JSON. لو الشكل غير كذا: null (ما نخمّن) */
 function between(txt) {
-  const re = /<untrusted-data-([A-Za-z0-9_-]+)>/g;
-  let m;
-  while ((m = re.exec(txt))) {
-    const start = m.index + m[0].length;
-    const end = txt.indexOf(`</untrusted-data-${m[1]}>`, start);
-    if (end < 0) continue;
-    const inner = txt.slice(start, end).trim();
-    if (!inner.startsWith('[')) continue;
-    try { const v = JSON.parse(inner); if (Array.isArray(v)) return v; } catch (e) { /* نجرب الوسم الجاي */ }
-  }
-  return null;
+  const m = /<untrusted-data-([A-Za-z0-9_-]+)>/.exec(txt);
+  if (!m) return null;
+  const open = `<untrusted-data-${m[1]}>`;
+  const end = txt.lastIndexOf(`</untrusted-data-${m[1]}>`);
+  if (end < m.index) return null;
+  // لو فيه وسم فتح ثاني بنفس المعرّف قبل القفل فالأول كان ذكره بالمقدمة والبيانات تبدأ من الثاني
+  const next = txt.indexOf(open, m.index + open.length);
+  const start = (next >= 0 && next < end ? next : m.index) + open.length;
+  try { const v = JSON.parse(txt.slice(start, end).trim()); return Array.isArray(v) ? v : null; } catch (e) { return null; }
 }
 function rowsFromText(s) {
   let txt = s;
   for (let i = 0; i < 3 && typeof txt === 'string'; i++) {
+    // نص مغلّف بعلامات تنصيص (JSON string): نفكّه أول قبل ما ندوّر على الوسوم
+    if (txt.trim().startsWith('"')) { try { const v = JSON.parse(txt); if (typeof v === 'string') { txt = v; continue; } } catch (e) { /* مو JSON */ } }
     const rows = between(txt);
     if (rows) return rows;
     // النص نفسه ممكن يكون JSON (مصفوفة، أو نص مغلّف بعلامات تنصيص)
@@ -321,6 +324,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** استعلام واحد. القراءات بس تنعاد مرة وحدة لو الخطأ مختوم retryable */
 async function sql(query, { read = false } = {}) {
   if (!mcp) { const e = new Error('no_mcp'); e.code = 'not_granted'; throw e; }
+  // الحساب تغيّر: ما نرسل شي بعدها أبد (لين تنفتح الصفحة من جديد)
+  if (state.conn && state.conn.kind === 'user_changed') { const e = new Error('user_changed'); e.code = 'user_changed'; throw e; }
   const q = asAdmin(query);
   try {
     return rowsFrom(await mcp.callTool(SERVER, TOOL, { project_id: PROJECT, query: q }, { cache: false }));
@@ -397,14 +402,16 @@ function deskStates() {
     const p = phase(task);
     if (p === 'waiting') st[d].waiting++; else if (p === 'working') st[d].working++; else st[d].done++;
   }
-  // طلبات الشركاء والتقارير الجديدة اللي ما عليها مهمة وكيل مفتوحة = تنتظر قرارك يدوي
+  // طلبات الشركاء والتقارير الجديدة اللي ما عليها مهمة وكيل مفتوحة = تنتظر قرارك يدوي.
+  // القاعدة تعدّ المغطّى على كل العناصر (pending_covered / new_covered)؛ القوائم مقصوصة (25 و20)، فنعدّ منها بس لو المفتاح ناقص (قاعدة أقدم)
+  const has = (path) => typeof get(o, path) === 'number';
+  const openAgent = (x) => x && x.agent_task && isOpenStatus(x.agent_task.status);
   const items = arr(get(o, 'partners.items'));
   for (const k of PARTNER_KINDS) {
-    const covered = items.filter((x) => x && x.kind === k && x.agent_task && isOpenStatus(x.agent_task.status)).length;
+    const covered = has(`partners.pending_covered.${k}`) ? n(o, `partners.pending_covered.${k}`) : items.filter((x) => openAgent(x) && x.kind === k).length;
     st[KIND_DESK[k]].waiting += Math.max(0, n(o, `partners.pending.${k}`) - covered);
   }
-  const reps = arr(get(o, 'reports.latest_new'));
-  const repCovered = reps.filter((x) => x && x.agent_task && isOpenStatus(x.agent_task.status)).length;
+  const repCovered = has('reports.new_covered') ? n(o, 'reports.new_covered') : arr(get(o, 'reports.latest_new')).filter(openAgent).length;
   st.reports.waiting += Math.max(0, n(o, 'reports.by_status.new') - repCovered);
   if (state.run && (state.run.phase === 'queued' || state.run.phase === 'waiting') && st[state.run.desk]) st[state.run.desk].working++;
   // تنبيهات (ما تحتاج قرار من هنا بس تستاهل نظرة)
@@ -503,8 +510,17 @@ function recountOffice() {
   const w = arr(state.tasks).filter((x) => x.status === 'waiting_approval').map((x) => x.created_at).sort();
   o.office.oldest_waiting_at = w[0] || null;
 }
+/** عنصر طلع من «المغطّى بوكيل» (انقرّر أو انقفلت مهمته): ننقص عدّاده لو موجود */
+function simUncover(kind) {
+  const o = state.data;
+  if (kind === 'report') { if (typeof get(o, 'reports.new_covered') === 'number') o.reports.new_covered = Math.max(0, o.reports.new_covered - 1); }
+  else if (typeof get(o, `partners.pending_covered.${kind}`) === 'number') o.partners.pending_covered[kind] = Math.max(0, o.partners.pending_covered[kind] - 1);
+}
 function simDecideItem(kind, id) {
   const o = state.data;
+  const list = kind === 'report' ? arr(get(o, 'reports.latest_new')) : arr(get(o, 'partners.items'));
+  const it = list.find((x) => x && x.id === id);
+  if (it && it.agent_task) simUncover(kind);
   if (kind === 'report') {
     o.reports.latest_new = arr(o.reports.latest_new).filter((x) => x.id !== id);
     o.reports.by_status.new = Math.max(0, n(o, 'reports.by_status.new') - 1);
@@ -539,10 +555,13 @@ function simulate(action, a) {
     simDecideItem(kind, a.id);
     if (action === 'report') state.data.reports.by_status[a.status] = n(state.data, `reports.by_status.${a.status}`) + 1;
   }
-  // عناصر اتقررت: نشيل ربطها بمهام الوكيل اللي انقفلت
-  for (const it of arr(get(state.data, 'partners.items')).concat(arr(get(state.data, 'reports.latest_new')))) {
-    if (it.agent_task) { const tk = tasks.find((x) => x.id === it.agent_task.id); if (tk && !isOpenStatus(tk.status)) it.agent_task = null; }
-  }
+  // عناصر باقية ومهمة وكيلها انقفلت: نشيل الربط وتصير تنتظر قرارك يدوي
+  const unlink = (x, kind) => {
+    const tk = x && x.agent_task ? tasks.find((y) => y.id === x.agent_task.id) : null;
+    if (tk && !isOpenStatus(tk.status)) { x.agent_task = null; simUncover(kind); }
+  };
+  for (const x of arr(get(state.data, 'partners.items'))) unlink(x, x.kind);
+  for (const x of arr(get(state.data, 'reports.latest_new'))) unlink(x, 'report');
   recountOffice();
   return true;
 }
