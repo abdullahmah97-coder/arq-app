@@ -1,0 +1,3722 @@
+{
+ "_note": "Sample data for the ARQ web office preview — every name and number is fake.",
+ "overview": {
+  "meta": {
+   "generated_at": "2026-10-07T06:12:00.000+00:00",
+   "days": 7,
+   "today": "2026-10-07",
+   "cur_from": "2026-10-01",
+   "prev_from": "2026-09-24",
+   "prev_to": "2026-09-30",
+   "timezone": "Asia/Riyadh"
+  },
+  "activity": {
+   "users": {
+    "total": 1284,
+    "trainees": 1236,
+    "partners": 48,
+    "by_account_type": {
+     "trainee": 1236,
+     "club": 14,
+     "coach": 11,
+     "store": 9,
+     "restaurant": 5,
+     "center": 4,
+     "venue": 5
+    }
+   },
+   "signups": {
+    "today": 9,
+    "cur": 96,
+    "prev": 71,
+    "daily": [
+     {
+      "day": "2026-10-01",
+      "n": 16
+     },
+     {
+      "day": "2026-10-02",
+      "n": 11
+     },
+     {
+      "day": "2026-10-03",
+      "n": 16
+     },
+     {
+      "day": "2026-10-04",
+      "n": 15
+     },
+     {
+      "day": "2026-10-05",
+      "n": 14
+     },
+     {
+      "day": "2026-10-06",
+      "n": 15
+     },
+     {
+      "day": "2026-10-07",
+      "n": 9
+     }
+    ]
+   },
+   "active_users": {
+    "today": 214,
+    "cur": 611,
+    "prev": 574,
+    "daily": [
+     {
+      "day": "2026-10-01",
+      "n": 243
+     },
+     {
+      "day": "2026-10-02",
+      "n": 222
+     },
+     {
+      "day": "2026-10-03",
+      "n": 218
+     },
+     {
+      "day": "2026-10-04",
+      "n": 212
+     },
+     {
+      "day": "2026-10-05",
+      "n": 242
+     },
+     {
+      "day": "2026-10-06",
+      "n": 242
+     },
+     {
+      "day": "2026-10-07",
+      "n": 214
+     }
+    ]
+   },
+   "checkins": {
+    "today": 132,
+    "cur": 1046,
+    "prev": 988,
+    "users_cur": 402,
+    "present_now": 37,
+    "daily": [
+     {
+      "day": "2026-10-01",
+      "n": 150
+     },
+     {
+      "day": "2026-10-02",
+      "n": 99
+     },
+     {
+      "day": "2026-10-03",
+      "n": 157
+     },
+     {
+      "day": "2026-10-04",
+      "n": 158
+     },
+     {
+      "day": "2026-10-05",
+      "n": 170
+     },
+     {
+      "day": "2026-10-06",
+      "n": 180
+     },
+     {
+      "day": "2026-10-07",
+      "n": 132
+     }
+    ]
+   },
+   "top_gyms": [
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000101",
+     "name": "نادي تجريبي - العليا",
+     "name_en": "Demo Gym - Olaya",
+     "n": 214,
+     "users": 88
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000102",
+     "name": "نادي تجريبي - الخبر",
+     "name_en": "Demo Gym - Khobar",
+     "n": 187,
+     "users": 71
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000103",
+     "name": "نادي تجريبي - النرجس",
+     "name_en": "Demo Gym - Narjis",
+     "n": 163,
+     "users": 64
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000104",
+     "name": "صالة اللياقة التجريبية",
+     "name_en": null,
+     "n": 121,
+     "users": 49
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000105",
+     "name": "نادي تجريبي - الكورنيش",
+     "name_en": "Demo Gym - Corniche",
+     "n": 96,
+     "users": 40
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000106",
+     "name": "نادي تجريبي - الصحافة",
+     "name_en": "Demo Gym - Sahafa",
+     "n": 58,
+     "users": 26
+    }
+   ],
+   "workouts": {
+    "today": 88,
+    "cur": 742,
+    "prev": 701,
+    "users_cur": 318,
+    "finished_cur": 655,
+    "plan_days_cur": 214,
+    "plan_days_prev": 196
+   },
+   "errors": {
+    "today": 4,
+    "cur": 23,
+    "prev": 31,
+    "users_cur": 14,
+    "top": [
+     {
+      "kind": "screen_error",
+      "n": 9,
+      "users": 6
+     },
+     {
+      "kind": "js_fatal",
+      "n": 5,
+      "users": 4
+     },
+     {
+      "kind": "js_fatal_prev",
+      "n": 5,
+      "users": 4
+     },
+     {
+      "kind": "checkin_locate_fail",
+      "n": 3,
+      "users": 3
+     },
+     {
+      "kind": "office3d_error",
+      "n": 1,
+      "users": 1
+     }
+    ]
+   },
+   "partner_intent": {
+    "total": 6,
+    "no_submission": 4,
+    "by_kind": {
+     "club": 2,
+     "store": 1,
+     "coach": 2,
+     "center": 0,
+     "venue": 1
+    }
+   }
+  },
+  "bookings": {
+   "venue_bookings": {
+    "created": {
+     "today": 6,
+     "cur": 41,
+     "prev": 33
+    },
+    "courts_cur": 29,
+    "classes_cur": 12,
+    "by_status_cur": {
+     "pending": 5,
+     "confirmed": 9,
+     "declined": 2,
+     "cancelled": 4,
+     "done": 19,
+     "no_show": 2
+    },
+    "today": {
+     "total": 7,
+     "pending": 2
+    },
+    "upcoming_7d": 14,
+    "awaiting_venue": 4,
+    "cancelled": {
+     "cur": 4,
+     "prev": 6
+    },
+    "declined_cur": 2,
+    "value_sar": {
+     "cur": 3150,
+     "prev": 2640
+    },
+    "stale_pending": 1,
+    "unclosed": 2,
+    "venues": {
+     "in_app": 5,
+     "directory": 22,
+     "pending": 1,
+     "hidden": 1
+    }
+   },
+   "gym_classes": {
+    "created": {
+     "today": 12,
+     "cur": 86,
+     "prev": 74
+    },
+    "today": {
+     "booked": 18,
+     "waitlist": 3
+    },
+    "upcoming_7d": {
+     "booked": 64,
+     "waitlist": 7
+    },
+    "cancelled": {
+     "cur": 9,
+     "prev": 11
+    },
+    "active_classes": 26
+   },
+   "memberships": {
+    "live": 412,
+    "active": 398,
+    "frozen": 14,
+    "upcoming": 9,
+    "new": {
+     "today": 3,
+     "cur": 27,
+     "prev": 22
+    },
+    "expiring_7d": 18,
+    "expired": {
+     "cur": 15,
+     "prev": 12
+    },
+    "requests_pending": 3,
+    "requests_over_48h": 1
+   },
+   "coaching": {
+    "coaches_approved": 11,
+    "clients_active": 37,
+    "link_requests": {
+     "pending": 4,
+     "pending_over_72h": 1,
+     "cur": 6,
+     "prev": 5
+    },
+    "sessions": {
+     "today": 5,
+     "upcoming_7d": 23,
+     "done": {
+      "cur": 31,
+      "prev": 28
+     },
+     "cancelled_cur": 3,
+     "no_show_cur": 1,
+     "stale_booked": 2
+    }
+   },
+   "recovery": {
+    "requests": {
+     "today": 2,
+     "cur": 13,
+     "prev": 9
+    },
+    "open_requests": 3,
+    "requests_over_24h": 1,
+    "today": 2,
+    "upcoming_7d": 6,
+    "done_cur": 8,
+    "declined_cur": 1,
+    "cancelled": {
+     "cur": 1,
+     "prev": 2
+    },
+    "unclosed": 0
+   },
+   "meal_subscriptions": {
+    "active": 21,
+    "subscribers": 19,
+    "restaurants": 3,
+    "requests": {
+     "today": 1,
+     "cur": 7,
+     "prev": 5
+    },
+    "open_requests": 2,
+    "requests_over_48h": 1,
+    "ended": {
+     "cur": 2,
+     "prev": 3
+    },
+    "declined_cur": 0,
+    "meals_today": 34,
+    "active_without_meals_3d": 1
+   },
+   "attention": [
+    {
+     "priority": 1,
+     "kind": "venue_unanswered_bookings",
+     "target": "venue",
+     "id": "5a3e0000-0000-4000-8000-000000000201",
+     "name": "Demo Padel Arena",
+     "n": 2,
+     "since": "2026-10-06T16:12:00.000+00:00"
+    },
+    {
+     "priority": 1,
+     "kind": "center_requests_waiting",
+     "target": "center",
+     "id": "5a3e0000-0000-4000-8000-000000000202",
+     "name": "مركز الاستشفاء التجريبي",
+     "n": 1,
+     "since": "2026-10-06T00:12:00.000+00:00"
+    },
+    {
+     "priority": 1,
+     "kind": "restaurant_requests_waiting",
+     "target": "store",
+     "id": "5a3e0000-0000-4000-8000-000000000203",
+     "name": "Sample Green Bowl",
+     "n": 1,
+     "since": "2026-10-05T02:12:00.000+00:00"
+    },
+    {
+     "priority": 1,
+     "kind": "gym_requests_waiting",
+     "target": "gym",
+     "id": "5a3e0000-0000-4000-8000-000000000101",
+     "name": "نادي تجريبي - العليا",
+     "n": 1,
+     "since": "2026-10-04T17:12:00.000+00:00"
+    },
+    {
+     "priority": 2,
+     "kind": "coach_requests_waiting",
+     "target": "coach",
+     "id": "5a3e0000-0000-4000-8000-000000000204",
+     "name": "Demo Coach Dana",
+     "n": 1,
+     "since": "2026-10-03T22:12:00.000+00:00"
+    },
+    {
+     "priority": 2,
+     "kind": "venue_expired_requests",
+     "target": "venue",
+     "id": "5a3e0000-0000-4000-8000-000000000205",
+     "name": "Demo Court Club",
+     "n": 1,
+     "since": "2026-10-06T04:12:00.000+00:00"
+    },
+    {
+     "priority": 2,
+     "kind": "restaurant_no_meals_planned",
+     "target": "store",
+     "id": "5a3e0000-0000-4000-8000-000000000203",
+     "name": "Sample Green Bowl",
+     "n": 1,
+     "since": "2026-10-06T10:12:00.000+00:00"
+    },
+    {
+     "priority": 3,
+     "kind": "coach_sessions_unclosed",
+     "target": "coach",
+     "id": "5a3e0000-0000-4000-8000-000000000204",
+     "name": "Demo Coach Dana",
+     "n": 2,
+     "since": "2026-10-05T14:12:00.000+00:00"
+    }
+   ]
+  },
+  "store": {
+   "orders_enabled": false,
+   "redemption_enabled": false,
+   "brands": {
+    "live": 14,
+    "live_partner": 9,
+    "live_unclaimed": 5,
+    "live_restaurants": 5,
+    "pending": 2,
+    "rejected": 1,
+    "suspended": 0,
+    "new": {
+     "today": 0,
+     "cur": 3,
+     "prev": 2
+    }
+   },
+   "products": {
+    "live": 186,
+    "new": {
+     "cur": 12,
+     "prev": 9
+    },
+    "sold_out": 4,
+    "low_stock": 7,
+    "stock_untracked": 41,
+    "no_price": 3,
+    "avg_price_sar": 89.5,
+    "low_stock_items": [
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000300",
+      "product": "تيشيرت تدريب أسود",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Sample Fit Wear",
+      "stock": 0
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000301",
+      "product": "Training Shorts",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Sample Fit Wear",
+      "stock": 0
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000302",
+      "product": "واي بروتين 2 كجم",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000401",
+      "brand": "متجر المكملات التجريبي",
+      "stock": 0
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000303",
+      "product": "Lifting Straps",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Demo Gear",
+      "stock": 0
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000304",
+      "product": "كرياتين 300 جم",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000401",
+      "brand": "متجر المكملات التجريبي",
+      "stock": 1
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000305",
+      "product": "Resistance Bands Set",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Demo Gear",
+      "stock": 2
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000306",
+      "product": "Hoodie — M",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Sample Fit Wear",
+      "stock": 3
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000307",
+      "product": "Jump Rope Pro",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Demo Gear",
+      "stock": 4
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000308",
+      "product": "Electrolyte Mix",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000401",
+      "brand": "متجر المكملات التجريبي",
+      "stock": 5
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000309",
+      "product": "Socks 3-pack",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Sample Fit Wear",
+      "stock": 5
+     }
+    ]
+   },
+   "offers": {
+    "live": 11,
+    "ending_3d": 2,
+    "expired_still_active": 1,
+    "views": {
+     "today": 64,
+     "cur": 518,
+     "prev": 446
+    },
+    "reveals": {
+     "cur": 87,
+     "prev": 71
+    },
+    "visits": {
+     "cur": 42,
+     "prev": 39
+    },
+    "people": {
+     "cur": 233,
+     "prev": 207
+    }
+   },
+   "followers": {
+    "total": 642,
+    "new": {
+     "cur": 58,
+     "prev": 47
+    }
+   },
+   "top_brands": [
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000400",
+     "name": "Sample Fit Wear",
+     "category": "apparel",
+     "city": "جدة",
+     "engagement": 96,
+     "followers": 211,
+     "followers_new": 21,
+     "offer_views": 160,
+     "code_reveals": 31,
+     "site_visits": 14,
+     "active_subs": 0,
+     "live_products": 48
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000401",
+     "name": "متجر المكملات التجريبي",
+     "category": "supplements",
+     "city": "الرياض",
+     "engagement": 74,
+     "followers": 158,
+     "followers_new": 15,
+     "offer_views": 122,
+     "code_reveals": 22,
+     "site_visits": 11,
+     "active_subs": 0,
+     "live_products": 61
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000203",
+     "name": "Sample Green Bowl",
+     "category": "restaurant",
+     "city": "الرياض",
+     "engagement": 39,
+     "followers": 87,
+     "followers_new": 9,
+     "offer_views": 54,
+     "code_reveals": 9,
+     "site_visits": 4,
+     "active_subs": 12,
+     "live_products": 18
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000402",
+     "name": "Demo Gear",
+     "category": "equipment",
+     "city": null,
+     "engagement": 27,
+     "followers": 64,
+     "followers_new": 6,
+     "offer_views": 41,
+     "code_reveals": 7,
+     "site_visits": 5,
+     "active_subs": 0,
+     "live_products": 33
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000403",
+     "name": "مطبخ تجريبي",
+     "category": "restaurant",
+     "city": "الخبر",
+     "engagement": 18,
+     "followers": 40,
+     "followers_new": 4,
+     "offer_views": 22,
+     "code_reveals": 3,
+     "site_visits": 2,
+     "active_subs": 7,
+     "live_products": 14
+    }
+   ],
+   "top_products": [
+    {
+     "product_id": "5a3e0000-0000-4000-8000-000000000501",
+     "product": "سلطة دجاج مشوي",
+     "brand_id": "5a3e0000-0000-4000-8000-000000000203",
+     "brand": "Sample Green Bowl",
+     "price_sar": 32,
+     "meals": 41
+    },
+    {
+     "product_id": "5a3e0000-0000-4000-8000-000000000502",
+     "product": "Salmon Rice Bowl",
+     "brand_id": "5a3e0000-0000-4000-8000-000000000203",
+     "brand": "Sample Green Bowl",
+     "price_sar": 45,
+     "meals": 33
+    },
+    {
+     "product_id": "5a3e0000-0000-4000-8000-000000000503",
+     "product": "شوفان بالتوت",
+     "brand_id": "5a3e0000-0000-4000-8000-000000000403",
+     "brand": "مطبخ تجريبي",
+     "price_sar": 18.5,
+     "meals": 27
+    },
+    {
+     "product_id": "5a3e0000-0000-4000-8000-000000000504",
+     "product": "Beef Burrito Bowl",
+     "brand_id": "5a3e0000-0000-4000-8000-000000000403",
+     "brand": "مطبخ تجريبي",
+     "price_sar": 39,
+     "meals": 19
+    },
+    {
+     "product_id": "5a3e0000-0000-4000-8000-000000000505",
+     "product": "Protein Pancakes",
+     "brand_id": "5a3e0000-0000-4000-8000-000000000203",
+     "brand": "Sample Green Bowl",
+     "price_sar": null,
+     "meals": 12
+    }
+   ],
+   "rewards": {
+    "points": {
+     "today": 1840,
+     "cur": 13260,
+     "prev": 12110
+    },
+    "earners_cur": 288,
+    "outstanding": 48210,
+    "holders": 731
+   }
+  },
+  "community": {
+   "posts": {
+    "today": 23,
+    "cur": 164,
+    "prev": 151,
+    "posters_cur": 97,
+    "with_photo_cur": 118,
+    "public_cur": 131,
+    "wake_cur": 61
+   },
+   "comments": {
+    "today": 41,
+    "cur": 309,
+    "prev": 287
+   },
+   "reactions": {
+    "today": 156,
+    "cur": 1204,
+    "prev": 1133
+   },
+   "follows": {
+    "cur": 88,
+    "prev": 76
+   },
+   "friend_requests": {
+    "cur": 54,
+    "prev": 49,
+    "pending": 17,
+    "pending_over_7d": 6
+   },
+   "challenges": {
+    "created_cur": 4,
+    "created_prev": 3,
+    "running": 6,
+    "ended_unsettled": 1,
+    "joins_cur": 73
+   },
+   "tips": {
+    "cur": 5,
+    "prev": 4,
+    "total": 63
+   },
+   "programs": {
+    "cur": 2,
+    "prev": 1,
+    "total": 19,
+    "adopts_cur": 34,
+    "adopts_prev": 29
+   },
+   "daily": [
+    {
+     "day": "2026-10-01",
+     "posts": 21,
+     "comments": 43,
+     "reactions": 216
+    },
+    {
+     "day": "2026-10-02",
+     "posts": 22,
+     "comments": 36,
+     "reactions": 118
+    },
+    {
+     "day": "2026-10-03",
+     "posts": 21,
+     "comments": 44,
+     "reactions": 152
+    },
+    {
+     "day": "2026-10-04",
+     "posts": 23,
+     "comments": 48,
+     "reactions": 206
+    },
+    {
+     "day": "2026-10-05",
+     "posts": 28,
+     "comments": 49,
+     "reactions": 205
+    },
+    {
+     "day": "2026-10-06",
+     "posts": 26,
+     "comments": 48,
+     "reactions": 151
+    },
+    {
+     "day": "2026-10-07",
+     "posts": 23,
+     "comments": 41,
+     "reactions": 156
+    }
+   ],
+   "moderation": {
+    "reports_supported": [
+     "gym_review"
+    ],
+    "user_report_block": false,
+    "reported": {
+     "open": 2,
+     "cur": 3,
+     "prev": 1
+    },
+    "kept": 5,
+    "removed": 2,
+    "latest": [
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000601",
+      "kind": "gym_review",
+      "target_id": "5a3e0000-0000-4000-8000-000000000102",
+      "target_name": "نادي تجريبي - الخبر",
+      "author_username": "demo_user17",
+      "reason": "fake",
+      "status": "new",
+      "created_at": "2026-10-07T04:37:00.000+00:00"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000602",
+      "kind": "gym_review",
+      "target_id": "5a3e0000-0000-4000-8000-000000000101",
+      "target_name": "نادي تجريبي - العليا",
+      "author_username": "demo_user42",
+      "reason": "offensive",
+      "status": "new",
+      "created_at": "2026-10-06T10:12:00.000+00:00"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000603",
+      "kind": "gym_review",
+      "target_id": "5a3e0000-0000-4000-8000-000000000104",
+      "target_name": "صالة اللياقة التجريبية",
+      "author_username": "demo_user08",
+      "reason": "spam",
+      "status": "removed",
+      "created_at": "2026-10-04T08:12:00.000+00:00"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000604",
+      "kind": "gym_review",
+      "target_id": "5a3e0000-0000-4000-8000-000000000101",
+      "target_name": "نادي تجريبي - العليا",
+      "author_username": "demo_user23",
+      "reason": "other",
+      "status": "kept",
+      "created_at": "2026-10-01T20:12:00.000+00:00"
+     }
+    ]
+   },
+   "chats": {
+    "messages": {
+     "today": 312,
+     "cur": 2210,
+     "prev": 1987
+    },
+    "senders": {
+     "cur": 274,
+     "prev": 251
+    },
+    "conversations": {
+     "cur": 389,
+     "prev": 352
+    },
+    "media": {
+     "cur": 241,
+     "prev": 198
+    },
+    "media_pct_cur": 11,
+    "unread_over_24h": 37,
+    "daily": [
+     {
+      "day": "2026-10-01",
+      "n": 298
+     },
+     {
+      "day": "2026-10-02",
+      "n": 233
+     },
+     {
+      "day": "2026-10-03",
+      "n": 322
+     },
+     {
+      "day": "2026-10-04",
+      "n": 370
+     },
+     {
+      "day": "2026-10-05",
+      "n": 356
+     },
+     {
+      "day": "2026-10-06",
+      "n": 319
+     },
+     {
+      "day": "2026-10-07",
+      "n": 312
+     }
+    ]
+   }
+  },
+  "partners": {
+   "pending": {
+    "club": 2,
+    "store": 2,
+    "coach": 1,
+    "center": 1,
+    "venue": 1
+   },
+   "pending_total": 7,
+   "items": [
+    {
+     "kind": "venue",
+     "id": "5a3e0000-0000-4000-8000-000000000205",
+     "name": "Demo Court Club",
+     "created_at": "2026-10-01T05:32:00.000+00:00",
+     "city": "جدة",
+     "username": "demo_khalid",
+     "agent_task": null
+    },
+    {
+     "kind": "center",
+     "id": "5a3e0000-0000-4000-8000-000000000206",
+     "name": "مركز الاستشفاء التجريبي - الملقا",
+     "created_at": "2026-10-02T05:57:00.000+00:00",
+     "city": "الرياض",
+     "username": "demo_ahmed",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000005",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "kind": "club",
+     "id": "5a3e0000-0000-4000-8000-000000000207",
+     "name": "نادي تجريبي - النرجس",
+     "created_at": "2026-10-03T04:42:00.000+00:00",
+     "city": "الرياض",
+     "username": "demo_faisal",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000002",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "kind": "store",
+     "id": "5a3e0000-0000-4000-8000-000000000208",
+     "name": "Sample Fit Wear Outlet",
+     "created_at": "2026-10-04T05:42:00.000+00:00",
+     "city": "جدة",
+     "username": "demo_manager",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000003",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "kind": "coach",
+     "id": "5a3e0000-0000-4000-8000-000000000209",
+     "name": "Demo Coach Sara",
+     "created_at": "2026-10-05T02:52:00.000+00:00",
+     "city": "الدمام",
+     "username": "demo_sara",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000004",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "kind": "club",
+     "id": "5a3e0000-0000-4000-8000-000000000210",
+     "name": "Demo Gym - Corniche",
+     "created_at": "2026-10-06T04:12:00.000+00:00",
+     "city": "الخبر",
+     "username": "demo_omar",
+     "agent_task": null
+    },
+    {
+     "kind": "store",
+     "id": "5a3e0000-0000-4000-8000-000000000211",
+     "name": "مطعم تجريبي صحي",
+     "created_at": "2026-10-06T23:12:00.000+00:00",
+     "city": "الرياض",
+     "username": "demo_rest",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000006",
+      "status": "in_progress"
+     }
+    }
+   ]
+  },
+  "reports": {
+   "by_status": {
+    "new": 4,
+    "seen": 7,
+    "fixed": 23,
+    "wontfix": 3
+   },
+   "received": {
+    "today": 2,
+    "cur": 9,
+    "prev": 6
+   },
+   "latest_new": [
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000801",
+     "category": "bug",
+     "message": "التطبيق يقفل لما أفتح شاشة الوجبات بعد التمرين وأمرر بسرعة — بلاغ تجريبي للمعاينة",
+     "created_at": "2026-10-07T05:32:00.000+00:00",
+     "username": "demo_ahmed",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000007",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000802",
+     "category": "idea",
+     "message": "ودي يكون فيه وضع ليلي لشاشة التمرين عشان أتمرن بالليل بدون إزعاج (تجريبي)",
+     "created_at": "2026-10-07T03:12:00.000+00:00",
+     "username": "demo_noura",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000008",
+      "status": "in_progress"
+     }
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000803",
+     "category": "design",
+     "message": "Sample: the check-in button is hard to reach on small phones",
+     "created_at": "2026-10-06T21:12:00.000+00:00",
+     "username": "demo_lee",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000009",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000804",
+     "category": "other",
+     "message": "Sample report: can I export my workout history?",
+     "created_at": "2026-10-06T04:12:00.000+00:00",
+     "username": null,
+     "agent_task": null
+    }
+   ]
+  },
+  "marketing": {
+   "live_ad": {
+    "id": "5a3e0000-0000-4000-8000-000000000701",
+    "title": "عرض الويكند (تجريبي)",
+    "kind": "ad",
+    "starts_at": "2026-10-06T04:12:00.000+00:00",
+    "ends_at": "2026-10-09T04:12:00.000+00:00"
+   },
+   "ads": {
+    "live": 1,
+    "scheduled": 1,
+    "ended": 4,
+    "off": 1,
+    "live_marketing": 1
+   },
+   "ad_stats": {
+    "cur": {
+     "views": 1840,
+     "reach": 912,
+     "clicks": 143,
+     "closes": 655
+    },
+    "prev": {
+     "views": 1610,
+     "reach": 844,
+     "clicks": 121,
+     "closes": 590
+    }
+   },
+   "events": {
+    "active": 12,
+    "past_still_active": 1,
+    "upcoming": [
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000900",
+      "title": "معرض الصقور والصيد السعودي الدولي 2026",
+      "title_en": "Saudi Falcons & Hunting Exhibition 2026",
+      "starts_on": "2026-10-01",
+      "ends_on": "2026-10-10",
+      "city": "الرياض",
+      "category": "shooting"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000901",
+      "title": "سباق الرياض",
+      "title_en": "Riyadh Run",
+      "starts_on": "2026-10-12",
+      "ends_on": null,
+      "city": "الرياض",
+      "category": "running"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000902",
+      "title": "موسم سباقات الرياض",
+      "title_en": "Riyadh Racing Season",
+      "starts_on": "2026-10-16",
+      "ends_on": "2027-04-17",
+      "city": "الرياض",
+      "category": "horse_racing"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000903",
+      "title": "نزالات موسم الرياض 2026",
+      "title_en": "Riyadh Season 2026 fight nights",
+      "starts_on": "2026-10-21",
+      "ends_on": null,
+      "city": "الرياض",
+      "category": "boxing"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000904",
+      "title": "دورة الألعاب الآسيوية للصالات والفنون القتالية",
+      "title_en": "Asian Indoor & Martial Arts Games",
+      "starts_on": "2026-12-13",
+      "ends_on": "2026-12-21",
+      "city": "الرياض",
+      "category": "boxing"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000905",
+      "title": "رالي داكار السعودية 2027",
+      "title_en": "Dakar Rally Saudi Arabia 2027",
+      "starts_on": "2027-01-01",
+      "ends_on": "2027-01-15",
+      "city": "رابغ",
+      "category": "motorsport"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000906",
+      "title": "سباق العلا للمسارات 2027",
+      "title_en": "AlUla Trail Race 2027",
+      "starts_on": "2027-01-22",
+      "ends_on": null,
+      "city": "العلا",
+      "category": "hiking"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000907",
+      "title": "ماراثون الرياض 2027",
+      "title_en": "Riyadh Marathon 2027",
+      "starts_on": "2027-01-31",
+      "ends_on": null,
+      "city": "الرياض",
+      "category": "running"
+     }
+    ]
+   },
+   "nudges": {
+    "today": 146,
+    "cur": 1012,
+    "prev": 938,
+    "by_category_cur": {
+     "gym": 402,
+     "friend": 188,
+     "streak": 231,
+     "workout": 127,
+     "meal": 64
+    },
+    "templates_active": 36,
+    "templates_paused": 2
+   }
+  },
+  "ai": {
+   "limits": {
+    "barcode_per_day": 2,
+    "meal_photos_per_day": 25
+   },
+   "fixed_caps": {
+    "plan": 8,
+    "office": 80
+   },
+   "usage": {
+    "meal_photo": {
+     "uses_today": 96,
+     "uses_cur": 702,
+     "uses_prev": 655,
+     "users_cur": 211
+    },
+    "barcode": {
+     "uses_today": 31,
+     "uses_cur": 214,
+     "uses_prev": 230,
+     "users_cur": 118
+    },
+    "plan": {
+     "uses_today": 7,
+     "uses_cur": 49,
+     "uses_prev": 44,
+     "users_cur": 41
+    },
+    "office": {
+     "uses_today": 13,
+     "uses_cur": 61,
+     "uses_prev": 48,
+     "users_cur": 1
+    }
+   },
+   "office_tasks_today": 11
+  },
+  "office": {
+   "by_status": {
+    "scheduled": 0,
+    "in_progress": 2,
+    "waiting_approval": 8,
+    "done": 4,
+    "failed": 1
+   },
+   "by_desk": {
+    "lead": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 0,
+     "done": 1,
+     "failed": 0
+    },
+    "clubs": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 1,
+     "done": 0,
+     "failed": 0
+    },
+    "stores": {
+     "scheduled": 0,
+     "in_progress": 1,
+     "waiting_approval": 1,
+     "done": 0,
+     "failed": 0
+    },
+    "coaches": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 1,
+     "done": 0,
+     "failed": 1
+    },
+    "care": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 1,
+     "done": 1,
+     "failed": 0
+    },
+    "reports": {
+     "scheduled": 0,
+     "in_progress": 1,
+     "waiting_approval": 2,
+     "done": 1,
+     "failed": 0
+    },
+    "marketing": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 1,
+     "done": 1,
+     "failed": 0
+    },
+    "users": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 0,
+     "done": 0,
+     "failed": 0
+    },
+    "ai": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 1,
+     "done": 0,
+     "failed": 0
+    }
+   },
+   "waiting_total": 8,
+   "working_total": 2,
+   "oldest_waiting_at": "2026-10-07T01:12:00.000+00:00"
+  }
+ },
+ "overview_30": {
+  "meta": {
+   "generated_at": "2026-10-07T06:12:00.000+00:00",
+   "days": 30,
+   "today": "2026-10-07",
+   "cur_from": "2026-09-08",
+   "prev_from": "2026-08-09",
+   "prev_to": "2026-09-07",
+   "timezone": "Asia/Riyadh"
+  },
+  "activity": {
+   "users": {
+    "total": 1284,
+    "trainees": 1236,
+    "partners": 48,
+    "by_account_type": {
+     "trainee": 1236,
+     "club": 14,
+     "coach": 11,
+     "store": 9,
+     "restaurant": 5,
+     "center": 4,
+     "venue": 5
+    }
+   },
+   "signups": {
+    "today": 9,
+    "cur": 424,
+    "prev": 290,
+    "daily": [
+     {
+      "day": "2026-09-08",
+      "n": 13
+     },
+     {
+      "day": "2026-09-09",
+      "n": 14
+     },
+     {
+      "day": "2026-09-10",
+      "n": 13
+     },
+     {
+      "day": "2026-09-11",
+      "n": 9
+     },
+     {
+      "day": "2026-09-12",
+      "n": 15
+     },
+     {
+      "day": "2026-09-13",
+      "n": 19
+     },
+     {
+      "day": "2026-09-14",
+      "n": 14
+     },
+     {
+      "day": "2026-09-15",
+      "n": 14
+     },
+     {
+      "day": "2026-09-16",
+      "n": 14
+     },
+     {
+      "day": "2026-09-17",
+      "n": 17
+     },
+     {
+      "day": "2026-09-18",
+      "n": 10
+     },
+     {
+      "day": "2026-09-19",
+      "n": 14
+     },
+     {
+      "day": "2026-09-20",
+      "n": 20
+     },
+     {
+      "day": "2026-09-21",
+      "n": 16
+     },
+     {
+      "day": "2026-09-22",
+      "n": 17
+     },
+     {
+      "day": "2026-09-23",
+      "n": 17
+     },
+     {
+      "day": "2026-09-24",
+      "n": 15
+     },
+     {
+      "day": "2026-09-25",
+      "n": 10
+     },
+     {
+      "day": "2026-09-26",
+      "n": 10
+     },
+     {
+      "day": "2026-09-27",
+      "n": 13
+     },
+     {
+      "day": "2026-09-28",
+      "n": 17
+     },
+     {
+      "day": "2026-09-29",
+      "n": 19
+     },
+     {
+      "day": "2026-09-30",
+      "n": 13
+     },
+     {
+      "day": "2026-10-01",
+      "n": 18
+     },
+     {
+      "day": "2026-10-02",
+      "n": 11
+     },
+     {
+      "day": "2026-10-03",
+      "n": 11
+     },
+     {
+      "day": "2026-10-04",
+      "n": 13
+     },
+     {
+      "day": "2026-10-05",
+      "n": 16
+     },
+     {
+      "day": "2026-10-06",
+      "n": 13
+     },
+     {
+      "day": "2026-10-07",
+      "n": 9
+     }
+    ]
+   },
+   "active_users": {
+    "today": 214,
+    "cur": 1104,
+    "prev": 1062,
+    "daily": [
+     {
+      "day": "2026-09-08",
+      "n": 178
+     },
+     {
+      "day": "2026-09-09",
+      "n": 218
+     },
+     {
+      "day": "2026-09-10",
+      "n": 172
+     },
+     {
+      "day": "2026-09-11",
+      "n": 205
+     },
+     {
+      "day": "2026-09-12",
+      "n": 210
+     },
+     {
+      "day": "2026-09-13",
+      "n": 229
+     },
+     {
+      "day": "2026-09-14",
+      "n": 245
+     },
+     {
+      "day": "2026-09-15",
+      "n": 203
+     },
+     {
+      "day": "2026-09-16",
+      "n": 177
+     },
+     {
+      "day": "2026-09-17",
+      "n": 200
+     },
+     {
+      "day": "2026-09-18",
+      "n": 175
+     },
+     {
+      "day": "2026-09-19",
+      "n": 220
+     },
+     {
+      "day": "2026-09-20",
+      "n": 207
+     },
+     {
+      "day": "2026-09-21",
+      "n": 211
+     },
+     {
+      "day": "2026-09-22",
+      "n": 206
+     },
+     {
+      "day": "2026-09-23",
+      "n": 228
+     },
+     {
+      "day": "2026-09-24",
+      "n": 193
+     },
+     {
+      "day": "2026-09-25",
+      "n": 228
+     },
+     {
+      "day": "2026-09-26",
+      "n": 162
+     },
+     {
+      "day": "2026-09-27",
+      "n": 187
+     },
+     {
+      "day": "2026-09-28",
+      "n": 209
+     },
+     {
+      "day": "2026-09-29",
+      "n": 178
+     },
+     {
+      "day": "2026-09-30",
+      "n": 225
+     },
+     {
+      "day": "2026-10-01",
+      "n": 186
+     },
+     {
+      "day": "2026-10-02",
+      "n": 181
+     },
+     {
+      "day": "2026-10-03",
+      "n": 219
+     },
+     {
+      "day": "2026-10-04",
+      "n": 199
+     },
+     {
+      "day": "2026-10-05",
+      "n": 167
+     },
+     {
+      "day": "2026-10-06",
+      "n": 230
+     },
+     {
+      "day": "2026-10-07",
+      "n": 214
+     }
+    ]
+   },
+   "checkins": {
+    "today": 132,
+    "cur": 4238,
+    "prev": 4254,
+    "users_cur": 688,
+    "present_now": 37,
+    "daily": [
+     {
+      "day": "2026-09-08",
+      "n": 153
+     },
+     {
+      "day": "2026-09-09",
+      "n": 148
+     },
+     {
+      "day": "2026-09-10",
+      "n": 182
+     },
+     {
+      "day": "2026-09-11",
+      "n": 85
+     },
+     {
+      "day": "2026-09-12",
+      "n": 122
+     },
+     {
+      "day": "2026-09-13",
+      "n": 137
+     },
+     {
+      "day": "2026-09-14",
+      "n": 117
+     },
+     {
+      "day": "2026-09-15",
+      "n": 117
+     },
+     {
+      "day": "2026-09-16",
+      "n": 144
+     },
+     {
+      "day": "2026-09-17",
+      "n": 123
+     },
+     {
+      "day": "2026-09-18",
+      "n": 93
+     },
+     {
+      "day": "2026-09-19",
+      "n": 151
+     },
+     {
+      "day": "2026-09-20",
+      "n": 167
+     },
+     {
+      "day": "2026-09-21",
+      "n": 167
+     },
+     {
+      "day": "2026-09-22",
+      "n": 144
+     },
+     {
+      "day": "2026-09-23",
+      "n": 172
+     },
+     {
+      "day": "2026-09-24",
+      "n": 179
+     },
+     {
+      "day": "2026-09-25",
+      "n": 117
+     },
+     {
+      "day": "2026-09-26",
+      "n": 135
+     },
+     {
+      "day": "2026-09-27",
+      "n": 153
+     },
+     {
+      "day": "2026-09-28",
+      "n": 138
+     },
+     {
+      "day": "2026-09-29",
+      "n": 142
+     },
+     {
+      "day": "2026-09-30",
+      "n": 148
+     },
+     {
+      "day": "2026-10-01",
+      "n": 148
+     },
+     {
+      "day": "2026-10-02",
+      "n": 107
+     },
+     {
+      "day": "2026-10-03",
+      "n": 138
+     },
+     {
+      "day": "2026-10-04",
+      "n": 159
+     },
+     {
+      "day": "2026-10-05",
+      "n": 157
+     },
+     {
+      "day": "2026-10-06",
+      "n": 163
+     },
+     {
+      "day": "2026-10-07",
+      "n": 132
+     }
+    ]
+   },
+   "top_gyms": [
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000101",
+     "name": "نادي تجريبي - العليا",
+     "name_en": "Demo Gym - Olaya",
+     "n": 943,
+     "users": 386
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000102",
+     "name": "نادي تجريبي - الخبر",
+     "name_en": "Demo Gym - Khobar",
+     "n": 833,
+     "users": 299
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000103",
+     "name": "نادي تجريبي - النرجس",
+     "name_en": "Demo Gym - Narjis",
+     "n": 691,
+     "users": 284
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000104",
+     "name": "صالة اللياقة التجريبية",
+     "name_en": null,
+     "n": 538,
+     "users": 205
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000105",
+     "name": "نادي تجريبي - الكورنيش",
+     "name_en": "Demo Gym - Corniche",
+     "n": 390,
+     "users": 167
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000106",
+     "name": "نادي تجريبي - الصحافة",
+     "name_en": "Demo Gym - Sahafa",
+     "n": 256,
+     "users": 113
+    }
+   ],
+   "workouts": {
+    "today": 88,
+    "cur": 3224,
+    "prev": 3111,
+    "users_cur": 571,
+    "finished_cur": 2860,
+    "plan_days_cur": 881,
+    "plan_days_prev": 810
+   },
+   "errors": {
+    "today": 4,
+    "cur": 101,
+    "prev": 126,
+    "users_cur": 37,
+    "top": [
+     {
+      "kind": "screen_error",
+      "n": 40,
+      "users": 26
+     },
+     {
+      "kind": "js_fatal",
+      "n": 22,
+      "users": 17
+     },
+     {
+      "kind": "js_fatal_prev",
+      "n": 21,
+      "users": 17
+     },
+     {
+      "kind": "checkin_locate_fail",
+      "n": 13,
+      "users": 13
+     },
+     {
+      "kind": "office3d_error",
+      "n": 1,
+      "users": 1
+     }
+    ]
+   },
+   "partner_intent": {
+    "total": 6,
+    "no_submission": 4,
+    "by_kind": {
+     "club": 2,
+     "store": 1,
+     "coach": 2,
+     "center": 0,
+     "venue": 1
+    }
+   }
+  },
+  "bookings": {
+   "venue_bookings": {
+    "created": {
+     "today": 6,
+     "cur": 180,
+     "prev": 145
+    },
+    "courts_cur": 126,
+    "classes_cur": 54,
+    "by_status_cur": {
+     "pending": 22,
+     "confirmed": 40,
+     "declined": 9,
+     "cancelled": 17,
+     "done": 84,
+     "no_show": 8
+    },
+    "today": {
+     "total": 7,
+     "pending": 2
+    },
+    "upcoming_7d": 14,
+    "awaiting_venue": 4,
+    "cancelled": {
+     "cur": 17,
+     "prev": 25
+    },
+    "declined_cur": 9,
+    "value_sar": {
+     "cur": 13617,
+     "prev": 11126
+    },
+    "stale_pending": 1,
+    "unclosed": 2,
+    "venues": {
+     "in_app": 5,
+     "directory": 22,
+     "pending": 1,
+     "hidden": 1
+    }
+   },
+   "gym_classes": {
+    "created": {
+     "today": 12,
+     "cur": 361,
+     "prev": 304
+    },
+    "today": {
+     "booked": 18,
+     "waitlist": 3
+    },
+    "upcoming_7d": {
+     "booked": 64,
+     "waitlist": 7
+    },
+    "cancelled": {
+     "cur": 39,
+     "prev": 45
+    },
+    "active_classes": 26
+   },
+   "memberships": {
+    "live": 412,
+    "active": 398,
+    "frozen": 14,
+    "upcoming": 9,
+    "new": {
+     "today": 3,
+     "cur": 119,
+     "prev": 96
+    },
+    "expiring_7d": 18,
+    "expired": {
+     "cur": 63,
+     "prev": 52
+    },
+    "requests_pending": 3,
+    "requests_over_48h": 1
+   },
+   "coaching": {
+    "coaches_approved": 11,
+    "clients_active": 37,
+    "link_requests": {
+     "pending": 4,
+     "pending_over_72h": 1,
+     "cur": 26,
+     "prev": 20
+    },
+    "sessions": {
+     "today": 5,
+     "upcoming_7d": 23,
+     "done": {
+      "cur": 129,
+      "prev": 124
+     },
+     "cancelled_cur": 12,
+     "no_show_cur": 4,
+     "stale_booked": 2
+    }
+   },
+   "recovery": {
+    "requests": {
+     "today": 2,
+     "cur": 55,
+     "prev": 36
+    },
+    "open_requests": 3,
+    "requests_over_24h": 1,
+    "today": 2,
+    "upcoming_7d": 6,
+    "done_cur": 35,
+    "declined_cur": 4,
+    "cancelled": {
+     "cur": 4,
+     "prev": 8
+    },
+    "unclosed": 0
+   },
+   "meal_subscriptions": {
+    "active": 21,
+    "subscribers": 19,
+    "restaurants": 3,
+    "requests": {
+     "today": 1,
+     "cur": 31,
+     "prev": 22
+    },
+    "open_requests": 2,
+    "requests_over_48h": 1,
+    "ended": {
+     "cur": 8,
+     "prev": 12
+    },
+    "declined_cur": 0,
+    "meals_today": 34,
+    "active_without_meals_3d": 1
+   },
+   "attention": [
+    {
+     "priority": 1,
+     "kind": "venue_unanswered_bookings",
+     "target": "venue",
+     "id": "5a3e0000-0000-4000-8000-000000000201",
+     "name": "Demo Padel Arena",
+     "n": 2,
+     "since": "2026-10-06T16:12:00.000+00:00"
+    },
+    {
+     "priority": 1,
+     "kind": "center_requests_waiting",
+     "target": "center",
+     "id": "5a3e0000-0000-4000-8000-000000000202",
+     "name": "مركز الاستشفاء التجريبي",
+     "n": 1,
+     "since": "2026-10-06T00:12:00.000+00:00"
+    },
+    {
+     "priority": 1,
+     "kind": "restaurant_requests_waiting",
+     "target": "store",
+     "id": "5a3e0000-0000-4000-8000-000000000203",
+     "name": "Sample Green Bowl",
+     "n": 1,
+     "since": "2026-10-05T02:12:00.000+00:00"
+    },
+    {
+     "priority": 1,
+     "kind": "gym_requests_waiting",
+     "target": "gym",
+     "id": "5a3e0000-0000-4000-8000-000000000101",
+     "name": "نادي تجريبي - العليا",
+     "n": 1,
+     "since": "2026-10-04T17:12:00.000+00:00"
+    },
+    {
+     "priority": 2,
+     "kind": "coach_requests_waiting",
+     "target": "coach",
+     "id": "5a3e0000-0000-4000-8000-000000000204",
+     "name": "Demo Coach Dana",
+     "n": 1,
+     "since": "2026-10-03T22:12:00.000+00:00"
+    },
+    {
+     "priority": 2,
+     "kind": "venue_expired_requests",
+     "target": "venue",
+     "id": "5a3e0000-0000-4000-8000-000000000205",
+     "name": "Demo Court Club",
+     "n": 1,
+     "since": "2026-10-06T04:12:00.000+00:00"
+    },
+    {
+     "priority": 2,
+     "kind": "restaurant_no_meals_planned",
+     "target": "store",
+     "id": "5a3e0000-0000-4000-8000-000000000203",
+     "name": "Sample Green Bowl",
+     "n": 1,
+     "since": "2026-10-06T10:12:00.000+00:00"
+    },
+    {
+     "priority": 3,
+     "kind": "coach_sessions_unclosed",
+     "target": "coach",
+     "id": "5a3e0000-0000-4000-8000-000000000204",
+     "name": "Demo Coach Dana",
+     "n": 2,
+     "since": "2026-10-05T14:12:00.000+00:00"
+    }
+   ]
+  },
+  "store": {
+   "orders_enabled": false,
+   "redemption_enabled": false,
+   "brands": {
+    "live": 14,
+    "live_partner": 9,
+    "live_unclaimed": 5,
+    "live_restaurants": 5,
+    "pending": 2,
+    "rejected": 1,
+    "suspended": 0,
+    "new": {
+     "today": 0,
+     "cur": 13,
+     "prev": 8
+    }
+   },
+   "products": {
+    "live": 186,
+    "new": {
+     "cur": 53,
+     "prev": 39
+    },
+    "sold_out": 4,
+    "low_stock": 7,
+    "stock_untracked": 41,
+    "no_price": 3,
+    "avg_price_sar": 89.5,
+    "low_stock_items": [
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000300",
+      "product": "تيشيرت تدريب أسود",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Sample Fit Wear",
+      "stock": 0
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000301",
+      "product": "Training Shorts",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Sample Fit Wear",
+      "stock": 0
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000302",
+      "product": "واي بروتين 2 كجم",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000401",
+      "brand": "متجر المكملات التجريبي",
+      "stock": 0
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000303",
+      "product": "Lifting Straps",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Demo Gear",
+      "stock": 0
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000304",
+      "product": "كرياتين 300 جم",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000401",
+      "brand": "متجر المكملات التجريبي",
+      "stock": 1
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000305",
+      "product": "Resistance Bands Set",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Demo Gear",
+      "stock": 2
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000306",
+      "product": "Hoodie — M",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Sample Fit Wear",
+      "stock": 3
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000307",
+      "product": "Jump Rope Pro",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Demo Gear",
+      "stock": 4
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000308",
+      "product": "Electrolyte Mix",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000401",
+      "brand": "متجر المكملات التجريبي",
+      "stock": 5
+     },
+     {
+      "product_id": "5a3e0000-0000-4000-8000-000000000309",
+      "product": "Socks 3-pack",
+      "brand_id": "5a3e0000-0000-4000-8000-000000000400",
+      "brand": "Sample Fit Wear",
+      "stock": 5
+     }
+    ]
+   },
+   "offers": {
+    "live": 11,
+    "ending_3d": 2,
+    "expired_still_active": 1,
+    "views": {
+     "today": 64,
+     "cur": 2254,
+     "prev": 1821
+    },
+    "reveals": {
+     "cur": 363,
+     "prev": 308
+    },
+    "visits": {
+     "cur": 186,
+     "prev": 166
+    },
+    "people": {
+     "cur": 997,
+     "prev": 903
+    }
+   },
+   "followers": {
+    "total": 642,
+    "new": {
+     "cur": 251,
+     "prev": 204
+    }
+   },
+   "top_brands": [
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000400",
+     "name": "Sample Fit Wear",
+     "category": "apparel",
+     "city": "جدة",
+     "engagement": 411,
+     "followers": 211,
+     "followers_new": 86,
+     "offer_views": 648,
+     "code_reveals": 133,
+     "site_visits": 58,
+     "active_subs": 0,
+     "live_products": 48
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000401",
+     "name": "متجر المكملات التجريبي",
+     "category": "supplements",
+     "city": "الرياض",
+     "engagement": 317,
+     "followers": 158,
+     "followers_new": 62,
+     "offer_views": 503,
+     "code_reveals": 94,
+     "site_visits": 47,
+     "active_subs": 0,
+     "live_products": 61
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000203",
+     "name": "Sample Green Bowl",
+     "category": "restaurant",
+     "city": "الرياض",
+     "engagement": 171,
+     "followers": 87,
+     "followers_new": 37,
+     "offer_views": 238,
+     "code_reveals": 36,
+     "site_visits": 17,
+     "active_subs": 12,
+     "live_products": 18
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000402",
+     "name": "Demo Gear",
+     "category": "equipment",
+     "city": null,
+     "engagement": 113,
+     "followers": 64,
+     "followers_new": 26,
+     "offer_views": 177,
+     "code_reveals": 31,
+     "site_visits": 20,
+     "active_subs": 0,
+     "live_products": 33
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000403",
+     "name": "مطبخ تجريبي",
+     "category": "restaurant",
+     "city": "الخبر",
+     "engagement": 80,
+     "followers": 40,
+     "followers_new": 17,
+     "offer_views": 96,
+     "code_reveals": 13,
+     "site_visits": 9,
+     "active_subs": 7,
+     "live_products": 14
+    }
+   ],
+   "top_products": [
+    {
+     "product_id": "5a3e0000-0000-4000-8000-000000000501",
+     "product": "سلطة دجاج مشوي",
+     "brand_id": "5a3e0000-0000-4000-8000-000000000203",
+     "brand": "Sample Green Bowl",
+     "price_sar": 32,
+     "meals": 179
+    },
+    {
+     "product_id": "5a3e0000-0000-4000-8000-000000000502",
+     "product": "Salmon Rice Bowl",
+     "brand_id": "5a3e0000-0000-4000-8000-000000000203",
+     "brand": "Sample Green Bowl",
+     "price_sar": 45,
+     "meals": 143
+    },
+    {
+     "product_id": "5a3e0000-0000-4000-8000-000000000503",
+     "product": "شوفان بالتوت",
+     "brand_id": "5a3e0000-0000-4000-8000-000000000403",
+     "brand": "مطبخ تجريبي",
+     "price_sar": 18.5,
+     "meals": 119
+    },
+    {
+     "product_id": "5a3e0000-0000-4000-8000-000000000504",
+     "product": "Beef Burrito Bowl",
+     "brand_id": "5a3e0000-0000-4000-8000-000000000403",
+     "brand": "مطبخ تجريبي",
+     "price_sar": 39,
+     "meals": 84
+    },
+    {
+     "product_id": "5a3e0000-0000-4000-8000-000000000505",
+     "product": "Protein Pancakes",
+     "brand_id": "5a3e0000-0000-4000-8000-000000000203",
+     "brand": "Sample Green Bowl",
+     "price_sar": null,
+     "meals": 49
+    }
+   ],
+   "rewards": {
+    "points": {
+     "today": 1840,
+     "cur": 57509,
+     "prev": 49588
+    },
+    "earners_cur": 517,
+    "outstanding": 48210,
+    "holders": 731
+   }
+  },
+  "community": {
+   "posts": {
+    "today": 23,
+    "cur": 685,
+    "prev": 616,
+    "posters_cur": 430,
+    "with_photo_cur": 478,
+    "public_cur": 532,
+    "wake_cur": 253
+   },
+   "comments": {
+    "today": 41,
+    "cur": 1361,
+    "prev": 1272
+   },
+   "reactions": {
+    "today": 156,
+    "cur": 4973,
+    "prev": 4987
+   },
+   "follows": {
+    "cur": 391,
+    "prev": 315
+   },
+   "friend_requests": {
+    "cur": 222,
+    "prev": 198,
+    "pending": 17,
+    "pending_over_7d": 6
+   },
+   "challenges": {
+    "created_cur": 17,
+    "created_prev": 13,
+    "running": 6,
+    "ended_unsettled": 1,
+    "joins_cur": 299
+   },
+   "tips": {
+    "cur": 21,
+    "prev": 17,
+    "total": 63
+   },
+   "programs": {
+    "cur": 8,
+    "prev": 4,
+    "total": 19,
+    "adopts_cur": 138,
+    "adopts_prev": 118
+   },
+   "daily": [
+    {
+     "day": "2026-09-08",
+     "posts": 26,
+     "comments": 41,
+     "reactions": 208
+    },
+    {
+     "day": "2026-09-09",
+     "posts": 29,
+     "comments": 57,
+     "reactions": 158
+    },
+    {
+     "day": "2026-09-10",
+     "posts": 25,
+     "comments": 41,
+     "reactions": 169
+    },
+    {
+     "day": "2026-09-11",
+     "posts": 15,
+     "comments": 34,
+     "reactions": 147
+    },
+    {
+     "day": "2026-09-12",
+     "posts": 20,
+     "comments": 36,
+     "reactions": 126
+    },
+    {
+     "day": "2026-09-13",
+     "posts": 22,
+     "comments": 41,
+     "reactions": 178
+    },
+    {
+     "day": "2026-09-14",
+     "posts": 23,
+     "comments": 61,
+     "reactions": 140
+    },
+    {
+     "day": "2026-09-15",
+     "posts": 24,
+     "comments": 44,
+     "reactions": 211
+    },
+    {
+     "day": "2026-09-16",
+     "posts": 23,
+     "comments": 53,
+     "reactions": 189
+    },
+    {
+     "day": "2026-09-17",
+     "posts": 25,
+     "comments": 42,
+     "reactions": 211
+    },
+    {
+     "day": "2026-09-18",
+     "posts": 18,
+     "comments": 34,
+     "reactions": 99
+    },
+    {
+     "day": "2026-09-19",
+     "posts": 18,
+     "comments": 44,
+     "reactions": 178
+    },
+    {
+     "day": "2026-09-20",
+     "posts": 29,
+     "comments": 42,
+     "reactions": 154
+    },
+    {
+     "day": "2026-09-21",
+     "posts": 23,
+     "comments": 59,
+     "reactions": 215
+    },
+    {
+     "day": "2026-09-22",
+     "posts": 27,
+     "comments": 58,
+     "reactions": 184
+    },
+    {
+     "day": "2026-09-23",
+     "posts": 25,
+     "comments": 58,
+     "reactions": 191
+    },
+    {
+     "day": "2026-09-24",
+     "posts": 25,
+     "comments": 57,
+     "reactions": 159
+    },
+    {
+     "day": "2026-09-25",
+     "posts": 16,
+     "comments": 40,
+     "reactions": 109
+    },
+    {
+     "day": "2026-09-26",
+     "posts": 20,
+     "comments": 46,
+     "reactions": 131
+    },
+    {
+     "day": "2026-09-27",
+     "posts": 25,
+     "comments": 44,
+     "reactions": 182
+    },
+    {
+     "day": "2026-09-28",
+     "posts": 28,
+     "comments": 38,
+     "reactions": 142
+    },
+    {
+     "day": "2026-09-29",
+     "posts": 22,
+     "comments": 43,
+     "reactions": 199
+    },
+    {
+     "day": "2026-09-30",
+     "posts": 26,
+     "comments": 40,
+     "reactions": 193
+    },
+    {
+     "day": "2026-10-01",
+     "posts": 21,
+     "comments": 38,
+     "reactions": 194
+    },
+    {
+     "day": "2026-10-02",
+     "posts": 17,
+     "comments": 36,
+     "reactions": 124
+    },
+    {
+     "day": "2026-10-03",
+     "posts": 19,
+     "comments": 37,
+     "reactions": 120
+    },
+    {
+     "day": "2026-10-04",
+     "posts": 22,
+     "comments": 54,
+     "reactions": 147
+    },
+    {
+     "day": "2026-10-05",
+     "posts": 22,
+     "comments": 49,
+     "reactions": 210
+    },
+    {
+     "day": "2026-10-06",
+     "posts": 27,
+     "comments": 53,
+     "reactions": 149
+    },
+    {
+     "day": "2026-10-07",
+     "posts": 23,
+     "comments": 41,
+     "reactions": 156
+    }
+   ],
+   "moderation": {
+    "reports_supported": [
+     "gym_review"
+    ],
+    "user_report_block": false,
+    "reported": {
+     "open": 2,
+     "cur": 13,
+     "prev": 4
+    },
+    "kept": 5,
+    "removed": 2,
+    "latest": [
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000601",
+      "kind": "gym_review",
+      "target_id": "5a3e0000-0000-4000-8000-000000000102",
+      "target_name": "نادي تجريبي - الخبر",
+      "author_username": "demo_user17",
+      "reason": "fake",
+      "status": "new",
+      "created_at": "2026-10-07T04:37:00.000+00:00"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000602",
+      "kind": "gym_review",
+      "target_id": "5a3e0000-0000-4000-8000-000000000101",
+      "target_name": "نادي تجريبي - العليا",
+      "author_username": "demo_user42",
+      "reason": "offensive",
+      "status": "new",
+      "created_at": "2026-10-06T10:12:00.000+00:00"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000603",
+      "kind": "gym_review",
+      "target_id": "5a3e0000-0000-4000-8000-000000000104",
+      "target_name": "صالة اللياقة التجريبية",
+      "author_username": "demo_user08",
+      "reason": "spam",
+      "status": "removed",
+      "created_at": "2026-10-04T08:12:00.000+00:00"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000604",
+      "kind": "gym_review",
+      "target_id": "5a3e0000-0000-4000-8000-000000000101",
+      "target_name": "نادي تجريبي - العليا",
+      "author_username": "demo_user23",
+      "reason": "other",
+      "status": "kept",
+      "created_at": "2026-10-01T20:12:00.000+00:00"
+     }
+    ]
+   },
+   "chats": {
+    "messages": {
+     "today": 312,
+     "cur": 9249,
+     "prev": 8693
+    },
+    "senders": {
+     "cur": 1164,
+     "prev": 1053
+    },
+    "conversations": {
+     "cur": 1669,
+     "prev": 1564
+    },
+    "media": {
+     "cur": 1050,
+     "prev": 879
+    },
+    "media_pct_cur": 11,
+    "unread_over_24h": 37,
+    "daily": [
+     {
+      "day": "2026-09-08",
+      "n": 370
+     },
+     {
+      "day": "2026-09-09",
+      "n": 354
+     },
+     {
+      "day": "2026-09-10",
+      "n": 384
+     },
+     {
+      "day": "2026-09-11",
+      "n": 203
+     },
+     {
+      "day": "2026-09-12",
+      "n": 233
+     },
+     {
+      "day": "2026-09-13",
+      "n": 373
+     },
+     {
+      "day": "2026-09-14",
+      "n": 361
+     },
+     {
+      "day": "2026-09-15",
+      "n": 329
+     },
+     {
+      "day": "2026-09-16",
+      "n": 346
+     },
+     {
+      "day": "2026-09-17",
+      "n": 322
+     },
+     {
+      "day": "2026-09-18",
+      "n": 237
+     },
+     {
+      "day": "2026-09-19",
+      "n": 240
+     },
+     {
+      "day": "2026-09-20",
+      "n": 274
+     },
+     {
+      "day": "2026-09-21",
+      "n": 276
+     },
+     {
+      "day": "2026-09-22",
+      "n": 317
+     },
+     {
+      "day": "2026-09-23",
+      "n": 316
+     },
+     {
+      "day": "2026-09-24",
+      "n": 293
+     },
+     {
+      "day": "2026-09-25",
+      "n": 251
+     },
+     {
+      "day": "2026-09-26",
+      "n": 240
+     },
+     {
+      "day": "2026-09-27",
+      "n": 271
+     },
+     {
+      "day": "2026-09-28",
+      "n": 264
+     },
+     {
+      "day": "2026-09-29",
+      "n": 388
+     },
+     {
+      "day": "2026-09-30",
+      "n": 393
+     },
+     {
+      "day": "2026-10-01",
+      "n": 270
+     },
+     {
+      "day": "2026-10-02",
+      "n": 264
+     },
+     {
+      "day": "2026-10-03",
+      "n": 264
+     },
+     {
+      "day": "2026-10-04",
+      "n": 323
+     },
+     {
+      "day": "2026-10-05",
+      "n": 399
+     },
+     {
+      "day": "2026-10-06",
+      "n": 382
+     },
+     {
+      "day": "2026-10-07",
+      "n": 312
+     }
+    ]
+   }
+  },
+  "partners": {
+   "pending": {
+    "club": 2,
+    "store": 2,
+    "coach": 1,
+    "center": 1,
+    "venue": 1
+   },
+   "pending_total": 7,
+   "items": [
+    {
+     "kind": "venue",
+     "id": "5a3e0000-0000-4000-8000-000000000205",
+     "name": "Demo Court Club",
+     "created_at": "2026-10-01T05:32:00.000+00:00",
+     "city": "جدة",
+     "username": "demo_khalid",
+     "agent_task": null
+    },
+    {
+     "kind": "center",
+     "id": "5a3e0000-0000-4000-8000-000000000206",
+     "name": "مركز الاستشفاء التجريبي - الملقا",
+     "created_at": "2026-10-02T05:57:00.000+00:00",
+     "city": "الرياض",
+     "username": "demo_ahmed",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000005",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "kind": "club",
+     "id": "5a3e0000-0000-4000-8000-000000000207",
+     "name": "نادي تجريبي - النرجس",
+     "created_at": "2026-10-03T04:42:00.000+00:00",
+     "city": "الرياض",
+     "username": "demo_faisal",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000002",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "kind": "store",
+     "id": "5a3e0000-0000-4000-8000-000000000208",
+     "name": "Sample Fit Wear Outlet",
+     "created_at": "2026-10-04T05:42:00.000+00:00",
+     "city": "جدة",
+     "username": "demo_manager",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000003",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "kind": "coach",
+     "id": "5a3e0000-0000-4000-8000-000000000209",
+     "name": "Demo Coach Sara",
+     "created_at": "2026-10-05T02:52:00.000+00:00",
+     "city": "الدمام",
+     "username": "demo_sara",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000004",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "kind": "club",
+     "id": "5a3e0000-0000-4000-8000-000000000210",
+     "name": "Demo Gym - Corniche",
+     "created_at": "2026-10-06T04:12:00.000+00:00",
+     "city": "الخبر",
+     "username": "demo_omar",
+     "agent_task": null
+    },
+    {
+     "kind": "store",
+     "id": "5a3e0000-0000-4000-8000-000000000211",
+     "name": "مطعم تجريبي صحي",
+     "created_at": "2026-10-06T23:12:00.000+00:00",
+     "city": "الرياض",
+     "username": "demo_rest",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000006",
+      "status": "in_progress"
+     }
+    }
+   ]
+  },
+  "reports": {
+   "by_status": {
+    "new": 4,
+    "seen": 7,
+    "fixed": 23,
+    "wontfix": 3
+   },
+   "received": {
+    "today": 2,
+    "cur": 36,
+    "prev": 27
+   },
+   "latest_new": [
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000801",
+     "category": "bug",
+     "message": "التطبيق يقفل لما أفتح شاشة الوجبات بعد التمرين وأمرر بسرعة — بلاغ تجريبي للمعاينة",
+     "created_at": "2026-10-07T05:32:00.000+00:00",
+     "username": "demo_ahmed",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000007",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000802",
+     "category": "idea",
+     "message": "ودي يكون فيه وضع ليلي لشاشة التمرين عشان أتمرن بالليل بدون إزعاج (تجريبي)",
+     "created_at": "2026-10-07T03:12:00.000+00:00",
+     "username": "demo_noura",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000008",
+      "status": "in_progress"
+     }
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000803",
+     "category": "design",
+     "message": "Sample: the check-in button is hard to reach on small phones",
+     "created_at": "2026-10-06T21:12:00.000+00:00",
+     "username": "demo_lee",
+     "agent_task": {
+      "id": "7a5c0000-0000-4000-8000-000000000009",
+      "status": "waiting_approval"
+     }
+    },
+    {
+     "id": "5a3e0000-0000-4000-8000-000000000804",
+     "category": "other",
+     "message": "Sample report: can I export my workout history?",
+     "created_at": "2026-10-06T04:12:00.000+00:00",
+     "username": null,
+     "agent_task": null
+    }
+   ]
+  },
+  "marketing": {
+   "live_ad": {
+    "id": "5a3e0000-0000-4000-8000-000000000701",
+    "title": "عرض الويكند (تجريبي)",
+    "kind": "ad",
+    "starts_at": "2026-10-06T04:12:00.000+00:00",
+    "ends_at": "2026-10-09T04:12:00.000+00:00"
+   },
+   "ads": {
+    "live": 1,
+    "scheduled": 1,
+    "ended": 4,
+    "off": 1,
+    "live_marketing": 1
+   },
+   "ad_stats": {
+    "cur": {
+     "views": 7575,
+     "reach": 3925,
+     "clicks": 602,
+     "closes": 2648
+    },
+    "prev": {
+     "views": 6605,
+     "reach": 3673,
+     "clicks": 527,
+     "closes": 2440
+    }
+   },
+   "events": {
+    "active": 12,
+    "past_still_active": 1,
+    "upcoming": [
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000900",
+      "title": "معرض الصقور والصيد السعودي الدولي 2026",
+      "title_en": "Saudi Falcons & Hunting Exhibition 2026",
+      "starts_on": "2026-10-01",
+      "ends_on": "2026-10-10",
+      "city": "الرياض",
+      "category": "shooting"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000901",
+      "title": "سباق الرياض",
+      "title_en": "Riyadh Run",
+      "starts_on": "2026-10-12",
+      "ends_on": null,
+      "city": "الرياض",
+      "category": "running"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000902",
+      "title": "موسم سباقات الرياض",
+      "title_en": "Riyadh Racing Season",
+      "starts_on": "2026-10-16",
+      "ends_on": "2027-04-17",
+      "city": "الرياض",
+      "category": "horse_racing"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000903",
+      "title": "نزالات موسم الرياض 2026",
+      "title_en": "Riyadh Season 2026 fight nights",
+      "starts_on": "2026-10-21",
+      "ends_on": null,
+      "city": "الرياض",
+      "category": "boxing"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000904",
+      "title": "دورة الألعاب الآسيوية للصالات والفنون القتالية",
+      "title_en": "Asian Indoor & Martial Arts Games",
+      "starts_on": "2026-12-13",
+      "ends_on": "2026-12-21",
+      "city": "الرياض",
+      "category": "boxing"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000905",
+      "title": "رالي داكار السعودية 2027",
+      "title_en": "Dakar Rally Saudi Arabia 2027",
+      "starts_on": "2027-01-01",
+      "ends_on": "2027-01-15",
+      "city": "رابغ",
+      "category": "motorsport"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000906",
+      "title": "سباق العلا للمسارات 2027",
+      "title_en": "AlUla Trail Race 2027",
+      "starts_on": "2027-01-22",
+      "ends_on": null,
+      "city": "العلا",
+      "category": "hiking"
+     },
+     {
+      "id": "5a3e0000-0000-4000-8000-000000000907",
+      "title": "ماراثون الرياض 2027",
+      "title_en": "Riyadh Marathon 2027",
+      "starts_on": "2027-01-31",
+      "ends_on": null,
+      "city": "الرياض",
+      "category": "running"
+     }
+    ]
+   },
+   "nudges": {
+    "today": 146,
+    "cur": 4379,
+    "prev": 4124,
+    "by_category_cur": {
+     "gym": 1751,
+     "friend": 806,
+     "streak": 1002,
+     "workout": 561,
+     "meal": 259
+    },
+    "templates_active": 36,
+    "templates_paused": 2
+   }
+  },
+  "ai": {
+   "limits": {
+    "barcode_per_day": 2,
+    "meal_photos_per_day": 25
+   },
+   "fixed_caps": {
+    "plan": 8,
+    "office": 80
+   },
+   "usage": {
+    "meal_photo": {
+     "uses_today": 96,
+     "uses_cur": 3073,
+     "uses_prev": 2728,
+     "users_cur": 402
+    },
+    "barcode": {
+     "uses_today": 31,
+     "uses_cur": 904,
+     "uses_prev": 956,
+     "users_cur": 251
+    },
+    "plan": {
+     "uses_today": 7,
+     "uses_cur": 203,
+     "uses_prev": 194,
+     "users_cur": 133
+    },
+    "office": {
+     "uses_today": 13,
+     "uses_cur": 268,
+     "uses_prev": 207,
+     "users_cur": 1
+    }
+   },
+   "office_tasks_today": 11
+  },
+  "office": {
+   "by_status": {
+    "scheduled": 0,
+    "in_progress": 2,
+    "waiting_approval": 8,
+    "done": 4,
+    "failed": 1
+   },
+   "by_desk": {
+    "lead": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 0,
+     "done": 1,
+     "failed": 0
+    },
+    "clubs": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 1,
+     "done": 0,
+     "failed": 0
+    },
+    "stores": {
+     "scheduled": 0,
+     "in_progress": 1,
+     "waiting_approval": 1,
+     "done": 0,
+     "failed": 0
+    },
+    "coaches": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 1,
+     "done": 0,
+     "failed": 1
+    },
+    "care": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 1,
+     "done": 1,
+     "failed": 0
+    },
+    "reports": {
+     "scheduled": 0,
+     "in_progress": 1,
+     "waiting_approval": 2,
+     "done": 1,
+     "failed": 0
+    },
+    "marketing": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 1,
+     "done": 1,
+     "failed": 0
+    },
+    "users": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 0,
+     "done": 0,
+     "failed": 0
+    },
+    "ai": {
+     "scheduled": 0,
+     "in_progress": 0,
+     "waiting_approval": 1,
+     "done": 0,
+     "failed": 0
+    }
+   },
+   "waiting_total": 8,
+   "working_total": 2,
+   "oldest_waiting_at": "2026-10-07T01:12:00.000+00:00"
+  }
+ },
+ "tasks": [
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000001",
+   "desk": "lead",
+   "kind": "daily_brief",
+   "target_kind": null,
+   "target_id": null,
+   "title": null,
+   "status": "done",
+   "input": {},
+   "output": {
+    "headline": {
+     "ar": "8 أشياء تنتظر قرارك، أهمها بلاغ تعطّل الوجبات",
+     "en": "8 things await your decision — start with the meals crash report"
+    },
+    "points": [
+     {
+      "ar": "التسجيلات أعلى من الأسبوع اللي قبل بـ35% (96 مقابل 71).",
+      "en": "Sign-ups are up 35% on last week (96 vs 71)."
+     },
+     {
+      "ar": "أعطال التطبيق نزلت من 31 إلى 23، بس js_fatal للحين موجود.",
+      "en": "App errors fell from 31 to 23, but js_fatal is still there."
+     },
+     {
+      "ar": "طلب نادي ينتظر من 4 أيام — أقدم طلب شريك عندك.",
+      "en": "A gym request has waited 4 days — your oldest partner request."
+     },
+     {
+      "ar": "ملعب Demo Padel Arena ما ردّ على حجزين من 14 ساعة.",
+      "en": "Demo Padel Arena has not answered 2 bookings for 14 hours."
+     }
+    ],
+    "priorities": [
+     {
+      "desk": "reports",
+      "text": {
+       "ar": "اعتمد فرز بلاغ تعطّل الوجبات وأرسل الرد للمختبر.",
+       "en": "Approve the meals-crash triage and send the reply."
+      }
+     },
+     {
+      "desk": "clubs",
+      "text": {
+       "ar": "قرّر طلب نادي تجريبي - النرجس.",
+       "en": "Decide the Demo Gym - Narjis request."
+      }
+     },
+     {
+      "desk": "ai",
+      "text": {
+       "ar": "راجع اقتراح رفع حد الباركود إلى 4.",
+       "en": "Review the proposal to raise the barcode limit to 4."
+      }
+     }
+    ]
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-1",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T03:02:00.000+00:00",
+   "updated_at": "2026-10-07T03:02:40.000+00:00",
+   "finished_at": "2026-10-07T03:02:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000002",
+   "desk": "clubs",
+   "kind": "review_partner",
+   "target_kind": "club",
+   "target_id": "5a3e0000-0000-4000-8000-000000000207",
+   "title": "نادي تجريبي - النرجس",
+   "status": "waiting_approval",
+   "input": {
+    "locale": "ar"
+   },
+   "output": {
+    "summary": {
+     "ar": "طلب نادي في الرياض ببيانات كاملة: السجل التجاري والرخصة والموقع موجودين.",
+     "en": "A Riyadh gym request with complete details: CR, license and location are all there."
+    },
+    "checks": [
+     {
+      "label": {
+       "ar": "السجل التجاري مرفق",
+       "en": "Commercial registration attached"
+      },
+      "ok": true
+     },
+     {
+      "label": {
+       "ar": "رخصة البلدية سارية",
+       "en": "Municipal license valid"
+      },
+      "ok": true
+     },
+     {
+      "label": {
+       "ar": "الموقع على الخريطة داخل المدينة",
+       "en": "Map location is inside the city"
+      },
+      "ok": true
+     },
+     {
+      "label": {
+       "ar": "صور النادي",
+       "en": "Gym photos"
+      },
+      "ok": false
+     }
+    ],
+    "missing": [
+     {
+      "ar": "صور من داخل النادي (اختياري)",
+      "en": "Photos from inside the gym (optional)"
+     }
+    ],
+    "recommendation": "approve",
+    "note": "",
+    "note_locale": "ar",
+    "confidence": "high"
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-2",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T04:07:00.000+00:00",
+   "updated_at": "2026-10-07T04:07:40.000+00:00",
+   "finished_at": "2026-10-07T04:07:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000003",
+   "desk": "stores",
+   "kind": "review_partner",
+   "target_kind": "store",
+   "target_id": "5a3e0000-0000-4000-8000-000000000208",
+   "title": "Sample Fit Wear Outlet",
+   "status": "waiting_approval",
+   "input": {
+    "locale": "en"
+   },
+   "output": {
+    "summary": {
+     "ar": "متجر ملابس رياضية بدون شعار وبدون منتجات للحين.",
+     "en": "A sportswear store with no logo and no products yet."
+    },
+    "checks": [
+     {
+      "label": {
+       "ar": "اسم المتجر والوصف",
+       "en": "Store name and description"
+      },
+      "ok": true
+     },
+     {
+      "label": {
+       "ar": "الشعار",
+       "en": "Logo"
+      },
+      "ok": false
+     },
+     {
+      "label": {
+       "ar": "منتج واحد على الأقل",
+       "en": "At least one product"
+      },
+      "ok": false
+     }
+    ],
+    "missing": [
+     {
+      "ar": "شعار المتجر",
+      "en": "Store logo"
+     },
+     {
+      "ar": "منتجات بأسعار",
+      "en": "Products with prices"
+     }
+    ],
+    "recommendation": "reject",
+    "note": "Please add your store logo and at least one product with a price, then submit again.",
+    "note_locale": "en",
+    "confidence": "medium"
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-3",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T04:08:00.000+00:00",
+   "updated_at": "2026-10-07T04:08:40.000+00:00",
+   "finished_at": "2026-10-07T04:08:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000004",
+   "desk": "coaches",
+   "kind": "review_partner",
+   "target_kind": "coach",
+   "target_id": "5a3e0000-0000-4000-8000-000000000209",
+   "title": "Demo Coach Sara",
+   "status": "waiting_approval",
+   "input": {
+    "locale": "ar"
+   },
+   "output": {
+    "summary": {
+     "ar": "مدربة بشهادة معتمدة وخبرة 5 سنوات، والشهادة واضحة.",
+     "en": "A coach with an accredited certificate and 5 years of experience; the certificate is clear."
+    },
+    "checks": [
+     {
+      "label": {
+       "ar": "الشهادة واضحة ومعتمدة",
+       "en": "Certificate clear and accredited"
+      },
+      "ok": true
+     },
+     {
+      "label": {
+       "ar": "سنوات الخبرة",
+       "en": "Years of experience"
+      },
+      "ok": true
+     }
+    ],
+    "missing": [],
+    "recommendation": "approve",
+    "note": "",
+    "note_locale": "ar",
+    "confidence": "high"
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-4",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T04:09:00.000+00:00",
+   "updated_at": "2026-10-07T04:09:40.000+00:00",
+   "finished_at": "2026-10-07T04:09:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000005",
+   "desk": "care",
+   "kind": "review_partner",
+   "target_kind": "center",
+   "target_id": "5a3e0000-0000-4000-8000-000000000206",
+   "title": "مركز الاستشفاء التجريبي - الملقا",
+   "status": "waiting_approval",
+   "input": {
+    "locale": "ar"
+   },
+   "output": {
+    "summary": {
+     "ar": "مركز استشفاء بخدمات واضحة، بس رقم الترخيص الصحي ناقص.",
+     "en": "A recovery center with clear services, but the health license number is missing."
+    },
+    "checks": [
+     {
+      "label": {
+       "ar": "الخدمات والأسعار",
+       "en": "Services and prices"
+      },
+      "ok": true
+     },
+     {
+      "label": {
+       "ar": "الترخيص الصحي",
+       "en": "Health license"
+      },
+      "ok": false
+     }
+    ],
+    "missing": [
+     {
+      "ar": "رقم الترخيص الصحي",
+      "en": "Health license number"
+     }
+    ],
+    "recommendation": "reject",
+    "note": "نحتاج رقم الترخيص الصحي للمركز عشان نكمل المراجعة.",
+    "note_locale": "ar",
+    "confidence": "medium"
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-5",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T04:10:00.000+00:00",
+   "updated_at": "2026-10-07T04:10:40.000+00:00",
+   "finished_at": "2026-10-07T04:10:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000006",
+   "desk": "stores",
+   "kind": "review_partner",
+   "target_kind": "store",
+   "target_id": "5a3e0000-0000-4000-8000-000000000211",
+   "title": "مطعم تجريبي صحي",
+   "status": "in_progress",
+   "input": {
+    "locale": "ar"
+   },
+   "output": null,
+   "error": null,
+   "model": null,
+   "request_id": "sample-run-6",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T06:09:00.000+00:00",
+   "updated_at": "2026-10-07T06:09:00.000+00:00",
+   "finished_at": null
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000007",
+   "desk": "reports",
+   "kind": "triage_report",
+   "target_kind": "report",
+   "target_id": "5a3e0000-0000-4000-8000-000000000801",
+   "title": "التطبيق يقفل لما أفتح شاشة الوجبات بعد التمرين وأمرر بسرعة",
+   "status": "waiting_approval",
+   "input": {
+    "locale": "ar"
+   },
+   "output": {
+    "summary": {
+     "ar": "تعطّل كامل في شاشة الوجبات بعد التمرين — يأثر على تسجيل الأكل.",
+     "en": "A full crash on the meals screen after a workout — it blocks food logging."
+    },
+    "severity": "critical",
+    "category_guess": "bug",
+    "status": "seen",
+    "reply": "شكراً على البلاغ! وصلنا وقاعدين نصلّحه، وبنبلغك أول ما يكون التحديث جاهز.",
+    "reply_locale": "ar"
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-7",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T05:42:00.000+00:00",
+   "updated_at": "2026-10-07T05:42:40.000+00:00",
+   "finished_at": "2026-10-07T05:42:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000008",
+   "desk": "reports",
+   "kind": "triage_report",
+   "target_kind": "report",
+   "target_id": "5a3e0000-0000-4000-8000-000000000802",
+   "title": "ودي يكون فيه وضع ليلي لشاشة التمرين",
+   "status": "in_progress",
+   "input": {
+    "locale": "ar"
+   },
+   "output": null,
+   "error": null,
+   "model": null,
+   "request_id": "sample-run-8",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T06:11:00.000+00:00",
+   "updated_at": "2026-10-07T06:11:00.000+00:00",
+   "finished_at": null
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000009",
+   "desk": "reports",
+   "kind": "triage_report",
+   "target_kind": "report",
+   "target_id": "5a3e0000-0000-4000-8000-000000000803",
+   "title": "Sample: the check-in button is hard to reach on small phones",
+   "status": "waiting_approval",
+   "input": {
+    "locale": "en"
+   },
+   "output": {
+    "summary": {
+     "ar": "ملاحظة تصميم بسيطة على مكان زر الحضور في الشاشات الصغيرة.",
+     "en": "A small design note about the check-in button placement on small screens."
+    },
+    "severity": "low",
+    "category_guess": "design",
+    "status": "seen",
+    "reply": "Thanks! We will look at moving the check-in button lower on small phones.",
+    "reply_locale": "en"
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-9",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T04:11:00.000+00:00",
+   "updated_at": "2026-10-07T04:11:40.000+00:00",
+   "finished_at": "2026-10-07T04:11:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000010",
+   "desk": "marketing",
+   "kind": "draft_nudge",
+   "target_kind": null,
+   "target_id": null,
+   "title": "الويكند",
+   "status": "waiting_approval",
+   "input": {
+    "brief": "الويكند"
+   },
+   "output": {
+    "why": {
+     "ar": "الحضور ينزل يوم الجمعة 30%، فتنبيه خفيف قبل الويكند يرجّع الناس للنادي.",
+     "en": "Check-ins drop 30% on Fridays, so a light nudge before the weekend brings people back."
+    },
+    "template": {
+     "category": "gym",
+     "gender": "all",
+     "locale": "ar",
+     "title": "ويكندك يبدأ من {gym} 💪",
+     "body": "هلا {name}! ساعة وحدة في {gym} اليوم تفرق معك طول الأسبوع."
+    }
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-10",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T01:12:00.000+00:00",
+   "updated_at": "2026-10-07T01:12:40.000+00:00",
+   "finished_at": "2026-10-07T01:12:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000011",
+   "desk": "ai",
+   "kind": "review_ai_limits",
+   "target_kind": null,
+   "target_id": null,
+   "title": null,
+   "status": "waiting_approval",
+   "input": {
+    "current": {
+     "barcode_per_day": 2,
+     "meal_photos_per_day": 25
+    },
+    "usage": {
+     "barcode": {
+      "uses_7d": 214,
+      "users_7d": 118,
+      "at_cap_users": 37
+     }
+    }
+   },
+   "output": {
+    "why": {
+     "ar": "37 مستخدم وصلوا حد الباركود هالأسبوع، وصور الوجبات بعيدة عن الحد.",
+     "en": "37 users hit the barcode cap this week; meal photos are far from their cap."
+    },
+    "barcode_per_day": 4,
+    "meal_photos_per_day": 25
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-11",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-07T02:12:00.000+00:00",
+   "updated_at": "2026-10-07T02:12:40.000+00:00",
+   "finished_at": "2026-10-07T02:12:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000012",
+   "desk": "reports",
+   "kind": "triage_report",
+   "target_kind": "report",
+   "target_id": "5a3e0000-0000-4000-8000-000000000811",
+   "title": "الإشعارات توصل مرتين",
+   "status": "done",
+   "input": {
+    "locale": "ar"
+   },
+   "output": {
+    "summary": {
+     "ar": "إشعار مكرر.",
+     "en": "Duplicate notification."
+    },
+    "severity": "medium",
+    "category_guess": "bug",
+    "status": "seen",
+    "reply": "شكراً، نشيّك عليه.",
+    "reply_locale": "ar"
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-12",
+   "decision": "approved",
+   "decision_note": null,
+   "final": {
+    "status": "fixed",
+    "reply": "تم الإصلاح في التحديث الأخير، شكراً لك!"
+   },
+   "decided_by": "00000000-0000-4000-8000-00000000a001",
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": "2026-10-06T05:12:00.000+00:00",
+   "created_at": "2026-10-06T03:12:00.000+00:00",
+   "updated_at": "2026-10-06T05:12:00.000+00:00",
+   "finished_at": "2026-10-06T03:12:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000013",
+   "desk": "care",
+   "kind": "review_partner",
+   "target_kind": "venue",
+   "target_id": "5a3e0000-0000-4000-8000-000000000212",
+   "title": "Demo Padel Arena",
+   "status": "done",
+   "input": {
+    "locale": "ar"
+   },
+   "output": {
+    "summary": {
+     "ar": "ملعب بادل ببيانات كاملة.",
+     "en": "A padel venue with complete details."
+    },
+    "checks": [],
+    "missing": [],
+    "recommendation": "approve",
+    "note": "",
+    "note_locale": "en",
+    "confidence": "high"
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-13",
+   "decision": "approved",
+   "decision_note": null,
+   "final": {
+    "decision": "approve",
+    "note": ""
+   },
+   "decided_by": "00000000-0000-4000-8000-00000000a001",
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": "2026-10-05T05:12:00.000+00:00",
+   "created_at": "2026-10-05T04:12:00.000+00:00",
+   "updated_at": "2026-10-05T05:12:00.000+00:00",
+   "finished_at": "2026-10-05T04:12:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000014",
+   "desk": "marketing",
+   "kind": "draft_nudge",
+   "target_kind": null,
+   "target_id": null,
+   "title": null,
+   "status": "done",
+   "input": {
+    "brief": null
+   },
+   "output": {
+    "why": {
+     "ar": "تنبيه للسلسلة.",
+     "en": "A streak nudge."
+    },
+    "template": {
+     "category": "streak",
+     "gender": "all",
+     "locale": "ar",
+     "title": "سلسلتك {streak} يوم!",
+     "body": "لا توقفها اليوم يا {name}."
+    }
+   },
+   "error": null,
+   "model": "sample-model",
+   "request_id": "sample-run-14",
+   "decision": "rejected",
+   "decision_note": "نفس تنبيه الأسبوع اللي فات تقريباً",
+   "final": null,
+   "decided_by": "00000000-0000-4000-8000-00000000a001",
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": "2026-10-04T06:12:00.000+00:00",
+   "created_at": "2026-10-04T04:12:00.000+00:00",
+   "updated_at": "2026-10-04T06:12:00.000+00:00",
+   "finished_at": "2026-10-04T04:12:40.000+00:00"
+  },
+  {
+   "id": "7a5c0000-0000-4000-8000-000000000015",
+   "desk": "coaches",
+   "kind": "review_partner",
+   "target_kind": "coach",
+   "target_id": "5a3e0000-0000-4000-8000-000000000213",
+   "title": "Demo Coach Hamad",
+   "status": "failed",
+   "input": {
+    "locale": "ar"
+   },
+   "output": null,
+   "error": "ai_failed",
+   "model": "sample-model",
+   "request_id": "sample-run-15",
+   "decision": null,
+   "decision_note": null,
+   "final": null,
+   "decided_by": null,
+   "created_by": "00000000-0000-4000-8000-00000000a001",
+   "decided_at": null,
+   "created_at": "2026-10-05T06:12:00.000+00:00",
+   "updated_at": "2026-10-05T06:12:40.000+00:00",
+   "finished_at": "2026-10-05T06:12:40.000+00:00"
+  }
+ ]
+}

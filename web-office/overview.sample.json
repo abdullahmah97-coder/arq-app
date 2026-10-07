@@ -1,0 +1,1024 @@
+{
+  "ai": {
+    "usage": {
+      "plan": {
+        "uses_cur": 0,
+        "users_cur": 0,
+        "uses_prev": 1,
+        "uses_today": 0
+      },
+      "office": {
+        "uses_cur": 1,
+        "users_cur": 1,
+        "uses_prev": 0,
+        "uses_today": 1
+      },
+      "barcode": {
+        "uses_cur": 1,
+        "users_cur": 1,
+        "uses_prev": 0,
+        "uses_today": 1
+      },
+      "meal_photo": {
+        "uses_cur": 1,
+        "users_cur": 1,
+        "uses_prev": 0,
+        "uses_today": 1
+      }
+    },
+    "limits": {
+      "barcode_per_day": 2,
+      "meal_photos_per_day": 25
+    },
+    "fixed_caps": {
+      "plan": 8,
+      "office": 80
+    },
+    "office_tasks_today": 13
+  },
+  "meta": {
+    "days": 7,
+    "today": "2026-10-07",
+    "prev_to": "2026-09-30",
+    "cur_from": "2026-10-01",
+    "timezone": "Asia/Riyadh",
+    "prev_from": "2026-09-24",
+    "generated_at": "2026-10-07T03:41:47.055+00:00"
+  },
+  "store": {
+    "brands": {
+      "new": {
+        "cur": 3,
+        "prev": 0,
+        "today": 2
+      },
+      "live": 2,
+      "pending": 1,
+      "rejected": 0,
+      "suspended": 0,
+      "live_partner": 1,
+      "live_unclaimed": 1,
+      "live_restaurants": 1
+    },
+    "offers": {
+      "live": 1,
+      "views": {
+        "cur": 1,
+        "prev": 1,
+        "today": 1
+      },
+      "people": {
+        "cur": 1,
+        "prev": 1
+      },
+      "visits": {
+        "cur": 0,
+        "prev": 0
+      },
+      "reveals": {
+        "cur": 1,
+        "prev": 0
+      },
+      "ending_3d": 1,
+      "expired_still_active": 0
+    },
+    "rewards": {
+      "points": {
+        "cur": 10,
+        "prev": 5,
+        "today": 10
+      },
+      "holders": 0,
+      "earners_cur": 1,
+      "outstanding": 0
+    },
+    "products": {
+      "new": {
+        "cur": 3,
+        "prev": 0
+      },
+      "live": 3,
+      "no_price": 0,
+      "sold_out": 1,
+      "low_stock": 1,
+      "avg_price_sar": 66,
+      "low_stock_items": [
+        {
+          "brand": "Fit Wear",
+          "stock": 0,
+          "product": "Shirt",
+          "brand_id": "36cda199-c746-4c79-ae76-03f5e7d94834",
+          "product_id": "db4acc15-1b78-4292-afcd-926dd6cddd8a"
+        },
+        {
+          "brand": "Fit Wear",
+          "stock": 3,
+          "product": "Shorts",
+          "brand_id": "36cda199-c746-4c79-ae76-03f5e7d94834",
+          "product_id": "5f5d30c0-849c-4834-940f-d6f359bc248a"
+        }
+      ],
+      "stock_untracked": 1
+    },
+    "followers": {
+      "new": {
+        "cur": 2,
+        "prev": 0
+      },
+      "total": 2
+    },
+    "top_brands": [
+      {
+        "id": "36cda199-c746-4c79-ae76-03f5e7d94834",
+        "city": null,
+        "name": "Fit Wear",
+        "category": "apparel",
+        "followers": 2,
+        "engagement": 3,
+        "active_subs": 0,
+        "offer_views": 1,
+        "site_visits": 0,
+        "code_reveals": 1,
+        "followers_new": 2,
+        "live_products": 3
+      },
+      {
+        "id": "b3720c58-1018-4ba2-a8c6-67a78d2b2f4f",
+        "city": "الرياض",
+        "name": "Green Bowl",
+        "category": "restaurant",
+        "followers": 0,
+        "engagement": 1,
+        "active_subs": 1,
+        "offer_views": 0,
+        "site_visits": 0,
+        "code_reveals": 0,
+        "followers_new": 0,
+        "live_products": 0
+      }
+    ],
+    "top_products": [],
+    "orders_enabled": false,
+    "redemption_enabled": false
+  },
+  "office": {
+    "by_desk": {
+      "ai": {
+        "done": 0,
+        "failed": 0,
+        "scheduled": 0,
+        "in_progress": 0,
+        "waiting_approval": 2
+      },
+      "care": {
+        "done": 0,
+        "failed": 0,
+        "scheduled": 0,
+        "in_progress": 0,
+        "waiting_approval": 3
+      },
+      "lead": {
+        "done": 1,
+        "failed": 0,
+        "scheduled": 0,
+        "in_progress": 1,
+        "waiting_approval": 0
+      },
+      "clubs": {
+        "done": 0,
+        "failed": 0,
+        "scheduled": 0,
+        "in_progress": 0,
+        "waiting_approval": 1
+      },
+      "users": {
+        "done": 0,
+        "failed": 0,
+        "scheduled": 0,
+        "in_progress": 0,
+        "waiting_approval": 0
+      },
+      "stores": {
+        "done": 0,
+        "failed": 0,
+        "scheduled": 0,
+        "in_progress": 0,
+        "waiting_approval": 1
+      },
+      "coaches": {
+        "done": 0,
+        "failed": 0,
+        "scheduled": 0,
+        "in_progress": 0,
+        "waiting_approval": 1
+      },
+      "reports": {
+        "done": 0,
+        "failed": 0,
+        "scheduled": 0,
+        "in_progress": 0,
+        "waiting_approval": 2
+      },
+      "marketing": {
+        "done": 0,
+        "failed": 0,
+        "scheduled": 0,
+        "in_progress": 0,
+        "waiting_approval": 2
+      }
+    },
+    "by_status": {
+      "done": 1,
+      "failed": 0,
+      "scheduled": 0,
+      "in_progress": 1,
+      "waiting_approval": 12
+    },
+    "waiting_total": 12,
+    "working_total": 1,
+    "oldest_waiting_at": "2026-01-01T00:00:00+00:00"
+  },
+  "reports": {
+    "received": {
+      "cur": 2,
+      "prev": 0,
+      "today": 2
+    },
+    "by_status": {
+      "new": 2,
+      "seen": 1,
+      "fixed": 0,
+      "wontfix": 0
+    },
+    "latest_new": [
+      {
+        "id": "71310eb9-cd50-490f-b4e6-3109ccbfb194",
+        "message": "Tester says the meals screen freezes when I open it after a workout and scroll fast; when I open it after a workout and scroll fast; when I ",
+        "category": "bug",
+        "username": "ahmed",
+        "agent_task": {
+          "id": "a5b01ff4-fd4a-4263-816a-05008a34e957",
+          "status": "waiting_approval"
+        },
+        "created_at": "2026-10-07T03:41:46.708+00:00"
+      },
+      {
+        "id": "6c032631-e503-453a-a31c-16de3e4accc2",
+        "message": "Second report",
+        "category": "idea",
+        "username": "sara",
+        "agent_task": {
+          "id": "33e3e9d0-d3fb-4086-ba46-e22b4cd5b5fa",
+          "status": "waiting_approval"
+        },
+        "created_at": "2026-10-07T02:41:46.71+00:00"
+      }
+    ]
+  },
+  "activity": {
+    "users": {
+      "total": 5,
+      "partners": 0,
+      "trainees": 5,
+      "by_account_type": {
+        "club": 0,
+        "coach": 0,
+        "store": 0,
+        "venue": 0,
+        "center": 0,
+        "trainee": 5,
+        "restaurant": 0
+      }
+    },
+    "errors": {
+      "cur": 3,
+      "top": [
+        {
+          "n": 2,
+          "kind": "screen_error",
+          "users": 2
+        },
+        {
+          "n": 1,
+          "kind": "js_fatal",
+          "users": 1
+        }
+      ],
+      "prev": 1,
+      "today": 2,
+      "users_cur": 2
+    },
+    "signups": {
+      "cur": 4,
+      "prev": 1,
+      "daily": [
+        {
+          "n": 0,
+          "day": "2026-10-01"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-02"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-03"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-04"
+        },
+        {
+          "n": 1,
+          "day": "2026-10-05"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-06"
+        },
+        {
+          "n": 3,
+          "day": "2026-10-07"
+        }
+      ],
+      "today": 3
+    },
+    "checkins": {
+      "cur": 3,
+      "prev": 1,
+      "daily": [
+        {
+          "n": 0,
+          "day": "2026-10-01"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-02"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-03"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-04"
+        },
+        {
+          "n": 1,
+          "day": "2026-10-05"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-06"
+        },
+        {
+          "n": 2,
+          "day": "2026-10-07"
+        }
+      ],
+      "today": 2,
+      "users_cur": 3,
+      "present_now": 1
+    },
+    "top_gyms": [
+      {
+        "n": 3,
+        "id": "0c4213f8-9d44-424f-9d31-5bf3357581b1",
+        "name": "نادي تجريبي - الخبر",
+        "users": 3,
+        "name_en": "Demo Gym - Khobar"
+      }
+    ],
+    "workouts": {
+      "cur": 1,
+      "prev": 1,
+      "today": 1,
+      "users_cur": 1,
+      "finished_cur": 1,
+      "plan_days_cur": 0,
+      "plan_days_prev": 0
+    },
+    "active_users": {
+      "cur": 3,
+      "prev": 2,
+      "daily": [
+        {
+          "n": 0,
+          "day": "2026-10-01"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-02"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-03"
+        },
+        {
+          "n": 1,
+          "day": "2026-10-04"
+        },
+        {
+          "n": 2,
+          "day": "2026-10-05"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-06"
+        },
+        {
+          "n": 3,
+          "day": "2026-10-07"
+        }
+      ],
+      "today": 3
+    },
+    "partner_intent": {
+      "total": 1,
+      "by_kind": {
+        "club": 1,
+        "coach": 0,
+        "store": 0,
+        "venue": 0,
+        "center": 0
+      },
+      "no_submission": 1
+    }
+  },
+  "bookings": {
+    "coaching": {
+      "sessions": {
+        "done": {
+          "cur": 0,
+          "prev": 0
+        },
+        "today": 0,
+        "no_show_cur": 0,
+        "upcoming_7d": 0,
+        "stale_booked": 1,
+        "cancelled_cur": 0
+      },
+      "link_requests": {
+        "cur": 1,
+        "prev": 0,
+        "pending": 1,
+        "pending_over_72h": 1
+      },
+      "clients_active": 0,
+      "coaches_approved": 1
+    },
+    "recovery": {
+      "today": 0,
+      "done_cur": 0,
+      "requests": {
+        "cur": 1,
+        "prev": 0,
+        "today": 0
+      },
+      "unclosed": 0,
+      "cancelled": {
+        "cur": 0,
+        "prev": 0
+      },
+      "upcoming_7d": 0,
+      "declined_cur": 0,
+      "open_requests": 1,
+      "requests_over_24h": 1
+    },
+    "attention": [
+      {
+        "n": 1,
+        "id": "b3720c58-1018-4ba2-a8c6-67a78d2b2f4f",
+        "kind": "restaurant_requests_waiting",
+        "name": "Green Bowl",
+        "since": "2026-10-04T03:41:46.648+00:00",
+        "target": "store",
+        "priority": 1
+      },
+      {
+        "n": 1,
+        "id": "10a2bd4a-b6ac-48c2-81f5-1d6aa308208f",
+        "kind": "center_requests_waiting",
+        "name": "السعودي الألماني الصحية - العلاج الطبيعي",
+        "since": "2026-10-05T03:41:46.644+00:00",
+        "target": "center",
+        "priority": 1
+      },
+      {
+        "n": 1,
+        "id": "5f9876f8-4bed-4cc4-a667-51a1c38096ba",
+        "kind": "venue_unanswered_bookings",
+        "name": "Padel Hub",
+        "since": "2026-10-06T20:41:46.615+00:00",
+        "target": "venue",
+        "priority": 1
+      },
+      {
+        "n": 1,
+        "id": "44444444-4444-4444-4444-444444444444",
+        "kind": "coach_requests_waiting",
+        "name": "Coach Dana",
+        "since": "2026-10-03T03:41:46.637+00:00",
+        "target": "coach",
+        "priority": 2
+      },
+      {
+        "n": 1,
+        "id": "b3720c58-1018-4ba2-a8c6-67a78d2b2f4f",
+        "kind": "restaurant_no_meals_planned",
+        "name": "Green Bowl",
+        "since": "2026-10-06T03:41:46.648+00:00",
+        "target": "store",
+        "priority": 2
+      },
+      {
+        "n": 1,
+        "id": "44444444-4444-4444-4444-444444444444",
+        "kind": "coach_sessions_unclosed",
+        "name": "Coach Dana",
+        "since": "2026-10-05T03:41:46.638+00:00",
+        "target": "coach",
+        "priority": 3
+      }
+    ],
+    "gym_classes": {
+      "today": {
+        "booked": 0,
+        "waitlist": 0
+      },
+      "created": {
+        "cur": 0,
+        "prev": 0,
+        "today": 0
+      },
+      "cancelled": {
+        "cur": 0,
+        "prev": 0
+      },
+      "upcoming_7d": {
+        "booked": 0,
+        "waitlist": 0
+      },
+      "active_classes": 0
+    },
+    "memberships": {
+      "new": {
+        "cur": 2,
+        "prev": 0,
+        "today": 2
+      },
+      "live": 1,
+      "active": 1,
+      "frozen": 0,
+      "expired": {
+        "cur": 1,
+        "prev": 0
+      },
+      "upcoming": 0,
+      "expiring_7d": 1,
+      "requests_pending": 0,
+      "requests_over_48h": 0
+    },
+    "venue_bookings": {
+      "today": {
+        "total": 0,
+        "pending": 0
+      },
+      "venues": {
+        "hidden": 0,
+        "in_app": 1,
+        "pending": 1,
+        "directory": 22
+      },
+      "created": {
+        "cur": 3,
+        "prev": 0,
+        "today": 1
+      },
+      "unclosed": 0,
+      "cancelled": {
+        "cur": 1,
+        "prev": 0
+      },
+      "value_sar": {
+        "cur": 200,
+        "prev": 0
+      },
+      "courts_cur": 3,
+      "classes_cur": 0,
+      "upcoming_7d": 1,
+      "declined_cur": 0,
+      "by_status_cur": {
+        "done": 1,
+        "no_show": 0,
+        "pending": 1,
+        "declined": 0,
+        "cancelled": 1,
+        "confirmed": 0
+      },
+      "stale_pending": 0,
+      "awaiting_venue": 1
+    },
+    "meal_subscriptions": {
+      "ended": {
+        "cur": 0,
+        "prev": 0
+      },
+      "active": 1,
+      "requests": {
+        "cur": 2,
+        "prev": 0,
+        "today": 0
+      },
+      "meals_today": 0,
+      "restaurants": 1,
+      "subscribers": 1,
+      "declined_cur": 0,
+      "open_requests": 1,
+      "requests_over_48h": 1,
+      "active_without_meals_3d": 1
+    }
+  },
+  "partners": {
+    "items": [
+      {
+        "id": "c1e1afd3-665a-47f6-bcfc-151743883cd6",
+        "city": "جدة",
+        "kind": "venue",
+        "name": "Court Club",
+        "username": "khalid",
+        "agent_task": {
+          "id": "f5164b93-ea2c-4c14-b13a-3acadbb10095",
+          "status": "waiting_approval"
+        },
+        "created_at": "2026-10-02T03:41:46.706+00:00"
+      },
+      {
+        "id": "62a14786-1920-48c9-83f6-0bf55afa81d2",
+        "city": "الرياض",
+        "kind": "center",
+        "name": "Recovery One",
+        "username": "ahmed",
+        "agent_task": {
+          "id": "96b0cc3b-c6e8-464a-82fd-3fb05bf3e24e",
+          "status": "waiting_approval"
+        },
+        "created_at": "2026-10-03T03:41:46.702+00:00"
+      },
+      {
+        "id": "df4af8b4-8ce2-4f8d-a7cb-1b355600d2fc",
+        "city": "الرياض",
+        "kind": "club",
+        "name": "Club One",
+        "username": "khalid",
+        "agent_task": {
+          "id": "864eb2e6-59a8-49e8-a2d0-2b32f8acad63",
+          "status": "waiting_approval"
+        },
+        "created_at": "2026-10-04T03:41:46.697+00:00"
+      },
+      {
+        "id": "17d8fdab-34c5-4bcb-a7b8-332742e594f9",
+        "city": "جدة",
+        "kind": "store",
+        "name": "Pending Co",
+        "username": "manager1",
+        "agent_task": {
+          "id": "188744cb-51d0-4b79-a19b-dba830c76095",
+          "status": "waiting_approval"
+        },
+        "created_at": "2026-10-05T03:41:46.699+00:00"
+      },
+      {
+        "id": "22222222-2222-2222-2222-222222222222",
+        "city": "جدة",
+        "kind": "coach",
+        "name": "Sara",
+        "username": "sara",
+        "agent_task": {
+          "id": "4895ab90-0802-4ee6-8fa7-bb9151d11c82",
+          "status": "waiting_approval"
+        },
+        "created_at": "2026-10-06T03:41:46.629+00:00"
+      }
+    ],
+    "pending": {
+      "club": 1,
+      "coach": 1,
+      "store": 1,
+      "venue": 1,
+      "center": 1
+    },
+    "pending_total": 5
+  },
+  "community": {
+    "tips": {
+      "cur": 1,
+      "prev": 0,
+      "total": 1
+    },
+    "chats": {
+      "daily": [
+        {
+          "n": 0,
+          "day": "2026-10-01"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-02"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-03"
+        },
+        {
+          "n": 1,
+          "day": "2026-10-04"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-05"
+        },
+        {
+          "n": 0,
+          "day": "2026-10-06"
+        },
+        {
+          "n": 2,
+          "day": "2026-10-07"
+        }
+      ],
+      "media": {
+        "cur": 1,
+        "prev": 0
+      },
+      "senders": {
+        "cur": 3,
+        "prev": 0
+      },
+      "messages": {
+        "cur": 3,
+        "prev": 0,
+        "today": 2
+      },
+      "conversations": {
+        "cur": 2,
+        "prev": 0
+      },
+      "media_pct_cur": 33,
+      "unread_over_24h": 1
+    },
+    "daily": [
+      {
+        "day": "2026-10-01",
+        "posts": 0,
+        "comments": 0,
+        "reactions": 0
+      },
+      {
+        "day": "2026-10-02",
+        "posts": 0,
+        "comments": 0,
+        "reactions": 0
+      },
+      {
+        "day": "2026-10-03",
+        "posts": 0,
+        "comments": 0,
+        "reactions": 0
+      },
+      {
+        "day": "2026-10-04",
+        "posts": 0,
+        "comments": 0,
+        "reactions": 0
+      },
+      {
+        "day": "2026-10-05",
+        "posts": 0,
+        "comments": 0,
+        "reactions": 0
+      },
+      {
+        "day": "2026-10-06",
+        "posts": 0,
+        "comments": 0,
+        "reactions": 0
+      },
+      {
+        "day": "2026-10-07",
+        "posts": 1,
+        "comments": 2,
+        "reactions": 2
+      }
+    ],
+    "posts": {
+      "cur": 1,
+      "prev": 1,
+      "today": 1,
+      "wake_cur": 1,
+      "public_cur": 1,
+      "posters_cur": 1,
+      "with_photo_cur": 1
+    },
+    "follows": {
+      "cur": 1,
+      "prev": 0
+    },
+    "comments": {
+      "cur": 2,
+      "prev": 0,
+      "today": 2
+    },
+    "programs": {
+      "cur": 0,
+      "prev": 0,
+      "total": 0,
+      "adopts_cur": 0,
+      "adopts_prev": 0
+    },
+    "reactions": {
+      "cur": 2,
+      "prev": 0,
+      "today": 2
+    },
+    "challenges": {
+      "running": 0,
+      "joins_cur": 1,
+      "created_cur": 1,
+      "created_prev": 0,
+      "ended_unsettled": 1
+    },
+    "moderation": {
+      "kept": 0,
+      "latest": [
+        {
+          "id": "dca6f91a-215e-4671-a6e1-4570ce0e7b5f",
+          "kind": "gym_review",
+          "reason": "fake",
+          "status": "new",
+          "target_id": "0c4213f8-9d44-424f-9d31-5bf3357581b1",
+          "created_at": "2026-10-07T03:41:46.691+00:00",
+          "target_name": "نادي تجريبي - الخبر",
+          "author_username": "khalid"
+        }
+      ],
+      "removed": 0,
+      "reported": {
+        "cur": 1,
+        "open": 1,
+        "prev": 0
+      },
+      "reports_supported": [
+        "gym_review"
+      ],
+      "user_report_block": false
+    },
+    "friend_requests": {
+      "cur": 0,
+      "prev": 1,
+      "pending": 1,
+      "pending_over_7d": 1
+    }
+  },
+  "marketing": {
+    "ads": {
+      "off": 0,
+      "live": 1,
+      "ended": 1,
+      "scheduled": 0,
+      "live_marketing": 1
+    },
+    "events": {
+      "active": 12,
+      "upcoming": [
+        {
+          "id": "e0e0e0e0-0000-4000-8000-000000000006",
+          "city": "الرياض",
+          "title": "معرض الصقور والصيد السعودي الدولي 2026",
+          "ends_on": "2026-10-10",
+          "category": "shooting",
+          "title_en": "Saudi Falcons & Hunting Exhibition 2026",
+          "starts_on": "2026-10-01"
+        },
+        {
+          "id": "9025ba54-0eb1-403b-9f85-911dd3b317d9",
+          "city": "الرياض",
+          "title": "سباق الرياض",
+          "ends_on": null,
+          "category": "running",
+          "title_en": "Riyadh Run",
+          "starts_on": "2026-10-12"
+        },
+        {
+          "id": "e0e0e0e0-0000-4000-8000-000000000003",
+          "city": "الرياض",
+          "title": "موسم سباقات الرياض",
+          "ends_on": "2027-04-17",
+          "category": "horse_racing",
+          "title_en": "Riyadh Racing Season",
+          "starts_on": "2026-10-16"
+        },
+        {
+          "id": "e0e0e0e0-0000-4000-8000-000000000009",
+          "city": "الرياض",
+          "title": "نزالات موسم الرياض 2026",
+          "ends_on": null,
+          "category": "boxing",
+          "title_en": "Riyadh Season 2026 fight nights",
+          "starts_on": "2026-10-21"
+        },
+        {
+          "id": "e0e0e0e0-0000-4000-8000-000000000008",
+          "city": "الرياض",
+          "title": "دورة الألعاب الآسيوية للصالات والفنون القتالية",
+          "ends_on": "2026-12-21",
+          "category": "boxing",
+          "title_en": "Asian Indoor & Martial Arts Games",
+          "starts_on": "2026-12-13"
+        },
+        {
+          "id": "e0e0e0e0-0000-4000-8000-000000000010",
+          "city": "رابغ",
+          "title": "رالي داكار السعودية 2027",
+          "ends_on": "2027-01-15",
+          "category": "motorsport",
+          "title_en": "Dakar Rally Saudi Arabia 2027",
+          "starts_on": "2027-01-01"
+        },
+        {
+          "id": "e0e0e0e0-0000-4000-8000-000000000004",
+          "city": "العلا",
+          "title": "سباق العلا للمسارات 2027",
+          "ends_on": null,
+          "category": "hiking",
+          "title_en": "AlUla Trail Race 2027",
+          "starts_on": "2027-01-22"
+        },
+        {
+          "id": "e0e0e0e0-0000-4000-8000-000000000001",
+          "city": "الرياض",
+          "title": "ماراثون الرياض 2027",
+          "ends_on": null,
+          "category": "running",
+          "title_en": "Riyadh Marathon 2027",
+          "starts_on": "2027-01-31"
+        },
+        {
+          "id": "e0e0e0e0-0000-4000-8000-000000000002",
+          "city": "الرياض",
+          "title": "كأس السعودية 2027",
+          "ends_on": "2027-02-06",
+          "category": "horse_racing",
+          "title_en": "The Saudi Cup 2027",
+          "starts_on": "2027-02-05"
+        },
+        {
+          "id": "e0e0e0e0-0000-4000-8000-000000000011",
+          "city": "جدة",
+          "title": "جائزة السعودية الكبرى للفورمولا 1 2027",
+          "ends_on": "2027-03-21",
+          "category": "motorsport",
+          "title_en": "Formula 1 Saudi Arabian Grand Prix 2027",
+          "starts_on": "2027-03-19"
+        }
+      ],
+      "past_still_active": 0
+    },
+    "nudges": {
+      "cur": 1,
+      "prev": 1,
+      "today": 1,
+      "by_category_cur": {
+        "gym": 1,
+        "meal": 0,
+        "friend": 0,
+        "streak": 0,
+        "workout": 0
+      },
+      "templates_active": 36,
+      "templates_paused": 0
+    },
+    "live_ad": {
+      "id": "471aadc7-59ac-41f2-a114-1d5e5040de05",
+      "kind": "ad",
+      "title": "Promo",
+      "ends_at": "2026-10-09T03:41:46.712+00:00",
+      "starts_at": "2026-10-06T03:41:46.712+00:00"
+    },
+    "ad_stats": {
+      "cur": {
+        "reach": 1,
+        "views": 1,
+        "clicks": 1,
+        "closes": 0
+      },
+      "prev": {
+        "reach": 1,
+        "views": 1,
+        "clicks": 0,
+        "closes": 0
+      }
+    }
+  }
+}

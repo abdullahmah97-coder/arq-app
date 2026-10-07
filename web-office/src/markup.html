@@ -1,0 +1,59 @@
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19 12 4l8 15" fill="none" stroke="#F8EDDA" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.2 13.5h7.6" stroke="#FEA94F" stroke-width="2.6" stroke-linecap="round"/></svg></span>
+      <div class="brand-text"><h1 id="title">مكتب أرك أب</h1><p class="sub" id="subtitle"></p></div>
+    </div>
+    <div class="top-status">
+      <span class="conn connecting" id="conn" role="status"><span class="dot"></span><span id="connText"></span></span>
+      <span class="updated" id="updated"></span>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" id="period" aria-label="">
+        <button type="button" id="days7" data-days="7" aria-pressed="true"></button>
+        <button type="button" id="days30" data-days="30" aria-pressed="false"></button>
+      </div>
+      <button type="button" class="btn" id="refreshBtn"></button>
+      <button type="button" class="btn" id="langBtn" lang="en"></button>
+      <button type="button" class="btn icon" id="themeBtn"></button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <main class="main" id="main">
+    <section class="panel" id="deskPanel" aria-labelledby="deskName"></section>
+    <section class="stage-col" id="stageCol" aria-labelledby="stageTitle">
+      <div class="stage-head">
+        <h2 id="stageTitle"></h2>
+        <div class="right">
+          <div class="legend" id="legend"></div>
+          <div class="view-tg" role="group" id="viewTg">
+            <button type="button" id="view3d" data-view="3d" aria-pressed="true"></button>
+            <button type="button" id="viewGrid" data-view="grid" aria-pressed="false"></button>
+          </div>
+        </div>
+      </div>
+      <div class="stage" id="stage">
+        <canvas id="cv" aria-hidden="true"></canvas>
+        <div class="signs" id="signs"></div>
+        <div class="grid2d" id="grid2d" hidden></div>
+        <div class="stage-note" id="stageNote" hidden></div>
+      </div>
+      <div class="stage-foot" id="stageFoot"></div>
+      <div class="today" id="todayStrip"></div>
+    </section>
+    <section class="panel" id="taskPanel" aria-labelledby="tasksTitle"></section>
+  </main>
+
+  <div class="dash-head">
+    <div><h2 id="dashTitle"></h2><p id="dashSub"></p></div>
+  </div>
+  <section class="dash" id="dash"></section>
+
+  <footer class="foot"><span id="footPrivacy"></span><span id="footSource" class="num"></span></footer>
+</div>
+
+<dialog class="sheet" id="sheet" aria-labelledby="sheetTitle"></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="tip" id="tip" hidden></div>
