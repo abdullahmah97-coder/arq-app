@@ -1,4 +1,5 @@
 // اختبار دالة office-agent (وكلاء مكتب أرك أب) بدون إنترنت: Deno و supabase و Anthropic SDK كلها بدائل
+// الطريقتين: توكن المالك من التطبيق (الأقسام ١-١٠) ومفتاح x-office-key من المكتب على الويب (القسم ١١)
 // التشغيل (من جذر المشروع):
 //   npx esbuild@0.25 supabase/functions/office-agent/index.ts --bundle --format=esm --platform=node \
 //     --alias:npm:@supabase/supabase-js@2=./supabase/tests/fn/supabase-mock-office.mjs \
@@ -626,6 +627,146 @@ let threw = null;
 try { mod.cleanOutput('review_partner', partnerOut({ recommendation: 'reject', note: 'Please add your license number.' }), 'ar', 'نادي القمة'); } catch (e) { threw = e; }
 ok(threw?.message === 'ai_bad_output' && threw.why === 'note_locale', 'cleanOutput: a reject note in the wrong language still fails (note_locale)');
 ok(mod.cleanOutput('review_partner', partnerOut({ recommendation: 'reject', note: 'أهلاً Fitness Time Pro، أضف الرخصة' }), 'ar').note === 'أهلاً Fitness Time Pro، أضف الرخصة', 'cleanOutput: a reject note keeps its text');
+
+// ---------------------------------------------------------------------------
+// ١١) المكتب على الويب: بدون توكن، بمفتاح x-office-key (office_admin.run_agent عبر pg_net) وباسم مالك من app_admins
+// ---------------------------------------------------------------------------
+const KEY = '9f'.repeat(32);
+const ADMIN = '11111111-2222-4333-8444-555555555555';
+const ADMIN2 = '22222222-2222-4333-8444-555555555555';
+const STRANGER = '33333333-2222-4333-8444-555555555555';
+const ADMINS = [{ user_id: ADMIN, created_at: ago(9999) }, { user_id: ADMIN2, created_at: ago(9999) }];
+const webReq = (body, { key = KEY, auth = null, raw = null } = {}) => {
+  const headers = { 'content-type': 'application/json' };
+  if (key !== null) headers['x-office-key'] = key;
+  if (auth !== null) headers.Authorization = auth;
+  return new Request('https://fn/office-agent', { method: 'POST', headers, body: raw ?? JSON.stringify(body) });
+};
+const webCall = async (body, opts) => {
+  const res = await handler(webReq(body, opts));
+  return { status: res.status, body: await res.json() };
+};
+const webFresh = (tables = {}) => { fresh({ app_admins: ADMINS, ...tables }); db.officeKey = KEY; };
+const keyChecks = () => db.rpcCalls.filter((c) => c.fn === 'office_agent_key_ok');
+const userClients = () => db.clients.filter((c) => c.client === 'user');
+const doneTask = (by, min, extra = {}) => ({ id: `q-${by}-${min}-${uid++}`, desk: 'marketing', kind: 'draft_nudge', target_kind: null, target_id: null, status: 'done', created_by: by, created_at: ago(min), output: {}, ...extra });
+
+// ١١أ) الدخول: المفتاح أول، بعدين الـ JSON، بعدين المالك، بعدين المكتب
+webFresh({ beta_feedback: [report('w1', 'p-ar', 10)] });
+r = await webCall({ desk: 'reports', admin_id: ADMIN }, { key: null });
+ok(r.status === 401 && r.body.error === 'unauthorized' && !keyChecks().length, 'no Authorization and no x-office-key → 401 unauthorized');
+const clientsBefore = db.clients.length;
+r = await webCall({ desk: 'reports', admin_id: ADMIN }, { key: 'wrong-key' });
+const kc = keyChecks()[0];
+ok(r.status === 401 && r.body.error === 'unauthorized', 'wrong x-office-key → 401 unauthorized');
+ok(kc?.client === 'service' && kc.args?.p_key === 'wrong-key', 'the key is checked with rpc office_agent_key_ok({ p_key }) on the service client', JSON.stringify(kc));
+r = await webCall(null, { key: 'wrong-key', raw: '{not json' });
+ok(r.status === 401, 'wrong key + broken JSON → 401 (the key is checked before the body)');
+r = await webCall({ desk: 'reports', admin_id: ADMIN }, { key: 'x'.repeat(300) });
+ok(r.status === 401 && keyChecks().length === 2, 'a key over 256 chars → 401 without asking the database');
+db.officeKey = null;
+r = await webCall({ desk: 'reports', admin_id: ADMIN });
+ok(r.status === 401 && r.body.error === 'unauthorized', 'vault secret missing (office_agent_key_ok false) → 401');
+db.officeKey = KEY; db.keyError = 'function public.office_agent_key_ok(p_key => text) does not exist';
+r = await webCall({ desk: 'reports', admin_id: ADMIN });
+ok(r.status === 401 && logs.some((l) => l.startsWith('office_key_check_failed') && l.includes('does not exist')), 'office_agent_key_ok error (migration missing) → 401, logged');
+db.keyError = null;
+r = await webCall(null, { raw: '{not json' });
+ok(r.status === 400 && r.body.error === 'bad_json', 'right key + broken JSON → 400 bad_json');
+r = await webCall({ desk: 'reports' });
+ok(r.status === 403 && r.body.error === 'not_allowed', 'right key without admin_id → 403 not_allowed');
+const adminReads = () => db.queries.filter((q) => q.table === 'app_admins');
+r = await webCall({ desk: 'reports', admin_id: 'u1' });
+ok(r.status === 403 && !adminReads().length, 'admin_id that isn’t a uuid → 403 without a lookup');
+r = await webCall({ desk: 'reports', admin_id: STRANGER });
+ok(r.status === 403 && r.body.error === 'not_allowed' && adminReads().length === 1 && adminReads()[0].client === 'service', 'admin_id not in app_admins → 403 (service select)');
+db.fail.app_admins = { op: 'select', message: 'db down' };
+r = await webCall({ desk: 'reports', admin_id: ADMIN });
+ok(r.status === 403 && r.body.error === 'not_allowed', 'app_admins read fails → 403 not_allowed');
+delete db.fail.app_admins;
+r = await webCall({ desk: 'users', admin_id: ADMIN });
+ok(r.status === 400 && r.body.error === 'agent_unavailable', 'web: users desk → 400 agent_unavailable');
+r = await webCall({ desk: 'finance', admin_id: ADMIN });
+ok(r.status === 400 && r.body.error === 'bad_input', 'web: unknown desk → 400 bad_input');
+r = await webCall({ desk: 'reports', admin_id: ADMIN, request_id: 'short' });
+ok(r.status === 400 && r.body.error === 'bad_input', 'web: bad request_id → 400 bad_input');
+delete env.ANTHROPIC_API_KEY;
+r = await webCall({ desk: 'reports', admin_id: ADMIN });
+ok(r.status === 503 && r.body.error === 'ai_not_configured', 'web: no ANTHROPIC_API_KEY → 503 ai_not_configured');
+env.ANTHROPIC_API_KEY = 'k';
+ok(!tasks().length && !anth.requests.length && !writes().length && db.clients.slice(clientsBefore).every((c) => c.client === 'service') && !db.rpcCalls.some((c) => c.client === 'user'),
+  'none of the rejected web requests wrote a task, called Claude or made a user-token client');
+
+// التوكن له الأولوية: معه Authorization = الطريقة القديمة بالحرف (المفتاح ما يُقرا)
+webFresh({ beta_feedback: [report('w1', 'p-ar', 10)] });
+r = await webCall({ desk: 'reports', admin_id: ADMIN }, { auth: 'Bearer bad' });
+ok(r.status === 401 && !keyChecks().length, 'Authorization + right key → token path (bad token → 401, key ignored)');
+r = await webCall({ desk: 'reports', admin_id: ADMIN }, { auth: 'Bearer user' });
+ok(r.status === 403 && !keyChecks().length && db.rpcCalls.some((c) => c.fn === 'is_admin' && c.client === 'user'), 'Authorization + right key → token path (non-admin token → 403)');
+anth.respond = (p) => triage(byLang(p));
+r = await webCall({ desk: 'reports', admin_id: ADMIN }, { auth: 'Bearer good' });
+ok(r.status === 200 && r.body.waiting === 1 && taskFor('w1')[0].created_by === 'u1' && takes().length === 1 && !keyChecks().length,
+  'token path ignores admin_id: created_by = the token’s user, quota via ai_take', JSON.stringify(taskFor('w1')[0]));
+ok(!mod.fromWeb(new Request('https://fn/office-agent', { method: 'GET', headers: { 'x-office-key': KEY } })) && mod.fromWeb(webReq({})) && !mod.fromWeb(webReq({}, { auth: 'Bearer good' })), 'fromWeb: POST with x-office-key and no Authorization only');
+
+// ١١ب) تشغيلة من الويب: باسم المالك، بدون توكن ولا ai_take، وكلها مسجّلة بـ waitUntil من أولها
+webFresh({ beta_feedback: [report('w1', 'p-ar', 20), report('w2', 'p-en', 10)] });
+anth.respond = (p) => triage(byLang(p)); anth.delayMs = 20;
+const waitedAtStart = waited.length;
+const pendingRun = handler(webReq({ desk: 'reports', admin_id: ADMIN, brief: null }));
+ok(waited.length === waitedAtStart + 1, 'web request: the whole run is registered with EdgeRuntime.waitUntil before the first await (pg_net hangs up after 1 s)');
+res = await pendingRun;
+r = { status: res.status, body: await res.json() };
+anth.delayMs = 0;
+ok(r.status === 200 && same(r.body, { ran: 2, waiting: 2, done: 0, failed: 0, skipped: 0 }), 'web: reports → 200 {ran 2, waiting 2}', JSON.stringify(r.body));
+ok((await waited[waitedAtStart]) instanceof Response, 'the registered promise is the request itself (resolves to the response)');
+ok(tasks().length === 2 && tasks().every((t) => t.created_by === ADMIN && t.status === 'waiting_approval' && t.request_id === null), 'web tasks: created_by = admin_id, waiting_approval', JSON.stringify(tasks().map((t) => [t.created_by, t.status])));
+ok(!takes().length && !db.rpcCalls.some((c) => c.fn === 'is_admin') && !userClients().length && db.rpcCalls.every((c) => c.client === 'service'), 'web: no user client, no is_admin, no ai_take (service client only)');
+const quotaQ = db.queries.find((q) => q.table === 'office_tasks' && q.op === 'select' && q.head);
+const since = quotaQ?.filters.find((f) => f[0] === 'gt' && f[1] === 'created_at')?.[2];
+ok(quotaQ && quotaQ.count === 'exact' && quotaQ.filters.some((f) => f[0] === 'eq' && f[1] === 'created_by' && f[2] === ADMIN) && Math.abs(Date.parse(since) - (Date.now() - 86_400_000)) < 60_000,
+  'web quota = count of the admin’s office_tasks with created_at > now − 24h', JSON.stringify(quotaQ));
+ok(db.queries.filter((q) => q.table === 'office_tasks' && q.head).length === 1, 'the quota is counted once per run');
+ok(reqWith('tester_en')?.output_config?.format?.type === 'json_schema' && same(reqWith('tester_en').betas, ['server-side-fallback-2026-07-01']), 'web runs send the same Claude request');
+webFresh({ beta_feedback: [report('w3', 'p-ar', 20)] });
+anth.respond = (p) => triage(byLang(p));
+r = await webCall({ desk: 'reports', admin_id: ADMIN, request_id: 'web-12345678' });
+ok(r.body.waiting === 1 && taskFor('w3')[0].request_id === 'web-12345678', 'web: request_id is stored like the app’s');
+
+// ١١ج) الحد من الويب: ٨٠ مهمة بآخر ٢٤ ساعة لنفس المالك
+const fourWeb = (old) => webFresh({ beta_feedback: Array.from({ length: 4 }, (_, i) => report(`wq${i}`, 'p-ar', 40 - i)), office_tasks: old });
+fourWeb(Array.from({ length: 80 }, (_, i) => doneTask(ADMIN, 10 + i)));
+r = await webCall({ desk: 'reports', admin_id: ADMIN });
+ok(r.status === 429 && r.body.error === 'rate_limited' && tasks().length === 80 && !anth.requests.length, 'web: 80 tasks in the last 24h → 429 rate_limited, nothing saved, no AI call');
+fourWeb(Array.from({ length: 78 }, (_, i) => doneTask(ADMIN, 10 + i)));
+anth.respond = (p) => triage(byLang(p));
+r = await webCall({ desk: 'reports', admin_id: ADMIN });
+ok(r.status === 200 && same(r.body, { ran: 2, waiting: 2, done: 0, failed: 0, skipped: 2 }) && tasks().length === 80, 'web: 78 used → 2 more tasks, the rest skipped (stops at 80)', JSON.stringify(r.body));
+fourWeb([...Array.from({ length: 80 }, (_, i) => doneTask(ADMIN, 25 * 60 + i)), ...Array.from({ length: 80 }, (_, i) => doneTask(ADMIN2, 10 + i))]);
+anth.respond = (p) => triage(byLang(p));
+r = await webCall({ desk: 'reports', admin_id: ADMIN });
+ok(r.status === 200 && r.body.ran === 4 && r.body.skipped === 0, 'web: tasks older than 24h or by another admin don’t count', JSON.stringify(r.body));
+webFresh({});
+db.fail.office_tasks = { op: 'select', message: 'statement timeout' };
+r = await webCall({ desk: 'marketing', admin_id: ADMIN });
+ok(r.status === 503 && r.body.error === 'busy' && !tasks().length && !anth.requests.length, 'web: the quota count fails → 503 busy');
+webFresh({ beta_feedback: [] });
+r = await webCall({ desk: 'reports', admin_id: ADMIN });
+ok(r.status === 200 && same(r.body, ZERO) && !db.queries.some((q) => q.head), 'web: nothing to do → ran 0 without counting the quota');
+
+// ١١د) المكتب على الويب: التسويق بملاحظة المالك، وملخص المدير بدون إحصائيات المستخدمين (تحتاج توكن)
+webFresh({});
+anth.respond = () => nudge();
+r = await webCall({ desk: 'marketing', admin_id: ADMIN, brief: 'رمضان <b>' });
+ok(r.body.waiting === 1 && tasks()[0].input.brief === 'رمضان b' && tasks()[0].created_by === ADMIN && count(textOf(anth.requests[0]), '<owner_brief>') === 1, 'web: marketing brief cleaned and tagged like the app’s', JSON.stringify(tasks()[0].input));
+webFresh({ beta_feedback: [report('lw', 'p-ar', 5)], club_requests: [{ id: 'lwc', status: 'pending', created_at: ago(5) }] });
+db.userStats = { total: 120, trainees: 100, partners: 20, new_7d: 9, active_7d: 60, unconfirmed: 3 };
+anth.respond = () => ({ json: { headline: { ar: 'يوم هادي', en: 'A quiet day' }, points: [], priorities: [] } });
+r = await webCall({ desk: 'lead', admin_id: ADMIN });
+const webNums = JSON.parse(textOf(anth.requests[0]).match(/<numbers>\n([\s\S]*)\n<\/numbers>/)[1]);
+ok(r.status === 200 && r.body.done === 1 && tasks()[0].status === 'done' && tasks()[0].created_by === ADMIN, 'web: lead → daily_brief done', JSON.stringify(r.body));
+ok(webNums.users === null && webNums.new_reports === 1 && webNums.pending_requests.clubs === 1 && !db.rpcCalls.some((c) => c.fn === 'admin_user_stats'), 'web: admin_user_stats is null (needs a user token), the other numbers load', JSON.stringify(webNums));
+ok(!logs.some((l) => l.includes(KEY)), 'the office key never reaches the logs');
 
 const secret = logs.filter((l) => /check-in button does nothing|approve everything|Ramadan|NASM-CPT|Fitness Time|Please upload/.test(l));
 ok(logs.some((l) => l.startsWith('office_task_failed')) && !secret.length, 'logs carry codes only, never user or model text', secret.join('\n'));

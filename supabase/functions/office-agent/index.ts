@@ -11,11 +11,20 @@
 // الوقت: كل مهام التشغيلة تطلع مع بعض بجولة وحدة وبدون إعادة (٩٠ ثانية بالأكثر للطلب)، فالتشغيلة تخلص تحت حد
 // Supabase للدالة (١٥٠ ثانية بالخطة المجانية). لو انقطعت قبل، مهامها تبقى in_progress لين تصير stale.
 //
-// النشر:
-//   supabase functions deploy office-agent
+// النشر (بدون تحقق البوابة من التوكن: الدالة تتحقق بنفسها، عشان المكتب على الويب يوصلها من القاعدة بدون توكن):
+//   supabase functions deploy office-agent --no-verify-jwt
 //   (ANTHROPIC_API_KEY، و ANTHROPIC_OFFICE_MODEL اختياري — الافتراضي claude-opus-5-5)
 //
-// الطلب (POST، بتوكن المالك): { desk: DeskId, brief?: string, request_id?: string }
+// مين يطلب (طريقتين):
+//   ١) التطبيق: Authorization: Bearer <توكن المالك> — نفس الطريقة القديمة بالحرف (getUser + is_admin + ai_take بتوكنه)
+//   ٢) المكتب على الويب (office_admin.run_agent بالقاعدة عبر pg_net): بدون Authorization، ومعه x-office-key
+//      = سر office_agent_key بالـ vault (نتأكد منه بـ rpc office_agent_key_ok بمفتاح الخدمة)، والطلب فيه admin_id
+//      (لازم يكون من app_admins) والمهام تنحفظ باسمه. الحد: مهامه بآخر ٢٤ ساعة (٨٠ بالأكثر، بدل ai_take)،
+//      وإحصائيات المستخدمين بملخص المدير null (تحتاج توكن المالك). القاعدة تقطع الاتصال بعد ثانية، فالتشغيلة كلها
+//      تتسجّل بـ waitUntil من أولها وتكمل لحالها، والصفحة تتابع المهام من office_tasks.
+//   لا هذا ولا هذا = 401 unauthorized.
+//
+// الطلب (POST): { desk: DeskId, brief?: string, request_id?: string }  (+ admin_id: uuid من الويب)
 //   brief: ملاحظة المالك لمكتب التسويق (٣٠٠ حرف، بدون < > ورموز التحكم، وتروح للنموذج داخل وسم <owner_brief>)
 //   request_id: ينحفظ مع كل مهمة عشان التطبيق يلقاها لو انقطع الاتصال
 // الرد: { ran, waiting, done, failed, skipped }  أو  { error }
@@ -45,9 +54,19 @@ export const MAX_TOKENS = 16_000;
 export const CONCURRENCY = PER_RUN;
 /** المهمة اللي بقت in_progress أكثر من كذا: الدالة انقطعت قبل ما تخلص */
 const STALE_MS = 15 * 60_000;
+/** حد المكتب على الويب: مهام المالك بآخر ٢٤ ساعة (نفس حد ai_take('office') بالقاعدة) */
+export const WEB_DAILY = 80;
+const DAY_MS = 24 * 3600_000;
+/** مفتاح x-office-key أطول من كذا ما نسأل عنه القاعدة (السر ٦٤ حرف hex) */
+const MAX_KEY = 256;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type FailCode = 'ai_failed' | 'ai_bad_output' | 'ai_refused' | 'timeout';
 type Outcome = 'waiting' | 'done' | 'failed';
+/** حجز مهمة من الحد: null = تمام، وإلا الخطأ (رسالته فيها rate_limited لو الحد خلص) */
+type Take = () => Promise<{ message?: string } | null>;
+/** صاحب الطلب: المالك بتوكنه (user = عميل التوكن)، أو المكتب على الويب باسم مالك (user = null) */
+type Caller = { id: string; user: SupabaseClient | null };
 
 /** يتحقق من الطلب: المكتب معروف، و request_id بالشكل الصحيح لو موجود */
 export function checkRequest(body: unknown): { desk: DeskId; brief: string | null; requestId: string | null } | { error: 'bad_input' | 'agent_unavailable' } {
@@ -115,9 +134,64 @@ async function runTask(db: SupabaseClient, client: Anthropic, model: string, id:
 }
 
 // ---------------------------------------------------------------------------
+// المكتب على الويب: بدون توكن، بمفتاح x-office-key
+// ---------------------------------------------------------------------------
+/** طلب من المكتب على الويب؟ (بدون Authorization ومعه x-office-key). اللي معه توكن يمشي بالطريقة القديمة دايماً */
+export const fromWeb = (req: Request) =>
+  req.method === 'POST' && !req.headers.get('Authorization') && !!req.headers.get('x-office-key');
+
+/** يتحقق من طلب الويب: المفتاح يطابق سر الـ vault (القاعدة تقارن، بمفتاح الخدمة)، والطلب يحدد المالك (admin_id)
+ *  ولازم يكون من app_admins. الترتيب: المفتاح أول (401) قبل ما نقرا الطلب، بعدين الـ JSON (400) والمالك (403) */
+async function webCaller(db: SupabaseClient, req: Request, key: string): Promise<Response | { caller: Caller; body: unknown }> {
+  if (key.length > MAX_KEY) return json({ error: 'unauthorized' }, 401);
+  const { data: keyOk, error: keyError } = await db.rpc('office_agent_key_ok', { p_key: key });
+  // ما نسجّل المفتاح نفسه أبد
+  if (keyError) console.error('office_key_check_failed', String(keyError.message ?? '').slice(0, 160));
+  if (keyError || keyOk !== true) return json({ error: 'unauthorized' }, 401);
+
+  let body: unknown;
+  try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400); }
+
+  const adminId = body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>).admin_id : null;
+  if (typeof adminId !== 'string' || !UUID.test(adminId)) return json({ error: 'not_allowed' }, 403);
+  const { data: admin, error: adminError } = await db.from('app_admins').select('user_id').eq('user_id', adminId).maybeSingle();
+  if (adminError) console.error('office_admin_check_failed', String(adminError.message ?? '').slice(0, 160));
+  const id = (admin as { user_id?: unknown } | null)?.user_id;
+  if (adminError || typeof id !== 'string' || !id) return json({ error: 'not_allowed' }, 403);
+  return { caller: { id, user: null }, body };
+}
+
+/** حد الويب (بدون توكن المالك ما فيه ai_take): نعدّ مهامه بآخر ٢٤ ساعة مرة وحدة بالتشغيلة، وكل مهمة تحجز وحدة
+ *  لين توصل WEB_DAILY. فشل العدّ = خطأ عادي (busy) */
+function webQuota(db: SupabaseClient, adminId: string): Take {
+  let used: number | null = null;
+  return async () => {
+    if (used === null) {
+      const { count, error } = await db.from('office_tasks').select('id', { count: 'exact', head: true })
+        .eq('created_by', adminId).gt('created_at', new Date(Date.now() - DAY_MS).toISOString());
+      if (error || typeof count !== 'number') return { message: `count: ${String(error?.message ?? 'no count')}` };
+      used = count;
+    }
+    if (used >= WEB_DAILY) return { message: 'rate_limited' };
+    used++;
+    return null;
+  };
+}
+
+// ---------------------------------------------------------------------------
 // الدالة
 // ---------------------------------------------------------------------------
-Deno.serve(async (req) => {
+// deno-lint-ignore no-explicit-any
+const runtime = () => (globalThis as any).EdgeRuntime as { waitUntil?: (p: Promise<unknown>) => void } | undefined;
+
+Deno.serve((req) => {
+  const res = handle(req);
+  // الويب: القاعدة (pg_net) تقطع الاتصال بعد ثانية، فالتشغيلة كلها (الجمع والحفظ والذكاء) تتسجّل من أولها عشان تكمل
+  if (fromWeb(req)) runtime()?.waitUntil?.(res.catch(() => {}));
+  return res;
+});
+
+async function handle(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
@@ -125,24 +199,35 @@ Deno.serve(async (req) => {
   if (!apiKey) return json({ error: 'ai_not_configured' }, 503);
 
   const url = Deno.env.get('SUPABASE_URL')!;
-  const supabase = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
-  });
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return json({ error: 'unauthorized' }, 401);
-
+  let caller: Caller;
   let body: unknown;
-  try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400); }
+  let webDb: SupabaseClient | null = null;
 
-  // للإدارة بس: نسأل القاعدة بتوكن المالك نفسه
-  const { data: isAdmin, error: adminError } = await supabase.rpc('is_admin');
-  if (adminError || isAdmin !== true) return json({ error: 'not_allowed' }, 403);
+  if (fromWeb(req)) {
+    webDb = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const web = await webCaller(webDb, req, req.headers.get('x-office-key') ?? '');
+    if (web instanceof Response) return web;
+    ({ caller, body } = web);
+  } else {
+    const supabase = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+    });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return json({ error: 'unauthorized' }, 401);
+
+    try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400); }
+
+    // للإدارة بس: نسأل القاعدة بتوكن المالك نفسه
+    const { data: isAdmin, error: adminError } = await supabase.rpc('is_admin');
+    if (adminError || isAdmin !== true) return json({ error: 'not_allowed' }, 403);
+    caller = { id: user.id, user: supabase };
+  }
 
   const r = checkRequest(body);
   if ('error' in r) return json({ error: r.error }, 400);
 
   // مفتاح الخدمة: قراءة الطلبات والبلاغات وكتابة office_tasks (المالك يقرا المهام بس، والقرار عبر office_decide)
-  const db = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const db = webDb ?? createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
   // تنظيف: مهمة بقت in_progress أكثر من ربع ساعة = الدالة انقطعت قبل ما تخلص، فتنفك عن عنصرها
   const { error: staleError } = await db.from('office_tasks').update({ status: 'failed', error: 'stale' })
@@ -151,7 +236,7 @@ Deno.serve(async (req) => {
 
   let jobs: Job[];
   try {
-    jobs = await collectJobs(r.desk, { db, user: supabase, brief: r.brief });
+    jobs = await collectJobs(r.desk, { db, user: caller.user, brief: r.brief });
   } catch (e) {
     console.error('office_collect_failed', r.desk, String(e).slice(0, 160));
     return json({ error: 'busy' }, 503);
@@ -160,11 +245,14 @@ Deno.serve(async (req) => {
   if (!jobs.length) return json(counts);
 
   // كل مهمة تحجز من الحد قبل ما تنحفظ. الحد خلص قبل أول مهمة = 429، وبعدها نوقف ونحسب الباقي skipped
+  // (بتوكن المالك: ai_take('office')؛ من الويب: عدّ مهامه بآخر ٢٤ ساعة)
+  const user = caller.user;
+  const take: Take = user ? async () => (await user.rpc('ai_take', { p_kind: 'office' })).error : webQuota(db, caller.id);
   const model = Deno.env.get('ANTHROPIC_OFFICE_MODEL') ?? 'claude-opus-5-5';
   const created: { id: string; job: Job }[] = [];
   for (let i = 0; i < jobs.length; i++) {
     const job = jobs[i];
-    const { error: takeError } = await supabase.rpc('ai_take', { p_kind: 'office' });
+    const takeError = await take();
     if (takeError) {
       const m = String(takeError.message ?? '');
       if (!created.length) {
@@ -179,7 +267,7 @@ Deno.serve(async (req) => {
     }
     const { data, error } = await db.from('office_tasks').insert({
       desk: job.desk, kind: job.kind, target_kind: job.target_kind, target_id: job.target_id, title: job.title,
-      status: 'in_progress', input: job.input, model: model.slice(0, 60), request_id: r.requestId, created_by: user.id,
+      status: 'in_progress', input: job.input, model: model.slice(0, 60), request_id: r.requestId, created_by: caller.id,
     }).select('id').single();
     if (error) {
       // تشغيلة ثانية أخذت نفس العنصر بنفس اللحظة (فهرس office_tasks_open_target)
@@ -201,8 +289,7 @@ Deno.serve(async (req) => {
     await pool(created, CONCURRENCY, async (t) => { counts[await runTask(db, client, model, t.id, t.job)]++; });
     return counts;
   })();
-  // deno-lint-ignore no-explicit-any
-  const rt = (globalThis as any).EdgeRuntime;
+  const rt = runtime();
   if (rt?.waitUntil) rt.waitUntil(work.catch(() => {}));
 
   try {
@@ -211,4 +298,4 @@ Deno.serve(async (req) => {
     console.error('office_run_failed', String(e).slice(0, 160));
     return json(counts);
   }
-});
+}

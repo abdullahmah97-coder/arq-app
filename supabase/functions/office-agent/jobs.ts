@@ -43,8 +43,8 @@ export interface Job {
 interface Ctx {
   /** مفتاح الخدمة: قراءة الجداول وكتابة office_tasks */
   db: SupabaseClient;
-  /** توكن المالك: RPC الإدارة (admin_user_stats) */
-  user: SupabaseClient;
+  /** توكن المالك: RPC الإدارة (admin_user_stats). null من المكتب على الويب (ما معه توكن) */
+  user: SupabaseClient | null;
   brief: string | null;
 }
 
@@ -395,8 +395,8 @@ async function leadNumbers({ db, user }: Ctx) {
     count('coach_profiles', [['status', 'pending']]),
     count('recovery_centers', [['status', 'pending'], ['listed_by', 'owner']]),
     count('venues', [['status', 'pending']]),
-    // إحصائيات المستخدمين للإدارة بس: بتوكن المالك
-    safe(async () => {
+    // إحصائيات المستخدمين للإدارة بس: بتوكن المالك (من الويب ما فيه توكن، فتصير null والملخص يكمل بدونها)
+    user && safe(async () => {
       const { data, error } = await user.rpc('admin_user_stats');
       const r = (Array.isArray(data) ? data[0] : data) as Row | null;
       if (error || !r) return null;

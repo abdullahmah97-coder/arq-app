@@ -186,10 +186,18 @@ npx supabase functions deploy coach
 **وكلاء مكتب أرك أب** (زر «شغّل الوكيل» على مكاتب `/owner-office`، للإدارة بس): يحتاجون ترحيل `20261007000880_office_agents.sql` (جدول `office_tasks` و`office_decide` ونوع `office` في حد الذكاء الاصطناعي) قبل نشر الدالة:
 ```bash
 npx supabase db push                                                  # أو شغّل الترحيل من SQL Editor
-npx supabase functions deploy office-agent
+npx supabase functions deploy office-agent --no-verify-jwt            # الدالة تتحقق بنفسها (توكن المالك أو مفتاح المكتب)
 npx supabase secrets set ANTHROPIC_OFFICE_MODEL=claude-opus-5-5       # اختياري (هذا الافتراضي)
 ```
 الوكيل يجهّز الشغل بس (فرز البلاغات، مراجعة طلبات الشركاء، مسودة تنبيه، اقتراح حدود الذكاء الاصطناعي، ملخص اليوم) ويحفظه بانتظار موافقتك؛ ما يتغيّر شي بالتطبيق إلا لما توافق. الحد 80 مهمة باليوم لكل مالك.
+
+`--no-verify-jwt` لازم عشان **مكتب الويب** (ترحيل `20261008000890_office_web.sql`) يشغّل الوكيل من قاعدة البيانات (`office_admin.run_agent` عبر pg_net) بدون توكن. الدالة ما تقبل إلا واحد من اثنين: توكن مالك من التطبيق (نفس الفحص القديم)، أو ترويسة `x-office-key` تطابق السر بالـ vault ومعها `admin_id` من `app_admins` (حدها 80 مهمة بآخر 24 ساعة). بدون توكن ولا مفتاح صحيح = 401، و`admin_id` مو مالك = 403. السرّين بالـ vault:
+- `office_agent_key`: المفتاح اللي ترسله القاعدة للدالة. الترحيل ينشئه لحاله (عشوائي) ولا يحتاج منك شي، والدالة تتأكد منه بـ `office_agent_key_ok`.
+- `office_agent_url`: رابط الدالة بمشروعك (يختلف من بيئة لبيئة، فالترحيل ما ينشئه). احفظه مرة وحدة من SQL Editor:
+  ```sql
+  select vault.create_secret('https://<ref>.supabase.co/functions/v1/office-agent', 'office_agent_url');
+  ```
+  بدونه زر «شغّل الوكيل» بمكتب الويب يرجع `agent_not_configured` (والتطبيق يشتغل عادي).
 
 ### 3) تشغيل التطبيق
 ```bash

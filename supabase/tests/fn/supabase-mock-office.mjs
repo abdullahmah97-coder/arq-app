@@ -1,10 +1,12 @@
 // بديل supabase-js لاختبار دالة office-agent: جداول بالذاكرة + فلاتر PostgREST اللي تستخدمها الدالة.
 // الحالة على globalThis لأن esbuild يدمج نسخة ثانية من هذا الملف داخل الحزمة.
 // التوكن: 'Bearer good' = المالك u1 (إدارة)، 'Bearer user' = مستخدم عادي u2، غيرها = بدون دخول.
-// مفتاح 'srv' = عميل الخدمة؛ أي مفتاح ثاني = عميل المستخدم (كل استعلام ينسجّل مع نوع العميل).
+// مفتاح 'srv' = عميل الخدمة؛ أي مفتاح ثاني = عميل المستخدم (كل استعلام ينسجّل مع نوع العميل، وكل عميل ينسجّل بـ clients).
+// المكتب على الويب: officeKey = سر office_agent_key بالـ vault (null = ما انحفظ)، و office_agent_key_ok تجاوب
+// لعميل الخدمة بس (مثل القاعدة)؛ keyError = الدالة ترجع خطأ (مثلاً الترحيل ما انطبق).
 export const office = (globalThis.__sbOffice ??= {
-  tables: {}, files: {}, queries: [], rpcCalls: [],
-  admins: ['u1'], takeLeft: Infinity, takeError: null, userStats: null,
+  tables: {}, files: {}, queries: [], rpcCalls: [], clients: [],
+  admins: ['u1'], takeLeft: Infinity, takeError: null, userStats: null, officeKey: null, keyError: null,
   /** { table: { op: 'select'|'insert'|'update', message, code } } → الاستعلام يرجع خطأ */
   fail: {},
   /** كم مرة يرجع الإدخال تعارض الفهرس 23505 كأن تشغيلة ثانية سبقت (للاختبار) */
@@ -18,8 +20,8 @@ const OPEN = ['scheduled', 'in_progress', 'waiting_approval'];
 /** يرجّع الحالة لبداية نظيفة (بين الاختبارات) */
 export function reset(tables = {}) {
   Object.assign(office, {
-    tables: structuredClone(tables), files: {}, queries: [], rpcCalls: [],
-    admins: ['u1'], takeLeft: Infinity, takeError: null, userStats: null, fail: {}, conflictOnce: 0,
+    tables: structuredClone(tables), files: {}, queries: [], rpcCalls: [], clients: [],
+    admins: ['u1'], takeLeft: Infinity, takeError: null, userStats: null, officeKey: null, keyError: null, fail: {}, conflictOnce: 0,
   });
 }
 
@@ -45,6 +47,7 @@ export function createClient(url, key, opts = {}) {
   const auth = opts.global?.headers?.Authorization ?? '';
   const client = key === 'srv' ? 'service' : 'user';
   const user = client === 'user' ? USERS[auth] ?? null : null;
+  office.clients.push({ client, auth });
   return {
     auth: { getUser: async () => ({ data: { user }, error: user ? null : { message: 'invalid token' } }) },
     rpc: async (fn, args) => {
@@ -58,6 +61,10 @@ export function createClient(url, key, opts = {}) {
         if (office.takeLeft <= 0) return { data: null, error: { message: 'rate_limited' } };
         office.takeLeft--;
         return { data: Number.isFinite(office.takeLeft) ? office.takeLeft : 79, error: null };
+      }
+      if (fn === 'office_agent_key_ok') {
+        if (office.keyError) return { data: null, error: { message: office.keyError } };
+        return { data: client === 'service' && office.officeKey !== null && args?.p_key === office.officeKey, error: null };
       }
       if (fn === 'admin_user_stats') {
         if (!admin) return { data: null, error: { message: 'not_allowed' } };
