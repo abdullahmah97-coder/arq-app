@@ -28,6 +28,8 @@ import { loadAiLimits, type AiLimits } from '@/lib/aiLimits';
 import { adminUserStats, type AdminUserStats } from '@/lib/adminUsers';
 import { verifiedCount } from '@/lib/verify';
 import { KIND_ICON, PARTNER_KINDS, partnerOverview, type Overview, type PartnerKind } from '@/lib/partners';
+import { snapshotFrom } from '@/lib/office';
+import { waitingTotal } from '@/lib/officeCore';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
 
@@ -50,6 +52,8 @@ export default function Owner() {
   const [aiLim, setAiLim] = useState<AiLimits | null>(null);
   const [users, setUsers] = useState<AdminUserStats | null>(null);
   const [verifiedN, setVerifiedN] = useState<number | null>(null);
+  // الإعلانات والفعاليات وصلت (قبلها ما نحسب تنبيهات "ما فيه إعلان/فعالية" في رقم المكتب)
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     const admin = await isAdmin();
@@ -64,7 +68,7 @@ export default function Owner() {
       loadReports().catch(() => [] as Report[]), loadBrandRequests().catch(() => [] as Brand[]), loadOffers().catch(() => [] as Offer[]),
       partnerOverview().catch(() => ({})), listLaunchAds().catch(() => [] as LaunchAdRow[]), listAllEvents().catch(() => [] as LocalEvent[]),
     ]);
-    setReports(r); setBrands(b); setOffers(o); setOv(v); setAds(a); setEvents(ev);
+    setReports(r); setBrands(b); setOffers(o); setOv(v); setAds(a); setEvents(ev); setLoaded(true);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -79,6 +83,10 @@ export default function Owner() {
   const liveAd = ads.filter((a) => adState(a) === 'live').sort((a, b) => b.priority - a.priority || b.created_at.localeCompare(a.created_at))[0];
   const shownEvents = upcomingEvents(events);
   const homeEvent = nextHighlight(events);
+  // نفس حساب المكتب بالضبط (طلبات + تقارير جديدة + تنبيهات تحتاج قرارك)
+  const officeWaiting = waitingTotal(snapshotFrom({
+    ov, brands, reports, ads: loaded ? ads : null, events: loaded ? events : null, kcalEnabled: kcal ? kcal.enabled : null,
+  }));
 
   return (
     <Screen edges={['bottom']}>
@@ -87,6 +95,11 @@ export default function Owner() {
         <Stat n={liveAll} label={t('partners.livePartners')} color={STATUS_COLOR.fixed} />
         <Stat n={count('new')} label={t('owner.newReports')} color={STATUS_COLOR.new} />
       </View>
+
+      {/* مكتب أرك أب: نفس الأقسام كمكتب ثلاثي الأبعاد، وكل اللي ينتظر موافقتك عليه علامة */}
+      <OwnerLink icon="business" title={t('office.title')}
+        sub={officeWaiting ? t('office.entrySubWaiting', { n: officeWaiting }) : t('office.entrySub')}
+        onPress={() => router.push('/owner-office')} />
 
       {/* المالك بس: الأجزاء اللي أخفاها عن المستخدمين بالضغط المطوّل */}
       <HiddenPartsCard />
