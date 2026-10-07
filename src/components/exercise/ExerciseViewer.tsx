@@ -166,18 +166,20 @@ export function ExerciseViewer({ motion, gender, focus, muscles, height = 420 }:
   const failed = useRef(false);
   const frames = useRef(0);
   const started = useRef(Date.now());
+  // الصفحة لسا مفتوحة؟ ما نكتب علامة "محاولة جارية" بعد ما تنقفل
+  const alive = useRef(true);
 
   useEffect(() => {
-    let alive = true;
+    alive.current = true;
     initial3DMode().then(async (m) => {
-      if (!alive) return;
+      if (!alive.current) return;
       if (m === '3d' && !loadEngine()) { mark3DFailed({ where: 'import', motion }); m = '2d'; }
       if (m === '3d') await mark3DStart({ motion, gender });
-      if (alive) { started.current = Date.now(); setMode(m); }
-      // خرج من الصفحة أثناء كتابة العلامة وقبل يفتح المشهد: نمسحها عشان ما تنحسب انهيار
-      else if (m === '3d') mark3DDone();
+      if (alive.current) { started.current = Date.now(); setMode(m); }
     });
-    return () => { alive = false; };
+    // عند الخروج نمسح العلامة دائماً حتى لو المشهد ما انفتح بعد:
+    // أي كتابة انرسلت والصفحة مفتوحة تنمسح بعدها لأن AsyncStorage ينفذ الأوامر بالترتيب
+    return () => { alive.current = false; mark3DDone(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -211,6 +213,7 @@ export function ExerciseViewer({ motion, gender, focus, muscles, height = 420 }:
   const retry3D = async () => {
     if (!loadEngine()) return;
     await reset3D();
+    if (!alive.current) return;
     failed.current = false; frames.current = 0;
     await mark3DStart({ motion, gender, retry: true });
     started.current = Date.now();
