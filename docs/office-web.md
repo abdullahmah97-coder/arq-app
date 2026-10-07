@@ -576,3 +576,259 @@ secret is missing, the key is empty or longer than 500 characters.
    To change it later: `select vault.update_secret((select id from vault.secrets where name = 'office_agent_url'), '<new url>');`
 3. Deploy `office-agent` with JWT verification off (it checks the user's token or the web key itself) — see README.
 4. The Supabase connector used by the page must run as `postgres` and not in read-only mode for actions.
+
+---
+
+## 7. App tab — change requests, content and settings (`20261008000900_office_app.sql`)
+
+### بالعربي
+تبويب «التطبيق» في المكتب: (١) طلبات التعديل — المالك يكتب طلب، الصفحة تفتح جلسة Claude Code تشتغل على فرع جديد
+وتفتح طلب دمج للمراجعة (ولا شي يوصل للناس لين المالك يدمج بنفسه)، والطلب ينحفظ في `office_change_requests` وتتابع
+الصفحة حالته؛ (٢) المحتوى والإعدادات — إعلان البداية، الفعاليات، تنبيهات التحفيز، الإعدادات، الشركاء، المتدربين.
+كل الدوال في `office_admin` (نفس قواعد القسم ٤: مقفولة على التطبيق، وتشتغل «بهوية المالك»)، فحرّاس الجداول ودوال
+التطبيق وسجل الإجراءات يشتغلون مثل ما هم. قائمة المتدربين ما فيها إيميلات ولا أوقات دخول.
+
+### 7.0 Conventions for this section
+- Same transport, literals, transactions and shared errors as sections 1 and 4 (`choose_admin`, `not_allowed` from
+  `_as_admin`; any other unexpected error text → show a generic message). One call = one row, one column:
+  ```sql
+  select office_admin.requests(50) as r;                                    -- rows[0].r = array
+  select office_admin.add_request('Coach filter', 'Add a city filter…', 'coaches', 'session_01Ab…', null) as r;  -- the saved row
+  select office_admin.update_request('<uuid>'::uuid, 'review', 'https://github.com/…/pull/42') as r;
+  select office_admin.content() as r;                                       -- rows[0].r = {ads, events, nudges, settings}
+  select office_admin.save_event(null, '{"title":"…","starts_on":"2026-12-01"}'::jsonb) as r;
+  select office_admin.set_event_active('<uuid>'::uuid, false) as r;          -- {"ok": true}
+  select office_admin.partners('store', 'fit') as r;
+  select office_admin.users(null, 'all', 50, 0) as r;
+  ```
+- **Edit objects (`p jsonb`)** for `save_ad`, `save_event`, `save_nudge`: a key that is **absent keeps the current value**
+  (on insert: the default); strings are trimmed (spaces and new lines at both ends); for nullable text fields `null` or a
+  blank string clears the field. Wrong JSON type, unknown enum value, out-of-range number or too-long text → error
+  **`bad_value: <field>`** (message is the code, a colon, a space and the JSON key, e.g. `bad_value: title`), so match
+  `/\bbad_value\b/` and show the field from the text after it. `p` that is not a JSON object → `bad_input`.
+- Numbers in `p` may be JSON numbers or digit strings (Arabic digits accepted); they must be whole numbers.
+- Writers return `{"ok": true}` or the saved row (stated per function). On any error nothing changes.
+
+**Error codes used in this section** (map these to friendly text; anything else = generic):
+| code | meaning |
+|---|---|
+| `bad_value` (`bad_value: <field>`) | a field value isn't allowed (also raised by the `app_settings` guard, then without a field) |
+| `bad_nudge` | nudge title/body length or `{placeholders}` not allowed for the category |
+| `bad_input` | malformed call: `p` not an object, unknown setting key, null where a boolean is needed, bad request fields (7.3) |
+| `bad_status` | unknown request status (7.4); partner kind/action not allowed here (7.13, 7.14) |
+| `not_found` | unknown request / ad / event / nudge id (and `save_ad` with a null id) |
+| `request_not_found` | unknown partner item |
+| `user_not_found`, `username_taken`, `bad_username`, `name_too_long` | from `admin_update_user` / `set_verified` |
+| `note_required` | reserved by `admin_partner_action` for rejections (not reachable from 7.14) |
+
+### 7.1 Table `public.office_change_requests`
+Read by admins from the app (RLS `is_admin()`); **no write policy** — writes only through `office_admin`.
+| column | type | meaning |
+|---|---|---|
+| `id` | uuid | request id |
+| `title` | string | 2–120 characters (whitespace collapsed to single spaces) |
+| `request` | string | the owner's details, 3–4000 characters (trimmed; inner new lines kept) |
+| `area` | string or null | `app` (the app in general) \| `lead` \| `clubs` \| `stores` \| `coaches` \| `care` \| `reports` \| `marketing` \| `users` \| `ai` \| `activity` \| `bookings` \| `orders` \| `community` |
+| `session_id` | string or null | Claude Code session id, `^session_[A-Za-z0-9]{8,80}$`; unique (one request per session) |
+| `session_url` | string or null | `https://claude.ai/code/<session_id>` |
+| `pr_url` | string or null | pull request link, `^https://github\.com/[^\s]{3,200}$` |
+| `status` | string | `sent` (saved without a session) \| `working` \| `needs_you` (the session waits for the owner) \| `review` (PR ready) \| `done` \| `failed` \| `cancelled` (marked by the owner — the session is **not** stopped) |
+| `created_by` | uuid or null | the admin |
+| `created_at`, `updated_at` | timestamp | `updated_at` changes on every update |
+
+### 7.2 `office_admin.requests(p_limit integer default 50) returns jsonb`
+Array of the latest `p_limit` requests (clamped 1–200, `null` → 50), **newest first**, each with every column of 7.1.
+Errors: shared only.
+
+### 7.3 `office_admin.add_request(p_title text, p_request text, p_area text, p_session_id text, p_session_url text) returns jsonb`
+Saves a request after the page started (or failed to start) a Claude Code session. Returns the saved row (7.1).
+- `p_title`: whitespace collapsed, 2–120. `p_request`: trimmed, 3–4000. `p_area`: one of the areas above, or null/blank → null.
+- `p_session_id`: null/blank → no session (`status = 'sent'`); otherwise `status = 'working'`.
+- `p_session_url`: null/blank with a session id → built as `https://claude.ai/code/<session_id>`.
+- **Same session id again → returns the existing request unchanged** (safe to retry after a network error).
+Errors: `bad_input` (any field out of range / bad format, including a session link outside `https://claude.ai/code/`).
+
+### 7.4 `office_admin.update_request(p_id uuid, p_status text, p_pr_url text default null) returns jsonb`
+Sets the status (any of the seven) and, optionally, the PR link. `p_pr_url` null or blank **keeps** the current link.
+Returns the updated row (7.1). The page maps the session's `status_bucket` like this: working → `working`,
+blocked → `needs_you`, review_ready → `review`, completed → `done`, failed → `failed`; «إلغاء» saves `cancelled`.
+Only refresh requests that are still open (`sent`, `working`, `needs_you`, `review`).
+Errors (in order): `bad_status` (unknown or null status), `bad_input` (PR link not `https://github.com/…`), `not_found`.
+
+### 7.5 `office_admin.content() returns jsonb`
+`{ "ads": [...], "events": [...], "nudges": [...], "settings": {...} }` — read only.
+
+**`ads`** — every launch ad, newest first (`created_at` desc):
+| key | type | meaning |
+|---|---|---|
+| `id` | uuid | ad id |
+| `kind` | string | `ad` (marketing, labelled «إعلان») \| `awareness` \| `occasion` |
+| `title` | string | 2–80 |
+| `media_path`, `media_type` | string | storage path in the public bucket `ads`; `image` \| `gif` \| `video` (not editable here) |
+| `link` | string or null | in-app path (`/store/<id>`, `/clubs/chain/<id>`, `/coaches/<id>`, `/recovery/centers?focus=<id>`, …) or `https://…` |
+| `cta` | string or null | button text ≤ 30 |
+| `audience` | string | `all` \| `men` \| `women` |
+| `starts_at`, `ends_at` | timestamp or null | null = no limit |
+| `active` | boolean | switched on |
+| `frequency` | string | `every_open` \| `daily` \| `once` |
+| `auto_close` | int | seconds 0–30 (0 = stays until skipped) |
+| `priority` | int | 0–100 (highest shown first, then newest) |
+| `created_at`, `updated_at` | timestamp | |
+| `state` | string | `off` (not active) \| `ended` (`ends_at` ≤ now) \| `scheduled` (`starts_at` > now) \| `live` — same rule as the app's `adState` |
+
+**`events`** — up to 80 local events ordered by `coalesce(starts_on, Riyadh day of created_at)` desc, every column of
+`local_events`: `id`, `category` (`running` \| `horse_racing` \| `hiking` \| `shooting` \| `boxing` \| `motorsport` \|
+`cycling` \| `football` \| `other`), `title` (2–90), `title_en` (≤ 90), `city` / `city_en` (≤ 40), `venue` / `venue_en`
+(≤ 90), `starts_on` / `ends_on` (`YYYY-MM-DD` or null), `date_note` / `date_note_en` (≤ 80, shown instead of the date when
+it is approximate), `summary` / `summary_en` (≤ 500), `url` (`https://…` ≤ 300), `image_path` (bucket `events`, or null),
+`featured`, `active` (boolean), `created_by`, `created_at`, `updated_at`. Text fields other than `title` may be null.
+
+**`nudges`** — up to 300 motivation nudge templates (the newest 300), ordered by `category`, `gender`, oldest first:
+`id`, `category` (`gym` \| `friend` \| `streak` \| `workout` \| `meal`), `gender` (`all` \| `male` \| `female`),
+`friend_gender` (same values; only meaningful for `friend`, otherwise `all`), `locale` (`ar` \| `en`), `title` (1–80),
+`body` (3–240), `active`, `updated_at`, `last_broadcast_at` (timestamp or null), `last_broadcast_n` (int or null).
+Placeholders allowed per category: gym `{name} {gym}`; friend `{name} {friend} {gym}`; streak `{name} {streak} {gym}`;
+workout `{name} {workout}`; meal `{name}`.
+
+**`settings`** (defaults when not saved):
+| key | type | meaning |
+|---|---|---|
+| `ai_limits.barcode_per_day` | int | AI barcode lookups per user per day, 0–100 (default 2) |
+| `ai_limits.meal_photos_per_day` | int | meal-photo analyses per user per day, 0–200 (default 25) |
+| `calorie_alert.enabled` | boolean | the "N kcal left" alert is on |
+| `calorie_alert.threshold` | int | alert when ≤ this many kcal are left, 50–500 (default 200) |
+| `calorie_alert.title_ar` / `.body_ar` | string | Arabic title (2–80) / text (2–200) — required |
+| `calorie_alert.title_en` / `.body_en` | string or null | English title (≤ 80) / text (≤ 200); null → the app falls back to Arabic |
+Calorie alert placeholders: `{n}` kcal left, `{eaten}` eaten today, `{goal}` daily target.
+
+### 7.6 `office_admin.save_ad(p_id uuid, p jsonb) returns jsonb`
+Edits an **existing** launch ad (new ads need an image/video and are added from the mobile app). Returns the ad as in 7.5
+(with `state`). Editable keys in `p`:
+| key | rule |
+|---|---|
+| `title` | string 2–80 (required, can't be cleared) |
+| `kind` | `ad` \| `awareness` \| `occasion` |
+| `link` | null/blank clears; else `/path` with only `A-Z a-z 0-9 _ - / ? = & . % [ ]`, or `https://…` without spaces; ≤ 300 |
+| `cta` | null/blank clears; ≤ 30 |
+| `audience` | `all` \| `men` \| `women` |
+| `starts_at` | null/blank clears; `YYYY-MM-DD` → **start** of that Riyadh day; `YYYY-MM-DDTHH:MM[:SS[.ffffff]]` → Riyadh time; with `Z` or `±HH[:MM]` → as given |
+| `ends_at` | same, but `YYYY-MM-DD` → **end** of that Riyadh day (next midnight), like the app; must be after `starts_at` |
+| `active` | boolean |
+| `frequency` | `every_open` \| `daily` \| `once` |
+| `auto_close` | int 0–30 |
+| `priority` | int 0–100 |
+Other keys are ignored (`media_*` can't change here). The table's trigger logs `admin_log` (`kind 'ad'`, action `edit`, or
+`show`/`hide` when `active` changed).
+Errors: `bad_input` (`p` not an object), `not_found` (null or unknown id), `bad_value: <field>`.
+
+### 7.7 `office_admin.set_ad_active(p_id uuid, p_active boolean) returns jsonb`
+Switches an ad on/off → `{"ok": true}`. Logged by the table trigger (`show` / `hide`).
+Errors: `bad_input` (null `p_active`), `not_found`.
+
+### 7.8 `office_admin.save_event(p_id uuid, p jsonb) returns jsonb`
+`p_id` null → **adds** an event; otherwise edits it. Returns the saved row (every column, as in 7.5). Keys in `p`:
+`category` (enum, default `other`), `title` (required, 2–90), `title_en` (≤ 90), `city` / `city_en` (≤ 40), `venue` /
+`venue_en` (≤ 90), `starts_on` / `ends_on` (`YYYY-MM-DD`, a real date; `ends_on` ≥ `starts_on`), `date_note` /
+`date_note_en` (≤ 80), `summary` / `summary_en` (≤ 500, new lines kept), `url` (`https://…` without spaces, ≤ 300),
+`featured` (boolean, default false), `active` (boolean, default **true**). `image_path` is never changed here.
+Logged by the table trigger (`kind 'event'`: `create`, `edit`, or `show`/`hide`).
+Errors: `bad_input`, `not_found` (unknown id), `bad_value: <field>` (a table check that still fails →
+`bad_value: <constraint name>`).
+
+### 7.9 `office_admin.set_event_active(p_id uuid, p_active boolean) returns jsonb`
+→ `{"ok": true}`; logged (`show` / `hide`). Errors: `bad_input`, `not_found`.
+
+### 7.10 `office_admin.save_nudge(p_id uuid, p jsonb) returns jsonb`
+`p_id` null → **adds** a template, **paused** unless `p.active` is `true`; otherwise edits `category`, `gender`,
+`friend_gender`, `locale`, `title`, `body` (`active` is ignored on edit — use 7.11). Defaults on add: `gender 'all'`,
+`locale 'ar'`; `category`, `title` and `body` are required. `friend_gender` is kept only for `friend` (otherwise forced to
+`all`). Title 1–80 and body 3–240 after trimming, and every `{…}` must be a placeholder allowed for the category (7.5), no
+stray braces — same rule as the app's `validNudgeText`. Returns the template as in 7.5. Writes `admin_log`
+(`kind 'nudge'`, `create` / `edit`, note = title).
+Errors: `bad_input`, `not_found`, `bad_value: category|gender|friend_gender|locale|title|body` (wrong type/enum),
+`bad_nudge` (length or placeholders).
+
+### 7.11 `office_admin.set_nudge_active(p_id uuid, p_active boolean) returns jsonb`
+→ `{"ok": true}`; writes `admin_log` (`kind 'nudge'`, `show` / `hide`). Errors: `bad_input`, `not_found`.
+
+### 7.12 `office_admin.save_setting(p_key text, p_value jsonb) returns jsonb`
+Saves (upserts) one setting: `p_key` = `ai_limits` \| `calorie_alert`; `p_value` = the whole object as in 7.5
+(`ai_limits`: `{barcode_per_day: 0–100, meal_photos_per_day: 0–200}` whole numbers; `calorie_alert`: `{enabled,
+threshold, title_ar, body_ar, title_en, body_en}`). The `app_settings` guard validates, keeps only the known keys
+(blank English → null) and writes `admin_log` (`kind 'setting'`, target = key, `edit`). Calorie-alert texts may only use
+`{n}`, `{eaten}`, `{goal}`. Returns `{"ok": true, "key": <key>, "value": <saved, cleaned value>}`.
+Errors: `bad_input` (other key), `bad_value` (value not an object, or rejected by the guard), `bad_value: <text key>`
+(unknown placeholder or stray brace in a calorie-alert text).
+
+### 7.13 `office_admin.partners(p_kind text, p_q text default null) returns jsonb`
+The app's partner management list (`admin_partner_list`) for one kind, same order, at most 200 rows.
+`p_kind`: `club` (gym chains) \| `store` \| `coach` \| `center` \| `venue`. `p_q`: search (name, English name or owner
+username, depending on kind), trimmed, ≤ 80; null/blank = all.
+| key | type | meaning |
+|---|---|---|
+| `id` | uuid | chain / brand / coach **user** / center / venue id (use it for 7.14) |
+| `name` | string | display name |
+| `subtitle` | string | English name or tagline/headline (`""` when none) |
+| `status` | string | club: `approved` (partner) \| `listed` \| `suspended` (hidden); others: `pending` \| `approved` \| `rejected` \| `suspended` (hidden) |
+| `logo_path` | string or null | logo/image storage path |
+| `avatar_url` | string or null | coach avatar |
+| `owner_id`, `owner_username` | uuid / string or null | owner account (clubs: managers' usernames, `، `-separated) |
+| `listed_by` | string | `owner` (signed up) \| `arq` (added by ARQ) |
+| `partner` | boolean | partner flag (clubs: `gym_chains.partner`; coaches: approved; others: owner-listed and approved) |
+| `meta` | object | per kind: club `{audience, branches, managers, offers}`; store `{category, city, products}`; coach `{city, specialties, clients}`; center `{kind, cities}` (licence number removed); venue `{sports, city, booking_url, courts, classes, upcoming}` |
+| `created_at` | timestamp | |
+Errors: `bad_status` (unknown kind).
+
+### 7.14 `office_admin.partner_action(p_kind text, p_id uuid, p_action text, p_note text default null) returns jsonb`
+`p_action`: `hide` \| `show` \| `partner_on` \| `partner_off` only (no approve/reject/delete here) → `admin_partner_action`,
+which notifies the partner as in the app and writes `admin_log` (`kind = p_kind`, `action = p_action`, note).
+`p_note` (trimmed, ≤ 300, optional) is the hide reason shown to the partner.
+- clubs: `hide`/`show` switch the chain off/on; `partner_on`/`partner_off` set the partner flag.
+- store / coach / center / venue: `hide` only an `approved` item (→ `suspended`), `show` only a `suspended` one
+  (→ `approved`) — so «إظهار» never approves a pending or rejected request. `partner_on`/`partner_off` → `bad_status`
+  (the flag exists for clubs only).
+Returns `{"ok": true}`. Errors: `bad_status` (action/kind not allowed, or item in the wrong state), `request_not_found`.
+
+### 7.15 `office_admin.users(p_q text default null, p_kind text default 'all', p_limit integer default 50, p_offset integer default 0) returns jsonb`
+The app's user list (`admin_user_list`) **without `email` and `last_sign_in_at`**, newest accounts first.
+`p_q`: search by username or full name (it also matches an email you type, but emails are never returned), ≤ 80.
+`p_kind`: `all` \| `trainee` \| `partner` (account type other than trainee). `p_limit` clamped 1–200, `p_offset` ≥ 0.
+Each row:
+| key | type | meaning |
+|---|---|---|
+| `id` | uuid | user id |
+| `username` | string | |
+| `full_name`, `avatar_url` | string or null | |
+| `account_type` | string | `trainee` \| `club` \| `coach` \| `store` \| `restaurant` \| `center` \| `venue` |
+| `gender` | string or null | from the health profile |
+| `created_at` | timestamp | sign-up time |
+| `email_confirmed` | boolean | |
+| `points` | int | |
+| `gym_name`, `gym_name_en` | string or null | home gym |
+| `is_admin` | boolean | |
+| `partner_intent` | string or null | partner kind chosen at sign-up and not yet approved |
+| `is_coach` | boolean | verified ✓ (toggle with 7.17) |
+| `total` | int | number of matching users (same on every row; use it for paging) |
+An offset past the end returns `[]`. Errors: `bad_input` (unknown kind).
+
+### 7.16 `office_admin.update_user(p_user uuid, p_full_name text, p_username text) returns jsonb`
+→ `admin_update_user`: full name trimmed (blank → null, ≤ 60), username trimmed and lower-cased (`^[a-z0-9_.]{3,24}$`,
+unique). Writes `admin_log` (`kind 'user'`, `edit`, "old → new"). Returns `{"ok": true, "id", "username", "full_name"}`.
+Errors: `user_not_found`, `bad_username`, `name_too_long`, `username_taken`.
+
+### 7.17 `office_admin.set_verified(p_user uuid, p_value boolean) returns jsonb`
+Verified ✓ → `set_coach`: sets `profiles.is_coach`; a coach profile follows (on → `approved`, off → `suspended`).
+Writes `admin_log` (`kind 'coach'`, `verify` / `unverify`). Returns `{"ok": true, "is_coach": boolean}`.
+Errors: `bad_input` (null value), `user_not_found`.
+
+### 7.18 What lands in `admin_log` (actor = the owner)
+| call | kind | action | written by |
+|---|---|---|---|
+| `save_ad`, `set_ad_active` | `ad` | `edit` / `show` / `hide` | `launch_ads` trigger |
+| `save_event`, `set_event_active` | `event` | `create` / `edit` / `show` / `hide` | `local_events` trigger |
+| `save_nudge`, `set_nudge_active` | `nudge` | `create` / `edit` / `show` / `hide` | `office_admin` |
+| `save_setting` | `setting` | `edit` | `app_settings` trigger |
+| `partner_action` | `club` \| `store` \| `coach` \| `center` \| `venue` | the action | `admin_partner_action` |
+| `update_user` | `user` | `edit` | `admin_update_user` |
+| `set_verified` | `coach` | `verify` / `unverify` | `office_admin` |
+Change requests are not logged (the table is the record).
