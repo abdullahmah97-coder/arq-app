@@ -2,7 +2,8 @@
 // يشتغل مع اختبار النوادي (npm run test:clubs) أو لحاله: node --experimental-strip-types tests/office.test.ts
 import { readFileSync } from 'node:fs';
 import {
-  agentRoute, buildTasks, DESKS, deskSpot, deskStates, DONE_LIMIT, EMPTY_SNAPSHOT, filterCounts, filterTasks, paintOrder, waitingTotal,
+  AGENT_STALE_MS, agentRoute, agentStale, agentTaskKind, buildTasks, DESKS, deskSpot, deskStates, DONE_LIMIT, EMPTY_SNAPSHOT, filterCounts, filterTasks,
+  paintOrder, waitingTotal,
   type AgentTaskLite, type OfficeSnapshot, type TaskKind,
 } from '../src/lib/officeCore.ts';
 
@@ -102,7 +103,9 @@ const agentList: AgentTaskLite[] = [
   ag('t9', { desk: 'finance' as never }),
 ];
 const asnap: OfficeSnapshot = { ...snap, agentTasks: agentList };
-const atasks = buildTasks(asnap, 'en');
+// الوقت ثابت بالاختبار: ٥ دقايق بعد ما بدأ الوكيل (الشغّالة للحين حيّة)
+const NOW = Date.parse(at(6)) + 5 * 60_000;
+const atasks = buildTasks(asnap, 'en', NOW);
 const aById = (id: string) => atasks.find((t) => t.id === id);
 
 ok(!aById('report:r1') && aById('agent:t1')?.status === 'waiting' && aById('agent:t1')?.kind === 'agent_report' && aById('agent:t1')?.desk === 'reports',
@@ -113,7 +116,7 @@ ok(aById('club:more')?.n === 1, 'an unlisted request with an agent task is not c
 ok(aById('store:s1')?.status === 'waiting' && aById('agent:t4')?.kind === 'agent_failed' && aById('agent:t4')?.status === 'done', 'a failed agent task leaves the manual request in place');
 ok(aById('agent:t4')?.name === 'Protein Shop', 'an agent task without a title takes the name of its item');
 ok(aById('agent:t5')?.kind === 'agent_brief' && aById('agent:t5')?.status === 'done' && aById('agent:t5')?.name === 'A calm day', 'the daily brief is done and named by its headline');
-ok(buildTasks(asnap, 'ar').find((t) => t.id === 'agent:t5')?.name === 'يومك هادي', 'brief headline in Arabic');
+ok(buildTasks(asnap, 'ar', NOW).find((t) => t.id === 'agent:t5')?.name === 'يومك هادي', 'brief headline in Arabic');
 ok(aById('agent:t6')?.name === 'يلا {name}' && aById('agent:t6')?.route.pathname === '/owner-nudges', 'a nudge draft is named by its proposed title and opens the nudges screen');
 ok(aById('agent:t7')?.status === 'in_progress' && aById('agent:t7')?.kind === 'agent_limits', 'a scheduled agent task counts as in progress');
 ok(atasks.filter((t) => t.kind === 'agent_report' && t.status === 'done').length === DONE_LIMIT && !!aById('agent:old10') && !aById('agent:old0'),
@@ -129,16 +132,50 @@ ok(ast('reports').waiting === 1, 'reports desk still waits on 1 (the agent propo
 ok(ast('marketing').waiting === st('marketing').waiting + 1 && ast('ai').inProgress === 1, 'a nudge draft waits on marketing; the AI desk works');
 ok(ast('lead').done === astates.filter((x) => x.id !== 'lead').reduce((n, x) => n + x.done, 0) + 1, 'the lead desk adds its own daily brief to the totals');
 // قبل الوكلاء ٩ تنتظرك: طلب c1 صار شغّال (−١)، ومسودة التنبيه تنتظرك (+١)، والباقي نفس العدد (مقترح الوكيل بدل مهمة العنصر)
-ok(waitingTotal(asnap) === ast('lead').waiting && waitingTotal(asnap) === st('lead').waiting - 1 + 1,
+ok(waitingTotal(asnap, NOW) === ast('lead').waiting && waitingTotal(asnap, NOW) === st('lead').waiting - 1 + 1,
   'the admin panel link counts agent proposals the same way as the office');
 ok(filterTasks(atasks, 'clubs', 'in_progress').some((t) => t.id === 'agent:t2'), 'in-progress filter shows the working agent');
 // القائمة كاملة بس فيها مهمة وكيل لطلب انقرّر يدوياً: ما تنقص "و N" تحت الصفر وتبقى تنتظرك (تقفلها)
-const stale = buildTasks({ ...snap, agentTasks: [ag('s', { desk: 'stores', kind: 'review_partner', target_kind: 'store', target_id: 'gone' })] });
-ok(stale.some((t) => t.id === 'store:s1') && !stale.some((t) => t.id === 'store:more') && stale.some((t) => t.id === 'agent:s' && t.status === 'waiting'),
+const decided = buildTasks({ ...snap, agentTasks: [ag('s', { desk: 'stores', kind: 'review_partner', target_kind: 'store', target_id: 'gone' })] }, 'en', NOW);
+ok(decided.some((t) => t.id === 'store:s1') && !decided.some((t) => t.id === 'store:more') && decided.some((t) => t.id === 'agent:s' && t.status === 'waiting'),
   'an agent task for an item decided by hand stays waiting without hiding other requests');
 ok(agentRoute({ desk: 'care', kind: 'review_partner', target_kind: 'venue' }).params?.kind === 'venue' && agentRoute({ desk: 'clubs', kind: 'review_partner', target_kind: 'club' }).pathname === '/owner'
   && agentRoute({ desk: 'ai', kind: 'review_ai_limits', target_kind: null }).pathname === '/owner-ai-limits', 'agent tasks open the right section');
 ok(waitingTotal({ ...EMPTY_SNAPSHOT, agentTasks: [ag('x', {})] }) === 1, 'an agent proposal alone counts as waiting');
+
+// ---------- مهمة وكيل «شغّالة» وقفت (انقطعت الدالة): بعد ١٥ دقيقة ما تخفي العنصر وتنعرض ما كمّلت ----------
+const LATE = Date.parse(at(6)) + AGENT_STALE_MS + 1;
+ok(AGENT_STALE_MS === 15 * 60_000, 'a working agent task counts as stopped after 15 minutes (same as the server)');
+ok(!agentStale({ status: 'in_progress', created_at: at(6) }, Date.parse(at(6)) + AGENT_STALE_MS) && agentStale({ status: 'in_progress', created_at: at(6) }, LATE)
+  && agentStale({ status: 'scheduled', created_at: at(6) }, LATE), 'stale only after the full 15 minutes, for in-progress and scheduled tasks');
+ok(!agentStale({ status: 'waiting_approval', created_at: at(1) }, LATE) && !agentStale({ status: 'done', created_at: at(1) }, LATE) && !agentStale({ status: 'in_progress', created_at: 'x' }, LATE),
+  'proposals awaiting you never go stale (nor finished tasks or unreadable dates)');
+ok(agentTaskKind({ kind: 'review_partner', status: 'in_progress', created_at: at(6) }, NOW) === 'agent_partner'
+  && agentTaskKind({ kind: 'review_partner', status: 'in_progress', created_at: at(6) }, LATE) === 'agent_failed', 'a stopped task is shown as not finished');
+const ltasks = buildTasks(asnap, 'en', LATE);
+const lById = (id: string) => ltasks.find((t) => t.id === id);
+ok(lById('club:c1')?.status === 'waiting' && lById('agent:t2')?.kind === 'agent_failed' && lById('agent:t2')?.status === 'done',
+  'a stopped agent review gives the request back to you and shows as not finished');
+ok(lById('agent:t7')?.kind === 'agent_failed' && lById('agent:t7')?.status === 'done' && lById('agent:t7')?.at === at(6), 'a stopped scheduled task is closed too, dated when it started');
+ok(lById('agent:t1')?.status === 'waiting' && !lById('report:r1'), 'an old proposal awaiting you still replaces its report');
+ok(lById('club:more')?.n === 1, 'the "more" count is unchanged when the stopped task was on a listed request');
+const lst = (id: string) => deskStates(ltasks).find((x) => x.id === id)!;
+ok(lst('clubs').waiting === 3 && lst('clubs').inProgress === 0 && lst('ai').inProgress === 0, 'gyms desk waits on all 3 requests again and nothing shows as working');
+ok(waitingTotal(asnap, LATE) === waitingTotal(asnap, NOW) + 1, 'the admin panel link counts the request again');
+// طلب ما هو في القائمة وعليه مهمة وقفت: يرجع للعدد في "و N"
+const hidden = { ...snap, agentTasks: [ag('h', { desk: 'clubs', kind: 'review_partner', target_kind: 'club', target_id: 'c9', status: 'in_progress' })] };
+ok(buildTasks(hidden, 'en', NOW).find((t) => t.id === 'club:more')?.n === 1 && buildTasks(hidden, 'en', LATE).find((t) => t.id === 'club:more')?.n === 2,
+  'an unlisted request whose agent stopped is counted again in "more"');
+// بلاغ عليه فرز وقف: يرجع بلاغ جديد ينتظرك
+const rep = { ...snap, agentTasks: [ag('q', { target_kind: 'report', target_id: 'r1', status: 'in_progress' })] };
+ok(!buildTasks(rep, 'en', NOW).some((t) => t.id === 'report:r1') && buildTasks(rep, 'en', LATE).find((t) => t.id === 'report:r1')?.status === 'waiting',
+  'a new report whose triage stopped waits on you again');
+// الوقفانة تنحسب مع اللي ما كمّلت (آخر DONE_LIMIT من نوعها)
+const many = buildTasks({ ...EMPTY_SNAPSHOT, agentTasks: [
+  ...Array.from({ length: 6 }, (_, i) => ag(`f${i}`, { status: 'failed', finished_at: at(5) })),
+  ...Array.from({ length: 6 }, (_, i) => ag(`w${i}`, { status: 'in_progress' })),
+] }, 'en', LATE);
+ok(many.filter((t) => t.kind === 'agent_failed').length === DONE_LIMIT && many.every((t) => t.status === 'done'), 'stopped tasks join the failed ones (latest DONE_LIMIT)');
 
 // المكاتب: ٩ أماكن مختلفة على الشبكة، والمدير في النص
 ok(DESKS.length === 9 && new Set(DESKS.map((d) => `${d.col},${d.row}`)).size === 9, 'nine desks on nine distinct spots');

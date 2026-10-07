@@ -5,8 +5,11 @@
 //
 // المكاتب: reports (فرز البلاغات الجديدة) · clubs / stores / coaches / care (مراجعة طلبات الشركاء) · marketing (مسودة تنبيه)
 //   ai (مراجعة حدود الذكاء الاصطناعي) · lead (ملخص اليوم). users ما له وكيل للحين (agent_unavailable).
-// كل عنصر ينراجع مرة وحدة: اللي له مهمة بأي حالة غير failed ما يرجع له. ٥ عناصر بالأكثر بالتشغيلة.
+// كل عنصر ينراجع مرة وحدة: اللي له مهمة بأي حالة غير failed ما يرجع له (إلا طلب شريك وافق المالك على رفضه ورجع
+// معلّق: الشريك عدّله وقدّمه من جديد). ٥ عناصر بالأكثر بالتشغيلة، أقدمها أول (الطابور يتقلّب صفحات لين نلقاها).
 // كل مهمة تحجز من حد المالك اليومي قبل الذكاء الاصطناعي: ai_take('office') = ٨٠ باليوم (ترحيل 20261007000880).
+// الوقت: كل مهام التشغيلة تطلع مع بعض بجولة وحدة وبدون إعادة (٩٠ ثانية بالأكثر للطلب)، فالتشغيلة تخلص تحت حد
+// Supabase للدالة (١٥٠ ثانية بالخطة المجانية). لو انقطعت قبل، مهامها تبقى in_progress لين تصير stale.
 //
 // النشر:
 //   supabase functions deploy office-agent
@@ -23,10 +26,10 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import Anthropic from 'npm:@anthropic-ai/sdk@0.131.0';
 import { clean, DESK_IDS, cleanOutput, type DeskId } from './agents.ts';
-import { collectJobs, type Job } from './jobs.ts';
+import { collectJobs, PER_RUN, type Job } from './jobs.ts';
 
 export { clean, cleanOutput, schemaFor, systemFor, validNudgeText, inLocale, NUDGE_VARS } from './agents.ts';
-export { aggregateUsage, PER_RUN } from './jobs.ts';
+export { aggregateUsage, PER_RUN, SCAN, MAX_PAGES } from './jobs.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -38,8 +41,8 @@ const json = (body: unknown, status = 200) =>
 
 export const AI_TIMEOUT_MS = 90_000;
 export const MAX_TOKENS = 16_000;
-/** كم مهمة تشتغل مع بعض */
-export const CONCURRENCY = 3;
+/** كم مهمة تشتغل مع بعض: كلها (PER_RUN) بجولة وحدة، لأن جولة ثانية تطوّل التشغيلة فوق حد الدالة */
+export const CONCURRENCY = PER_RUN;
 /** المهمة اللي بقت in_progress أكثر من كذا: الدالة انقطعت قبل ما تخلص */
 const STALE_MS = 15 * 60_000;
 
@@ -94,7 +97,7 @@ async function runTask(db: SupabaseClient, client: Anthropic, model: string, id:
     const raw = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
     let parsed: unknown;
     try { parsed = JSON.parse(raw); } catch { throw new Error('ai_bad_output'); }
-    const output = cleanOutput(job.kind, parsed, job.locale);
+    const output = cleanOutput(job.kind, parsed, job.locale, job.title);
     const status = job.kind === 'daily_brief' ? 'done' : 'waiting_approval';
     const served = typeof res.model === 'string' && res.model ? res.model.slice(0, 60) : model.slice(0, 60);
     const { error } = await db.from('office_tasks').update({ status, output, model: served }).eq('id', id).eq('status', 'in_progress');
@@ -192,7 +195,8 @@ Deno.serve(async (req) => {
   if (!created.length) return json(counts);
 
   // الشغل هنا: يكمل ويحفظ حتى لو التطبيق انقفل أو انقطع الاتصال (waitUntil)، والتطبيق يحدّث المهام
-  const client = new Anthropic({ apiKey, timeout: AI_TIMEOUT_MS, maxRetries: 1 });
+  // بدون إعادة: إعادة بعد مهلة ٩٠ ثانية تطلع فوق حد الدالة، والمهمة الفاشلة ترجع بالتشغيلة الجاية
+  const client = new Anthropic({ apiKey, timeout: AI_TIMEOUT_MS, maxRetries: 0 });
   const work = (async () => {
     await pool(created, CONCURRENCY, async (t) => { counts[await runTask(db, client, model, t.id, t.job)]++; });
     return counts;

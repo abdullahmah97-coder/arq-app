@@ -155,7 +155,7 @@ ok(staleSweep && staleSweep.filters.some((f) => f[0] === 'eq' && f[1] === 'statu
 // الطلب لـ Claude
 const q2 = reqWith('tester_en');
 ok(anth.requests.length === 4, '4 requests to Claude');
-ok(same(anth.clients.at(-1), { apiKey: 'k', timeout: 90000, maxRetries: 1 }), 'SDK client: apiKey, timeout 90s, maxRetries 1', JSON.stringify(anth.clients.at(-1)));
+ok(same(anth.clients.at(-1), { apiKey: 'k', timeout: 90000, maxRetries: 0 }), 'SDK client: apiKey, timeout 90s, no retries (a run stays under the 150 s wall clock)', JSON.stringify(anth.clients.at(-1)));
 ok(q2.model === 'claude-opus-5-5' && q2.max_tokens === 16000, 'default model claude-opus-5-5 and max_tokens 16000');
 ok(same(q2.betas, ['server-side-fallback-2026-07-01']) && q2.fallbacks === 'default', 'server-side fallback: beta header + fallbacks "default"');
 ok(q2.output_config?.effort === 'medium' && q2.output_config?.format?.type === 'json_schema' && q2.output_config.format.schema?.type === 'object', 'output_config: effort medium + json_schema format');
@@ -179,11 +179,30 @@ const takesBefore = takes().length; const reqsBefore = anth.requests.length;
 r = await call({ desk: 'reports' });
 ok(r.status === 200 && same(r.body, ZERO) && takes().length === takesBefore && anth.requests.length === reqsBefore, 'nothing left → ran 0 without quota or AI calls');
 
-// ٢ج) التوازي: ٣ مهام بالمرة
+const feedbackPages = () => db.queries.filter((q) => q.table === 'beta_feedback').map((q) => q.range);
+ok(same(feedbackPages(), [[0, 99], [0, 99], [0, 99]]), 'a short queue is read in one page per run', JSON.stringify(feedbackPages()));
+
+// ٢ب٢) الطابور يتقلّب صفحات: البلاغات اللي انفرزت وباقية new (المالك رفض الفرز) ما تسد الطريق على الأحدث
+ok(mod.SCAN === 100 && mod.MAX_PAGES === 10 && mod.PER_RUN === 5, 'scan pages of 100, up to 10 pages, 5 per run');
+const handledReports = (n) => Array.from({ length: n }, (_, i) => task('triage_report', 'report', `pg${i}`, 'done', { id: `old-pg${i}`, decision: 'rejected' }));
+fresh({ beta_feedback: Array.from({ length: 250 }, (_, i) => report(`pg${i}`, 'p-ar', 1000 - i)), office_tasks: handledReports(120) });
+anth.respond = (p) => triage(byLang(p));
+r = await call({ desk: 'reports' });
+ok(r.body.ran === 5 && same(tasks().filter((t) => t.status === 'waiting_approval').map((t) => t.target_id), ['pg120', 'pg121', 'pg122', 'pg123', 'pg124']),
+  '120 oldest already handled → the next 5 are found on page 2', JSON.stringify({ body: r.body, ids: tasks().filter((t) => t.status === 'waiting_approval').map((t) => t.target_id) }));
+ok(same(feedbackPages(), [[0, 99], [100, 199]]), 'paging stops once 5 unhandled items are found', JSON.stringify(feedbackPages()));
+const pageOrder = db.queries.find((q) => q.table === 'beta_feedback').order;
+ok(same(pageOrder, [['created_at', true], ['id', true]]) && db.queries.find((q) => q.table === 'beta_feedback').limit === null, 'pages ordered by created_at then id (stable), no fixed limit', JSON.stringify(pageOrder));
+fresh({ beta_feedback: Array.from({ length: 1100 }, (_, i) => report(`pg${i}`, 'p-ar', 5000 - i)), office_tasks: handledReports(1100) });
+r = await call({ desk: 'reports' });
+const capped = feedbackPages();
+ok(same(r.body, ZERO) && capped.length === 10 && same(capped.at(-1), [900, 999]) && !anth.requests.length && !takes().length, 'at most 10 pages, then nothing to do', JSON.stringify({ body: r.body, pages: capped.length }));
+
+// ٢ج) التوازي: كل مهام التشغيلة (٥) بجولة وحدة عشان التشغيلة تخلص تحت حد وقت الدالة
 fresh({ beta_feedback: Array.from({ length: 5 }, (_, i) => report(`c${i}`, 'p-ar', 50 - i)) });
 anth.respond = (p) => triage(byLang(p)); anth.delayMs = 40;
 r = await call({ desk: 'reports' });
-ok(r.body.waiting === 5 && anth.maxInFlight === 3, 'jobs run with concurrency 3', `maxInFlight=${anth.maxInFlight}`);
+ok(mod.CONCURRENCY === mod.PER_RUN && r.body.waiting === 5 && anth.maxInFlight === 5, 'all 5 jobs of a run go out in one round (concurrency = PER_RUN)', `maxInFlight=${anth.maxInFlight}`);
 
 // ٢د) مهمة معلّقة من تشغيلة انقطعت: بعد ربع ساعة تصير failed/stale وينفك عنصرها، والحديثة تبقى
 fresh({
@@ -240,10 +259,17 @@ await oneReport(triage('ar', { status: 'fixed' }), 'status outside seen/wontfix'
 await oneReport(triage('ar', { reply: 'Thanks, we will check it.' }), 'reply not in the tester’s language', 'ai_bad_output');
 await oneReport(triage('ar', { reply: ' ' }), 'empty reply', 'ai_bad_output');
 await oneReport(triage('ar', { summary: { ar: '', en: '  ' } }), 'empty summary', 'ai_bad_output');
+await oneReport(triage('ar', { reply: 'Thanks for the report! We got it, شكراً.' }), 'English reply with one Arabic word (under a quarter Arabic)', 'ai_bad_output');
 // الفاشلة ترجع بالتشغيلة الجاية
 anth.respond = (p) => triage(byLang(p));
 r = await call({ desk: 'reports' });
 ok(r.body.waiting === 1 && taskFor('f1').length === 2, 'a failed task’s report is retried on the next run');
+// الرد يقتبس البلاغ نفسه (عنوان المهمة) بالإنجليزي: الاقتباس ما ينحسب بفحص اللغة
+fresh({ beta_feedback: [report('qt', 'p-ar', 5)] });
+anth.respond = () => triage('ar', { reply: 'بلاغك «Report qt: the check-in button does nothing» وصل' });
+r = await call({ desk: 'reports' });
+ok(r.body.waiting === 1 && taskFor('qt')[0].status === 'waiting_approval', 'Arabic reply quoting the English report (the task title) is accepted', JSON.stringify(taskFor('qt')[0]));
+ok(!mod.inLocale('بلاغك «Report qt: the check-in button does nothing» وصل', 'ar'), '…and the same reply fails without the title (under a quarter Arabic)');
 // النموذج المضبوط، واللي رد فعلاً (بعد التحويل للبديل)
 fresh({ beta_feedback: [report('mdl', 'p-ar', 5)] });
 env.ANTHROPIC_OFFICE_MODEL = 'claude-sonnet-5-5';
@@ -301,6 +327,9 @@ ok(c1.output.checks.length === 8 && c1.output.checks.every((c) => typeof c.ok ==
 ok(c1.output.summary.ar.length <= 240 && c1.output.summary.en.length <= 240, 'summary ≤ 240');
 ok(same(Object.keys(c1.output).sort(), ['checks', 'confidence', 'missing', 'note', 'note_locale', 'recommendation', 'summary']), 'review output has exactly the contract fields');
 ok(taskFor('cl3').length === 0, 'approved club requests are not picked');
+const c2 = taskFor('cl2')[0];
+ok(c2.output.recommendation === 'approve' && c2.output.note === '' && c2.output.note_locale === 'ar', 'approve → the note is dropped (only a reject note reaches the partner)', JSON.stringify(c2.output));
+ok(/When recommending "approve", leave note empty \(""\): only a rejection note reaches the partner/.test(cq.system) && !/welcome line/.test(cq.system), 'partner prompt: note empty on approve, no welcome line');
 
 // رفض بدون ملاحظة، أو توصية غريبة، أو ملاحظة بغير لغة الشريك = ai_bad_output
 async function oneClub(step, label) {
@@ -314,6 +343,20 @@ await oneClub(review('ar', { recommendation: 'reject', note: 'لا' }), 'reject 
 await oneClub(review('ar', { recommendation: 'maybe' }), 'recommendation outside approve/reject');
 await oneClub(review('ar', { recommendation: 'reject', note: 'Please add your license number.' }), 'note not in the partner’s language');
 await oneClub(review('ar', { confidence: 'certain' }), 'confidence outside the enum');
+await oneClub(review('ar', { recommendation: 'reject', note: 'Please add your license number for نادي' }), 'English reject note + the club’s Arabic name (the name doesn’t count)');
+// الموافقة ما تفشل بسبب الملاحظة (حتى لو بغير لغة الشريك)، والملاحظة تنشال
+fresh({ club_requests: [{ id: 'cw', user_id: 'p-ar', club_name: 'Fitness Time Pro', role: 'owner', status: 'pending', created_at: ago(5) }] });
+anth.respond = () => review('ar', { note: 'Welcome to ARQ, Fitness Time Pro! We are glad to have you.' });
+r = await call({ desk: 'clubs' });
+ok(r.body.waiting === 1 && taskFor('cw')[0].status === 'waiting_approval' && taskFor('cw')[0].output.note === '', 'approve with a note in the other language → still waiting_approval, note dropped', JSON.stringify(taskFor('cw')[0]));
+// ملاحظة رفض فيها اسم النادي اللاتيني: الاسم (عنوان المهمة) ما ينحسب
+const LATIN_CLUB = 'Fitness Time Olaya Riyadh Branch';
+const latinNote = `${LATIN_CLUB}: أضف الرخصة`;
+fresh({ club_requests: [{ id: 'cx', user_id: 'p-ar', club_name: LATIN_CLUB, role: 'owner', status: 'pending', created_at: ago(5) }] });
+anth.respond = () => review('ar', { recommendation: 'reject', note: latinNote });
+r = await call({ desk: 'clubs' });
+ok(r.body.waiting === 1 && taskFor('cx')[0].output.note === latinNote && taskFor('cx')[0].output.recommendation === 'reject', 'Arabic reject note with the club’s Latin name → accepted', JSON.stringify(taskFor('cx')[0]));
+ok(!mod.inLocale(latinNote, 'ar') && mod.inLocale(latinNote, 'ar', LATIN_CLUB), '…it only passes because the item’s own name is ignored');
 fresh({ club_requests: [{ id: 'cn', user_id: 'p-ar', club_name: 'نادي', role: 'owner', status: 'pending', created_at: ago(5) }] });
 anth.respond = () => review('ar', { note: '' });
 r = await call({ desk: 'clubs' });
@@ -338,6 +381,28 @@ ok(count(textOf(sq), '"price_sar"') === 10 && /منتج 9/.test(textOf(sq)) && !
 ok(/Your desk: stores/.test(sq.system) && /steroids/.test(sq.system), 'store system prompt covers prohibited products');
 ok(taskFor('b1')[0].target_kind === 'store' && taskFor('b1')[0].desk === 'stores' && taskFor('b2')[0].error === 'ai_bad_output' && !taskFor('b3').length, 'store tasks: target kind store; approved brands skipped');
 
+// ٦أ) طلب انرفض بموافقة المالك ورجع معلّق (الشريك عدّله وقدّمه من جديد بنفس الصف) → ينراجع مرة ثانية
+fresh({
+  brands: ['rs1', 'rs2', 'rs3', 'rs4', 'rs5'].map((id, i) => ({ id, owner: 'p-ar', name: `متجر ${i}`, category: 'apparel', status: 'pending', created_at: ago(50 - i) })),
+  office_tasks: [
+    task('review_partner', 'store', 'rs1', 'done', { decision: 'approved', final: { decision: 'reject', note: 'أضف حساب انستقرام' } }),
+    task('review_partner', 'store', 'rs2', 'done', { decision: 'approved', final: { decision: 'approve', note: '' } }),
+    task('review_partner', 'store', 'rs3', 'done', { decision: 'rejected', final: null }),
+    task('review_partner', 'store', 'rs4', 'waiting_approval'),
+    task('review_partner', 'store', 'rs5', 'done', { id: 'rs5-a', decision: 'approved', final: { decision: 'reject', note: 'أضف وصف' } }),
+    task('review_partner', 'store', 'rs5', 'done', { id: 'rs5-b', decision: 'rejected', final: null }),
+  ],
+});
+anth.respond = () => review('ar');
+r = await call({ desk: 'stores' });
+const reviewedAgain = tasks().filter((t) => t.id.startsWith('task-')).map((t) => t.target_id);
+ok(r.body.ran === 1 && same(reviewedAgain, ['rs1']), 'resubmitted after an approved reject → reviewed again; an approve, an owner-rejected proposal, an open task or a later decision still count', JSON.stringify({ body: r.body, reviewedAgain }));
+const handledQ = db.queries.find((q) => q.table === 'office_tasks' && q.op === 'select');
+ok(/\bdecision\b/.test(handledQ.cols) && /\bfinal\b/.test(handledQ.cols) && /\bstatus\b/.test(handledQ.cols), 'handled() reads status, decision and final', handledQ.cols);
+fresh({ beta_feedback: [report('rk', 'p-ar', 5)], office_tasks: [task('triage_report', 'report', 'rk', 'done', { decision: 'approved', final: { decision: 'reject', status: 'seen', reply: 'شكراً' } })] });
+r = await call({ desk: 'reports' });
+ok(same(r.body, ZERO), 'the resubmission rule is only for partner reviews (a decided triage still counts)', JSON.stringify(r.body));
+
 fresh({
   coach_profiles: [
     { user_id: 'p-en', headline: 'Strength coach', bio: 'NASM certified', specialties: ['strength', 'muscle'], years_exp: 6, certifications: 'NASM-CPT', languages: ['en', 'ar'], trains: 'any', city: 'Riyadh', online: true, in_person: true, price_from_sar: 250, instagram: 'johnfit', status: 'pending', submitted_at: ago(15) },
@@ -349,6 +414,18 @@ r = await call({ desk: 'coaches' });
 const co = taskFor('p-en')[0];
 ok(r.body.waiting === 1 && co.target_kind === 'coach' && co.desk === 'coaches' && co.title === 'John Smith' && same(co.input, { locale: 'en' }), 'coach task: target_id = user_id, title = full name, partner’s locale');
 ok(/NASM-CPT/.test(textOf(anth.requests[0])) && /Your desk: coaches/.test(anth.requests[0].system), 'coach profile and coach checks go to the model');
+// المدربين: صفحات بترتيب submitted_at ثم user_id، والمدرب اللي انرفض بموافقة المالك وقدّم من جديد يرجع
+const cu = (i) => `cu${String(i).padStart(3, '0')}`;
+fresh({
+  coach_profiles: Array.from({ length: 103 }, (_, i) => ({ user_id: cu(i), headline: `Coach ${i}`, status: 'pending', submitted_at: ago(500 - i) })),
+  office_tasks: Array.from({ length: 101 }, (_, i) => task('review_partner', 'coach', cu(i), i === 100 ? 'done' : 'waiting_approval',
+    i === 100 ? { decision: 'approved', final: { decision: 'reject', note: 'أضف شهادة معتمدة' } } : {})),
+});
+anth.respond = () => review('ar');
+r = await call({ desk: 'coaches' });
+const coachPages = db.queries.filter((q) => q.table === 'coach_profiles');
+ok(r.body.ran === 3 && same(tasks().filter((t) => t.id.startsWith('task-')).map((t) => t.target_id), [cu(100), cu(101), cu(102)]), 'coaches: page 2 is read; a resubmitted coach is reviewed again', JSON.stringify(r.body));
+ok(same(coachPages.map((q) => q.range), [[0, 99], [100, 199]]) && same(coachPages[0].order, [['submitted_at', true], ['user_id', true]]), 'coach pages ordered by submitted_at then user_id', JSON.stringify(coachPages.map((q) => [q.range, q.order])));
 
 fresh({
   recovery_centers: [
@@ -379,6 +456,19 @@ fresh({
 anth.respond = (p) => review(byLang(p));
 r = await call({ desk: 'care' });
 ok(r.body.ran === 5 && same(tasks().map((t) => t.target_id), ['rcx0', 'vx0', 'rcx1', 'vx1', 'rcx2']), 'care: 5 in total per run, oldest first', JSON.stringify(tasks().map((t) => t.target_id)));
+// الاستشفاء: كل طابور يتقلّب لحاله (١٠٠ مركز انراجعت ما تسد الطريق)، وبعدين الأقدم من الاثنين
+const pc = (i) => `pc${String(i).padStart(3, '0')}`;
+fresh({
+  recovery_centers: Array.from({ length: 102 }, (_, i) => ({ id: pc(i), owner: 'p-ar', listed_by: 'owner', name: `مركز ${i}`, kind: 'physio', cities: ['الرياض'], status: 'pending', created_at: ago(900 - i) })),
+  venues: [{ id: 'pv1', owner: 'p-ar', name: 'ملعب', city: 'الرياض', sports: ['padel'], status: 'pending', created_at: ago(850) }],
+  office_tasks: Array.from({ length: 100 }, (_, i) => task('review_partner', 'center', pc(i), 'done', { decision: 'rejected' })),
+});
+anth.respond = (p) => review(byLang(p));
+r = await call({ desk: 'care' });
+const carePages = (t) => db.queries.filter((q) => q.table === t).map((q) => q.range);
+ok(r.body.ran === 3 && same(tasks().filter((t) => t.id.startsWith('task-')).map((t) => `${t.target_kind}:${t.target_id}`), ['venue:pv1', `center:${pc(100)}`, `center:${pc(101)}`]),
+  'care: centers paged past 100 handled ones, merged with venues oldest first', JSON.stringify(tasks().filter((t) => t.id.startsWith('task-')).map((t) => t.target_id)));
+ok(same(carePages('recovery_centers'), [[0, 99], [100, 199]]) && same(carePages('venues'), [[0, 99]]), 'centers and venues are paged separately', JSON.stringify([carePages('recovery_centers'), carePages('venues')]));
 
 // ---------------------------------------------------------------------------
 // ٧) التسويق: مسودة تنبيه، المتغيرات المسموحة بس
@@ -525,6 +615,17 @@ for (const kind of ['triage_report', 'review_partner', 'draft_nudge', 'review_ai
 ok(mod.validNudgeText('friend', '{friend} في {gym}', 'يا {name} صاحبك وصل') && !mod.validNudgeText('workout', '{gym}', 'نص طويل') && !mod.validNudgeText('meal', 'هلا }', 'نص طويل'), 'validNudgeText: allowed placeholders only, no stray braces');
 ok(mod.clean('a'.repeat(79) + '😀 tail', 80) === 'a'.repeat(79) && mod.clean(' x\n\t<y>\u0000 ', 10) === 'x y', 'clean: one line, no <> or control chars, never splits an emoji');
 ok(mod.inLocale('شكراً على بلاغك عن InBody', 'ar') && !mod.inLocale('Thanks for the report', 'ar') && mod.inLocale('{name} thanks!', 'en') && !mod.inLocale('{name}', 'en'), 'inLocale checks the script of the text (placeholders ignored)');
+ok(mod.inLocale('Welcome to ARQ, نادي القمة الرياضي!', 'en') && mod.inLocale('أهلاً Fitness Time Olaya في أرك!', 'ar'), 'inLocale: a welcome with a name in the other script passes (target letters ≥ 25%)');
+ok(!mod.inLocale('Thanks for the report! We got it, شكراً.', 'ar') && !mod.inLocale('شكراً على بلاغك، وصلتنا الملاحظة والفريق بيشيك عليها. OK', 'en'), 'inLocale: under a quarter of the letters in the target script fails');
+ok(mod.inLocale('Welcome نادي القمة الرياضي', 'ar') && !mod.inLocale('Welcome نادي القمة الرياضي', 'ar', 'نادي القمة الرياضي'), 'inLocale: the ignored name doesn’t count for the target script either');
+ok(!mod.inLocale('أهلاً johnsmith_fitness_coach!', 'ar') && mod.inLocale('أهلاً johnsmith_fitness_coach!', 'ar', '@JohnSmith_Fitness_Coach'), 'inLocale: the name is matched without its @ and in any letter case');
+ok(mod.inLocale('ok ok ok ok', 'en', 'ok') && mod.inLocale('أهلاً Fitness', 'ar', null), 'inLocale: names under 3 chars (or none) are not stripped');
+const partnerOut = (over) => ({ summary: { ar: 'ملخص', en: 'Summary' }, checks: [], missing: [], recommendation: 'approve', note: '', note_locale: 'ar', confidence: 'high', ...over });
+ok(mod.cleanOutput('review_partner', partnerOut({ note: 'Welcome to ARQ, نادي القمة!' }), 'ar').note === '' && mod.cleanOutput('review_partner', partnerOut({ note: 'أهلاً Fitness Time Pro في أرك' }), 'ar', 'Fitness Time Pro').note === '', 'cleanOutput: approve never fails on its note and stores it empty');
+let threw = null;
+try { mod.cleanOutput('review_partner', partnerOut({ recommendation: 'reject', note: 'Please add your license number.' }), 'ar', 'نادي القمة'); } catch (e) { threw = e; }
+ok(threw?.message === 'ai_bad_output' && threw.why === 'note_locale', 'cleanOutput: a reject note in the wrong language still fails (note_locale)');
+ok(mod.cleanOutput('review_partner', partnerOut({ recommendation: 'reject', note: 'أهلاً Fitness Time Pro، أضف الرخصة' }), 'ar').note === 'أهلاً Fitness Time Pro، أضف الرخصة', 'cleanOutput: a reject note keeps its text');
 
 const secret = logs.filter((l) => /check-in button does nothing|approve everything|Ramadan|NASM-CPT|Fitness Time|Please upload/.test(l));
 ok(logs.some((l) => l.startsWith('office_task_failed')) && !secret.length, 'logs carry codes only, never user or model text', secret.join('\n'));

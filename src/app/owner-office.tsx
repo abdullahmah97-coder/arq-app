@@ -3,7 +3,7 @@
 // كل مكتب (غير المتدربين للحين) عليه وكيل ذكاء اصطناعي: «شغّل الوكيل» يجهّز الشغل ويرفعه هنا لموافقتك،
 // ومهامه عليها علامة ✨ وتنفتح في ورقة توافق فيها أو ترفض (ما يتغيّر شي بالتطبيق إلا بموافقتك)
 import { Ionicons } from '@expo/vector-icons';
-import { router, Stack, useFocusEffect, useIsFocused } from 'expo-router';
+import { router, Stack, useFocusEffect, useIsFocused, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, I18nManager, Pressable, View } from 'react-native';
@@ -15,7 +15,7 @@ import { timeAgo } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import { loadOffice } from '@/lib/office';
 import { fetchAgentTasks, runDeskAgent, type RunOutcome } from '@/lib/officeAgents';
-import { hasAgent, isWorking, runLine, type AgentTaskRow } from '@/lib/officeAgentsCore';
+import { agentStale, hasAgent, isWorking, runLine, type AgentTaskRow } from '@/lib/officeAgentsCore';
 import {
   agentRoute, buildTasks, deskDef, deskStates, filterCounts, filterTasks,
   type DeskId, type OfficeRoute, type OfficeSnapshot, type OfficeTask, type TaskFilter, type TaskStatus,
@@ -26,8 +26,6 @@ import { brand, colors, radius, space, withAlpha } from '@/theme';
 const FILTERS: TaskFilter[] = ['waiting', 'in_progress', 'done', 'all'];
 /** كل كم نحدّث مهام الوكلاء وهم يشتغلون */
 const POLL_MS = 4000;
-/** مهمة «شغّالة» أقدم من كذا غالباً وقفت (الدالة تعلّمها فاشلة بالتشغيلة الجاية) — ما نستنى عليها */
-const WORKING_FRESH_MS = 10 * 60_000;
 
 /** تشغيل وكيل مكتب: شغّال الحين، أو نتيجة آخر تشغيلة */
 type DeskRun = { busy: true } | { busy: false; res: RunOutcome };
@@ -42,6 +40,7 @@ export default function OwnerOffice() {
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const focused = useIsFocused();
+  const navigation = useNavigation();
   const [ok, setOk] = useState<boolean | null>(null);
   const [snap, setSnap] = useState<OfficeSnapshot | null>(null);
   const [agents, setAgents] = useState<AgentTaskRow[] | null>(null);
@@ -71,7 +70,8 @@ export default function OwnerOffice() {
 
   // الوكلاء يشتغلون: نحدّث مهامهم كل ٤ ثواني لين يخلصون (والشاشة قدامك)
   const anyRun = Object.values(runs).some((r) => r?.busy);
-  const working = useMemo(() => (agents ?? []).some((a) => isWorking(a.status) && Date.now() - Date.parse(a.created_at) < WORKING_FRESH_MS), [agents]);
+  // مهمة «شغّالة» من زمان وقفت (نفس قاعدة المكتب AGENT_STALE_MS: تنعرض ما كمّلت) — ما نستنى عليها
+  const working = useMemo(() => (agents ?? []).some((a) => isWorking(a.status) && !agentStale(a, Date.now())), [agents]);
   useEffect(() => {
     if (!focused || (!anyRun && !working)) return;
     const h = setInterval(() => {
@@ -93,12 +93,13 @@ export default function OwnerOffice() {
       if (res.error !== 'running') Alert.alert(t(`office.err_${res.error}`));
       return;
     }
-    // ملخص اليوم جاهز: نفتحه لك على طول
+    // ملخص اليوم جاهز: نفتحه لك على طول — بس لو المكتب قدامك الحين (مو شاشة ثانية فوقه) وما فيه ورقة مفتوحة
+    // (ما نستبدل مهمة تشتغل عليها). وإلا يبقى في القائمة. isFocused تقرا الحالة الحين مو وقت ما بدأ التشغيل
     if (id === 'lead' && res.done) {
       const daily = rows?.find((a) => a.kind === 'daily_brief' && a.status === 'done');
-      if (daily) setSheet(daily.id);
+      if (daily && navigation.isFocused()) setSheet((cur) => cur ?? daily.id);
     }
-  }, [t]);
+  }, [t, navigation]);
 
   const full = useMemo(() => (snap ? { ...snap, agentTasks: agents ?? snap.agentTasks } : null), [snap, agents]);
   const tasks = useMemo(() => (full ? buildTasks(full, lng) : []), [full, lng]);
@@ -145,8 +146,9 @@ export default function OwnerOffice() {
         <TaskRow key={task.id} task={task} onPress={() => (task.agentTaskId ? setSheet(task.agentTaskId) : open(task.route))} />
       )) : <Empty icon="checkmark-done-outline" text={t(filter === 'waiting' ? 'office.emptyWaiting' : 'office.empty')} />}
 
+      {/* key: مهمة ثانية = ورقة جديدة (المسودة والرفض ما ينتقلون من مهمة لثانية) */}
       {sheetTask ? (
-        <AgentTaskSheet task={sheetTask} route={agentRoute(sheetTask)} onClose={() => setSheet(null)}
+        <AgentTaskSheet key={sheetTask.id} task={sheetTask} route={agentRoute(sheetTask)} onClose={() => setSheet(null)}
           onChanged={() => { reload().catch(() => {}); }} onOpen={open} onPickDesk={(id) => { setDesk(id); setFilter('waiting'); }} />
       ) : null}
     </Screen>

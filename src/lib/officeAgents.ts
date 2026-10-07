@@ -1,22 +1,35 @@
 // مكتب أرك أب — وكلاء الذكاء الاصطناعي من جهة التطبيق: تشغيل وكيل مكتب، قراءة مهامهم، والموافقة أو الرفض.
 // الوكيل نفسه ما يغيّر أي شي: لما توافق، التطبيق ينفّذ الاقتراح بجلستك أنت (نفس دوال الأقسام بالضبط)،
 // وبعدها يسجّل القرار بـ office_decide (ينكتب في سجل إجراءات المالك). الرفض يسجّل القرار بس.
-import { saveAiLimits } from './aiLimits';
+import { parseAiLimits, saveAiLimits, type AiLimits } from './aiLimits';
 import { saveNudge } from './nudges';
 import {
-  asAgentRow, parseRunResult, prepareFinal, runErrorCode,
-  type AgentTarget, type AgentTaskRow, type OfficeError, type RunResult,
+  approveSteps, limitsChanged, mergeAgentRows, parseRunResult, runErrorCode,
+  type AgentTarget, type AgentTaskRow, type OfficeError, type Prepared, type RunResult,
 } from './officeAgentsCore';
 import type { DeskId } from './officeCore';
 import { updateReport } from './owner';
 import { partnerAction, reviewClubRequest } from './partners';
 import { supabase } from './supabase';
 
-/** مهام الوكلاء (الأحدث أول، آخر ١٥٠). ترمي الخطأ — للتحديث وهم يشتغلون: خطأ شبكة ما يمسح اللي قدامك */
+/** المفتوحة كلها (حد الخادم الافتراضي ١٠٠٠)، ومن المنتهية آخر ١٥٠ بس (المكتب يعرض آخر كم وحدة لكل نوع) */
+const OPEN_MAX = 1000;
+const CLOSED_MAX = 150;
+
+/**
+ * مهام الوكلاء (الأحدث أول): كل المفتوحة (تشتغل أو تنتظرك — مهما قدمت، عشان ما تختفي وهي تنتظر قرارك)
+ * + آخر المنتهية. ترمي الخطأ — للتحديث وهم يشتغلون: خطأ شبكة ما يمسح اللي قدامك
+ */
 export async function fetchAgentTasks(): Promise<AgentTaskRow[]> {
-  const { data, error } = await supabase.from('office_tasks').select('*').order('created_at', { ascending: false }).limit(150);
-  if (error) throw error;
-  return ((data ?? []) as unknown[]).map(asAgentRow).filter((x): x is AgentTaskRow => !!x);
+  const [open, closed] = await Promise.all([
+    supabase.from('office_tasks').select('*').in('status', ['scheduled', 'in_progress', 'waiting_approval'])
+      .order('created_at', { ascending: false }).limit(OPEN_MAX),
+    supabase.from('office_tasks').select('*').in('status', ['done', 'failed'])
+      .order('created_at', { ascending: false }).limit(CLOSED_MAX),
+  ]);
+  if (open.error) throw open.error;
+  if (closed.error) throw closed.error;
+  return mergeAgentRows((open.data ?? []) as unknown[], (closed.data ?? []) as unknown[]);
 }
 
 /** مهام الوكلاء. لو ما قدرنا نقراها (أو الجدول للحين ما انضاف) = ولا مهمة */
@@ -79,6 +92,19 @@ export async function stillPending(task: Pick<AgentTaskRow, 'target_kind' | 'tar
   return (data as { status?: string } | null)?.status === t.want;
 }
 
+/** حدود الذكاء اللي بالإعدادات الحين (ترمي الخطأ: ما نقارن بالقيم الافتراضية وهي بس ما وصلت) */
+export async function currentAiLimits(): Promise<AiLimits> {
+  const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'ai_limits').maybeSingle();
+  if (error) throw error;
+  return parseAiLimits((data as { value?: unknown } | null)?.value);
+}
+
+/** الاقتراح للحين له معنى؟ العنصر ينتظر قرار، ولاقتراح الحدود: الحدود نفسها ما تغيّرت من وقت ما انبنى عليها */
+async function stillCurrent(task: AgentTaskRow): Promise<boolean> {
+  if (task.kind === 'review_ai_limits') return !limitsChanged(task.input.current, await currentAiLimits());
+  return stillPending(task);
+}
+
 async function decide(id: string, decision: 'approved' | 'rejected', final: Record<string, unknown> | null, note?: string) {
   const args: Record<string, unknown> = { p_id: id, p_decision: decision, p_final: final };
   if (note?.trim()) args.p_note = note.trim();
@@ -86,20 +112,8 @@ async function decide(id: string, decision: 'approved' | 'rejected', final: Reco
   if (error) throw error;
 }
 
-/**
- * توافق على اقتراح الوكيل (بعد تعديلك): نتأكد إن المهمة والعنصر للحين ينتظرون، ننفّذ بنفس دوال الأقسام، ونسجّل القرار.
- * أخطاء: not_waiting (انقرّرت أو الوكيل لسا يشتغل)، already_decided (العنصر انقرّر يدوياً)،
- * not_recorded (انطبق بس ما قدرنا نقفل المهمة)، bad_input (المسودة ناقصة)، وأخطاء الأقسام نفسها
- */
-export async function approveTask(task: AgentTaskRow, final: unknown): Promise<void> {
-  const ready = prepareFinal(task.kind, final);
-  if ('error' in ready) throw new Error('bad_input');
-  // المهمة للحين تنتظرك؟ (ممكن انقرّرت من جهاز ثاني)
-  const cur = await supabase.from('office_tasks').select('status').eq('id', task.id).maybeSingle();
-  if (cur.error) throw cur.error;
-  if ((cur.data as { status?: string } | null)?.status !== 'waiting_approval') throw new Error('not_waiting');
-  if (!(await stillPending(task))) throw new Error('already_decided');
-
+/** ينفّذ اقتراحك بنفس دوال الأقسام */
+async function applyProposal(task: AgentTaskRow, ready: Prepared): Promise<void> {
   switch (ready.kind) {
     case 'triage_report':
       if (!task.target_id) throw new Error('bad_input');
@@ -108,9 +122,11 @@ export async function approveTask(task: AgentTaskRow, final: unknown): Promise<v
     case 'review_partner': {
       const { decision, note } = ready.final;
       if (!task.target_id || !task.target_kind || task.target_kind === 'report') throw new Error('bad_input');
+      // الرسالة توصل للشريك مع الرفض بس (نفس لوحة الإدارة): مع القبول ما نمرّرها
+      const reason = decision === 'reject' ? note || undefined : undefined;
       // طلب النادي: نفس قرار لوحة الإدارة (ما نمرّر سلسلة أبداً — الخادم يربطه بسلسلته أو ينشئ وحدة)
-      if (task.target_kind === 'club') await reviewClubRequest(task.target_id, decision === 'approve' ? 'approved' : 'rejected', note || undefined);
-      else await partnerAction(task.target_kind, task.target_id, decision === 'approve' ? 'approve' : 'reject', note);
+      if (task.target_kind === 'club') await reviewClubRequest(task.target_id, decision === 'approve' ? 'approved' : 'rejected', reason);
+      else await partnerAction(task.target_kind, task.target_id, decision === 'approve' ? 'approve' : 'reject', reason);
       break;
     }
     case 'draft_nudge':
@@ -121,17 +137,37 @@ export async function approveTask(task: AgentTaskRow, final: unknown): Promise<v
       await saveAiLimits(ready.final);
       break;
   }
+}
 
-  // تسجيل القرار (نعيد مرة لو تعثّر الاتصال: الاقتراح انطبق خلاص)
-  try {
-    await decide(task.id, 'approved', ready.final as unknown as Record<string, unknown>);
-  } catch {
-    await new Promise((r) => setTimeout(r, 800));
-    try { await decide(task.id, 'approved', ready.final as unknown as Record<string, unknown>); } catch { throw new Error('not_recorded'); }
-  }
+/**
+ * موافقات انطبقت بهالجلسة بس قرارها ما انسجّل (not_recorded): رقم المهمة → final اللي انطبق.
+ * تعيش طول ما التطبيق مفتوح (حتى لو قفلت الورقة وفتحتها): «اعتمد» مرة ثانية يسجّل القرار بس وما ينفّذ مرة ثانية
+ */
+const appliedPending = new Map<string, Record<string, unknown>>();
+
+/**
+ * توافق على اقتراح الوكيل (بعد تعديلك): نتأكد إن المهمة والعنصر للحين ينتظرون، ننفّذ بنفس دوال الأقسام، ونسجّل القرار.
+ * أخطاء: not_waiting (انقرّرت أو الوكيل لسا يشتغل)، already_decided (العنصر انقرّر يدوياً أو الحدود تغيّرت)،
+ * not_recorded (انطبق بس ما قدرنا نسجّل القرار: اعتمد مرة ثانية يسجّله بس)، bad_input (المسودة ناقصة)، وأخطاء الأقسام نفسها
+ */
+export async function approveTask(task: AgentTaskRow, final: unknown): Promise<void> {
+  await approveSteps(task, final, {
+    // المهمة للحين تنتظرك؟ (ممكن انقرّرت من جهاز ثاني)
+    status: async () => {
+      const cur = await supabase.from('office_tasks').select('status').eq('id', task.id).maybeSingle();
+      if (cur.error) throw cur.error;
+      return (cur.data as { status?: string } | null)?.status ?? null;
+    },
+    current: () => stillCurrent(task),
+    apply: (ready) => applyProposal(task, ready),
+    record: (fin) => decide(task.id, 'approved', fin),
+    wait: (ms) => new Promise((r) => setTimeout(r, ms)),
+  }, appliedPending);
 }
 
 /** ترفض الاقتراح: يتسجّل القرار بس وما يتغيّر شي بالتطبيق */
 export async function rejectTask(task: Pick<AgentTaskRow, 'id'>, note?: string): Promise<void> {
+  // اقتراح انطبق بس قراره ما انسجّل: ما نسجّله «مرفوض» وهو منفّذ — اعتمد يسجّله
+  if (appliedPending.has(task.id)) throw new Error('not_recorded');
   await decide(task.id, 'rejected', null, note);
 }

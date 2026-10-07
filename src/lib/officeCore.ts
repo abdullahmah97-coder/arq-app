@@ -117,8 +117,17 @@ const AGENT_TASK_KIND: Record<AgentKind, TaskKind> = {
   triage_report: 'agent_report', review_partner: 'agent_partner', draft_nudge: 'agent_nudge', review_ai_limits: 'agent_limits', daily_brief: 'agent_brief',
 };
 const DESK_IDS = new Set<string>(DESKS.map((d) => d.id));
-/** مهمة الوكيل مفتوحة (يشتغل عليها أو تنتظرك) = هي اللي تمثّل العنصر بدل مهمته اليدوية */
-const agentOpen = (a: AgentTaskLite) => a.status === 'scheduled' || a.status === 'in_progress' || a.status === 'waiting_approval';
+
+/**
+ * مهمة «شغّالة» أقدم من كذا وقفت (انقطعت الدالة قبل ما تكمّل): نفس STALE_MS بدالة office-agent،
+ * والتشغيلة الجاية لأي مكتب تعلّمها فاشلة (stale). لين ذاك الوقت نعاملها كأنها ما كمّلت
+ */
+export const AGENT_STALE_MS = 15 * 60_000;
+/** الوكيل يشتغل عليها (أو مجدولة) بس من زمان = وقفت. now يجي من برّا عشان المنطق يبقى بحت وينختبر */
+export const agentStale = (a: Pick<AgentTaskLite, 'status' | 'created_at'>, now: number = Date.now()): boolean =>
+  (a.status === 'scheduled' || a.status === 'in_progress') && now - Date.parse(a.created_at) > AGENT_STALE_MS;
+/** مهمة الوكيل مفتوحة فعلاً (يشتغل عليها الحين أو تنتظرك) = هي اللي تمثّل العنصر بدل مهمته اليدوية. اللي وقفت ما تخفي شي */
+const agentOpen = (a: AgentTaskLite, now: number) => a.status === 'waiting_approval' || ((a.status === 'scheduled' || a.status === 'in_progress') && !agentStale(a, now));
 /** رقم العنصر نفسه في المهام اليدوية (report:<id> أو <نوع الشريك>:<id>) */
 const itemKey = (a: Pick<AgentTaskLite, 'target_kind' | 'target_id'>) => (a.target_kind && a.target_id ? `${a.target_kind}:${a.target_id}` : null);
 
@@ -145,21 +154,22 @@ function agentName(a: AgentTaskLite, lng: 'ar' | 'en', items: Map<string, string
   return null;
 }
 
-/** نوع مهمة الوكيل في المكتب (اللي ما كمّلت لها نوعها) */
-export const agentTaskKind = (a: Pick<AgentTaskLite, 'kind' | 'status'>): TaskKind => (a.status === 'failed' ? 'agent_failed' : AGENT_TASK_KIND[a.kind]);
+/** نوع مهمة الوكيل في المكتب (اللي ما كمّلت، أو وقفت وهي شغّالة، لها نوعها) */
+export const agentTaskKind = (a: Pick<AgentTaskLite, 'kind' | 'status' | 'created_at'>, now: number = Date.now()): TaskKind =>
+  (a.status === 'failed' || agentStale(a, now) ? 'agent_failed' : AGENT_TASK_KIND[a.kind]);
 
-/** مهام الوكلاء: تشتغل/مجدولة = شغّالة، تنتظر موافقتك = تنتظرك، خلصت/فشلت = منتهية (آخر DONE_LIMIT لكل نوع بكل مكتب) */
-function agentTasksOf(list: AgentTaskLite[], lng: 'ar' | 'en', items: Map<string, string>): OfficeTask[] {
+/** مهام الوكلاء: تشتغل/مجدولة = شغّالة، تنتظر موافقتك = تنتظرك، خلصت/فشلت/وقفت = منتهية (آخر DONE_LIMIT لكل نوع بكل مكتب) */
+function agentTasksOf(list: AgentTaskLite[], lng: 'ar' | 'en', items: Map<string, string>, now: number): OfficeTask[] {
   const out: OfficeTask[] = [];
   const closed: { t: OfficeTask; group: string }[] = [];
   for (const a of list) {
     if (!DESK_IDS.has(a.desk) || !AGENT_TASK_KIND[a.kind]) continue; // نوع من نسخة أحدث ما نعرفه
-    const failed = a.status === 'failed';
-    const kind = agentTaskKind(a);
+    const ended = a.status === 'done' || a.status === 'failed' || agentStale(a, now);
+    const kind = agentTaskKind(a, now);
     const base = { id: `agent:${a.id}`, desk: a.desk, kind, name: agentName(a, lng, items), route: agentRoute(a), agent: 'claude' as const, agentTaskId: a.id };
     if (a.status === 'waiting_approval') out.push({ ...base, status: 'waiting', at: a.finished_at ?? a.created_at });
+    else if (ended) closed.push({ t: { ...base, status: 'done', at: a.decided_at ?? a.finished_at ?? a.created_at }, group: `${a.desk}:${kind}` });
     else if (a.status === 'in_progress' || a.status === 'scheduled') out.push({ ...base, status: 'in_progress', at: a.created_at });
-    else if (a.status === 'done' || failed) closed.push({ t: { ...base, status: 'done', at: a.decided_at ?? a.finished_at ?? a.created_at }, group: `${a.desk}:${kind}` });
   }
   const groups = new Map<string, OfficeTask[]>();
   for (const c of closed) groups.set(c.group, [...(groups.get(c.group) ?? []), c.t]);
@@ -167,12 +177,12 @@ function agentTasksOf(list: AgentTaskLite[], lng: 'ar' | 'en', items: Map<string
   return out;
 }
 
-/** مهام المكتب كلها من لقطة البيانات */
-export function buildTasks(s: OfficeSnapshot, lng: 'ar' | 'en' = 'ar'): OfficeTask[] {
+/** مهام المكتب كلها من لقطة البيانات (now = الوقت الحين: مهمة وكيل شغّالة من زمان = وقفت) */
+export function buildTasks(s: OfficeSnapshot, lng: 'ar' | 'en' = 'ar', now: number = Date.now()): OfficeTask[] {
   const tasks: OfficeTask[] = [];
   const agents = s.agentTasks ?? [];
-  // العنصر اللي عليه مهمة وكيل مفتوحة تمثّله مهمة الوكيل (ما ننحسب مرتين)
-  const taken = new Set(agents.filter(agentOpen).map(itemKey).filter((k): k is string => !!k));
+  // العنصر اللي عليه مهمة وكيل مفتوحة تمثّله مهمة الوكيل (ما ننحسب مرتين). اللي وقفت ترجّع مهمته اليدوية
+  const taken = new Set(agents.filter((a) => agentOpen(a, now)).map(itemKey).filter((k): k is string => !!k));
   const add = (t: Omit<OfficeTask, 'agent'>) => { if (!taken.has(t.id)) tasks.push({ ...t, agent: 'manual' }); };
 
   // طلبات الشركاء: كل طلب مهمة تنتظر موافقتك، ولو العدد أكبر من القائمة نضيف مهمة "و N طلبات ثانية"
@@ -181,7 +191,7 @@ export function buildTasks(s: OfficeSnapshot, lng: 'ar' | 'en' = 'ar'): OfficeTa
     for (const q of items) add({ id: `${k}:${q.id}`, desk: REQUEST_DESK[k], kind: `${k}_request` as TaskKind, status: 'waiting', name: q.name, at: q.at, route: REQUEST_ROUTE[k] });
     // طلبات عليها مهمة وكيل مفتوحة بس مو في القائمة (القائمة لها حد): هي من العدد، فما نحسبها مرة ثانية في "و N"
     const listed = new Set(items.map((q) => q.id));
-    const agentOnly = agents.filter((a) => agentOpen(a) && a.target_kind === k && a.target_id && !listed.has(a.target_id)).length;
+    const agentOnly = agents.filter((a) => agentOpen(a, now) && a.target_kind === k && a.target_id && !listed.has(a.target_id)).length;
     const extra = Math.max(0, (s.pending[k] ?? 0) - items.length - agentOnly);
     if (extra) add({ id: `${k}:more`, desk: REQUEST_DESK[k], kind: 'more_requests', status: 'waiting', name: null, n: extra, at: null, route: REQUEST_ROUTE[k] });
   }
@@ -226,7 +236,7 @@ export function buildTasks(s: OfficeSnapshot, lng: 'ar' | 'en' = 'ar'): OfficeTa
     ...s.requests.map((q): [string, string] => [`${q.kind}:${q.id}`, q.name]),
     ...s.reports.map((x): [string, string] => [`report:${x.id}`, clip(x.message)]),
   ]);
-  tasks.push(...agentTasksOf(agents, lng, itemNames));
+  tasks.push(...agentTasksOf(agents, lng, itemNames, now));
 
   return tasks;
 }
@@ -252,7 +262,7 @@ export function deskStates(tasks: OfficeTask[]): DeskState[] {
 }
 
 /** كل اللي ينتظر موافقتك في المكتب (رقم المدير) — نفس الرقم في رابط المكتب بلوحة الإدارة */
-export const waitingTotal = (s: OfficeSnapshot): number => deskStates(buildTasks(s)).find((x) => x.id === 'lead')!.waiting;
+export const waitingTotal = (s: OfficeSnapshot, now: number = Date.now()): number => deskStates(buildTasks(s, 'ar', now)).find((x) => x.id === 'lead')!.waiting;
 
 export type TaskFilter = 'waiting' | 'in_progress' | 'done' | 'all';
 

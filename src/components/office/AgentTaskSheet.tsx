@@ -1,6 +1,6 @@
 // مكتب أرك أب: ورقة مهمة الوكيل الذكي — ملخص اقتراحه وتفاصيله، تعدّل عليه لو تبي،
 // وبعدين «اعتمد ونفّذ» (التطبيق ينفّذه بجلستك بنفس دوال الأقسام) أو «ارفض الاقتراح» (ينسجّل قرارك بس).
-// المهام اللي خلصت أو ما كمّلت تنفتح للقراءة بس (القرار، أو سبب الفشل)
+// المهام اللي خلصت أو ما كمّلت (أو وقفت وهي شغّالة) تنفتح للقراءة بس (القرار، أو سبب الفشل)
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,11 +9,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Input, Row, T } from '@/components/ui';
 import { timeAgo } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
-import { approveTask, rejectTask } from '@/lib/officeAgents';
+import { approveTask, currentAiLimits, rejectTask } from '@/lib/officeAgents';
 import {
-  AGENT_LIMIT_MAX, clampLimits, draftFrom, failReason, isWorking, NOTE_MAX, NUDGE_PLACEHOLDERS, NUDGE_WHO, officeErrorCode, parseProposal,
+  AGENT_LIMIT_MAX, agentStale, clampLimits, draftFrom, failReason, isWorking, NOTE_MAX, NUDGE_PLACEHOLDERS, NUDGE_WHO, officeErrorCode, parseProposal,
   prepareFinal, REPLY_MAX, REPORT_FINAL_STATUSES,
-  type AgentProposal, type AgentTaskRow, type BriefOutput, type LimitsOutput, type NudgeCat, type NudgeOutput, type PartnerOutput, type Severity, type TriageOutput,
+  type AgentProposal, type AgentTaskRow, type AiLimitsLite, type BriefOutput, type LimitsOutput, type NudgeCat, type NudgeOutput, type PartnerOutput, type Severity, type TriageOutput,
 } from '@/lib/officeAgentsCore';
 import { agentTaskKind, deskDef, type DeskId, type OfficeRoute } from '@/lib/officeCore';
 import { errorKey } from '@/lib/supabase';
@@ -49,7 +49,11 @@ export function AgentTaskSheet({ task, route, onClose, onChanged, onOpen, onPick
   }, [draft, proposal]);
 
   const waiting = task.status === 'waiting_approval';
-  const working = isWorking(task.status);
+  // شغّالة من زمان = وقفت (انقطعت الدالة): نعرضها كأنها ما كمّلت بدل ما ندوّر للأبد (التشغيلة الجاية تعلّمها فاشلة)
+  const now = Date.now();
+  const stale = agentStale(task, now);
+  const working = isWorking(task.status) && !stale;
+  const failed = task.status === 'failed' || stale;
   const canApprove = waiting && !!proposal && proposal.kind !== 'daily_brief' && !!draft;
   const d = deskDef(task.desk);
   const set = (patch: Draft) => setDraft((x) => ({ ...(x ?? {}), ...patch }));
@@ -118,10 +122,10 @@ export function AgentTaskSheet({ task, route, onClose, onChanged, onOpen, onPick
                 <Ionicons name="sparkles" size={20} color={brand.cream} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
-                <T bold numberOfLines={2}>{t(`office.kind_${agentTaskKind(task)}`, { n: 0 })}</T>
+                <T bold numberOfLines={2}>{t(`office.kind_${agentTaskKind(task, now)}`, { n: 0 })}</T>
                 <T size="xs" muted numberOfLines={1}>{[t(`office.sign_${task.desk}`), timeAgo(when, lng)].filter(Boolean).join(' · ')}</T>
               </View>
-              <StatusPill status={task.status} />
+              <StatusPill status={stale ? 'failed' : task.status} />
               <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </Pressable>
@@ -137,14 +141,14 @@ export function AgentTaskSheet({ task, route, onClose, onChanged, onOpen, onPick
                 </Row>
               ) : null}
 
-              {task.status === 'failed' ? (
+              {failed ? (
                 <Box tone={colors.danger}>
                   <T size="sm" semibold color={colors.danger}>{t('office.sh_failed')}</T>
-                  <T size="sm">{t(`office.aerr_${failReason(task.error)}`)}</T>
+                  <T size="sm">{t(`office.aerr_${stale ? 'stale' : failReason(task.error)}`)}</T>
                 </Box>
               ) : null}
 
-              {!working && task.status !== 'failed' && !proposal ? <T size="sm" muted>{t('office.sh_unreadable')}</T> : null}
+              {!working && !failed && !proposal ? <T size="sm" muted>{t('office.sh_unreadable')}</T> : null}
 
               {proposal ? (
                 <ProposalView p={proposal} task={task} value={value} editable={canApprove} set={set} onPickDesk={onPickDesk ? (id) => { onClose(); onPickDesk(id); } : undefined} />
@@ -347,9 +351,12 @@ function PartnerView({ out, value, editable, set }: ViewProps<PartnerOutput>) {
         <Chips editable={editable} value={value?.decision as string | undefined} onChange={(v) => set({ decision: v })}
           options={[{ value: 'approve', label: t('office.dec_approve') }, { value: 'reject', label: t('office.dec_reject') }]} />
       </Section>
-      <Section title={t('office.sh_note')} hint={editable ? t('office.sh_noteHint', { lang }) : undefined}>
-        <Field editable={editable} multiline maxLength={NOTE_MAX} value={s(value?.note)} onChange={(v) => set({ note: v })} />
-      </Section>
+      {/* الرسالة توصل للشريك مع الرفض بس (القبول له إشعار ثابت)، فما نعرضها إلا مع الرفض */}
+      {value?.decision === 'reject' ? (
+        <Section title={t('office.sh_note')} hint={editable ? t('office.sh_noteHint', { lang }) : undefined}>
+          <Field editable={editable} multiline maxLength={NOTE_MAX} value={s(value?.note)} onChange={(v) => set({ note: v })} />
+        </Section>
+      ) : null}
     </>
   );
 }
@@ -385,7 +392,16 @@ function NudgeView({ out, value, editable, set }: ViewProps<NudgeOutput>) {
 
 function LimitsView({ out, task, value, editable, set }: ViewProps<LimitsOutput> & { task: AgentTaskRow }) {
   const { t } = useTranslation();
-  const cur = (task.input.current && typeof task.input.current === 'object') ? clampLimits(task.input.current as Record<string, unknown>) : null;
+  // وهي تنتظرك نعرض الحدود اللي بالإعدادات الحين (ممكن عدّلتها بعد الاقتراح)، وإلا اللي انبنى عليها الاقتراح
+  const [live, setLive] = useState<AiLimitsLite | null>(null);
+  useEffect(() => {
+    if (!editable) return;
+    let alive = true;
+    currentAiLimits().then((v) => { if (alive) setLive(v); }).catch(() => {});
+    return () => { alive = false; };
+  }, [editable]);
+  const was = (task.input.current && typeof task.input.current === 'object') ? clampLimits(task.input.current as Record<string, unknown>) : null;
+  const cur = (editable && live) || was;
   const rows = [
     { key: 'barcode_per_day' as const, label: t('aiLimits.barcode_per_day') },
     { key: 'meal_photos_per_day' as const, label: t('aiLimits.meal_photos_per_day') },

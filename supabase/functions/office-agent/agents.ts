@@ -61,12 +61,21 @@ function bad(why: string): never {
   throw Object.assign(new Error('ai_bad_output'), { why });
 }
 
-/** هل النص مكتوب باللغة المطلوبة؟ (نعدّ الحروف العربية واللاتينية، والمتغيرات {name} ما تنحسب) */
-export function inLocale(s: string, locale: Locale): boolean {
-  const t = s.replace(/\{[^{}]*\}/g, ' ');
+/** أقل نسبة لحروف اللغة المطلوبة من كل الحروف العربية واللاتينية بالنص */
+const LOCALE_SHARE = 0.25;
+
+/** هل النص مكتوب باللغة المطلوبة؟ نعدّ الحروف العربية واللاتينية، والمتغيرات {name} ما تنحسب، ولا اسم العنصر نفسه
+ *  (ignore: اسم النادي أو المتجر أو المدرب، ممكن يكون بالحرف الثاني). يكفي إن حروف اللغة المطلوبة موجودة وربع الحروف
+ *  على الأقل: «Welcome to ARQ, نادي القمة!» يمشي بالإنجليزي، والرد المكتوب كله باللغة الثانية ما يمشي */
+export function inLocale(s: string, locale: Locale, ignore?: string | null): boolean {
+  let t = s.replace(/\{[^{}]*\}/g, ' ');
+  // الاسم بأي حالة أحرف، وبدون @ اللي قبل اسم المستخدم. الاسم القصير جداً ما نشيله (يشيل حروف من كلمات ثانية)
+  const name = (ignore ?? '').trim().replace(/^@/, '').toLowerCase();
+  if (name.length >= 3) t = t.toLowerCase().split(name).join(' ');
   const ar = (t.match(/[؀-ۿ]/g) ?? []).length;
   const la = (t.match(/[A-Za-z]/g) ?? []).length;
-  return locale === 'ar' ? ar > 0 && ar >= la : la > 0 && la > ar;
+  const target = locale === 'ar' ? ar : la;
+  return target > 0 && target >= (ar + la) * LOCALE_SHARE;
 }
 
 /** نص التنبيه: متغيرات بقوس واحد ومسموحة لنوعه بس (أي {...} ثاني أو قوس وحيد = يخرّب القالب)، والطول ضمن حدود القاعدة */
@@ -113,8 +122,9 @@ export function schemaFor(kind: AgentKind, locale: Locale = 'ar'): Schema {
 
 // ---------------------------------------------------------------------------
 // تنظيف رد كل نوع والتحقق منه (أي حقل غلط = ai_bad_output، والقوائم ناخذ الصالح منها بس)
+// name: اسم العنصر (عنوان المهمة)، ما ينحسب بفحص لغة الرد أو الملاحظة
 // ---------------------------------------------------------------------------
-export function cleanOutput(kind: AgentKind, raw: unknown, locale: Locale = 'ar'): Record<string, unknown> {
+export function cleanOutput(kind: AgentKind, raw: unknown, locale: Locale = 'ar', name?: string | null): Record<string, unknown> {
   const o = record(raw);
   switch (kind) {
     case 'triage_report': {
@@ -125,7 +135,7 @@ export function cleanOutput(kind: AgentKind, raw: unknown, locale: Locale = 'ar'
       const reply = clean(o.reply, 600);
       if (reply.length < 2) bad('reply');
       // الرد يوصل للمختبر نفسه: لازم يكون بلغته
-      if (!inLocale(reply, locale)) bad('reply_locale');
+      if (!inLocale(reply, locale, name)) bad('reply_locale');
       return { summary, severity, category_guess, status, reply, reply_locale: locale };
     }
     case 'review_partner': {
@@ -136,10 +146,14 @@ export function cleanOutput(kind: AgentKind, raw: unknown, locale: Locale = 'ar'
       }).filter(notNull).slice(0, 8);
       const missing = list(o.missing).map((m) => bi(m, 120)).filter(notNull).slice(0, 6);
       const recommendation = oneOf(o.recommendation, RECOMMENDATIONS) ?? bad('recommendation');
-      const note = clean(o.note, 300);
-      // الرفض لازم يقول للشريك وش يصلّح
-      if (recommendation === 'reject' && note.length < 3) bad('note');
-      if (note && !inLocale(note, locale)) bad('note_locale');
+      // الملاحظة توصل للشريك مع الرفض بس (الموافقة لها إشعار ثابت)، فمع الموافقة تنشال وما تفشّل المراجعة.
+      // والرفض لازم يقول للشريك وش يصلّح، وبلغته
+      let note = clean(o.note, 300);
+      if (recommendation === 'approve') note = '';
+      else {
+        if (note.length < 3) bad('note');
+        if (!inLocale(note, locale, name)) bad('note_locale');
+      }
       const confidence = oneOf(o.confidence, CONFIDENCE) ?? bad('confidence');
       return { summary, checks, missing, recommendation, note, note_locale: locale, confidence };
     }
@@ -258,7 +272,7 @@ Fields:
 - checks: up to 8 short checks you made, each {label {"ar","en"} max 80 characters, ok true or false}.
 - missing: up to 6 things that are missing or must be fixed (max 120 characters each); [] when nothing is missing.
 - recommendation: "approve" only when the request is complete, plausible and appropriate for ARQ; otherwise "reject".
-- note: a message to the partner, written ONLY in ${LANG[locale]}, max 300 characters. When rejecting, say politely and exactly what to fix or add so they can apply again. When approving, one short welcome line.
+- note: a message to the partner, written ONLY in ${LANG[locale]}, max 300 characters. When rejecting, say politely and exactly what to fix or add so they can apply again. When recommending "approve", leave note empty (""): only a rejection note reaches the partner.
 - note_locale: "${locale}".
 - confidence: "high", "medium" or "low". Use "low" when documents can't be seen or key facts can't be checked.`;
 

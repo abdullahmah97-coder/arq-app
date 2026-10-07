@@ -1,5 +1,6 @@
 // وش يشتغل عليه كل مكتب: يقرا الطلبات/البلاغات المعلّقة من القاعدة (بمفتاح الخدمة) ويطلع «شغلة» لكل عنصر.
-// العنصر اللي له مهمة سابقة (بأي حالة غير failed) ما يرجع له الوكيل: ينراجع مرة وحدة، والمالك يقدر يتصرف بنفسه.
+// العنصر اللي له مهمة سابقة (بأي حالة غير failed) ما يرجع له الوكيل: ينراجع مرة وحدة، والمالك يقدر يتصرف بنفسه
+// (إلا طلب شريك انرفض بموافقة المالك ورجع معلّق: الشريك قدّمه من جديد، فينراجع مرة ثانية).
 // نص المستخدمين كله يمر على clean (بدون < > ورموز التحكم) ويروح للنموذج داخل وسم، فما يقدر يطلع منه.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import {
@@ -7,9 +8,12 @@ import {
   type AgentKind, type DeskId, type Locale, type PartnerKind, type TargetKind,
 } from './agents.ts';
 
-/** أقصى عدد مهام بالتشغيلة الوحدة (الطلبات والبلاغات)، وكم عنصر نقلّب عشان نلقى اللي ما انراجع */
+/** أقصى عدد مهام بالتشغيلة الوحدة (الطلبات والبلاغات) */
 export const PER_RUN = 5;
-const SCAN = 100;
+/** نقلّب الطابور صفحات (SCAN بالصفحة، لين MAX_PAGES) عشان نلقى اللي ما انراجع: البلاغ اللي انفرز وباقي new
+ *  والطلب اللي ينتظر قرار المالك ما يسدّون الطريق على الأحدث منهم */
+export const SCAN = 100;
+export const MAX_PAGES = 10;
 /** حد صورة المستند: ٤ ميقا وأقل (بعد الترميز base64 تبقى تحت حد Claude للصورة) */
 export const MAX_DOC_BYTES = 3_750_000;
 /** صفوف ai_usage لآخر ٧ أيام: صفحات ١٠٠٠ (حد PostgREST الافتراضي) لين ٢٠ ألف */
@@ -70,22 +74,37 @@ async function rows(q: Q, label: string): Promise<Row[]> {
   return (Array.isArray(data) ? data : []) as Row[];
 }
 
-/** العناصر اللي لها مهمة من نفس النوع بأي حالة غير failed */
+/** مراجعة شريك وافق المالك على رفضها: الطلب انرفض فعلاً، فلو رجع معلّق يعني الشريك عدّله وقدّمه من جديد
+ *  (المتاجر والمدربين والمراكز والملاعب يرجعون بنفس الصف). هذي ما تنحسب، والطلب ينراجع مرة ثانية */
+const resubmitted = (kind: AgentKind, t: Row) =>
+  kind === 'review_partner' && t.status === 'done' && t.decision === 'approved' &&
+  !!t.final && typeof t.final === 'object' && (t.final as Row).decision === 'reject';
+
+/** العناصر اللي لها مهمة من نفس النوع بأي حالة غير failed (ما عدا resubmitted) */
 async function handled(db: SupabaseClient, kind: AgentKind, tk: TargetKind, ids: string[]): Promise<Set<string>> {
   if (!ids.length) return new Set();
-  const found = await rows(db.from('office_tasks').select('target_id').eq('kind', kind).eq('target_kind', tk)
+  const found = await rows(db.from('office_tasks').select('target_id, status, decision, final').eq('kind', kind).eq('target_kind', tk)
     .in('target_id', ids).neq('status', 'failed'), 'office_tasks');
-  return new Set(found.map((r) => String(r.target_id)));
+  return new Set(found.filter((t) => !resubmitted(kind, t)).map((t) => String(t.target_id)));
 }
 
-/** أقدم العناصر اللي ما انراجعت (لين PER_RUN) */
-async function fresh<K extends TargetKind>(db: SupabaseClient, kind: AgentKind, items: { tk: K; row: Row }[]) {
-  const done = new Set<string>();
-  for (const tk of [...new Set(items.map((x) => x.tk))]) {
-    const ids = items.filter((x) => x.tk === tk).map((x) => String(x.row.id));
-    for (const id of await handled(db, kind, tk, ids)) done.add(`${tk}:${id}`);
+/** صفحة من طابور المكتب (الأقدم أول): الصفوف from..to */
+type Page = (from: number, to: number) => Promise<Row[]>;
+
+/** أقدم العناصر اللي ما انراجعت (لين PER_RUN): يقرا الطابور صفحة صفحة لين يلقاها، أو يخلص الطابور، أو MAX_PAGES */
+async function fresh(db: SupabaseClient, kind: AgentKind, tk: TargetKind, page: Page): Promise<Row[]> {
+  const out: Row[] = [];
+  const seen = new Set<string>();
+  for (let p = 0; p < MAX_PAGES && out.length < PER_RUN; p++) {
+    const got = await page(p * SCAN, (p + 1) * SCAN - 1);
+    // لو تغيّر الطابور بين صفحتين ممكن يتكرر صف، فما ناخذه مرتين
+    const items = got.filter((r) => !seen.has(String(r.id)));
+    for (const r of items) seen.add(String(r.id));
+    const done = await handled(db, kind, tk, items.map((r) => String(r.id)));
+    out.push(...items.filter((r) => !done.has(String(r.id))));
+    if (got.length < SCAN) break;
   }
-  return items.filter((x) => !done.has(`${x.tk}:${x.row.id}`)).slice(0, PER_RUN);
+  return out.slice(0, PER_RUN);
 }
 
 /** أسماء ولغة أصحاب الطلبات (لو تعطّلت نكمّل بالعربي) */
@@ -145,11 +164,11 @@ const job = (b: Base, input: Record<string, unknown>, build: Job['build']): Job 
 
 /** البلاغات: الجديدة (status new) */
 async function reportJobs({ db }: Ctx): Promise<Job[]> {
-  const list = await rows(db.from('beta_feedback').select('id, user_id, category, message, screen, app_version, platform, created_at')
-    .eq('status', 'new').order('created_at', { ascending: true }).limit(SCAN), 'beta_feedback');
-  const picked = await fresh(db, 'triage_report', list.map((row) => ({ tk: 'report' as const, row })));
-  const people = await profilesOf(db, picked.map((x) => x.row.user_id));
-  return picked.map(({ row: r }) => {
+  const picked = await fresh(db, 'triage_report', 'report', (from, to) => rows(db.from('beta_feedback')
+    .select('id, user_id, category, message, screen, app_version, platform, created_at')
+    .eq('status', 'new').order('created_at', { ascending: true }).order('id', { ascending: true }).range(from, to), 'beta_feedback'));
+  const people = await profilesOf(db, picked.map((r) => r.user_id));
+  return picked.map((r) => {
     const p = people.get(String(r.user_id));
     const locale = localeOf(p);
     return job({ desk: 'reports', kind: 'triage_report', target_kind: 'report', target_id: String(r.id), title: clean(r.message, 80) || null, locale },
@@ -166,10 +185,9 @@ async function reportJobs({ db }: Ctx): Promise<Job[]> {
 
 /** طلبات الأندية المعلّقة (مع صور السجل التجاري والرخصة لو انرفعت) */
 async function clubJobs({ db }: Ctx): Promise<Job[]> {
-  const list = await rows(db.from('club_requests').select('id, user_id, chain_id, gym_id, club_name, role, cr_number, license_number, city, branches, note, email, created_at, cr_doc_path, license_doc_path')
-    .eq('status', 'pending').order('created_at', { ascending: true }).limit(SCAN), 'club_requests');
-  const picked = await fresh(db, 'review_partner', list.map((row) => ({ tk: 'club' as const, row })));
-  const rs = picked.map((x) => x.row);
+  const rs = await fresh(db, 'review_partner', 'club', (from, to) => rows(db.from('club_requests')
+    .select('id, user_id, chain_id, gym_id, club_name, role, cr_number, license_number, city, branches, note, email, created_at, cr_doc_path, license_doc_path')
+    .eq('status', 'pending').order('created_at', { ascending: true }).order('id', { ascending: true }).range(from, to), 'club_requests'));
   const [people, gyms, chains] = await Promise.all([
     profilesOf(db, rs.map((r) => r.user_id)), namesOf(db, 'gyms', rs.map((r) => r.gym_id)), namesOf(db, 'gym_chains', rs.map((r) => r.chain_id)),
   ]);
@@ -204,11 +222,11 @@ async function clubJobs({ db }: Ctx): Promise<Job[]> {
 
 /** المتاجر المعلّقة (مع أول ١٠ منتجات) */
 async function storeJobs({ db }: Ctx): Promise<Job[]> {
-  const list = await rows(db.from('brands').select('id, owner, name, tagline, description, category, city, website, instagram, created_at')
-    .eq('status', 'pending').order('created_at', { ascending: true }).limit(SCAN), 'brands');
-  const picked = await fresh(db, 'review_partner', list.map((row) => ({ tk: 'store' as const, row })));
-  const people = await profilesOf(db, picked.map((x) => x.row.owner));
-  return picked.map(({ row: r }) => {
+  const picked = await fresh(db, 'review_partner', 'store', (from, to) => rows(db.from('brands')
+    .select('id, owner, name, tagline, description, category, city, website, instagram, created_at')
+    .eq('status', 'pending').order('created_at', { ascending: true }).order('id', { ascending: true }).range(from, to), 'brands'));
+  const people = await profilesOf(db, picked.map((r) => r.owner));
+  return picked.map((r) => {
     const locale = localeOf(people.get(String(r.owner)));
     return job({ desk: 'stores', kind: 'review_partner', target_kind: 'store', target_id: String(r.id), title: clean(r.name, 80) || null, locale, partner: 'store' },
       { locale },
@@ -229,11 +247,12 @@ async function storeJobs({ db }: Ctx): Promise<Job[]> {
 
 /** ملفات المدربين المعلّقة (المعرّف = user_id) */
 async function coachJobs({ db }: Ctx): Promise<Job[]> {
-  const list = await rows(db.from('coach_profiles').select('user_id, headline, bio, specialties, years_exp, certifications, languages, trains, city, online, in_person, price_from_sar, instagram, submitted_at')
-    .eq('status', 'pending').order('submitted_at', { ascending: true }).limit(SCAN), 'coach_profiles');
-  const picked = await fresh(db, 'review_partner', list.map((r) => ({ tk: 'coach' as const, row: { ...r, id: r.user_id } })));
-  const people = await profilesOf(db, picked.map((x) => x.row.user_id));
-  return picked.map(({ row: r }) => {
+  const picked = await fresh(db, 'review_partner', 'coach', async (from, to) => (await rows(db.from('coach_profiles')
+    .select('user_id, headline, bio, specialties, years_exp, certifications, languages, trains, city, online, in_person, price_from_sar, instagram, submitted_at')
+    .eq('status', 'pending').order('submitted_at', { ascending: true }).order('user_id', { ascending: true }).range(from, to), 'coach_profiles'))
+    .map((r) => ({ ...r, id: r.user_id })));
+  const people = await profilesOf(db, picked.map((r) => r.user_id));
+  return picked.map((r) => {
     const p = people.get(String(r.user_id));
     const locale = localeOf(p);
     const name = clean(p?.full_name, 80) || (clean(p?.username, 40) ? `@${clean(p?.username, 40)}` : '') || clean(r.headline, 80);
@@ -251,17 +270,19 @@ async function coachJobs({ db }: Ctx): Promise<Job[]> {
   });
 }
 
-/** مراكز الاستشفاء (اللي سجّلها أصحابها) والملاعب/الاستوديوهات المعلّقة: ٥ بالمجموع، الأقدم أول */
+/** مراكز الاستشفاء (اللي سجّلها أصحابها) والملاعب/الاستوديوهات المعلّقة: ٥ بالمجموع، الأقدم أول.
+ *  كل طابور يتقلّب لحاله (أقدم ٥ ما انراجعت من كل واحد)، وبعدين ناخذ أقدم ٥ منهم مع بعض */
 async function careJobs({ db }: Ctx): Promise<Job[]> {
   const [centers, venues] = await Promise.all([
-    rows(db.from('recovery_centers').select('id, owner, name, name_en, kind, cities, services, description, phone, website, instagram, license_no, created_at')
-      .eq('status', 'pending').eq('listed_by', 'owner').order('created_at', { ascending: true }).limit(SCAN), 'recovery_centers'),
-    rows(db.from('venues').select('id, owner, name, city, district, sports, audience, about, phone, website, instagram, open_hour, close_hour, price_sar, created_at')
-      .eq('status', 'pending').order('created_at', { ascending: true }).limit(SCAN), 'venues'),
+    fresh(db, 'review_partner', 'center', (from, to) => rows(db.from('recovery_centers')
+      .select('id, owner, name, name_en, kind, cities, services, description, phone, website, instagram, license_no, created_at')
+      .eq('status', 'pending').eq('listed_by', 'owner').order('created_at', { ascending: true }).order('id', { ascending: true }).range(from, to), 'recovery_centers')),
+    fresh(db, 'review_partner', 'venue', (from, to) => rows(db.from('venues')
+      .select('id, owner, name, city, district, sports, audience, about, phone, website, instagram, open_hour, close_hour, price_sar, created_at')
+      .eq('status', 'pending').order('created_at', { ascending: true }).order('id', { ascending: true }).range(from, to), 'venues')),
   ]);
-  const all = [...centers.map((row) => ({ tk: 'center' as const, row })), ...venues.map((row) => ({ tk: 'venue' as const, row }))]
-    .sort((a, b) => String(a.row.created_at ?? '').localeCompare(String(b.row.created_at ?? '')));
-  const picked = await fresh(db, 'review_partner', all);
+  const picked = [...centers.map((row) => ({ tk: 'center' as const, row })), ...venues.map((row) => ({ tk: 'venue' as const, row }))]
+    .sort((a, b) => String(a.row.created_at ?? '').localeCompare(String(b.row.created_at ?? ''))).slice(0, PER_RUN);
   const people = await profilesOf(db, picked.map((x) => x.row.owner));
   return picked.map(({ tk, row: r }) => {
     const locale = localeOf(people.get(String(r.owner)));

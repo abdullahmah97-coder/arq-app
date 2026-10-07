@@ -3,9 +3,10 @@
 // يشتغل مع اختبار النوادي (npm run test:clubs) أو لحاله: node --experimental-strip-types tests/officeAgents.test.ts
 import { readFileSync } from 'node:fs';
 import {
-  AGENT_DESKS, AGENT_FAIL_REASONS, AGENT_KINDS, asAgentRow, clampLimits, CONFIDENCES, draftFrom, failReason, hasAgent, isOpenAgent, isWorking,
-  NUDGE_PLACEHOLDERS, OFFICE_ERRORS, officeErrorCode, parseBi, parseBrief, parseLimits, parseNudge, parsePartner, parseProposal, parseRunResult,
-  parseTriage, prepareFinal, REPORT_FINAL_STATUSES, runErrorCode, runLine, SEVERITIES, validNudgeText,
+  AGENT_DESKS, AGENT_FAIL_REASONS, AGENT_KINDS, AGENT_STALE_MS, agentStale, approveSteps, asAgentRow, clampLimits, CONFIDENCES, draftFrom, failReason, hasAgent,
+  isOpenAgent, isWorking, limitsChanged, mergeAgentRows, NUDGE_PLACEHOLDERS, OFFICE_ERRORS, officeErrorCode, parseBi, parseBrief, parseLimits, parseNudge,
+  parsePartner, parseProposal, parseRunResult, parseTriage, prepareFinal, RECORD_RETRY_MS, REPORT_FINAL_STATUSES, runErrorCode, runLine, SEVERITIES,
+  validNudgeText, type ApproveSteps, type Prepared,
 } from '../src/lib/officeAgentsCore.ts';
 import { DESKS } from '../src/lib/officeCore.ts';
 
@@ -29,6 +30,27 @@ ok(asAgentRow({ ...row, kind: 'write_ad' }) === null && asAgentRow({ ...row, des
 const odd = asAgentRow({ ...row, input: 'x', output: [1], target_kind: 'planet' });
 ok(!!odd && Object.keys(odd.input).length === 0 && odd.output === null && odd.target_kind === null, 'bad input/output/target shapes become empty');
 
+// ---------- تحميل المهام: كل المفتوحة + آخر المنتهية (طلبين يندمجون) ----------
+const raw = (id: string, status: string, created: string, updated = created) => ({ ...row, id, status, created_at: created, updated_at: updated });
+// مهمة تنتظرك من شهر (أقدم من آخر ١٥٠ منتهية) لازم تبقى
+const openRows = [raw('w-old', 'waiting_approval', '2026-09-01T00:00:00Z'), raw('run', 'in_progress', '2026-10-07T09:00:00Z'), raw('dup', 'waiting_approval', '2026-10-06T00:00:00Z', '2026-10-06T00:01:00Z')];
+const closedRows = [
+  ...Array.from({ length: 150 }, (_, i) => raw(`c${i}`, 'done', `2026-10-05T${String(i % 24).padStart(2, '0')}:${String(Math.floor(i / 24)).padStart(2, '0')}:00Z`)),
+  // نفس المهمة انقرّرت بين الطلبين: ناخذ الأحدث تعديلاً
+  raw('dup', 'done', '2026-10-06T00:00:00Z', '2026-10-06T00:05:00Z'),
+  { id: 'junk', status: 'paused' },
+];
+const merged = mergeAgentRows(openRows, closedRows);
+ok(merged.length === 153 && merged.some((r) => r.id === 'w-old' && r.status === 'waiting_approval'), 'an old proposal awaiting you is loaded even behind 150 newer finished tasks');
+ok(merged.filter((r) => r.id === 'dup').length === 1 && merged.find((r) => r.id === 'dup')?.status === 'done', 'a task in both lists appears once, with its latest state');
+ok(merged[0].id === 'run' && merged[merged.length - 1].id === 'w-old' && merged.every((r, i) => i === 0 || Date.parse(merged[i - 1].created_at) >= Date.parse(r.created_at)),
+  'merged tasks are newest first');
+ok(!merged.some((r) => r.id === 'junk') && mergeAgentRows([], []).length === 0, 'unreadable rows are dropped');
+
+// ---------- المهمة الشغّالة اللي وقفت (نفس قاعدة المكتب) ----------
+ok(AGENT_STALE_MS === 15 * 60_000 && agentStale({ status: 'in_progress', created_at: '2026-10-07T10:00:00Z' }, Date.parse('2026-10-07T10:16:00Z'))
+  && !agentStale({ status: 'in_progress', created_at: '2026-10-07T10:00:00Z' }, Date.parse('2026-10-07T10:10:00Z')), 'the stale rule is shared with the agent screens');
+
 // ---------- نص بلغتين ----------
 ok(parseBi({ ar: ' مرحبا ', en: '' })?.en === 'مرحبا' && parseBi({ ar: '', en: 'Hi' })?.ar === 'Hi', 'a missing language falls back to the other');
 ok(parseBi({ ar: '', en: '  ' }) === null && parseBi('hi') === null && parseBi({ ar: 'x'.repeat(500), en: 'y' }, 200)?.ar.length === 200, 'empty texts are null and long ones are cut');
@@ -50,6 +72,9 @@ const pp = parsePartner(partner);
 ok(!!pp && pp.checks.length === 8 && pp.checks[1].ok === false && pp.missing.length === 6 && pp.missing[0].en === 'License photo', 'partner review parses, drops bad checks and caps the lists');
 ok(parsePartner({ ...partner, note: 'no' }) === null, 'a reject without a real reason is unreadable (same rule as the server)');
 ok(parsePartner({ ...partner, recommendation: 'approve', note: '' })?.note === '', 'approve may come without a note');
+// رسالة الشريك توصل مع الرفض بس: اقتراح القبول تبدأ مسودته بدون رسالة (لو قلبته رفض تكتب السبب بنفسك)
+const approveDraft = draftFrom(parseProposal('review_partner', { ...partner, recommendation: 'approve', note: 'Welcome to ARQ!' })!) as { decision: string; note: string };
+ok(approveDraft.decision === 'approve' && approveDraft.note === '', 'an approve proposal starts without a partner message (it would never reach them)');
 ok(parsePartner({ ...partner, recommendation: 'maybe' }) === null && parsePartner({ ...partner, confidence: 'sure' }) === null && parsePartner({ ...partner, checks: null }) === null,
   'partner review with a wrong enum or missing list is unreadable');
 ok(CONFIDENCES.join() === 'high,medium,low', 'confidence levels');
@@ -95,6 +120,8 @@ const pf = prepareFinal('review_partner', { decision: 'reject', note: '  ok  ' }
 ok('error' in pf && pf.error === 'note', 'reject needs a note of 3 letters');
 const pf2 = prepareFinal('review_partner', { decision: 'approve', note: '  ' });
 ok(!('error' in pf2) && pf2.kind === 'review_partner' && pf2.final.note === '', 'approve without a note is fine');
+const pf4 = prepareFinal('review_partner', { decision: 'approve', note: 'Please add your logo' });
+ok(!('error' in pf4) && pf4.kind === 'review_partner' && pf4.final.decision === 'approve' && pf4.final.note === '', 'an approval does not record a message the partner never gets');
 const pf3 = prepareFinal('review_partner', { decision: 'reject', note: 'x'.repeat(400) });
 ok(!('error' in pf3) && pf3.kind === 'review_partner' && pf3.final.note.length === 300, 'partner note is cut to 300');
 ok(prepareFinal('triage_report', { status: 'fixed', reply: '  Thanks  ' }).hasOwnProperty('final') && 'error' in prepareFinal('triage_report', { status: 'new', reply: 'x' })
@@ -106,7 +133,77 @@ ok((prepareFinal('draft_nudge', { template: { ...nudge.template, body: 'Hi {stre
 const lf = prepareFinal('review_ai_limits', { barcode_per_day: '12', meal_photos_per_day: 500 });
 ok(!('error' in lf) && lf.kind === 'review_ai_limits' && lf.final.barcode_per_day === 12 && lf.final.meal_photos_per_day === 200, 'limits from the text fields are clamped');
 ok((prepareFinal('review_ai_limits', { barcode_per_day: '', meal_photos_per_day: 3 }) as { error?: string }).error === 'bad', 'an empty limit is refused');
+// الحدود تغيّرت بعد الاقتراح (عدّلتها بنفسك)؟ الاقتراح صار قديم
+ok(!limitsChanged({ barcode_per_day: 2, meal_photos_per_day: 25 }, { barcode_per_day: 2, meal_photos_per_day: 25 })
+  && limitsChanged({ barcode_per_day: 2, meal_photos_per_day: 25 }, { barcode_per_day: 10, meal_photos_per_day: 25 })
+  && limitsChanged({ barcode_per_day: 2, meal_photos_per_day: 25 }, { barcode_per_day: 2, meal_photos_per_day: 60 }), 'limits changed by hand since the proposal are detected');
+ok(!limitsChanged({ barcode_per_day: '2', meal_photos_per_day: 25.2 }, { barcode_per_day: 2, meal_photos_per_day: 25 }) && !limitsChanged(undefined, { barcode_per_day: 9, meal_photos_per_day: 9 }),
+  'stored limits are compared as whole numbers; a task without stored limits has nothing to compare');
 ok('error' in prepareFinal('daily_brief', {}) && 'error' in prepareFinal('triage_report', null), 'the daily brief has nothing to apply');
+
+// ---------- خطوات الموافقة: تنفيذ مرة وحدة، وتسجيل القرار يتعاد بدون ما ينفّذ مرة ثانية ----------
+type Log = { status: number; current: number; apply: Prepared[]; record: Record<string, unknown>[]; wait: number[] };
+/** خطوات وهمية: record ترجع الأخطاء اللي بالقائمة بالترتيب، وبعدها تنجح */
+function fakeSteps(o: { status?: string | null; current?: boolean; applyErr?: Error; recordErrs?: unknown[] } = {}): { steps: ApproveSteps; log: Log } {
+  const log: Log = { status: 0, current: 0, apply: [], record: [], wait: [] };
+  const errs = [...(o.recordErrs ?? [])];
+  const steps: ApproveSteps = {
+    status: async () => { log.status++; return o.status === undefined ? 'waiting_approval' : o.status; },
+    current: async () => { log.current++; return o.current ?? true; },
+    apply: async (p) => { if (o.applyErr) throw o.applyErr; log.apply.push(p); },
+    record: async (fin) => { log.record.push(fin); if (errs.length) throw errs.shift(); },
+    wait: async (ms) => { log.wait.push(ms); },
+  };
+  return { steps, log };
+}
+const rejects = async (p: Promise<unknown>): Promise<string | null> => { try { await p; return null; } catch (e) { return (e as Error).message; } };
+const nudgeTask = { id: 'n1', kind: 'draft_nudge' as const };
+const nudgeDraft = { template: { ...nudge.template } };
+const netErr = new Error('Network request failed');
+const notWaiting = { message: 'not_waiting', code: 'P0001' };
+
+{
+  const memo = new Map<string, Record<string, unknown>>();
+  const a = fakeSteps();
+  ok(await rejects(approveSteps(nudgeTask, nudgeDraft, a.steps, memo)) === null && a.log.apply.length === 1 && a.log.record.length === 1 && memo.size === 0,
+    'approve applies once, records the decision and forgets the task');
+
+  // التسجيل تعثّر مرتين: انطبق بس ما انسجّل
+  const b = fakeSteps({ recordErrs: [netErr, netErr] });
+  ok(await rejects(approveSteps(nudgeTask, nudgeDraft, b.steps, memo)) === 'not_recorded' && b.log.apply.length === 1 && b.log.record.length === 2
+    && b.log.wait.join() === String(RECORD_RETRY_MS) && memo.has('n1'), 'when recording fails twice it says not_recorded and remembers what was applied');
+  // «اعتمد» مرة ثانية (حتى لو عدّلت المسودة): يسجّل اللي انطبق فعلاً بس، بدون تنفيذ ولا فحوصات
+  const c = fakeSteps({ recordErrs: [netErr, netErr] });
+  ok(await rejects(approveSteps(nudgeTask, { template: { ...nudge.template, title: 'Changed' } }, c.steps, memo)) === 'not_recorded'
+    && c.log.apply.length === 0 && c.log.status === 0 && c.log.current === 0 && memo.has('n1'), 'retrying while offline never applies again (no duplicate nudge)');
+  const d = fakeSteps();
+  ok(await rejects(approveSteps(nudgeTask, { template: { ...nudge.template, title: 'Changed' } }, d.steps, memo)) === null && d.log.apply.length === 0
+    && (d.log.record[0]?.template as { title?: string })?.title === nudge.template.title && memo.size === 0,
+  'the next Approve only records the applied proposal, then forgets it');
+
+  // المحاولة الأولى وصلت وردّها ضاع: الثانية تقول not_waiting = انسجّل خلاص
+  const e = fakeSteps({ recordErrs: [netErr, notWaiting] });
+  ok(await rejects(approveSteps(nudgeTask, nudgeDraft, e.steps, memo)) === null && e.log.record.length === 2 && memo.size === 0,
+    'not_waiting on the retry counts as recorded');
+  memo.set('n1', { template: nudge.template });
+  const f = fakeSteps({ recordErrs: [notWaiting] });
+  ok(await rejects(approveSteps(nudgeTask, nudgeDraft, f.steps, memo)) === null && f.log.apply.length === 0 && memo.size === 0,
+    'not_waiting when only recording an applied task counts as recorded');
+
+  const g = fakeSteps({ status: 'done' });
+  ok(await rejects(approveSteps(nudgeTask, nudgeDraft, g.steps, memo)) === 'not_waiting' && g.log.apply.length === 0 && g.log.record.length === 0, 'a task no longer waiting is not applied');
+  const h = fakeSteps({ current: false });
+  ok(await rejects(approveSteps({ id: 'l1', kind: 'review_ai_limits' }, { barcode_per_day: 5, meal_photos_per_day: 40 }, h.steps, memo)) === 'already_decided'
+    && h.log.apply.length === 0 && memo.size === 0, 'an out-of-date proposal (item decided or limits changed by hand) is refused before applying');
+  const i = fakeSteps();
+  ok(await rejects(approveSteps(nudgeTask, { template: { ...nudge.template, body: 'Hi {streak}' } }, i.steps, memo)) === 'bad_input' && i.log.status === 0, 'a bad draft is refused first');
+  const j = fakeSteps({ applyErr: new Error('report_locked') });
+  ok(await rejects(approveSteps({ id: 'r9', kind: 'triage_report' }, { status: 'seen', reply: 'Thanks' }, j.steps, memo)) === 'report_locked' && j.log.record.length === 0 && memo.size === 0,
+    'if applying fails nothing is recorded or remembered');
+  const k = fakeSteps({ recordErrs: [{ message: 'not_allowed' }, { message: 'not_allowed' }] });
+  ok(await rejects(approveSteps({ id: 'p1', kind: 'review_partner' }, { decision: 'approve', note: 'Hi there' }, k.steps, memo)) === 'not_recorded'
+    && (memo.get('p1') as { note?: string })?.note === '', 'any other recording error keeps the applied proposal for the next Approve');
+}
 
 // ---------- التشغيل والأخطاء ----------
 const rr = parseRunResult({ ran: 3, waiting: 2, done: 0, failed: 1, skipped: 1 })!;
@@ -142,5 +239,25 @@ const vars = (s: string) => [...s.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).s
 const officeKeys = Object.keys(en.office);
 ok(officeKeys.every((k) => vars(en.office[k]) === vars(ar.office[k] ?? '')), 'Arabic and English use the same {{variables}}');
 ok(AGENT_KINDS.length === 5, 'five agent kinds');
+
+// ---------- الشاشات: إصلاحات ما تنختبر إلا من الكود نفسه ----------
+const read = (f: string) => readFileSync(new URL(f, import.meta.url), 'utf8');
+const officeScreen = read('../src/app/owner-office.tsx');
+const sheetSrc = read('../src/components/office/AgentTaskSheet.tsx');
+const clientSrc = read('../src/lib/officeAgents.ts');
+ok(!/WORKING_FRESH_MS|10 \* 60_000/.test(officeScreen) && /agentStale\(/.test(officeScreen), 'the office polls with the same stale rule as the task list');
+ok(/const stale = agentStale\(task/.test(sheetSrc) && /isWorking\(task\.status\) && !stale/.test(sheetSrc) && /aerr_\$\{stale \? 'stale'/.test(sheetSrc),
+  'the task sheet shows a stopped task as not finished instead of spinning');
+ok(/<AgentTaskSheet key=\{sheetTask\.id\}/.test(officeScreen), 'switching tasks mounts a fresh sheet');
+ok(/navigation\.isFocused\(\)\) setSheet\(\(cur\) => cur \?\? daily\.id\)/.test(officeScreen), 'the daily brief opens only on the focused office and never replaces an open sheet');
+ok(/value\?\.decision === 'reject' \? \(\s*<Section title=\{t\('office\.sh_note'\)\}/.test(sheetSrc), 'the partner message shows only when rejecting');
+ok(/const reason = decision === 'reject' \? note \|\| undefined : undefined;/.test(clientSrc) && (clientSrc.match(/, reason\)/g) ?? []).length === 2,
+  'the partner message is sent only with a rejection');
+ok(/limitsChanged\(task\.input\.current, await currentAiLimits\(\)\)/.test(clientSrc), 'approving limits first compares them with the live ones');
+ok(/in\('status', \['scheduled', 'in_progress', 'waiting_approval'\]\)/.test(clientSrc) && /mergeAgentRows\(/.test(clientSrc), 'all open agent tasks are loaded, merged with the recent finished ones');
+ok(/const appliedPending = new Map/.test(clientSrc) && /appliedPending\.has\(task\.id\)\) throw new Error\('not_recorded'\)/.test(clientSrc),
+  'the applied-but-unrecorded memo lives for the app session and blocks rejecting an applied proposal');
+ok(/Approve/.test(en.office.err_not_recorded) && /اعتمد/.test(ar.office.err_not_recorded) && !/close it/.test(en.office.err_not_recorded),
+  'not_recorded tells you to tap Approve again (not to close the task)');
 
 if (fail) console.log(`\n${fail} office agent test(s) failed`);

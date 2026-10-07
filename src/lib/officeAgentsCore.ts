@@ -2,6 +2,8 @@
 // منطق بحت (بدون React Native ولا supabase) عشان ينختبر لحاله. نفس قواعد دالة الخادم office-agent:
 // الوكيل يجهّز الاقتراح ويحفظه في office_tasks، وأنت تعدّله لو تبي وتوافق (التطبيق ينفّذه بجلستك) أو ترفضه.
 import { DESKS, type DeskId } from './officeCore.ts';
+// قاعدة «المهمة الشغّالة وقفت» عايشة في officeCore (المكتب يحتاجها وهو يبني المهام) ونعيد تصديرها هنا لشاشات الوكلاء
+export { AGENT_STALE_MS, agentStale } from './officeCore.ts';
 
 export type AgentKind = 'triage_report' | 'review_partner' | 'draft_nudge' | 'review_ai_limits' | 'daily_brief';
 export type AgentStatus = 'scheduled' | 'in_progress' | 'waiting_approval' | 'done' | 'failed';
@@ -92,6 +94,26 @@ export function asAgentRow(v: unknown): AgentTaskRow | null {
     finished_at: ts(o.finished_at),
     decided_at: ts(o.decided_at),
   };
+}
+
+/** وقت الصف (للترتيب): تاريخ مقروء، وإلا صفر */
+const time = (v: string) => { const n = Date.parse(v); return Number.isFinite(n) ? n : 0; };
+
+/**
+ * يدمج أكثر من قائمة صفوف office_tasks (المفتوحة كلها + آخر المنتهية) في قائمة وحدة: بدون تكرار (نفس الرقم = الأحدث
+ * تعديلاً، لأن الحالة ممكن تتغيّر بين الطلبين)، الأحدث إنشاءً أول، والصف اللي ما ينقرا ينشال
+ */
+export function mergeAgentRows(...lists: unknown[][]): AgentTaskRow[] {
+  const byId = new Map<string, AgentTaskRow>();
+  for (const list of lists) {
+    for (const raw of list ?? []) {
+      const row = asAgentRow(raw);
+      if (!row) continue;
+      const had = byId.get(row.id);
+      if (!had || time(row.updated_at) >= time(had.updated_at)) byId.set(row.id, row);
+    }
+  }
+  return [...byId.values()].sort((a, b) => time(b.created_at) - time(a.created_at) || b.created_at.localeCompare(a.created_at));
 }
 
 // ---------------------------------------------------------------------------
@@ -257,6 +279,18 @@ function num(v: unknown): number | null {
   return Number(s);
 }
 
+/**
+ * الحدود تغيّرت من وقت ما جهّز الوكيل اقتراحه؟ (was = input.current المحفوظ مع المهمة، live = اللي بالإعدادات الحين)
+ * لو تغيّرت (عدّلتها بنفسك بعده) الاقتراح صار قديم وما ننفّذه. مهمة بدون current محفوظ: ما فيه شي نقارن فيه
+ */
+export function limitsChanged(was: unknown, live: AiLimitsLite): boolean {
+  const w = rec(was);
+  if (!w) return false;
+  const a = clampLimits(w);
+  const b = clampLimits(live);
+  return a.barcode_per_day !== b.barcode_per_day || a.meal_photos_per_day !== b.meal_photos_per_day;
+}
+
 /** أعداد صحيحة ضمن الحدود (٠..١٠٠ للباركود، ٠..٢٠٠ للصور). اللي مو رقم ياخذ القيمة الاحتياطية */
 export function clampLimits(v: { barcode_per_day?: unknown; meal_photos_per_day?: unknown } | null | undefined, fallback: AiLimitsLite = AGENT_LIMIT_DEFAULT): AiLimitsLite {
   const one = (x: unknown, d: number, hi: number) => {
@@ -295,7 +329,8 @@ export const NOTE_MAX = 300;
 export function draftFrom(p: AgentProposal): Prepared['final'] | null {
   switch (p.kind) {
     case 'triage_report': return { status: p.out.status, reply: p.out.reply };
-    case 'review_partner': return { decision: p.out.recommendation, note: p.out.note };
+    // رسالة الشريك توصله مع الرفض بس (القبول له إشعار ثابت)، فمع اقتراح القبول تبدأ فاضية: لو قلبته رفض تكتب السبب بنفسك
+    case 'review_partner': return { decision: p.out.recommendation, note: p.out.recommendation === 'reject' ? p.out.note : '' };
     case 'draft_nudge': return { template: { ...p.out.template } };
     case 'review_ai_limits': return { barcode_per_day: p.out.barcode_per_day, meal_photos_per_day: p.out.meal_photos_per_day };
     default: return null;
@@ -319,7 +354,8 @@ export function prepareFinal(kind: AgentKind, draft: unknown): Prepared | { erro
       if (!decision || typeof d.note !== 'string') return { error: 'bad' };
       const note = d.note.trim().slice(0, NOTE_MAX).trim();
       if (decision === 'reject' && note.length < 3) return { error: 'note' };
-      return { kind, final: { decision, note } };
+      // مع القبول الرسالة ما توصل للشريك، فما نسجّلها كأنها انرسلت
+      return { kind, final: { decision, note: decision === 'reject' ? note : '' } };
     }
     case 'draft_nudge': {
       const t = rec(d.template);
@@ -379,6 +415,58 @@ export function officeErrorCode(e: unknown): OfficeError | null {
   const msg = typeof e === 'string' ? e : String((e as { message?: unknown })?.message ?? '');
   // بس الرموز اللي فيها _ (كلمات مثل running أو network ممكن تجي بأي رسالة)
   return OFFICE_ERRORS.filter((c) => c.includes('_')).find((c) => new RegExp(`\\b${c}\\b`).test(msg)) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// خطوات الموافقة: نتأكد → ننفّذ → نسجّل القرار. لو انطبق بس التسجيل تعثّر (not_recorded)، نتذكّر اللي انطبق
+// (applied: رقم المهمة → final) عشان ضغطة «اعتمد» الثانية تسجّل القرار بس وما تنفّذه مرة ثانية (تنبيه مكرر مثلاً)
+// ---------------------------------------------------------------------------
+export interface ApproveSteps {
+  /** حالة المهمة الحين في office_tasks (null = ما لقيناها) */
+  status: () => Promise<string | null>;
+  /** العنصر نفسه للحين ينتظر قرار (وحدود الذكاء ما تغيّرت من وقت الاقتراح) */
+  current: () => Promise<boolean>;
+  /** ينفّذ اقتراحك بنفس دوال الأقسام */
+  apply: (p: Prepared) => Promise<void>;
+  /** يسجّل الموافقة: office_decide('approved', final) */
+  record: (final: Record<string, unknown>) => Promise<void>;
+  /** انتظار قصير قبل ما نعيد التسجيل */
+  wait: (ms: number) => Promise<void>;
+}
+
+/** كم مرة نحاول نسجّل القرار بعد التنفيذ، والانتظار بينها */
+export const RECORD_TRIES = 2;
+export const RECORD_RETRY_MS = 800;
+
+/**
+ * موافقتك على اقتراح الوكيل. أخطاء: bad_input (المسودة ناقصة)، not_waiting (انقرّرت أو الوكيل لسا يشتغل)،
+ * already_decided (العنصر انقرّر يدوياً أو الحدود تغيّرت)، not_recorded (انطبق بس ما انسجّل: اضغط اعتمد مرة ثانية يسجّله بس)،
+ * وأخطاء الأقسام نفسها. not_waiting وقت التسجيل (بعد ما انطبق) = المهمة انقفلت خلاص (غالباً محاولتنا الأولى وصلت وردّها ضاع)
+ */
+export async function approveSteps(
+  task: Pick<AgentTaskRow, 'id' | 'kind'>, draft: unknown, steps: ApproveSteps, applied: Map<string, Record<string, unknown>>,
+): Promise<void> {
+  let final = applied.get(task.id);
+  if (!final) {
+    const ready = prepareFinal(task.kind, draft);
+    if ('error' in ready) throw new Error('bad_input');
+    if ((await steps.status()) !== 'waiting_approval') throw new Error('not_waiting');
+    if (!(await steps.current())) throw new Error('already_decided');
+    await steps.apply(ready);
+    final = ready.final as unknown as Record<string, unknown>;
+    applied.set(task.id, final);
+  }
+  for (let i = 1; ; i++) {
+    try {
+      await steps.record(final);
+      break;
+    } catch (e) {
+      if (officeErrorCode(e) === 'not_waiting') break;
+      if (i >= RECORD_TRIES) throw new Error('not_recorded');
+      await steps.wait(RECORD_RETRY_MS);
+    }
+  }
+  applied.delete(task.id);
 }
 
 /** سبب فشل مهمة الوكيل (office_tasks.error) → مفتاح نصه */
