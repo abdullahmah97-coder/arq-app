@@ -88,6 +88,11 @@ export default function Owner() {
         <Stat n={count('new')} label={t('owner.newReports')} color={STATUS_COLOR.new} />
       </View>
 
+      {/* مكتب أرك أب: نفس الأقسام كمكتب ثلاثي الأبعاد، وكل اللي ينتظر موافقتك عليه علامة */}
+      <OwnerLink icon="business" title={t('office.title')}
+        sub={pendingAll + count('new') ? t('office.entrySubWaiting', { n: pendingAll + count('new') }) : t('office.entrySub')}
+        onPress={() => router.push('/owner-office')} />
+
       {/* المالك بس: الأجزاء اللي أخفاها عن المستخدمين بالضغط المطوّل */}
       <HiddenPartsCard />
 

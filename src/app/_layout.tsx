@@ -128,6 +128,7 @@ function RootNavigator() {
         <Stack.Screen name="gym/[id]" options={{ title: t('presence.title') }} />
         <Stack.Screen name="messages" options={{ title: t('chat.title') }} />
         <Stack.Screen name="owner" options={{ title: t('owner.title') }} />
+        <Stack.Screen name="owner-office" options={{ title: t('office.title') }} />
         <Stack.Screen name="clubs/index" options={{ title: t('clubs.title') }} />
         <Stack.Screen name="clubs/[id]" options={{ title: '' }} />
         <Stack.Screen name="clubs/chain/[id]" options={{ title: '' }} />
