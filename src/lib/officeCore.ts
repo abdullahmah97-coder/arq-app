@@ -1,6 +1,7 @@
 // مكتب أرك أب: منطق بحت (المكاتب، مهام كل مكتب، العدّادات) بدون أي استيراد من React Native عشان ينختبر لحاله.
-// كل قسم في لوحة الإدارة = مكتب عليه موظف. المهام اليوم تنبني من بيانات الأقسام الموجودة (agent: 'manual')،
-// ولاحقاً وكلاء الذكاء الاصطناعي يضيفون مهامهم بنفس الشكل (agent: 'claude') وتمر على موافقتك.
+// كل قسم في لوحة الإدارة = مكتب عليه موظف. المهام تنبني من بيانات الأقسام الموجودة (agent: 'manual')،
+// ومن شغل وكلاء الذكاء الاصطناعي (office_tasks، agent: 'claude') اللي يمر على موافقتك.
+import type { AgentKind, AgentTaskRow } from './officeAgentsCore.ts';
 
 export type DeskId = 'lead' | 'clubs' | 'stores' | 'coaches' | 'care' | 'reports' | 'marketing' | 'users' | 'ai';
 /** scheduled محجوزة لمهام الوكلاء المجدولة (المرحلة الجاية) */
@@ -10,7 +11,9 @@ export type TaskKind =
   | 'report_new' | 'report_seen' | 'report_done'
   | 'ad_none' | 'ad_live' | 'ad_scheduled' | 'ad_ended'
   | 'event_none' | 'event_upcoming' | 'event_past'
-  | 'kcal_off' | 'users_new';
+  | 'kcal_off' | 'users_new'
+  // شغل الوكلاء: فرز بلاغ، مراجعة طلب شريك، مسودة تنبيه، اقتراح حدود، ملخص اليوم، ومهمة ما كمّلت
+  | 'agent_report' | 'agent_partner' | 'agent_nudge' | 'agent_limits' | 'agent_brief' | 'agent_failed';
 
 export interface OfficeRoute { pathname: string; params?: Record<string, string> }
 
@@ -26,6 +29,8 @@ export interface OfficeTask {
   at: string | null;
   route: OfficeRoute;
   agent: 'manual' | 'claude';
+  /** رقم صف office_tasks (لمهام الوكلاء بس) — الضغط عليها يفتح ورقة الموافقة بدل القسم */
+  agentTaskId?: string;
 }
 
 export interface DeskLink { key: string; route: OfficeRoute }
@@ -64,6 +69,10 @@ export type ReportStatusLite = 'new' | 'seen' | 'fixed' | 'wontfix';
 export type AdStateLite = 'live' | 'scheduled' | 'ended' | 'off';
 export type EventStateLite = 'now' | 'soon' | 'open' | 'past' | 'hidden';
 
+/** اللي يحتاجه المكتب من مهمة الوكيل (صف office_tasks) */
+export type AgentTaskLite = Pick<AgentTaskRow,
+  'id' | 'desk' | 'kind' | 'target_kind' | 'target_id' | 'title' | 'status' | 'output' | 'created_at' | 'finished_at' | 'decided_at'>;
+
 /** كل اللي يحتاجه المكتب من قاعدة البيانات، بأنواع بسيطة (تنبني في office.ts) */
 export interface OfficeSnapshot {
   /** عدد الطلبات المعلّقة لكل نوع شريك (partner_overview: المصدر الأدق للعدد) */
@@ -76,10 +85,12 @@ export interface OfficeSnapshot {
   events: { id: string; title: string; title_en: string | null; state: EventStateLite; starts_on: string | null; at: string | null }[] | null;
   users: { trainees: number; new7d: number } | null;
   kcalEnabled: boolean | null;
+  /** مهام الوكلاء (الأحدث أول). null = ما انحمّلت */
+  agentTasks: AgentTaskLite[] | null;
 }
 
 /** ولا شي محمّل */
-export const EMPTY_SNAPSHOT: OfficeSnapshot = { pending: {}, requests: [], reports: [], ads: null, events: null, users: null, kcalEnabled: null };
+export const EMPTY_SNAPSHOT: OfficeSnapshot = { pending: {}, requests: [], reports: [], ads: null, events: null, users: null, kcalEnabled: null, agentTasks: null };
 
 const REQUEST_DESK: Record<PartnerKindLite, DeskId> = { club: 'clubs', store: 'stores', coach: 'coaches', center: 'care', venue: 'care' };
 const REQUEST_ROUTE: Record<PartnerKindLite, OfficeRoute> = {
@@ -101,16 +112,77 @@ const clip = (s: string, n = 90) => {
   return one.length > n ? `${one.slice(0, n - 1)}…` : one;
 };
 
+/** نوع المهمة في المكتب لكل نوع شغل وكيل */
+const AGENT_TASK_KIND: Record<AgentKind, TaskKind> = {
+  triage_report: 'agent_report', review_partner: 'agent_partner', draft_nudge: 'agent_nudge', review_ai_limits: 'agent_limits', daily_brief: 'agent_brief',
+};
+const DESK_IDS = new Set<string>(DESKS.map((d) => d.id));
+/** مهمة الوكيل مفتوحة (يشتغل عليها أو تنتظرك) = هي اللي تمثّل العنصر بدل مهمته اليدوية */
+const agentOpen = (a: AgentTaskLite) => a.status === 'scheduled' || a.status === 'in_progress' || a.status === 'waiting_approval';
+/** رقم العنصر نفسه في المهام اليدوية (report:<id> أو <نوع الشريك>:<id>) */
+const itemKey = (a: Pick<AgentTaskLite, 'target_kind' | 'target_id'>) => (a.target_kind && a.target_id ? `${a.target_kind}:${a.target_id}` : null);
+
+/** وين يفتح «افتح القسم» لمهمة الوكيل */
+export function agentRoute(a: Pick<AgentTaskLite, 'desk' | 'kind' | 'target_kind'>): OfficeRoute {
+  if (a.target_kind === 'report') return r('/owner');
+  if (a.target_kind) return REQUEST_ROUTE[a.target_kind];
+  if (a.kind === 'draft_nudge') return r('/owner-nudges');
+  if (a.kind === 'review_ai_limits') return r('/owner-ai-limits');
+  return DESK_IDS.has(a.desk) ? deskDef(a.desk).links[0].route : r('/owner');
+}
+
+/** اسم مهمة الوكيل: عنوانها، أو اسم العنصر نفسه، أو عنوان التنبيه المقترح، أو عنوان ملخص اليوم بلغتك */
+function agentName(a: AgentTaskLite, lng: 'ar' | 'en', items: Map<string, string>): string | null {
+  if (a.title) return clip(a.title);
+  const item = itemKey(a);
+  if (item && items.get(item)) return items.get(item)!;
+  const o = a.output as Record<string, any> | null;
+  const nudge = o?.template?.title;
+  if (a.kind === 'draft_nudge' && typeof nudge === 'string' && nudge.trim()) return clip(nudge);
+  const h = o?.headline;
+  const head = h && typeof h === 'object' ? (typeof h[lng] === 'string' && h[lng].trim() ? h[lng] : h.ar ?? h.en) : null;
+  if (a.kind === 'daily_brief' && typeof head === 'string' && head.trim()) return clip(head);
+  return null;
+}
+
+/** نوع مهمة الوكيل في المكتب (اللي ما كمّلت لها نوعها) */
+export const agentTaskKind = (a: Pick<AgentTaskLite, 'kind' | 'status'>): TaskKind => (a.status === 'failed' ? 'agent_failed' : AGENT_TASK_KIND[a.kind]);
+
+/** مهام الوكلاء: تشتغل/مجدولة = شغّالة، تنتظر موافقتك = تنتظرك، خلصت/فشلت = منتهية (آخر DONE_LIMIT لكل نوع بكل مكتب) */
+function agentTasksOf(list: AgentTaskLite[], lng: 'ar' | 'en', items: Map<string, string>): OfficeTask[] {
+  const out: OfficeTask[] = [];
+  const closed: { t: OfficeTask; group: string }[] = [];
+  for (const a of list) {
+    if (!DESK_IDS.has(a.desk) || !AGENT_TASK_KIND[a.kind]) continue; // نوع من نسخة أحدث ما نعرفه
+    const failed = a.status === 'failed';
+    const kind = agentTaskKind(a);
+    const base = { id: `agent:${a.id}`, desk: a.desk, kind, name: agentName(a, lng, items), route: agentRoute(a), agent: 'claude' as const, agentTaskId: a.id };
+    if (a.status === 'waiting_approval') out.push({ ...base, status: 'waiting', at: a.finished_at ?? a.created_at });
+    else if (a.status === 'in_progress' || a.status === 'scheduled') out.push({ ...base, status: 'in_progress', at: a.created_at });
+    else if (a.status === 'done' || failed) closed.push({ t: { ...base, status: 'done', at: a.decided_at ?? a.finished_at ?? a.created_at }, group: `${a.desk}:${kind}` });
+  }
+  const groups = new Map<string, OfficeTask[]>();
+  for (const c of closed) groups.set(c.group, [...(groups.get(c.group) ?? []), c.t]);
+  for (const g of groups.values()) out.push(...g.sort((a, b) => byNewest(a.at, b.at)).slice(0, DONE_LIMIT));
+  return out;
+}
+
 /** مهام المكتب كلها من لقطة البيانات */
 export function buildTasks(s: OfficeSnapshot, lng: 'ar' | 'en' = 'ar'): OfficeTask[] {
   const tasks: OfficeTask[] = [];
-  const add = (t: Omit<OfficeTask, 'agent'>) => tasks.push({ ...t, agent: 'manual' });
+  const agents = s.agentTasks ?? [];
+  // العنصر اللي عليه مهمة وكيل مفتوحة تمثّله مهمة الوكيل (ما ننحسب مرتين)
+  const taken = new Set(agents.filter(agentOpen).map(itemKey).filter((k): k is string => !!k));
+  const add = (t: Omit<OfficeTask, 'agent'>) => { if (!taken.has(t.id)) tasks.push({ ...t, agent: 'manual' }); };
 
   // طلبات الشركاء: كل طلب مهمة تنتظر موافقتك، ولو العدد أكبر من القائمة نضيف مهمة "و N طلبات ثانية"
   for (const k of PARTNER_KINDS_LITE) {
     const items = s.requests.filter((q) => q.kind === k);
     for (const q of items) add({ id: `${k}:${q.id}`, desk: REQUEST_DESK[k], kind: `${k}_request` as TaskKind, status: 'waiting', name: q.name, at: q.at, route: REQUEST_ROUTE[k] });
-    const extra = Math.max(0, (s.pending[k] ?? 0) - items.length);
+    // طلبات عليها مهمة وكيل مفتوحة بس مو في القائمة (القائمة لها حد): هي من العدد، فما نحسبها مرة ثانية في "و N"
+    const listed = new Set(items.map((q) => q.id));
+    const agentOnly = agents.filter((a) => agentOpen(a) && a.target_kind === k && a.target_id && !listed.has(a.target_id)).length;
+    const extra = Math.max(0, (s.pending[k] ?? 0) - items.length - agentOnly);
     if (extra) add({ id: `${k}:more`, desk: REQUEST_DESK[k], kind: 'more_requests', status: 'waiting', name: null, n: extra, at: null, route: REQUEST_ROUTE[k] });
   }
 
@@ -119,7 +191,7 @@ export function buildTasks(s: OfficeSnapshot, lng: 'ar' | 'en' = 'ar'): OfficeTa
     if (rep.status === 'new') add({ id: `report:${rep.id}`, desk: 'reports', kind: 'report_new', status: 'waiting', name: clip(rep.message), at: rep.at, route: r('/owner') });
     else if (rep.status === 'seen') add({ id: `report:${rep.id}`, desk: 'reports', kind: 'report_seen', status: 'in_progress', name: clip(rep.message), at: rep.updated_at ?? rep.at, route: r('/owner') });
   }
-  s.reports.filter((x) => x.status === 'fixed' || x.status === 'wontfix')
+  s.reports.filter((x) => (x.status === 'fixed' || x.status === 'wontfix') && !taken.has(`report:${x.id}`))
     .sort((a, b) => byNewest(a.updated_at ?? a.at, b.updated_at ?? b.at)).slice(0, DONE_LIMIT)
     .forEach((rep) => add({ id: `report:${rep.id}`, desk: 'reports', kind: 'report_done', status: 'done', name: clip(rep.message), at: rep.updated_at ?? rep.at, route: r('/owner') }));
 
@@ -149,13 +221,20 @@ export function buildTasks(s: OfficeSnapshot, lng: 'ar' | 'en' = 'ar'): OfficeTa
   // تنبيه السعرات موقوف = يحتاج قرارك
   if (s.kcalEnabled === false) add({ id: 'kcal:off', desk: 'ai', kind: 'kcal_off', status: 'waiting', name: null, at: null, route: r('/owner-calorie-alert') });
 
+  // شغل الوكلاء (يشتغلون، ينتظرون موافقتك، أو خلصوا) — واسم العنصر من بياناته لو المهمة بدون عنوان
+  const itemNames = new Map<string, string>([
+    ...s.requests.map((q): [string, string] => [`${q.kind}:${q.id}`, q.name]),
+    ...s.reports.map((x): [string, string] => [`report:${x.id}`, clip(x.message)]),
+  ]);
+  tasks.push(...agentTasksOf(agents, lng, itemNames));
+
   return tasks;
 }
 
 /** عدد المهام في المهمة الواحدة (مهمة "و N طلبات ثانية" تنحسب N) */
 const weight = (t: OfficeTask) => (t.kind === 'more_requests' ? t.n ?? 1 : 1);
 
-/** عدّادات كل مكتب. المدير (lead) يجمع كل اللي ينتظر موافقتك */
+/** عدّادات كل مكتب. المدير (lead) يجمع كل اللي ينتظر موافقتك (ومعها شغل وكيله: ملخص اليوم) */
 export function deskStates(tasks: OfficeTask[]): DeskState[] {
   const states = DESKS.map((d): DeskState => {
     const mine = tasks.filter((t) => t.desk === d.id);
@@ -165,9 +244,9 @@ export function deskStates(tasks: OfficeTask[]): DeskState[] {
   });
   const lead = states.find((x) => x.id === 'lead')!;
   const others = states.filter((x) => x.id !== 'lead');
-  lead.waiting = others.reduce((n, x) => n + x.waiting, 0);
-  lead.inProgress = others.reduce((n, x) => n + x.inProgress, 0);
-  lead.done = others.reduce((n, x) => n + x.done, 0);
+  lead.waiting += others.reduce((n, x) => n + x.waiting, 0);
+  lead.inProgress += others.reduce((n, x) => n + x.inProgress, 0);
+  lead.done += others.reduce((n, x) => n + x.done, 0);
   lead.alert = lead.waiting > 0;
   return states;
 }

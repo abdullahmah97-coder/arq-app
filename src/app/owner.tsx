@@ -28,7 +28,8 @@ import { loadAiLimits, type AiLimits } from '@/lib/aiLimits';
 import { adminUserStats, type AdminUserStats } from '@/lib/adminUsers';
 import { verifiedCount } from '@/lib/verify';
 import { KIND_ICON, PARTNER_KINDS, partnerOverview, type Overview, type PartnerKind } from '@/lib/partners';
-import { snapshotFrom } from '@/lib/office';
+import { loadRequestLists, snapshotFrom } from '@/lib/office';
+import { loadAgentTasks } from '@/lib/officeAgents';
 import { waitingTotal } from '@/lib/officeCore';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
@@ -54,6 +55,8 @@ export default function Owner() {
   const [verifiedN, setVerifiedN] = useState<number | null>(null);
   // الإعلانات والفعاليات وصلت (قبلها ما نحسب تنبيهات "ما فيه إعلان/فعالية" في رقم المكتب)
   const [loaded, setLoaded] = useState(false);
+  // لرقم رابط المكتب بس: قوائم الطلبات ومهام الوكلاء (مهمة الوكيل المفتوحة تمثّل طلبها، فلازم نعرف أي الطلبات للحين معلّقة)
+  const [officeExtra, setOfficeExtra] = useState<Partial<Parameters<typeof snapshotFrom>[0]>>({});
 
   const load = useCallback(async () => {
     const admin = await isAdmin();
@@ -64,11 +67,12 @@ export default function Owner() {
     loadAiLimits().then(setAiLim).catch(() => {});
     adminUserStats().then(setUsers).catch(() => {});
     verifiedCount().then(setVerifiedN).catch(() => {});
-    const [r, b, o, v, a, ev] = await Promise.all([
+    const [r, b, o, v, a, ev, lists, agentTasks] = await Promise.all([
       loadReports().catch(() => [] as Report[]), loadBrandRequests().catch(() => [] as Brand[]), loadOffers().catch(() => [] as Offer[]),
       partnerOverview().catch(() => ({})), listLaunchAds().catch(() => [] as LaunchAdRow[]), listAllEvents().catch(() => [] as LocalEvent[]),
+      loadRequestLists().catch(() => ({})), loadAgentTasks(),
     ]);
-    setReports(r); setBrands(b); setOffers(o); setOv(v); setAds(a); setEvents(ev); setLoaded(true);
+    setReports(r); setBrands(b); setOffers(o); setOv(v); setAds(a); setEvents(ev); setOfficeExtra({ ...lists, agentTasks }); setLoaded(true);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -83,9 +87,9 @@ export default function Owner() {
   const liveAd = ads.filter((a) => adState(a) === 'live').sort((a, b) => b.priority - a.priority || b.created_at.localeCompare(a.created_at))[0];
   const shownEvents = upcomingEvents(events);
   const homeEvent = nextHighlight(events);
-  // نفس حساب المكتب بالضبط (طلبات + تقارير جديدة + تنبيهات تحتاج قرارك)
+  // نفس حساب المكتب بالضبط (طلبات + تقارير جديدة + تنبيهات تحتاج قرارك + مقترحات الوكلاء اللي تنتظرك)
   const officeWaiting = waitingTotal(snapshotFrom({
-    ov, brands, reports, ads: loaded ? ads : null, events: loaded ? events : null, kcalEnabled: kcal ? kcal.enabled : null,
+    ...officeExtra, ov, brands, reports, ads: loaded ? ads : null, events: loaded ? events : null, kcalEnabled: kcal ? kcal.enabled : null,
   }));
 
   return (

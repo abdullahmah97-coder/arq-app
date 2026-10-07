@@ -3,6 +3,7 @@ import "./nutrition.test.ts"; // سجل السعرات (يشتغل مع اختب
 import "./qr.test.ts"; // مولّد رمز QR لبطاقة الدخول
 import "./homeLayout.test.ts"; // ترتيب أقسام الرئيسية
 import "./office.test.ts"; // مكتب أرك أب: المهام والمكاتب والترجمة
+import "./officeAgents.test.ts"; // وكلاء المكتب: قراءة الاقتراحات والتحقق قبل التنفيذ
 import { daysLeft, discountPct, gymsInRange, isStale, monthly, ratingBars } from '../src/lib/clubsMath.ts';
 let fail = 0;
 const ok = (c: boolean, m: string) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };

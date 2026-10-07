@@ -183,6 +183,14 @@ npx supabase functions deploy coach
 بدون هذي الخطوة التطبيق يشتغل عادي ويولّد خطة قياسية بالقواعد.
 الحد الافتراضي 5 خطط بالذكاء الاصطناعي لكل مستخدم يومياً (للتحكم في التكلفة) — عدّله في `MAX_AI_PLANS_PER_DAY`.
 
+**وكلاء مكتب أرك أب** (زر «شغّل الوكيل» على مكاتب `/owner-office`، للإدارة بس): يحتاجون ترحيل `20261007000880_office_agents.sql` (جدول `office_tasks` و`office_decide` ونوع `office` في حد الذكاء الاصطناعي) قبل نشر الدالة:
+```bash
+npx supabase db push                                                  # أو شغّل الترحيل من SQL Editor
+npx supabase functions deploy office-agent
+npx supabase secrets set ANTHROPIC_OFFICE_MODEL=claude-opus-5-5       # اختياري (هذا الافتراضي)
+```
+الوكيل يجهّز الشغل بس (فرز البلاغات، مراجعة طلبات الشركاء، مسودة تنبيه، اقتراح حدود الذكاء الاصطناعي، ملخص اليوم) ويحفظه بانتظار موافقتك؛ ما يتغيّر شي بالتطبيق إلا لما توافق. الحد 80 مهمة باليوم لكل مالك.
+
 ### 3) تشغيل التطبيق
 ```bash
 cp .env.example .env        # وعبّئ رابط المشروع و anon key
