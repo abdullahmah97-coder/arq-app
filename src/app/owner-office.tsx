@@ -73,7 +73,7 @@ export default function OwnerOffice() {
             style={{ flex: 1, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, padding: space.md, gap: 2,
               borderColor: filter === f ? STATUS_COLOR[f] : colors.border }}>
             <Num size={26} color={STATUS_COLOR[f]}>{counts[f]}</Num>
-            <T size="xs" muted numberOfLines={1}>{t(`office.stat_${f}`)}</T>
+            <T size="xs" muted numberOfLines={2}>{t(`office.stat_${f}`)}</T>
           </Pressable>
         ))}
       </View>
@@ -140,7 +140,7 @@ function DeskCard({ id, waiting, inProgress, done, onClose }: { id: DeskId; wait
 
 function Count({ n, label, color }: { n: number; label: string; color: string }) {
   return (
-    <View style={{ gap: 0 }}>
+    <View style={{ flex: 1 }}>
       <Num size={22} color={color}>{n}</Num>
       <T size="xs" muted>{label}</T>
     </View>

@@ -2,7 +2,7 @@
 // يشتغل مع اختبار النوادي (npm run test:clubs) أو لحاله: node --experimental-strip-types tests/office.test.ts
 import { readFileSync } from 'node:fs';
 import {
-  buildTasks, DESKS, deskSpot, deskStates, DONE_LIMIT, EMPTY_SNAPSHOT, filterCounts, filterTasks, paintOrder,
+  buildTasks, DESKS, deskSpot, deskStates, DONE_LIMIT, EMPTY_SNAPSHOT, filterCounts, filterTasks, paintOrder, waitingTotal,
   type OfficeSnapshot, type TaskKind,
 } from '../src/lib/officeCore.ts';
 
@@ -63,6 +63,12 @@ ok(st('lead').waiting === others.reduce((n, s) => n + s.waiting, 0) && st('lead'
 
 const quiet = deskStates(buildTasks({ ...EMPTY_SNAPSHOT, ads: [{ id: 'a', title: 'x', state: 'live', at: null }], events: [{ id: 'e', title: 'x', title_en: null, state: 'open', starts_on: null, at: null }] }));
 ok(quiet.every((s) => !s.alert), 'nothing pending → no desk raises a hand');
+
+// ما قدرنا نحمّل الإعلانات/الفعاليات (خطأ شبكة): لا نقول "ما فيه إعلان" وهي بس ما وصلت
+const offline = buildTasks({ ...snap, ads: null, events: null });
+ok(!offline.some((t) => t.id === 'ad:none' || t.id === 'event:none' || t.desk === 'marketing'), 'unloaded ads/events raise no marketing alert');
+ok(waitingTotal(snap) === st('lead').waiting, 'the admin panel link uses the same waiting total as the office');
+ok(waitingTotal(EMPTY_SNAPSHOT) === 0, 'nothing loaded → nothing waiting');
 
 const waiting = filterTasks(tasks, null, 'waiting');
 ok(waiting.length > 0 && waiting.every((t) => t.status === 'waiting'), 'waiting filter');

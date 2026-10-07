@@ -97,6 +97,8 @@ export function OfficeStage({ states, selected, onPick, label, paused }: Props) 
   useEffect(() => {
     let alive = true;
     initial3DMode(SCOPE).then(async (m) => {
+      // طلع من الشاشة قبل ما نبدأ: لا نكتب علامة "محاولة جارية" ما أحد بيمسحها
+      if (!alive) return;
       if (m === '3d' && !loadR3F()) { mark3DFailed({ where: 'import' }, SCOPE); m = '2d'; }
       if (m === '3d') await mark3DStart({ screen: 'office' }, SCOPE);
       if (alive) { started.current = Date.now(); setMode(m); }
@@ -157,18 +159,21 @@ export function OfficeStage({ states, selected, onPick, label, paused }: Props) 
         <View style={styles.center}><ActivityIndicator color={brand.amber} /></View>
       ) : mode === '2d' || !E ? flat : (
         <Guard fallback={flat} onError={(e) => fail('render', e)}>
-          <E.Canvas style={StyleSheet.absoluteFill} flat frameloop={paused ? 'never' : 'always'} gl={{ antialias: true }}
-            onCreated={({ gl }) => {
-              try {
-                const c = gl.getContext();
-                logEvent('office3d_gl', { webgl2: gl.capabilities.isWebGL2, version: String(c.getParameter(c.VERSION)) }, { once: true });
-              } catch (e) { logEvent('office3d_gl_error', errorDetail(e), { once: true }); }
-            }}>
-            <color attach="background" args={[night.bg]} />
-            <Suspense fallback={null}>
-              <Scene cam={camRef} live={live} onFrame={onFrame} onFail={fail} />
-            </Suspense>
-          </E.Canvas>
+          {/* اللمس للوحات وللتمرير، مو للمشهد (ما فيه شي يتضغط داخل 3D): بدونها لوحة اللمس حق r3f تاخذ السحب وما تنزل الصفحة على أندرويد */}
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <E.Canvas style={StyleSheet.absoluteFill} flat frameloop={paused ? 'never' : 'always'} gl={{ antialias: true }}
+              onCreated={({ gl }) => {
+                try {
+                  const c = gl.getContext();
+                  logEvent('office3d_gl', { webgl2: gl.capabilities.isWebGL2, version: String(c.getParameter(c.VERSION)) }, { once: true });
+                } catch (e) { logEvent('office3d_gl_error', errorDetail(e), { once: true }); }
+              }}>
+              <color attach="background" args={[night.bg]} />
+              <Suspense fallback={null}>
+                <Scene cam={camRef} live={live} onFrame={onFrame} onFail={fail} />
+              </Suspense>
+            </E.Canvas>
+          </View>
         </Guard>
       )}
 
@@ -191,9 +196,9 @@ export function OfficeStage({ states, selected, onPick, label, paused }: Props) 
                 style={{ position: 'absolute', left: sign.x - signW / 2, top, width: signW, height: Math.max(SIGN_H * 2, base.y - top), alignItems: 'center' }}>
                 <View style={[styles.sign, { maxWidth: signW }, on && { backgroundColor: brand.amber, borderColor: brand.amber }, { direction: I18nManager.isRTL ? 'rtl' : 'ltr' }]}>
                   <Ionicons name={d.icon as never} size={11} color={on ? brand.deepGreen : brand.amber} />
-                  <T size="xs" bold color={on ? brand.deepGreen : brand.cream} numberOfLines={1} style={styles.signText}>{label(d.id)}</T>
+                  <T size="xs" bold fit maxFontSizeMultiplier={1.4} color={on ? brand.deepGreen : brand.cream} style={styles.signText}>{label(d.id)}</T>
                   {st?.waiting ? (
-                    <View style={[styles.badge, { backgroundColor: brand.orange }]}><Text style={[styles.badgeText, { color: brand.cream }]}>{st.waiting > 99 ? '99+' : st.waiting}</Text></View>
+                    <View style={[styles.badge, { backgroundColor: brand.orange }]}><Text maxFontSizeMultiplier={1.2} style={[styles.badgeText, { color: brand.cream }]}>{st.waiting > 99 ? '99+' : st.waiting}</Text></View>
                   ) : (
                     <Ionicons name="checkmark-circle" size={12} color={on ? brand.deepGreen : '#8FD19E'} />
                   )}
@@ -207,7 +212,7 @@ export function OfficeStage({ states, selected, onPick, label, paused }: Props) 
       {mode === '2d' ? (
         <Pressable onPress={retry3D} style={styles.try3d} accessibilityRole="button" accessibilityLabel={t('office.try3d')}>
           <Ionicons name="cube-outline" size={14} color={brand.cream} />
-          <Text style={[styles.try3dText, { color: brand.cream }]}>3D</Text>
+          <Text maxFontSizeMultiplier={1.3} style={[styles.try3dText, { color: brand.cream }]}>3D</Text>
         </Pressable>
       ) : null}
     </View>
@@ -234,7 +239,7 @@ const styles = StyleSheet.create({
   wrap: { width: '100%', aspectRatio: 1 / 0.8, borderRadius: 16, overflow: 'hidden' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   sign: {
-    flexDirection: 'row', alignItems: 'center', gap: 3, height: SIGN_H, paddingHorizontal: 6, borderRadius: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 2, height: SIGN_H, paddingHorizontal: 4, borderRadius: 6,
     backgroundColor: 'rgba(6,31,27,0.88)', borderWidth: 1, borderColor: 'rgba(248,237,218,0.18)',
   },
   signText: { flexShrink: 1, fontSize: 10, lineHeight: 14 },

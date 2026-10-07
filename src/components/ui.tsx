@@ -32,11 +32,13 @@ export function Screen({ children, scroll = true, padded = true, edges = ['top']
 }
 
 /** نص بخط الهوية: Bold للعناوين، Light للنصوص (وRegular للأحجام الصغيرة لسهولة القراءة) */
-export function T({ children, style, muted, size = 'md', bold, semibold, center, numberOfLines, color, fit }: {
+export function T({ children, style, muted, size = 'md', bold, semibold, center, numberOfLines, color, fit, maxFontSizeMultiplier }: {
   children: ReactNode; style?: StyleProp<TextStyle>; muted?: boolean; size?: keyof typeof font;
   bold?: boolean; semibold?: boolean; center?: boolean; numberOfLines?: number; color?: string;
   /** سطر واحد ويصغّر الخط لو ما وسع */
   fit?: boolean;
+  /** حد لتكبير الخط من إعدادات الجوال (للنصوص اللي مساحتها ثابتة) */
+  maxFontSizeMultiplier?: number;
 }) {
   const family = bold ? fonts.title : semibold ? fonts.semibold : font[size] <= font.sm ? fonts.regular : fonts.body;
   return (
@@ -44,6 +46,7 @@ export function T({ children, style, muted, size = 'md', bold, semibold, center,
       numberOfLines={fit ? 1 : numberOfLines}
       adjustsFontSizeToFit={fit}
       minimumFontScale={fit ? 0.7 : undefined}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       style={[{
         color: color ?? (muted ? colors.muted : colors.text),
         fontSize: font[size],

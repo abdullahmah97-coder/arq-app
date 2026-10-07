@@ -71,13 +71,15 @@ export interface OfficeSnapshot {
   /** الطلبات نفسها (ممكن تكون أقل من العدد لأن كل قائمة لها حد) */
   requests: { kind: PartnerKindLite; id: string; name: string; at: string | null }[];
   reports: { id: string; status: ReportStatusLite; message: string; at: string; updated_at: string | null }[];
-  ads: { id: string; title: string; state: AdStateLite; at: string | null }[];
-  events: { id: string; title: string; title_en: string | null; state: EventStateLite; starts_on: string | null; at: string | null }[];
+  /** null = ما قدرنا نحمّلها (ما نقول "ما فيه إعلان" وهي بس ما وصلت) */
+  ads: { id: string; title: string; state: AdStateLite; at: string | null }[] | null;
+  events: { id: string; title: string; title_en: string | null; state: EventStateLite; starts_on: string | null; at: string | null }[] | null;
   users: { trainees: number; new7d: number } | null;
   kcalEnabled: boolean | null;
 }
 
-export const EMPTY_SNAPSHOT: OfficeSnapshot = { pending: {}, requests: [], reports: [], ads: [], events: [], users: null, kcalEnabled: null };
+/** ولا شي محمّل */
+export const EMPTY_SNAPSHOT: OfficeSnapshot = { pending: {}, requests: [], reports: [], ads: null, events: null, users: null, kcalEnabled: null };
 
 const REQUEST_DESK: Record<PartnerKindLite, DeskId> = { club: 'clubs', store: 'stores', coach: 'coaches', center: 'care', venue: 'care' };
 const REQUEST_ROUTE: Record<PartnerKindLite, OfficeRoute> = {
@@ -123,20 +125,22 @@ export function buildTasks(s: OfficeSnapshot, lng: 'ar' | 'en' = 'ar'): OfficeTa
 
   // التسويق: لو ما فيه إعلان شغّال أو فعالية قادمة ينبّهك المكتب (تحتاج قرارك)
   const ads = r('/owner-ads');
-  if (!s.ads.some((a) => a.state === 'live')) add({ id: 'ad:none', desk: 'marketing', kind: 'ad_none', status: 'waiting', name: null, at: null, route: ads });
-  for (const a of s.ads) {
+  const adList = s.ads ?? [];
+  if (s.ads && !adList.some((a) => a.state === 'live')) add({ id: 'ad:none', desk: 'marketing', kind: 'ad_none', status: 'waiting', name: null, at: null, route: ads });
+  for (const a of adList) {
     if (a.state === 'live') add({ id: `ad:${a.id}`, desk: 'marketing', kind: 'ad_live', status: 'in_progress', name: a.title, at: a.at, route: ads });
     else if (a.state === 'scheduled') add({ id: `ad:${a.id}`, desk: 'marketing', kind: 'ad_scheduled', status: 'in_progress', name: a.title, at: a.at, route: ads });
   }
-  s.ads.filter((a) => a.state === 'ended').sort((a, b) => byNewest(a.at, b.at)).slice(0, DONE_LIMIT)
+  adList.filter((a) => a.state === 'ended').sort((a, b) => byNewest(a.at, b.at)).slice(0, DONE_LIMIT)
     .forEach((a) => add({ id: `ad:${a.id}`, desk: 'marketing', kind: 'ad_ended', status: 'done', name: a.title, at: a.at, route: ads }));
 
   const events = r('/owner-events');
-  const title = (e: OfficeSnapshot['events'][number]) => (lng === 'en' && e.title_en ? e.title_en : e.title);
-  const upcoming = s.events.filter((e) => e.state === 'now' || e.state === 'soon' || e.state === 'open');
-  if (!upcoming.length) add({ id: 'event:none', desk: 'marketing', kind: 'event_none', status: 'waiting', name: null, at: null, route: events });
+  const evList = s.events ?? [];
+  const title = (e: (typeof evList)[number]) => (lng === 'en' && e.title_en ? e.title_en : e.title);
+  const upcoming = evList.filter((e) => e.state === 'now' || e.state === 'soon' || e.state === 'open');
+  if (s.events && !upcoming.length) add({ id: 'event:none', desk: 'marketing', kind: 'event_none', status: 'waiting', name: null, at: null, route: events });
   for (const e of upcoming) add({ id: `event:${e.id}`, desk: 'marketing', kind: 'event_upcoming', status: 'in_progress', name: title(e), at: e.starts_on, route: events });
-  s.events.filter((e) => e.state === 'past').sort((a, b) => byNewest(a.starts_on, b.starts_on)).slice(0, DONE_LIMIT)
+  evList.filter((e) => e.state === 'past').sort((a, b) => byNewest(a.starts_on, b.starts_on)).slice(0, DONE_LIMIT)
     .forEach((e) => add({ id: `event:${e.id}`, desk: 'marketing', kind: 'event_past', status: 'done', name: title(e), at: e.starts_on, route: events }));
 
   // المتدربين الجدد هذا الأسبوع: شغل جاري (ترحيب، متابعة)
@@ -167,6 +171,9 @@ export function deskStates(tasks: OfficeTask[]): DeskState[] {
   lead.alert = lead.waiting > 0;
   return states;
 }
+
+/** كل اللي ينتظر موافقتك في المكتب (رقم المدير) — نفس الرقم في رابط المكتب بلوحة الإدارة */
+export const waitingTotal = (s: OfficeSnapshot): number => deskStates(buildTasks(s)).find((x) => x.id === 'lead')!.waiting;
 
 export type TaskFilter = 'waiting' | 'in_progress' | 'done' | 'all';
 
