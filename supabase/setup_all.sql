@@ -10840,7 +10840,9 @@ begin
               where e2.created_at >= t_cur group by e2.kind order by count(*) desc, e2.kind limit 5) x))
   into j7 from e;
 
-  -- اختار نوع شريك وقت التسجيل وللحين ما انعتمد (يبقى متدرب لين يوافق المالك)
+  -- اختار نوع شريك وقت التسجيل وللحين ما انعتمد (يبقى متدرب لين يوافق المالك).
+  -- اللي عنده أي شي معتمد (أو موقوف بعد اعتماد) ما ينحسب: اعتماد المدرب مثلاً يحط is_coach بس وما يمسح partner_intent.
+  -- الفلتر بالـ where عشان total و no_submission و by_kind يطلعون من نفس الناس
   select jsonb_build_object(
     'total', count(*),
     'no_submission', count(*) filter (where
@@ -10855,7 +10857,13 @@ begin
       'coach', count(*) filter (where p.partner_intent = 'coach'),
       'center', count(*) filter (where p.partner_intent = 'center'),
       'venue', count(*) filter (where p.partner_intent = 'venue')))
-  into j8 from profiles p where p.partner_intent is not null and p.id <> all(v_admins);
+  into j8 from profiles p
+  where p.partner_intent is not null and p.id <> all(v_admins) and not p.is_coach
+    and not exists (select 1 from club_requests r where r.user_id = p.id and r.status = 'approved')
+    and not exists (select 1 from brands b where b.owner = p.id and b.status in ('approved', 'suspended'))
+    and not exists (select 1 from coach_profiles cp where cp.user_id = p.id and cp.status in ('approved', 'suspended'))
+    and not exists (select 1 from recovery_centers rc where rc.owner = p.id and rc.status in ('approved', 'suspended'))
+    and not exists (select 1 from venues v where v.owner = p.id and v.status in ('approved', 'suspended'));
 
   v_activity := jsonb_build_object('users', j1, 'signups', j2, 'active_users', j3, 'checkins', j4, 'top_gyms', j5,
                                    'workouts', j6, 'errors', j7, 'partner_intent', j8);
@@ -11328,8 +11336,21 @@ begin
                        and ot.status in ('scheduled', 'in_progress', 'waiting_approval')
                      order by ot.created_at desc limit 1) t on true;
 
+  -- من المعلّق: كم عليه مهمة وكيل مفتوحة — على كل المعلّق، مو بس أول ٢٥ في items
+  -- (فيه مهمة مفتوحة وحدة بالكثير لكل عنصر: الفهرس office_tasks_open_target، فالـ join ما يكرر)
+  with ot as (select t.target_kind as k, t.target_id as id from office_tasks t
+              where t.kind = 'review_partner' and t.status in ('scheduled', 'in_progress', 'waiting_approval'))
+  select jsonb_build_object(
+    'club', (select count(*) from club_requests x join ot on ot.k = 'club' and ot.id = x.id where x.status = 'pending'),
+    'store', (select count(*) from brands x join ot on ot.k = 'store' and ot.id = x.id where x.status = 'pending'),
+    'coach', (select count(*) from coach_profiles x join ot on ot.k = 'coach' and ot.id = x.user_id where x.status = 'pending'),
+    'center', (select count(*) from recovery_centers x join ot on ot.k = 'center' and ot.id = x.id where x.status = 'pending'),
+    'venue', (select count(*) from venues x join ot on ot.k = 'venue' and ot.id = x.id where x.status = 'pending'))
+  into j3;
+
   v_partners := jsonb_build_object('pending', j1,
     'pending_total', (j1->>'club')::int + (j1->>'store')::int + (j1->>'coach')::int + (j1->>'center')::int + (j1->>'venue')::int,
+    'pending_covered', j3,
     'items', j2);
 
   -- ===================================================================
@@ -11340,6 +11361,10 @@ begin
                                     'seen', count(*) filter (where f.status = 'seen'),
                                     'fixed', count(*) filter (where f.status = 'fixed'),
                                     'wontfix', count(*) filter (where f.status = 'wontfix')),
+    -- الجديدة اللي عليها مهمة وكيل مفتوحة — على كل الجديدة، مو بس أول ٢٠ في latest_new
+    'new_covered', count(*) filter (where f.status = 'new' and exists (
+        select 1 from office_tasks ot where ot.kind = 'triage_report' and ot.target_kind = 'report' and ot.target_id = f.id
+          and ot.status in ('scheduled', 'in_progress', 'waiting_approval'))),
     'received', jsonb_build_object('today', count(*) filter (where f.created_at >= t0),
                                    'cur', count(*) filter (where f.created_at >= t_cur),
                                    'prev', count(*) filter (where f.created_at >= t_prev and f.created_at < t_cur)))
