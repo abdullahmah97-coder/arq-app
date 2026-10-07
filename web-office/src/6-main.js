@@ -41,6 +41,7 @@ function connFail(e, kind) {
     const info = { code: kind, msg: t('c_user_changed'), raw: '' };
     Object.assign(state, { mode: 'error', data: null, tasks: null, isSample: false, updatedAt: null, errs: { overview: info, tasks: info }, drafts: {}, itemErr: {} });
     state.fresh.clear();
+    appWipe(true); // تبويب التطبيق: نفس الشي (طلبات ومحتوى الحساب الأول ما تبقى)
   } else if (kind !== 'unavailable' || state.isSample) state.mode = 'error';
   // متابعة الوكيل ما تكمل بدون اتصال: نوقفها ونقول ليش
   const run = state.run;
@@ -75,7 +76,9 @@ async function refresh(user) {
     state.busyRefresh = false;
     renderAll();
   }
-  if (refreshAgain) { refreshAgain = false; await refresh(); }
+  if (refreshAgain) { refreshAgain = false; await refresh(); return; }
+  // تبويب التطبيق مفتوح: أول اتصال حي (أو رجوعه) يحمّل بياناته
+  if (state.top === 'app' && state.mode === 'live') appEnter();
 }
 
 // ===================== الإجراءات =====================
@@ -88,6 +91,8 @@ async function write(query) {
     const ck = connKind(e);
     if (ck && ck !== 'unavailable') { connFail(e, ck); renderAll(); }
     const info = errInfo(e);
+    // مشكلة اتصال (ربط منتهي، رفض…): نقول وش هي بدل «صار خطأ»
+    if (ck && ck !== 'unavailable') info.msg = connTitle(ck);
     if (info.code === 'read_only') { state.readOnly = true; renderBanner(); }
     if (info.code === 'choose_admin') { state.needAdmin = true; }
     // ما وصل رد (انقطع أو طوّل): الإجراء يمكن انطبق، فنطلب تحديث قبل الإعادة
@@ -279,6 +284,7 @@ function renderAll() {
   renderTasks();
   renderDash();
   if (state.sheet) renderSheet();
+  renderApp();
   if (office3d) { try { office3d.update(deskStates(), state.desk); kick(); } catch (e) { fail3d(e); } }
 }
 function loop(now) {
@@ -323,11 +329,13 @@ function init3d() {
 let refreshTimer = 0, clockTimer = 0;
 function startTimers() {
   clearInterval(refreshTimer); clearInterval(clockTimer);
-  refreshTimer = setInterval(() => { if (!document.hidden && autoRefreshOk() && !state.sheet) refresh(); }, REFRESH_MS);
+  // المكتب يتحدّث وهو ظاهر بس (تبويب التطبيق له مؤقته: appTick)
+  refreshTimer = setInterval(() => { if (!document.hidden && state.top === 'office' && autoRefreshOk() && !state.sheet) refresh(); }, REFRESH_MS);
+  startAppTimer();
   // الأوقات النسبية («قبل دقيقة») تتحدّث كل ٣٠ ثانية بدون استعلام
   clockTimer = setInterval(() => { if (!document.hidden) { renderTop(); renderTasks(); renderStageMeta(); } }, 30_000);
 }
-function stopTimers() { clearInterval(refreshTimer); clearInterval(clockTimer); clearTimeout(pollTimer); }
+function stopTimers() { clearInterval(refreshTimer); clearInterval(clockTimer); clearTimeout(pollTimer); clearInterval(appTimer); }
 /** التحديث التلقائي: مع الاتصال الحي، أو لو Supabase ما ردّ (حتى لو ما وصلت بيانات للحين) — مرة وحدة كل دقيقة بالكثير.
  * باقي المشاكل (ربط منتهي، رفض…) تحتاج منك تصلّحها وتضغط «حاول مرة ثانية» */
 const autoRefreshOk = () => !!mcp && (state.mode === 'live' || (state.mode === 'error' && !!state.conn && state.conn.kind === 'unavailable'));
@@ -336,7 +344,7 @@ const autoRefreshOk = () => !!mcp && (state.mode === 'live' || (state.mode === '
 function bind() {
   $('days7').addEventListener('click', () => setDays(7));
   $('days30').addEventListener('click', () => setDays(30));
-  $('refreshBtn').addEventListener('click', () => refresh(true));
+  $('refreshBtn').addEventListener('click', () => (state.top === 'app' ? appRefresh() : refresh(true)));
   $('langBtn').addEventListener('click', () => { state.lang = state.lang === 'ar' ? 'en' : 'ar'; store('lang', state.lang); applyLang(); renderAll(); layoutStage(); });
   $('themeBtn').addEventListener('click', () => { state.theme = currentTheme() === 'dark' ? 'light' : 'dark'; store('theme', state.theme); applyTheme(); renderTop(); });
   for (const b of [$('view3d'), $('viewGrid')]) {
@@ -356,8 +364,10 @@ function bind() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     kick();
+    if (state.top === 'app') { if (state.mode === 'live' && Date.now() - app.reqAt > REFRESH_MS) appTick(); else if (state.mode !== 'live' && autoRefreshOk() && Date.now() - lastTry > REFRESH_MS) refresh(); return; }
     if (autoRefreshOk() && Date.now() - lastTry > REFRESH_MS) refresh();
   });
+  bindApp();
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderTop()); } catch (e) { /* متصفح قديم */ }
 }
 function setDays(d) {
@@ -380,6 +390,7 @@ function start() {
   const hasClaude = typeof window.claude === 'object' && window.claude && typeof window.claude.use === 'function';
   state.mode = hasClaude ? 'connecting' : 'sample';
   bind();
+  applyTop();
   renderAll();
   // three.js يتحمّل async: لو وصل قبلنا نبدأ على طول، وإلا ننتظر حدث التحميل (ولو فشل نعرض البطاقات)
   const tag = document.getElementById('three-js');

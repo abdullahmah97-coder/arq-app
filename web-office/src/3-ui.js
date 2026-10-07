@@ -140,15 +140,22 @@ function renderTop() {
   $('connText').textContent = t(m === 'error' && state.isSample ? 'conn_error_sample' : `conn_${m}`);
   // «آخر تحديث» = آخر مرة وصلت نتيجة office_overview (حتى لو الاتصال انقطع بعدها)، وما نعرضه أبد مع بيانات تجريبية
   const liveShown = !state.isSample && (state.mode === 'live' || state.mode === 'error') && (state.data || state.tasks);
-  $('updated').textContent = liveShown ? (state.updatedAt ? t('updated', { t: ago(new Date(state.updatedAt).toISOString()) }) : t('updated_never')) : '';
+  $('updated').textContent = state.top === 'app' ? (liveShown && app.reqAt ? t('app_updated', { t: ago(new Date(app.reqAt).toISOString()) }) : '')
+    : liveShown ? (state.updatedAt ? t('updated', { t: ago(new Date(state.updatedAt).toISOString()) }) : t('updated_never')) : '';
+  // التبويب العلوي: المكتب / التطبيق (الفترة تخص المكتب بس)
+  $('topTabs').setAttribute('aria-label', t('top_tabs'));
+  $('topOfficeL').textContent = t('top_office');
+  $('topAppL').textContent = t('top_app');
+  $('period').hidden = state.top === 'app';
   $('period').setAttribute('aria-label', t('period'));
   for (const b of [$('days7'), $('days30')]) {
     b.textContent = t(`days_${b.dataset.days}`);
     b.setAttribute('aria-pressed', String(Number(b.dataset.days) === state.days));
   }
   const rb = $('refreshBtn');
-  rb.replaceChildren(state.busyRefresh ? h('span', { class: 'spin' }) : icon('refresh', 'sm'), h('span', { text: state.busyRefresh ? t('refreshing') : t('refresh') }));
-  rb.disabled = state.mode === 'connecting' || state.busyRefresh || !!(state.conn && state.conn.kind === 'user_changed');
+  const busy = state.busyRefresh || (state.top === 'app' && appBusy());
+  rb.replaceChildren(busy ? h('span', { class: 'spin' }) : icon('refresh', 'sm'), h('span', { text: busy ? t('refreshing') : t('refresh') }));
+  rb.disabled = state.mode === 'connecting' || busy || !!(state.conn && state.conn.kind === 'user_changed');
   const lb = $('langBtn');
   lb.textContent = t('lang_switch');
   lb.setAttribute('lang', state.lang === 'ar' ? 'en' : 'ar');
@@ -492,8 +499,8 @@ function renderDeskPanel() {
   restoreFocus(keep);
 }
 
-function adminPicker() {
-  const id = 'adminPick';
+function adminPicker(suffix = '') {
+  const id = `adminPick${suffix}`;
   const dr = state.drafts.admin || { note: state.adminId || '' };
   return h('div', { class: 'err-box' }, h('span', { text: t('err_choose_admin') }),
     h('div', { class: 'field' }, h('label', { for: id, text: t('admin_pick') }),

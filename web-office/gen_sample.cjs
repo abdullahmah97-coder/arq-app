@@ -394,6 +394,144 @@ for (const [name, o] of [['7', o7], ['30', o30]]) {
 const tp = Object.keys(o7.store.top_products[0]).sort().join(',');
 if (tp !== 'brand,brand_id,meals,price_sar,product,product_id') { console.error('top_products keys', tp); process.exit(1); }
 
-const out = { _note: 'Sample data for the ARQ web office preview — every name and number is fake.', overview: o7, overview_30: o30, tasks: TASKS };
+// ===================== تبويب «التطبيق»: طلبات التعديل + المحتوى والإعدادات (docs/office-web.md القسم ٧) =====================
+const SID = (s) => `session_01Sample${s}`;
+const appUid = (n) => `5a3e0000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+function request(n, o) {
+  const sid = o.session ? SID(o.session) : null;
+  return {
+    id: appUid(1100 + n), title: o.title, request: o.request, area: o.area, session_id: sid,
+    session_url: sid ? `https://claude.ai/code/${sid}` : null, pr_url: o.pr || null, status: o.status,
+    created_by: ADMIN, created_at: ago(o.min), updated_at: ago(o.upd ?? o.min),
+  };
+}
+const APP_REQUESTS = [
+  request(1, { title: 'زر مشاركة للفعاليات (تجريبي)', area: 'marketing', status: 'working', session: 'EventShare01', min: 35, upd: 4,
+    request: 'أبي زر مشاركة في صفحة الفعالية يرسل رابطها بالواتساب، مع اسم الفعالية وتاريخها. (طلب تجريبي للمعاينة)' }),
+  request(2, { title: 'فلتر المدينة في دليل المدربين (تجريبي)', area: 'coaches', status: 'review', session: 'CoachCity0002', pr: 'https://github.com/abdullahmah97-coder/arq-app/pull/9001', min: 60 * 5, upd: 60,
+    request: 'في دليل المدربين أبي فلتر بالمدينة فوق القائمة، ويتذكر آخر مدينة اخترتها. (طلب تجريبي)' }),
+  request(3, { title: 'تنبيه للمتجر لما المخزون يخلص (تجريبي)', area: 'stores', status: 'needs_you', session: 'StockAlert003', min: 60 * 26, upd: 60 * 20,
+    request: 'لما منتج يوصل صفر بالمخزون يوصل صاحب المتجر تنبيه. (طلب تجريبي)' }),
+  request(4, { title: 'Sample: fix the bookings page title in English', area: 'bookings', status: 'done', session: 'BookTitle0004', pr: 'https://github.com/abdullahmah97-coder/arq-app/pull/9000', min: 60 * 50, upd: 60 * 30,
+    request: 'The English title on the bookings page says "Reservation" — it should say "Bookings". (sample request)' }),
+  request(5, { title: 'وضع داكن لبطاقة إعلان البداية (تجريبي)', area: 'app', status: 'failed', session: 'DarkAd000005', min: 60 * 74, upd: 60 * 70,
+    request: 'بطاقة إعلان البداية تطلع فاتحة حتى لو الجوال على الوضع الداكن. (طلب تجريبي)' }),
+  request(6, { title: 'ترتيب التحديات حسب الأقرب (تجريبي)', area: 'community', status: 'cancelled', session: 'Challenges06', min: 60 * 120, upd: 60 * 100,
+    request: 'رتّب التحديات بحيث اللي ينتهي قريب يطلع أول. (طلب تجريبي)' }),
+];
+
+function ad(n, o) {
+  const state = !o.active ? 'off' : o.ends_at && Date.parse(o.ends_at) <= NOW ? 'ended' : o.starts_at && Date.parse(o.starts_at) > NOW ? 'scheduled' : 'live';
+  return {
+    id: appUid(700 + n), kind: o.kind, title: o.title, media_path: `sample/ad-${n}.${o.media_type === 'video' ? 'mp4' : 'jpg'}`, media_type: o.media_type || 'image',
+    link: o.link ?? null, cta: o.cta ?? null, audience: o.audience || 'all', starts_at: o.starts_at ?? null, ends_at: o.ends_at ?? null,
+    active: o.active, frequency: o.frequency || 'daily', auto_close: o.auto_close ?? 0, priority: o.priority ?? 0,
+    created_at: ago(o.min), updated_at: ago(o.min - 30), state,
+  };
+}
+// منتصف ليل الرياض لليوم d = بداية اليوم، ومنتصف الليل اللي بعده = نهاية اليوم (نفس لوحة الإعلانات)
+const rStart = (d) => iso(Date.parse(`${d}T00:00:00+03:00`));
+const APP_ADS = [
+  ad(1, { kind: 'ad', title: 'عرض الويكند (تجريبي)', link: '/store/5a3e0000-0000-4000-8000-000000000208', cta: 'زور المتجر', starts_at: rStart('2026-10-06'), ends_at: rStart('2026-10-09'), active: true, frequency: 'daily', priority: 60, min: 60 * 30 }),
+  ad(2, { kind: 'occasion', title: 'افتتاح موسم الشتاء (تجريبي)', starts_at: rStart('2026-10-15'), ends_at: rStart('2026-10-18'), active: true, frequency: 'once', priority: 80, audience: 'all', min: 60 * 50, media_type: 'video', auto_close: 8 }),
+  ad(3, { kind: 'awareness', title: 'اشرب ماي قبل التمرين (تجريبي)', starts_at: rStart('2026-09-20'), ends_at: rStart('2026-10-01'), active: true, frequency: 'every_open', priority: 20, audience: 'women', min: 60 * 400, media_type: 'gif' }),
+  ad(4, { kind: 'ad', title: 'Sample: protein bar launch', link: 'https://example.com/sample', cta: 'Shop now', starts_at: null, ends_at: null, active: false, frequency: 'daily', priority: 40, audience: 'men', min: 60 * 600 }),
+];
+
+const EV_MORE = [
+  { id: appUid(950), title: 'هايكنج طويق التجريبي', title_en: 'Sample Tuwaiq Hike', starts_on: '2026-09-12', ends_on: null, city: 'الرياض', category: 'hiking', active: true },
+  { id: appUid(951), title: 'بطولة بادل تجريبية', title_en: null, starts_on: null, ends_on: null, city: 'جدة', category: 'other', active: false, date_note: 'نهاية نوفمبر (يُعلن الموعد)' },
+];
+const APP_EVENTS = [...EVENTS.map((e, i) => ({ ...e, active: true, featured: i === 1 || i === 7 })), ...EV_MORE].map((e, i) => ({
+  id: e.id, category: e.category, title: `${e.title}${/تجريبي/.test(e.title) ? '' : ' (تجريبي)'}`, title_en: e.title_en ? `${e.title_en}${/Sample/.test(e.title_en) ? '' : ' (sample)'}` : null,
+  city: e.city, city_en: e.city === 'الرياض' ? 'Riyadh' : e.city === 'جدة' ? 'Jeddah' : null, venue: i === 1 ? 'وادي حنيفة' : null, venue_en: i === 1 ? 'Wadi Hanifa' : null,
+  starts_on: e.starts_on, ends_on: e.ends_on, date_note: e.date_note || null, date_note_en: null,
+  summary: i === 1 ? 'سباق جري تجريبي بمسافات ٥ و١٠ و٢١ كم — للمعاينة بس.' : null, summary_en: null,
+  url: i === 1 ? 'https://example.com/riyadh-run-sample' : null, image_path: null, featured: !!e.featured, active: e.active !== false,
+  created_by: ADMIN, created_at: ago(60 * (300 + i * 20)), updated_at: ago(60 * (100 + i * 10)),
+}));
+
+const NUDGES = [
+  ['gym', 'all', 'all', 'ar', 'النادي يناديك 💪 (تجريبي)', 'يا {name}، {gym} ينتظرك اليوم!', true, 120],
+  ['gym', 'female', 'all', 'ar', 'وقتك اليوم (تجريبي)', 'يا {name}، ساعة في {gym} تفرق يومك.', true, 0],
+  ['gym', 'all', 'all', 'en', 'Sample: the gym is calling', '{name}, {gym} is waiting for you today!', true, 40],
+  ['friend', 'male', 'male', 'ar', 'صديقك سبقك (تجريبي)', '{friend} راح {gym} اليوم، وأنت يا {name}؟', true, 85],
+  ['friend', 'all', 'female', 'ar', 'صديقتك سبقتك (تجريبي)', '{friend} راحت {gym} اليوم، وأنت يا {name}؟', true, 22],
+  ['friend', 'all', 'all', 'en', 'Sample: a friend beat you to it', '{friend} already went to {gym} today. Your turn, {name}!', false, null],
+  ['streak', 'all', 'all', 'ar', 'لا تكسر السلسلة (تجريبي)', '{streak} يوم ورا بعض يا {name}! كمّل اليوم.', true, 64],
+  ['streak', 'all', 'all', 'en', 'Sample: keep the streak', '{streak} days in a row, {name}. Keep it going!', true, null],
+  ['workout', 'all', 'all', 'ar', 'تمرين اليوم جاهز (تجريبي)', 'يا {name}، {workout} ينتظرك.', true, 210],
+  ['workout', 'male', 'all', 'ar', 'جاهز؟ (تجريبي)', '{workout} اليوم يا {name}، يلا!', false, null],
+  ['meal', 'all', 'all', 'ar', 'وش أكلت اليوم؟ (تجريبي)', 'يا {name}، سجّل وجبتك عشان تعرف وين وصلت.', true, 156],
+  ['meal', 'all', 'all', 'en', 'Sample: log your lunch', '{name}, log a meal to see where you stand.', true, 18],
+].map(([category, gender, friend_gender, locale, title, body, active, n], i) => ({
+  id: appUid(1300 + i), category, gender, friend_gender, locale, title, body, active, updated_at: ago(60 * (200 + i * 15)),
+  last_broadcast_at: n === null ? null : ago(60 * (20 + i * 9)), last_broadcast_n: n,
+}));
+
+const SETTINGS = {
+  ai_limits: { barcode_per_day: 2, meal_photos_per_day: 25 },
+  calorie_alert: {
+    enabled: true, threshold: 200, title_ar: 'باقي لك {n} سعرة وتكمّل احتياجك', body_ar: 'أكلت {eaten} من {goal} سعرة اليوم. خل آخر شي تاكله خفيف وفيه بروتين.',
+    title_en: '{n} kcal left to hit your target', body_en: "You've had {eaten} of {goal} kcal today. Keep the last bite light and high in protein.",
+  },
+};
+
+function partner(kind, n, o) {
+  return {
+    id: appUid(1500 + n), name: o.name, subtitle: o.subtitle || '', status: o.status, logo_path: null, avatar_url: null,
+    owner_id: o.owner ? appUid(1700 + n) : null, owner_username: o.owner || null, listed_by: o.listed_by || 'owner', partner: !!o.partner,
+    meta: o.meta || {}, created_at: ago(60 * 24 * (n % 40 + 3)),
+  };
+}
+const PARTNERS = {
+  club: [
+    partner('club', 1, { name: 'نادي تجريبي - العليا', subtitle: 'Sample Gym Olaya', status: 'approved', partner: true, owner: 'demo_mgr1، demo_mgr2', meta: { audience: 'all', branches: 3, managers: 2, offers: 1 } }),
+    partner('club', 2, { name: 'Demo Gym - Corniche', subtitle: '', status: 'listed', listed_by: 'arq', meta: { audience: 'men', branches: 1, managers: 0, offers: 0 } }),
+    partner('club', 3, { name: 'نادي تجريبي للسيدات', subtitle: 'Sample Ladies Club', status: 'approved', partner: true, owner: 'demo_noura', meta: { audience: 'women', branches: 2, managers: 1, offers: 2 } }),
+    partner('club', 4, { name: 'نادي تجريبي مخفي', subtitle: '', status: 'suspended', listed_by: 'arq', meta: { audience: 'all', branches: 1, managers: 0, offers: 0 } }),
+  ],
+  store: [
+    partner('store', 11, { name: 'Sample Fit Wear', subtitle: 'ملابس رياضية', status: 'approved', partner: true, owner: 'demo_store', meta: { category: 'apparel', city: 'جدة', products: 42 } }),
+    partner('store', 12, { name: 'مطعم تجريبي صحي', subtitle: 'وجبات صحية', status: 'pending', owner: 'demo_rest', meta: { category: 'restaurant', city: 'الرياض', products: 0 } }),
+    partner('store', 13, { name: 'مكملات تجريبية', subtitle: 'Sample Supplements', status: 'suspended', owner: 'demo_supp', meta: { category: 'supplements', city: 'الدمام', products: 18 } }),
+  ],
+  coach: [
+    partner('coach', 21, { name: 'Demo Coach Sara', subtitle: 'تمارين قوة وتغذية', status: 'approved', partner: true, owner: 'demo_sara', meta: { city: 'الدمام', specialties: ['strength'], clients: 12 } }),
+    partner('coach', 22, { name: 'المدرب التجريبي فهد', subtitle: 'جري ومسافات', status: 'pending', owner: 'demo_fahad', meta: { city: 'الرياض', specialties: ['running'], clients: 0 } }),
+  ],
+  center: [
+    partner('center', 31, { name: 'مركز الاستشفاء التجريبي - الملقا', subtitle: 'علاج طبيعي', status: 'approved', partner: true, owner: 'demo_ahmed', meta: { kind: 'physio', cities: ['الرياض'] } }),
+    partner('center', 32, { name: 'Sample Recovery Lab', subtitle: '', status: 'rejected', owner: 'demo_lab', meta: { kind: 'recovery', cities: ['جدة'] } }),
+  ],
+  venue: [
+    partner('venue', 41, { name: 'Demo Court Club', subtitle: 'بادل وتنس', status: 'approved', partner: true, owner: 'demo_khalid', meta: { sports: ['padel', 'tennis'], city: 'جدة', booking_url: null, courts: 4, classes: 0, upcoming: 9 } }),
+    partner('venue', 42, { name: 'استوديو يوقا تجريبي', subtitle: 'Sample Yoga Studio', status: 'suspended', listed_by: 'arq', meta: { sports: ['yoga'], city: 'الرياض', booking_url: null, courts: 0, classes: 6, upcoming: 0 } }),
+  ],
+};
+
+const FIRST = ['أحمد', 'نورة', 'فيصل', 'سارة', 'خالد', 'ريم', 'عمر', 'لمى', 'Lee', 'Maya', 'سلمان', 'هيا', 'يوسف', 'دانة', 'Adam', 'جود'];
+const LAST = ['التجريبي', 'Demo', 'المعاينة', 'Sample'];
+const ACCT = ['trainee', 'trainee', 'trainee', 'trainee', 'trainee', 'coach', 'trainee', 'trainee', 'store', 'trainee', 'trainee', 'club', 'trainee', 'trainee', 'center', 'trainee'];
+const USERS = Array.from({ length: 64 }, (_, i) => ({
+  id: appUid(2000 + i), username: `demo_user${String(i + 1).padStart(2, '0')}`, full_name: i % 9 === 4 ? null : `${FIRST[i % FIRST.length]} ${LAST[i % LAST.length]}`,
+  avatar_url: null, account_type: ACCT[i % ACCT.length], gender: i % 3 === 0 ? 'female' : i % 3 === 1 ? 'male' : null, created_at: ago(60 * (3 + i * 17)),
+  email_confirmed: i % 7 !== 3, points: (i * 37) % 900, gym_name: i % 4 === 0 ? 'نادي تجريبي - العليا' : i % 4 === 1 ? null : 'Demo Gym - Corniche', gym_name_en: i % 4 === 0 ? 'Sample Gym Olaya' : null,
+  is_admin: i === 63, partner_intent: i % 11 === 2 ? 'store' : null, is_coach: ACCT[i % ACCT.length] === 'coach', total: 64,
+}));
+
+// الشكل: نفس مفاتيح docs/office-web.md (7.1، 7.5، 7.13، 7.15) بالحرف
+const keysOf = (o) => Object.keys(o).sort().join(',');
+const expectKeys = (label, rows, keys) => { for (const r of rows) if (keysOf(r) !== [...keys].sort().join(',')) { console.error(`${label} keys`, keysOf(r)); process.exit(1); } };
+expectKeys('request', APP_REQUESTS, ['id', 'title', 'request', 'area', 'session_id', 'session_url', 'pr_url', 'status', 'created_by', 'created_at', 'updated_at']);
+expectKeys('ad', APP_ADS, ['id', 'kind', 'title', 'media_path', 'media_type', 'link', 'cta', 'audience', 'starts_at', 'ends_at', 'active', 'frequency', 'auto_close', 'priority', 'created_at', 'updated_at', 'state']);
+expectKeys('event', APP_EVENTS, ['id', 'category', 'title', 'title_en', 'city', 'city_en', 'venue', 'venue_en', 'starts_on', 'ends_on', 'date_note', 'date_note_en', 'summary', 'summary_en', 'url', 'image_path', 'featured', 'active', 'created_by', 'created_at', 'updated_at']);
+expectKeys('nudge', NUDGES, ['id', 'category', 'gender', 'friend_gender', 'locale', 'title', 'body', 'active', 'updated_at', 'last_broadcast_at', 'last_broadcast_n']);
+for (const k of Object.keys(PARTNERS)) expectKeys(`partner ${k}`, PARTNERS[k], ['id', 'name', 'subtitle', 'status', 'logo_path', 'avatar_url', 'owner_id', 'owner_username', 'listed_by', 'partner', 'meta', 'created_at']);
+expectKeys('user', USERS, ['id', 'username', 'full_name', 'avatar_url', 'account_type', 'gender', 'created_at', 'email_confirmed', 'points', 'gym_name', 'gym_name_en', 'is_admin', 'partner_intent', 'is_coach', 'total']);
+if (USERS.some((u) => 'email' in u || 'last_sign_in_at' in u)) { console.error('users must not carry email / last_sign_in_at'); process.exit(1); }
+const APP = { requests: APP_REQUESTS, content: { ads: APP_ADS, events: APP_EVENTS, nudges: NUDGES, settings: SETTINGS }, partners: PARTNERS, users: USERS };
+
+const out = { _note: 'Sample data for the ARQ web office preview — every name and number is fake.', overview: o7, overview_30: o30, tasks: TASKS, app: APP };
 fs.writeFileSync(path.join(DIR, 'sample.json'), `${JSON.stringify(out, null, 1)}\n`);
-console.log(`sample.json ok: ${want.length} key paths match, ${TASKS.length} tasks, waiting ${o7.office.waiting_total}`);
+console.log(`sample.json ok: ${want.length} key paths match, ${TASKS.length} tasks, waiting ${o7.office.waiting_total}; app: ${APP_REQUESTS.length} requests, ${APP_ADS.length} ads, ${APP_EVENTS.length} events, ${NUDGES.length} nudges, ${USERS.length} users`);

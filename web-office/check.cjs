@@ -31,6 +31,10 @@ scripts.forEach((m, i) => {
     try {
       const v = JSON.parse(body);
       expect(v && v.overview && v.overview_30 && Array.isArray(v.tasks), `inline script #${i + 1} (sample JSON) parses with overview/overview_30/tasks`);
+      const a = v && v.app;
+      expect(a && Array.isArray(a.requests) && a.content && Array.isArray(a.content.ads) && Array.isArray(a.content.events) && Array.isArray(a.content.nudges)
+        && a.content.settings && a.partners && Array.isArray(a.users), `inline script #${i + 1} (sample JSON) has the App tab sample (requests, content, partners, users)`);
+      expect(a && a.users.every((u) => !('email' in u) && !('last_sign_in_at' in u)), 'sample users carry no email / last_sign_in_at');
     } catch (e) { bad(`inline script #${i + 1} (sample JSON) parses`, e.message); }
     return;
   }
@@ -39,5 +43,23 @@ scripts.forEach((m, i) => {
   try { execFileSync(process.execPath, ['--check', f], { stdio: 'pipe' }); pass(`node --check inline script #${i + 1} (${(body.length / 1024).toFixed(0)} KB)`); }
   catch (e) { bad(`node --check inline script #${i + 1}`, String(e.stderr || e.message).slice(0, 400)); }
 });
+// النصوص: كل مفتاح له عربي وإنجليزي، ونفس المتغيرات {…} بالاثنين، وكل t('…') بالكود له نص
+{
+  const vm = require('vm');
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(['src/1-i18n.js', 'src/1b-i18n-app.js'].map((f) => fs.readFileSync(path.join(__dirname, f), 'utf8')).join('\n') + '\nthis.I18N = I18N;', ctx);
+  const { ar, en } = ctx.I18N;
+  const onlyAr = Object.keys(ar).filter((k) => !(k in en)), onlyEn = Object.keys(en).filter((k) => !(k in ar));
+  expect(!onlyAr.length && !onlyEn.length, 'i18n: every key exists in Arabic and English', `ar only: ${onlyAr.join(', ')} · en only: ${onlyEn.join(', ')}`);
+  const vars = (x) => (String(x).match(/\{\w+\}/g) || []).sort().join(',');
+  const mism = Object.keys(ar).filter((k) => k in en && vars(ar[k]) !== vars(en[k]));
+  expect(!mism.length, 'i18n: same {placeholders} in both languages', mism.join(', '));
+  const code = ['src/2-core.js', 'src/3-ui.js', 'src/4-scene.js', 'src/5-app.js', 'src/6-main.js'].map((f) => fs.readFileSync(path.join(__dirname, f), 'utf8')).join('\n');
+  const missing = new Set();
+  for (const m of code.matchAll(/\bt\(\s*'([A-Za-z0-9_]+)'/g)) if (!(m[1] in ar)) missing.add(m[1]);
+  for (const m of code.matchAll(/\b(?:label|hint|yes|msg):\s*'([a-z][A-Za-z0-9_]+)'/g)) if (/^(f|v|cf|pa|ad|ev|nd|req|set)_/.test(m[1]) && !(m[1] in ar)) missing.add(m[1]);
+  expect(!missing.size, 'i18n: every literal t(\'key\') / field label in the code has a string', [...missing].join(', '));
+}
 console.log(`\n${ok} ok, ${fail} FAIL`);
 process.exit(fail ? 1 : 0);

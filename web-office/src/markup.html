@@ -4,6 +4,10 @@
       <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19 12 4l8 15" fill="none" stroke="#F8EDDA" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.2 13.5h7.6" stroke="#FEA94F" stroke-width="2.6" stroke-linecap="round"/></svg></span>
       <div class="brand-text"><h1 id="title">مكتب أرك أب</h1><p class="sub" id="subtitle"></p></div>
     </div>
+    <div class="top-tabs" role="tablist" id="topTabs" aria-label="">
+      <button type="button" role="tab" id="topOffice" aria-controls="officeView" aria-selected="true"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg><span id="topOfficeL">المكتب</span></button>
+      <button type="button" role="tab" id="topApp" aria-controls="appView" aria-selected="false" tabindex="-1"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2"/></svg><span id="topAppL">التطبيق</span></button>
+    </div>
     <div class="top-status">
       <span class="conn connecting" id="conn" role="status"><span class="dot"></span><span id="connText"></span></span>
       <span class="updated" id="updated"></span>
@@ -21,6 +25,7 @@
 
   <div class="banner" id="banner" hidden></div>
 
+  <div class="view" id="officeView" role="tabpanel" aria-labelledby="topOffice">
   <main class="main" id="main">
     <section class="panel" id="deskPanel" aria-labelledby="deskName"></section>
     <section class="stage-col" id="stageCol" aria-labelledby="stageTitle">
@@ -51,10 +56,14 @@
   </div>
   <div class="dash-note" id="dashNote" hidden></div>
   <section class="dash" id="dash"></section>
+  </div>
+
+  <div class="view" id="appView" role="tabpanel" aria-labelledby="topApp" hidden></div>
 
   <footer class="foot"><span id="footPrivacy"></span><span id="footSource" class="num"></span></footer>
 </div>
 
 <dialog class="sheet" id="sheet" aria-labelledby="sheetTitle"></dialog>
+<dialog class="sheet wide" id="appSheet" aria-labelledby="appSheetTitle"></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="tip" id="tip" hidden></div>

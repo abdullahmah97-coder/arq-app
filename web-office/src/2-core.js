@@ -21,7 +21,9 @@ const POLL_MS = 4000;
 const POLL_FOR_MS = 120_000;
 /** رموز أخطاء دوال القاعدة (docs/office-web.md) — نطابقها بـ \b في نص الخطأ */
 const DB_CODES = ['not_waiting', 'already_decided', 'bad_input', 'note_required', 'bad_nudge', 'bad_status', 'request_not_found',
-  'report_not_found', 'choose_admin', 'not_allowed', 'agent_unavailable', 'agent_not_configured', 'rate_limited'];
+  'report_not_found', 'choose_admin', 'not_allowed', 'agent_unavailable', 'agent_not_configured', 'rate_limited',
+  // تبويب «التطبيق» (القسم ٧): bad_value يجي مع اسم الحقل «bad_value: title»
+  'bad_value', 'user_not_found', 'username_taken', 'bad_username', 'name_too_long', 'not_found'];
 /** أخطاء الموصّل اللي معناها «ما فيه اتصال» على مستوى الصفحة كلها */
 const CONN_CODES = {
   server_not_connected: 'server_not_connected', needs_reauth: 'needs_reauth', selection_required: 'selection_required',
@@ -141,6 +143,8 @@ const state = {
   tab: ['all', 'waiting', 'working', 'done'].includes(store('tab')) ? store('tab') : 'waiting',
   deskOnly: store('deskOnly') === '1',
   view: store('view') === 'grid' ? 'grid' : '3d',
+  /** التبويب العلوي: office (المكتب) | app (التطبيق) */
+  top: store('top') === 'app' ? 'app' : 'office',
   can3d: true,
   /** connecting | live | sample | error */
   mode: 'connecting',
@@ -353,7 +357,9 @@ function dbCode(e) {
 function errInfo(e) {
   const code = dbCode(e);
   const raw = str(e && e.message).replace(/\s+/g, ' ').trim().slice(0, 300);
-  return { code, msg: code ? t(`err_${code}`) : t('err_generic'), raw: code && code !== 'unknown_result' ? '' : raw };
+  // bad_value: <الحقل> — نحتفظ باسم الحقل عشان نوضّح وين الغلط
+  const fm = code === 'bad_value' ? /\bbad_value: ([A-Za-z0-9_]{1,63})/.exec(errText(e)) : null;
+  return { code, field: fm ? fm[1] : null, msg: code ? t(`err_${code}`) : t('err_generic'), raw: code && code !== 'unknown_result' ? '' : raw };
 }
 /** خطأ اتصال على مستوى الصفحة؟ */
 function connKind(e) {
