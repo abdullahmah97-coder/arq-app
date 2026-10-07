@@ -170,9 +170,12 @@ export function ExerciseViewer({ motion, gender, focus, muscles, height = 420 }:
   useEffect(() => {
     let alive = true;
     initial3DMode().then(async (m) => {
+      if (!alive) return;
       if (m === '3d' && !loadEngine()) { mark3DFailed({ where: 'import', motion }); m = '2d'; }
       if (m === '3d') await mark3DStart({ motion, gender });
       if (alive) { started.current = Date.now(); setMode(m); }
+      // خرج من الصفحة أثناء كتابة العلامة وقبل يفتح المشهد: نمسحها عشان ما تنحسب انهيار
+      else if (m === '3d') mark3DDone();
     });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
