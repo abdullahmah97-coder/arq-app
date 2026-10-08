@@ -703,6 +703,11 @@ dialog.sheet.wide { width: min(760px, calc(100vw - 32px)); }
   --os-screen-text: var(--screen-text, #F4F4F0);
   --os-screen-muted: var(--screen-muted, rgba(244, 244, 240, 0.6));
   --os-idle: var(--screen-up, #3DDC84);
+  /* لافتات الأقسام على المبنى: حبة فاتحة بالثيمين (مثل لوحات المعماريين) بحبر غامق */
+  --os-plate: #FAFAF7;
+  --os-plate-ink: #121212;
+  --os-plate-mute: #56564F;
+  --os-plate-line: rgba(18, 18, 18, 0.16);
 }
 :root[lang="en"] .os, :root[lang="en"] .os-brand, :root[lang="en"] .os-status, :root[lang="en"] .os-today { --os-ls: 0.05em; }
 /* بالعربي الكوفي أول: مسافات الخط أحادي العرض تفرّق الكلمات العربية. الأرقام تبقى IBM Plex Mono (--os-num) */
@@ -795,6 +800,8 @@ dialog.sheet.wide { width: min(760px, calc(100vw - 32px)); }
 .os-card-ic svg.ic { width: 28px; height: 28px; stroke-width: 1.5; }
 .os-card-m { display: contents; }
 .os-card-t { grid-area: t; min-width: 0; font-family: var(--os-mono); font-size: 13px; font-weight: 700; line-height: 1.3; letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* رقم الدور ببطاقات المقر (نفس أرقام الأدوار جنب المبنى) */
+.os-card-n { margin-inline-end: 8px; font: 600 11px/1 var(--os-num); letter-spacing: 0.06em; color: var(--accent-ink, #B83D0E); }
 .os-card-d { grid-area: d; min-width: 0; font-family: var(--os-mono); font-size: 11px; line-height: 1.45; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .os-card > .os-chip { grid-area: chip; }
 .os-chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding-inline: 7px; border-radius: 999px; background: var(--chip, rgba(0, 0, 0, 0.06)); color: var(--muted); font: 600 10.5px/1 var(--os-mono); white-space: nowrap; letter-spacing: 0; }
@@ -817,12 +824,62 @@ dialog.sheet.wide { width: min(760px, calc(100vw - 32px)); }
 .os-hit { position: absolute; pointer-events: auto; border: 0; padding: 0; margin: 0; background: transparent; border-radius: 6px; cursor: pointer; }
 .os-hit:hover { background: rgba(241, 85, 29, 0.07); box-shadow: inset 0 0 0 1px rgba(241, 85, 29, 0.45); }
 .os-hit:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 0; box-shadow: 0 0 0 4px var(--focus, var(--os-acc)), inset 0 0 0 2px var(--focus, var(--os-acc)); background: rgba(255, 255, 255, 0.1); }
-.os-badge { position: absolute; top: -11px; left: -11px; min-width: 22px; height: 22px; padding-inline: 6px; border-radius: 11px; background: var(--os-acc); color: #1A0B04; font: 700 12px/22px var(--os-num); text-align: center; box-shadow: 0 0 0 2px var(--os-shell), 0 2px 10px rgba(241, 85, 29, 0.4); pointer-events: none; }
-.os-badge.work { background: var(--work, #FEA94F); color: #1A1205; box-shadow: 0 0 0 2px var(--os-shell), 0 2px 10px rgba(254, 169, 79, 0.4); }
-.os-badge.alert { background: var(--info-ink, #2C54A6); color: var(--bg, #F2F2EF); box-shadow: 0 0 0 2px var(--os-shell), 0 2px 10px rgba(44, 84, 166, 0.35); }
-:root[dir="rtl"] .os-hit .os-badge { left: auto; right: -11px; }
-.os-hit.sm .os-badge { top: -9px; left: -9px; min-width: 18px; height: 18px; padding-inline: 4px; font-size: 10.5px; line-height: 18px; }
-:root[dir="rtl"] .os-hit.sm .os-badge { left: auto; right: -9px; }
+/* لافتة القسم: معلّقة تحت البلاطة بزاوية الغرفة جهة النص (top من الصفحة = خط السقف المايل) — كلها داخل غرفتها، عرضها ما يتعدّى الغرفة */
+.os-plate { position: absolute; z-index: 1; display: inline-flex; align-items: center; gap: 5px; height: 24px; padding-inline: 7px; box-sizing: border-box; max-width: 100%;
+  border-radius: 6px; border: 1px solid var(--os-plate-line); background: var(--os-plate); color: var(--os-plate-ink); white-space: nowrap; letter-spacing: 0;
+  box-shadow: 0 1px 1px rgba(18, 18, 18, 0.1), 0 4px 12px -4px rgba(18, 18, 18, 0.38); transition: border-color 0.12s, box-shadow 0.12s, background-color 0.12s; }
+.os-plate svg.os-pl-ic { flex: none; width: 14px; height: 14px; color: var(--os-acc); stroke-width: 2; }
+.os-pl-t { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 700 12px/1.6 var(--os-mono); color: inherit; }
+:root[lang="en"] .os-pl-t { font-weight: 600; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+/* الحالة: ينتظرك برتقالي بأرقام غامقة، يشتغل كهرماني، تحتاج نظرة أزرق، هادي نقطة (المقر) أو «هادي» */
+.os-pl-c { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 16px; min-width: 16px; padding-inline: 5px; border-radius: 999px; box-sizing: border-box;
+  font: 700 10.5px/1 var(--os-num); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.os-pl-c.wait { background: #F1551D; color: #1A0B04; }
+.os-pl-c.work { background: #FEA94F; color: #1A1205; }
+.os-pl-c.alert { background: #2C54A6; color: #FFFFFF; }
+.os-pl-c.idle { background: #ECECE6; color: var(--os-plate-mute); }
+.os-pl-c.idle i { width: 6px; height: 6px; border-radius: 50%; background: #2FAE69; flex: none; }
+.os-pl-c.dot { width: 7px; height: 7px; min-width: 0; padding: 0; background: #2FAE69; box-shadow: 0 0 0 2.5px rgba(47, 174, 105, 0.2); }
+/* شريحة الفريق (غرفة كبيرة بكل دور): الاسم الكامل أكبر والحالة مكتوبة */
+.os-plate.team { height: 30px; gap: 7px; padding-inline: 9px; border-radius: 7px; }
+.os-plate.team svg.os-pl-ic { width: 16px; height: 16px; }
+.os-plate.team .os-pl-t { font-size: 13.5px; }
+:root[lang="en"] .os-plate.team { height: 28px; }
+:root[lang="en"] .os-plate.team .os-pl-t { font-size: 11.5px; }
+.os-plate.team .os-pl-c:not(.num):not(.dot) { height: 20px; padding-inline: 8px; font: 700 11px/1 var(--os-mono); }
+:root[lang="en"] .os-plate.team .os-pl-c:not(.num):not(.dot) { font-weight: 600; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+.os-plate.team .os-pl-c.num { height: 18px; min-width: 18px; font-size: 11.5px; }
+/* غرفة ضيقة (الجوال): أصغر بدون أيقونة، وبعدها الرقم يطلع شارة معلّقة تحت زاوية اللافتة (داخل غرفتها، ما يغطي الاسم)
+ * والاسم ياخذ العرض كله؛ tiny = آخر درجة قبل «…» (الشاشات الأضيق من ٣٦٠) */
+.os-plate.xs { height: 19px; gap: 3px; padding-inline: 4px; border-radius: 5px; }
+.os-plate.xs .os-pl-t { font-size: 10.5px; }
+:root[lang="en"] .os-plate.xs .os-pl-t { font-size: 10px; letter-spacing: 0.02em; }
+.os-plate.xs .os-pl-c:not(.dot) { height: 14px; min-width: 14px; padding-inline: 3px; font-size: 9.5px; }
+.os-plate.xs.corner { padding-inline: 2px; }
+.os-plate.xs.corner .os-pl-c { position: absolute; bottom: -15px; inset-inline-end: 0; box-shadow: 0 0 0 1.5px var(--os-plate); }
+.os-plate.xs.corner .os-pl-c.dot { bottom: -8px; inset-inline-end: 2px; }
+.os-plate.xs.tiny .os-pl-t { font-size: 9.5px; }
+:root[lang="en"] .os-plate.xs.tiny .os-pl-t { font-size: 9px; letter-spacing: 0; }
+/* المختارة (شرائح الفرق بس): إطار برتقالي وخلفية دافية، والمرور على الغرفة أو بطاقتها (أو التركيز) يبرّزها بإطار وظل */
+.os-plate.sel { border-color: var(--os-acc); background: #FFF4EE; box-shadow: 0 0 0 1px var(--os-acc), 0 4px 14px -4px rgba(241, 85, 29, 0.6); }
+.os-plate.sel .os-pl-t { color: #9E330B; }
+.os-hit:hover .os-plate, .os-hit:focus-visible .os-plate, .os-plate.hot { border-color: var(--os-acc); box-shadow: 0 0 0 1px var(--os-acc), 0 6px 16px -4px rgba(18, 18, 18, 0.5); }
+/* أرقام الأدوار وأسماء الفرق (المقر): عمود ملاحظات على الجهة البعيدة برا المبنى بخط قصير لحافة الدور.
+ * tight = خط أصغر لو المسافة ضيقة، nums = الأرقام بس (الجوال؛ الاسم بالبطاقة اللي فيها نفس الرقم) */
+.os-ftag { position: absolute; display: flex; align-items: center; gap: 8px; transform: translateY(-50%); white-space: nowrap; pointer-events: none; color: var(--text); }
+.os-ftag-ln { position: relative; flex: none; height: 1.25px; background: var(--os-acc); opacity: 0.7; }
+.os-ftag-ln::before { content: ""; position: absolute; top: 50%; inset-inline-start: -2.5px; width: 5px; height: 5px; border-radius: 50%; background: var(--os-acc); transform: translateY(-50%); }
+.os-ftag-n { flex: none; font: 600 11px/1 var(--os-num); letter-spacing: 0.06em; color: var(--accent-ink, #B83D0E); }
+.os-ftag-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 700 13px/1.6 var(--os-mono); color: var(--text); }
+:root[lang="en"] .os-ftag-t { font-weight: 600; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.os-ftag.hot .os-ftag-ln { opacity: 1; height: 2px; }
+.os-ftag.hot .os-ftag-t, .os-ftag.hot .os-ftag-n { color: var(--accent-ink, #B83D0E); }
+.os-ftag.tight { gap: 6px; }
+.os-ftag.tight .os-ftag-t { font-size: 11.5px; }
+:root[lang="en"] .os-ftag.tight .os-ftag-t { font-size: 10.5px; letter-spacing: 0.02em; }
+.os-ftag.nums { gap: 4px; }
+.os-ftag.nums .os-ftag-t { display: none; }
+.os-ftag.nums .os-ftag-n { font-size: 12px; font-weight: 700; }
 .os-links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 2; }
 .os-link { fill: none; stroke: var(--os-acc); stroke-width: 1.25; opacity: 0.7; stroke-linejoin: round; }
 .os-link.on { opacity: 1; stroke-width: 2; }
@@ -847,19 +904,22 @@ dialog.sheet.wide { width: min(760px, calc(100vw - 32px)); }
 .os-fb-floor { display: flex; gap: 6px; align-items: stretch; min-width: 0; padding-bottom: 6px; border-bottom: 3px solid rgba(18, 18, 18, 0.07); }
 .os-fb-floor:last-child { border-bottom: 0; padding-bottom: 0; }
 .os-fb-fl { flex: none; width: 78px; display: grid; place-items: center; padding: 6px; border-radius: 4px; background: var(--os-screen); color: var(--os-acc); text-align: center;
-  font: 700 10.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow-wrap: anywhere; }
+  font: 700 10.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow-wrap: normal; }
+:root[lang="en"] .os-fb-fl { font-size: 9.5px; letter-spacing: 0; }
+.os-fb-fl b { display: block; margin-bottom: 3px; color: var(--os-screen-muted); font: 600 10px/1 var(--os-num); letter-spacing: 0.06em; }
 .os-fb-rooms { flex: 1; min-width: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
 .os-cell { position: relative; min-width: 0; min-height: 62px; display: flex; flex-direction: column; justify-content: flex-start; gap: 5px; padding: 8px 9px 9px; border: 0; border-radius: 4px; text-align: start;
   background: linear-gradient(180deg, var(--os-screen-2), var(--os-screen)); color: var(--os-screen-text); box-shadow: inset 0 -3px 0 rgba(254, 169, 79, 0.18); }
 .os-cell:hover { box-shadow: inset 0 -3px 0 rgba(254, 169, 79, 0.18), inset 0 0 0 1px rgba(241, 85, 29, 0.6); }
 .os-cell.sel { box-shadow: inset 0 -3px 0 var(--os-acc), inset 0 0 0 1.5px var(--os-acc); }
-.os-cell-h { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.os-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--os-idle); flex: none; }
-.os-cell.waiting .os-dot { background: var(--os-acc); box-shadow: 0 0 0 3px rgba(241, 85, 29, 0.25); }
-.os-cell.working .os-dot { background: var(--work, #FEA94F); }
-.os-cell.alert .os-dot { background: #6E9BFF; box-shadow: 0 0 0 3px rgba(110, 155, 255, 0.25); }
-.os-cell-l { flex: 1; min-width: 0; color: var(--os-acc); font: 700 11.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.os-cell .os-badge { position: static; min-width: 18px; height: 18px; padding-inline: 5px; font-size: 10.5px; line-height: 18px; box-shadow: none; flex: none; }
+.os-cell-h { display: flex; align-items: center; gap: 6px; min-width: 0; container-type: inline-size; }
+.os-cell-h svg.os-cell-ic { flex: none; width: 15px; height: 15px; color: var(--os-acc); stroke-width: 1.9; }
+.os-cell-l { flex: 1; min-width: 0; color: var(--os-acc); font: 700 11.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: normal; }
+@container (max-width: 100px) { .os-cell-h svg.os-cell-ic { display: none; } }
+.os-cell .os-pl-c:not(.num):not(.dot) { height: 19px; padding-inline: 7px; font: 700 10.5px/1 var(--os-mono); }
+:root[lang="en"] .os-cell .os-pl-c:not(.num):not(.dot) { font-weight: 600; font-size: 9.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+.os-cell .os-pl-c.num { height: 18px; min-width: 18px; }
 /* أرقام الغرفة مثل شاشة: العنوان صغير فوق والرقم كبير تحته، عمودين جنب بعض */
 .os-cell-ks { display: flex; flex-wrap: wrap; gap: 4px 22px; margin-top: auto; min-width: 0; }
 .os-cell-k { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 100%; font: 500 10px/1.35 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; color: var(--os-screen-muted); }
@@ -974,6 +1034,13 @@ dialog.sheet.wide { width: min(760px, calc(100vw - 32px)); }
   .os-today-g { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
+  /* المقر بالجوال: المسرح أطول عشان المبنى يكبر وغرف الدور الرابع (٤ مكاتب) تتسع لأسمائها */
+  .os-stage[data-shape="hq"]:not(.flat) { aspect-ratio: 1 / 1.16; }
+  .os-plate.team { height: 26px; gap: 6px; padding-inline: 7px; }
+  .os-plate.team .os-pl-t { font-size: 12.5px; }
+  :root[lang="en"] .os-plate.team { height: 24px; }
+  :root[lang="en"] .os-plate.team .os-pl-t { font-size: 10.5px; }
+  .os-plate.team .os-pl-c:not(.num):not(.dot) { height: 18px; padding-inline: 7px; font-size: 10.5px; }
   .os-h { font-size: clamp(38px, 12.5vw, 60px); }
   :root[lang="ar"] .os-h { font-size: clamp(34px, 10.5vw, 52px); }
   .os-rule { margin: 14px 0 10px; }
@@ -993,10 +1060,13 @@ dialog.sheet.wide { width: min(760px, calc(100vw - 32px)); }
   .os-fb.hq .os-cell { min-height: 46px; }
   .os-fb.hq .os-cell-ks { display: none; }
   /* المقر بالجوال: ٤ غرف بالدور، فالشارة على الزاوية والاسم ياخذ العرض كله */
-  .os-fb.hq .os-dot { display: none; }
+  .os-fb.hq .os-cell-ic { display: none; }
   .os-fb.hq .os-cell { padding-top: 8px; justify-content: center; }
-  .os-fb.hq .os-cell .os-badge { position: absolute; top: -6px; left: auto; right: auto; inset-inline-end: -4px; box-shadow: 0 0 0 2px var(--os-shell); }
-  .os-fb.hq .os-cell-l { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .os-fb.hq .os-cell .os-pl-c { position: absolute; top: -6px; left: auto; right: auto; inset-inline-end: -4px; box-shadow: 0 0 0 2px var(--os-shell); }
+  .os-fb.hq .os-cell .os-pl-c.dot { top: -3px; inset-inline-end: -2px; }
+  .os-fb-fl { display: flex; align-items: center; gap: 6px; }
+  .os-fb-fl b { margin: 0; }
+  .os-fb.hq .os-cell-l { text-overflow: clip; }
   .os-cell-l { font-size: 10.5px; }
   .os-fb-roof { font-size: 19px; padding: 9px 10px 8px; }
   :root[lang="ar"] .os-fb-roof { font-size: 17px; }
@@ -1249,8 +1319,9 @@ const I18N = {
     foot_source: 'Supabase · {p}',
     // نظام الشركة (واجهة المكتب): الحالة، الشرائح، العناوين، البطاقات، خط سير العمل، شاشات المبنى
     os_status: 'الحالة:', os_st_errors: 'يعمل · أعطال اليوم: {n}', os_st_partial: 'يعمل · بعض البيانات ما انحمّلت', os_slides: 'فرق الشركة', os_prev: 'الفريق السابق', os_next: 'الفريق التالي',
-    os_count: '{n}/{m}', os_ver_a: 'نظام الشركة v1.0', os_ver_b: 'نبني المستقبل', os_open_team: 'افتح فريق {name}',
+    os_count: '{n}/{m}', os_ver_a: 'نظام الشركة v1.0', os_ver_b: 'نبني المستقبل', os_open_team: 'افتح فريق {name}', os_floor_n: 'الدور {n}',
     os_c_wait: '{n} ينتظرك', os_c_work: '{n} يشتغل', os_c_idle: 'هادي', os_c_alert: '{n} تحتاج نظرة',
+    os_room_ceo: 'مكتب المدير',
     os_s_hq: 'المقر', os_s_ceo: 'المدير', os_s_partners: 'الشركاء', os_s_ops: 'العمليات', os_s_community: 'المجتمع', os_s_growth: 'النمو', os_s_eng: 'المهندسين',
     os_vision: 'نخلّي الرياضة أسهل وأقرب لكل الناس.',
     os_roof_hq: 'أرك أب', os_roof_ceo: 'المدير', os_roof_partners: 'الشركاء', os_roof_ops: 'العمليات', os_roof_community: 'المجتمع', os_roof_growth: 'النمو', os_roof_eng: 'الهندسة',
@@ -1436,8 +1507,9 @@ const I18N = {
     foot_privacy: 'This page reads counts and short lists only — no messages, phone numbers, emails, locations or health data.',
     foot_source: 'Supabase · {p}',
     os_status: 'Status:', os_st_errors: 'Running · errors today: {n}', os_st_partial: 'Running · some data didn’t load', os_slides: 'Company teams', os_prev: 'Previous team', os_next: 'Next team',
-    os_count: '{n}/{m}', os_ver_a: 'COMPANY OS v1.0', os_ver_b: 'BUILDING THE FUTURE', os_open_team: 'Open the {name} team',
+    os_count: '{n}/{m}', os_ver_a: 'COMPANY OS v1.0', os_ver_b: 'BUILDING THE FUTURE', os_open_team: 'Open the {name} team', os_floor_n: 'Floor {n}',
     os_c_wait: '{n} waiting', os_c_work: '{n} working', os_c_idle: 'Quiet', os_c_alert: '{n} need a look',
+    os_room_ceo: 'CEO office',
     os_s_hq: 'HQ', os_s_ceo: 'CEO', os_s_partners: 'Partners', os_s_ops: 'Operations', os_s_community: 'Community', os_s_growth: 'Growth', os_s_eng: 'Engineers',
     os_vision: 'Make fitness easier and closer for everyone.',
     os_roof_hq: 'ARQ App', os_roof_ceo: 'CEO', os_roof_partners: 'Partners', os_roof_ops: 'Operations', os_roof_community: 'Community', os_roof_growth: 'Growth', os_roof_eng: 'Engineering',
@@ -2945,8 +3017,13 @@ function teamState(id, rs) {
   return teamRooms(id).reduce((a, r) => { const s = rs[r] || {}; a.waiting += num(s.waiting); a.working += num(s.working); a.alert += num(s.alert); return a; }, { waiting: 0, working: 0, alert: 0 });
 }
 const roomName = (id) => (id === 'eng' ? t('os_s_eng') : t(`desk_${id}`));
-const roomLabel = (id, s) => {
-  const a = t('a11y_desk', { name: roomName(id), w: num(s && s.waiting), p: num(s && s.working) });
+/** الاسم المقروء للغرفة: الأسماء الظاهرة (اللافتة بكل درجاتها أو البطاقة) أول، بعدها اسم المكتب — بدون تكرار.
+ * عشان اللي يقول اللي يشوفه («اضغط التقارير») يلقى الزر */
+const roomLabel = (id, s, shown) => {
+  const low = (x) => str(x).toLowerCase();
+  const names = [];
+  for (const x of [...arr(shown), roomName(id)]) if (x && !names.some((y) => low(y).includes(low(x)))) names.push(x);
+  const a = t('a11y_desk', { name: names.join(' · '), w: num(s && s.waiting), p: num(s && s.working) });
   return s && num(s.alert) > 0 ? `${a}${state.lang === 'ar' ? '، ' : ', '}${t('n_alert', { n: num(s.alert) })}` : a;
 };
 function stateChip(s) {
@@ -2956,13 +3033,29 @@ function stateChip(s) {
   return h('span', { class: 'os-chip idle' }, h('i'), t('os_c_idle'));
 }
 const textChip = (cls, text) => h('span', { class: `os-chip ${cls}` }, h('i'), text);
-/** شارة الغرفة فوق المبنى: ينتظرك (برتقالي) وإلا يشتغل (كهرماني) وإلا تحتاج نظرة (أزرق) */
-function roomBadge(s) {
-  const b = (cls, v) => h('span', { class: `os-badge${cls} num`, 'aria-hidden': 'true', text: v > 99 ? '99+' : String(v) });
-  if (s && s.waiting) return b('', s.waiting);
-  if (s && s.working) return b(' work', s.working);
-  if (s && num(s.alert) > 0) return b(' alert', num(s.alert));
-  return null;
+
+// ---------- لافتات الأقسام على المبنى (نفس الأسماء والحالة بالمشهد وبالمبنى المسطّح) ----------
+/** أسماء الغرفة على لافتتها بالترتيب (لو الأول ما كفّى عرض الغرفة ناخذ اللي بعده): المقر = القصير، الفريق = الكامل ثم القصير */
+function plateNames(id, kind) {
+  if (id === 'eng') return [t('os_s_eng')];
+  if (id === 'lead') return kind === 'hq' ? [t('os_s_ceo')] : [t('os_room_ceo'), t('os_s_ceo')];
+  return kind === 'hq' ? [t(`sign_${id}`)] : [t(`desk_${id}`), t(`sign_${id}`)];
+}
+const plateIcon = (id) => (id === 'eng' ? 'code' : DESK[id] ? DESK[id].icon : 'cube');
+/** حالة اللافتة: ينتظرك (برتقالي) وإلا يشتغل (كهرماني) وإلا تحتاج نظرة (أزرق) وإلا هادي. المهندسين قبل ما تنحمّل طلباتهم: none */
+function plateState(id, s) {
+  if (id === 'eng' && !engCounts().loaded) return { cls: 'none', n: 0 };
+  if (s && num(s.waiting)) return { cls: 'wait', n: num(s.waiting), key: 'os_c_wait' };
+  if (s && num(s.working)) return { cls: 'work', n: num(s.working), key: 'os_c_work' };
+  if (s && num(s.alert)) return { cls: 'alert', n: num(s.alert), key: 'os_c_alert' };
+  return { cls: 'idle', n: 0, key: 'os_c_idle' };
+}
+/** شريحة الحالة: worded = «٢ ينتظرك» / «هادي»، وإلا الرقم بس (والهادي نقطة صغيرة) */
+function plateChip(ps, worded) {
+  if (ps.cls === 'none') return h('span', { class: 'os-pl-c idle num', text: '—' });
+  if (ps.cls === 'idle') return worded ? h('span', { class: 'os-pl-c idle' }, h('i'), t('os_c_idle')) : h('span', { class: 'os-pl-c dot' });
+  const v = ps.n > 99 ? '99+' : fmt(ps.n);
+  return worded ? h('span', { class: `os-pl-c ${ps.cls}`, text: t(ps.key, { n: v }) }) : h('span', { class: `os-pl-c ${ps.cls} num`, text: v });
 }
 
 // ---------- الخطة اللي ينبني منها المبنى (نفس الخطة للمشهد وللمبنى المسطّح) ----------
@@ -3055,8 +3148,8 @@ function buildPlan(sid, rs, o) {
       const people = rooms.length === 1 ? (team.id === 'ceo' ? 1 : 2) : rooms.length === 2 ? 2 : 1;
       return { id: team.id, label: t(`os_s_${team.id}`), rooms: rooms.map((r) => osRoom(r, rs, o, true, people)) };
     });
-  } else if (sid === 'ceo') plan.floors = [{ id: 'lead', label: t('desk_lead'), rooms: [osRoom('lead', rs, o, false, 1)] }];
-  else if (sid === 'eng') plan.floors = [{ id: 'eng', label: t('os_roof_eng'), rooms: [osRoom('eng', rs, o, false, 3)] }];
+  } else if (sid === 'ceo') plan.floors = [{ id: 'lead', label: t('os_room_ceo'), rooms: [osRoom('lead', rs, o, false, 1)] }];
+  else if (sid === 'eng') plan.floors = [{ id: 'eng', label: t('os_s_eng'), rooms: [osRoom('eng', rs, o, false, 3)] }];
   else plan.floors = OS_SLIDE[sid].desks.map((d) => ({ id: d, label: t(`sign_${d}`), rooms: [osRoom(d, rs, o, false, 3)] }));
   return plan;
 }
@@ -3073,14 +3166,18 @@ function openApp(where) {
   const f = where === 'form' ? target : target.querySelector('button:not(:disabled), a[href]');
   (f || $('topApp')).focus({ preventScroll: true });
 }
+/** رقم الدور بخانتين: أعلى دور = العدد، وأسفل دور = ٠١ */
+const floorNo = (i, n) => String(n - i).padStart(2, '0');
 function heroCards(sid, rs, o) {
   if (sid === 'hq') {
     // المهندسين: الطلبات تتحمّل لما تفتح شريحتهم (أو تبويب «التطبيق») — قبلها «—» مو «هادي»
     const engOff = !engCounts().loaded;
-    return OS_TEAMS.map((team) => {
+    // رقم الدور (٠٦ فوق … ٠١ تحت) نفس أرقام الأدوار جنب المبنى — بالجوال الأرقام بس جنب المبنى والأسماء هنا
+    return OS_TEAMS.map((team, i) => {
       const chip = team.id === 'eng' && engOff ? textChip('idle', '—') : stateChip(teamState(team.id, rs));
-      return { id: team.id, icon: team.icon, title: t(`os_s_${team.id}`), desc: t(`os_cd_${team.id}`), chip,
-        label: `${t('os_open_team', { name: t(`os_s_${team.id}`) })} · ${chip.textContent}`, onClick: () => { setSlide(team.id); focusSlide(); } };
+      const fl = floorNo(i, OS_TEAMS.length);
+      return { id: team.id, icon: team.icon, title: t(`os_s_${team.id}`), num: fl, desc: t(`os_cd_${team.id}`), chip,
+        label: `${t('os_open_team', { name: t(`os_s_${team.id}`) })} · ${t('os_floor_n', { n: fl })} · ${chip.textContent}`, onClick: () => { setSlide(team.id); focusSlide(); } };
     });
   }
   if (sid === 'ceo') {
@@ -3112,21 +3209,42 @@ function heroCards(sid, rs, o) {
     ];
   }
   return OS_SLIDE[sid].desks.map((d) => ({ id: d, icon: DESK[d].icon, title: t(`sign_${d}`), desc: t(`os_cd_${d}`), chip: stateChip(rs[d]), sel: state.desk === d,
-    label: roomLabel(d, rs[d]), onClick: () => selectDesk(d) }));
+    label: roomLabel(d, rs[d], [t(`sign_${d}`)]), onClick: () => selectDesk(d) }));
 }
-/** المرور على بطاقة (أو التركيز عليها) يبرّز خطها */
-function hiLink(i, on) { const p = $(`os-link-${i}`); if (p) p.classList.toggle('on', on); }
+/** وش تبرّز كل بطاقة بالمبنى: المقر = غرف الفريق ووسم دوره، الفريق = غرفة المكتب، المدير/المهندسين = غرفتهم */
+let osCardHot = [];
+let osCardHov = -1, osCardFoc = -1; // البطاقة تحت الماوس والمركّزة
+/** المرور على بطاقة (أو التركيز عليها بالكيبورد: why = 'f') يبرّز خطها ولافتات غرفها */
+function hiLink(i, on, why) {
+  if (why === 'f') osCardFoc = on ? i : osCardFoc === i ? -1 : osCardFoc;
+  else osCardHov = on ? i : osCardHov === i ? -1 : osCardHov;
+  syncHot();
+}
+/** تركيز بالكيبورد (مو ضغطة ماوس) */
+const focusRing = (el) => { try { return el.matches(':focus-visible'); } catch (e) { return true; } };
+function syncHot() {
+  const on = [osCardHov, osCardFoc].filter((i) => i >= 0);
+  osHot = new Set(on.flatMap((i) => osCardHot[i] || []));
+  for (const p of $('osLinks').querySelectorAll('.os-link')) p.classList.toggle('on', on.includes(Number(p.id.replace('os-link-', ''))));
+  for (const el of $('signs').querySelectorAll('[data-hot]')) el.classList.toggle('hot', osHot.has(el.dataset.hot));
+}
 function renderCards(sid, rs, o) {
   const keep = focusState();
   const list = heroCards(sid, rs, o);
+  osCardHot = list.map((c) => (sid === 'hq' ? [...teamRooms(c.id), `f:${c.id}`] : sid === 'ceo' || sid === 'eng' ? teamRooms(sid) : [c.id]));
   $('osCards').classList.toggle('many', list.length > 4);
   put($('osCards'), list.map((c, i) => h('button', { type: 'button', class: `os-card${c.sel ? ' sel' : ''}`, id: `os-card-${c.id}`, 'aria-pressed': c.sel === undefined ? null : String(!!c.sel),
     'aria-label': c.label ? `${c.label} — ${c.desc}` : null, onclick: c.onClick,
-    onmouseenter: () => hiLink(i, true), onmouseleave: () => hiLink(i, false), onfocus: () => hiLink(i, true), onblur: () => hiLink(i, false) },
+    onmouseenter: () => hiLink(i, true), onmouseleave: () => hiLink(i, false), onfocus: (e) => hiLink(i, focusRing(e.currentTarget), 'f'), onblur: () => hiLink(i, false, 'f') },
   h('span', { class: 'os-card-ic' }, icon(c.icon)),
-  h('span', { class: 'os-card-m' }, h('span', { class: 'os-card-t', text: c.title }), h('span', { class: 'os-card-d', text: c.desc })),
+  h('span', { class: 'os-card-m' }, h('span', { class: 'os-card-t' }, c.num ? h('b', { class: 'os-card-n num', text: c.num }) : null, c.title), h('span', { class: 'os-card-d', text: c.desc })),
   c.chip)));
+  // البطاقات انرسمت من جديد: التبريز للي تحت الماوس أو المركّزة الحين بس
+  const cards = [...$('osCards').children];
+  osCardHov = cards.findIndex((c) => c.matches(':hover'));
   restoreFocus(keep);
+  osCardFoc = cards.findIndex((c) => c === document.activeElement && focusRing(c));
+  osHot = new Set([osCardHov, osCardFoc].filter((i) => i >= 0).flatMap((i) => osCardHot[i] || []));
 }
 
 // ---------- الشريط والعنوان وخط سير العمل والأرقام ----------
@@ -3237,20 +3355,148 @@ function renderFoot(rs, o) {
 // ---------- المبنى: المشهد ثلاثي الأبعاد أو المسطّح ----------
 let heroPlan = null;
 let osPlanSig = '';
-/** غرف الشريحة الحالية: أزرار شفافة فوق غرف المشهد (تركيز + شارة ينتظرك) */
+/** خط سقف الفتحة الأمامية لكل دور على الشاشة (من floors()): الحافة جهة النص = زاوية الواجهة عند الجدار المصمت، والمستطيل
+ * = حدود الفتحة. الخط مايل بالمنظور: لو زاوية جهة النص هي الأعلى فأعلى كل غرفة (rooms) هو زاويتها جهة النص، وإلا نقيس
+ * على الخط من الحافة لأعلى المستطيل بالجهة البعيدة */
+function floorLines(floors, rtl) {
+  const side = rtl ? 'r' : 'l';
+  const ok = (e) => Array.isArray(e) && e.length >= 4 && e.every(Number.isFinite);
+  return floors.map((f) => {
+    const e = f && f.edge && f.edge[side], r = f && f.rect;
+    if (!ok(e) || !r || ![r.left, r.top, r.w, r.h].every(Number.isFinite)) return null;
+    const xFar = rtl ? r.left : r.left + r.w;
+    const copyTop = e[1] <= r.top + 1;
+    return { yAt: (x, roomTop) => (copyTop ? roomTop : e[1] + ((r.top - e[1]) * (x - e[0])) / (xFar - e[0] || 1)) };
+  });
+}
+/** محتوى اللافتة لدرجة «v» من درجات التصغير: { name, worded, icon, xs, corner, tiny } */
+function fillPlate(p, v) {
+  const name = h('span', { class: 'os-pl-t', text: p.names[Math.min(v.name, p.names.length - 1)] });
+  p.el.classList.toggle('xs', !!v.xs);
+  p.el.classList.toggle('corner', !!v.corner);
+  p.el.classList.toggle('tiny', !!v.tiny);
+  put(p.el, v.icon ? icon(plateIcon(p.id), 'os-pl-ic') : null, name, plateChip(p.ps, v.worded));
+  p.name = name;
+}
+/** درجات اللافتة من الأوضح للأصغر: الفريق = الاسم الكامل بحالة مكتوبة ← القصير ← الرقم بس ← بدون أيقونة ← أصغر؛
+ * المقر = القصير بالرقم ← بدون أيقونة ← أصغر. آخرها: الرقم شارة تحت زاوية اللافتة والاسم ياخذ العرض كله (ويصغر شوي
+ * لو لازم). بعدها «…» من CSS (اللافتة ما تطلع عن عرض غرفتها أبد) */
+function plateSteps(kind, names) {
+  const xs = { name: 1, worded: false, icon: false, xs: true };
+  const tail = [xs, Object.assign({}, xs, { corner: true }), Object.assign({}, xs, { corner: true, tiny: true })];
+  if (kind === 'hq') return [{ name: 0, worded: false, icon: true }, { name: 0, worded: false, icon: false }, ...tail];
+  const steps = [{ name: 0, worded: true, icon: true }];
+  if (names.length > 1) steps.push({ name: 1, worded: true, icon: true });
+  steps.push({ name: 1, worded: false, icon: true }, { name: 1, worded: false, icon: false }, ...tail);
+  return steps;
+}
+/** نقيس كل اللافتات مرة وحدة بكل درجة (قراءة بعد كتابة الكل = حساب تخطيط واحد بكل درجة). بعدها كل لافتات الشريحة
+ * تاخذ نفس الدرجة (أصغر وحدة احتاجتها) عشان المبنى كله يبان بنفس الشكل: نفس المقاس، والأيقونات كلها أو ولا وحدة */
+function fitPlates(plates) {
+  let left = plates.filter((p) => p.el.isConnected);
+  for (let step = 0; left.length; step++) {
+    for (const p of left) { p.step = Math.min(step, p.steps.length - 1); fillPlate(p, p.steps[p.step]); }
+    left = left.filter((p) => step < p.steps.length - 1 && (p.name.scrollWidth > p.name.clientWidth + 0.5 || p.el.scrollWidth > p.el.clientWidth + 0.5));
+  }
+  const top = Math.max(0, ...plates.map((p) => p.step || 0));
+  for (const p of plates) if (p.el.isConnected && (p.step || 0) < top) { p.step = Math.min(top, p.steps.length - 1); fillPlate(p, p.steps[p.step]); }
+}
+/** أرقام الأدوار وأسماء الفرق (المقر بس): عمود على الجهة البعيدة (عكس عمود النص) برا المبنى، بخط قصير لحافة كل دور
+ * عند ربعها العلوي (بعيد عن النباتات اللي تحت). كل الوسوم بنفس الشكل: الاسم كامل ← خط أصغر ← الرقم بس (الجوال والشاشة
+ * الضيقة الطويلة — الاسم بالبطاقة اللي فيها نفس الرقم). ما ينقص اسم أبد، وما يغطي غرفة لأنه برا المبنى */
+function floorTags(box, plan, floors, rtl, stageW) {
+  if (plan.kind !== 'hq' || floors.length !== plan.floors.length) return;
+  const far = rtl ? 'l' : 'r';
+  const ok = (e) => Array.isArray(e) && e.length >= 4 && e.every(Number.isFinite);
+  const es = floors.map((f) => f && f.edge && f.edge[far]);
+  if (!es.every(ok)) return;
+  const at = es.map((e) => ({ x: e[0] + (e[2] - e[0]) / 4, y: e[1] + (e[3] - e[1]) / 4 }));
+  const outer = rtl ? Math.min(...at.map((a) => a.x)) : Math.max(...at.map((a) => a.x));
+  const room = (rtl ? outer : stageW - outer) - 4;
+  const bw = Math.max(...floors.map((f) => (f && f.rect ? f.rect.w : 0)));
+  const gapMax = Math.max(22, Math.min(52, bw * 0.1));
+  const n = plan.floors.length;
+  const tags = plan.floors.map((f, i) => h('span', { class: `os-ftag${osHot.has(`f:${f.id}`) ? ' hot' : ''}`, id: `os-ftag-${f.id}`, dir: rtl ? 'rtl' : 'ltr', 'aria-hidden': 'true', 'data-hot': `f:${f.id}`,
+    style: { top: `${Math.round(at[i].y)}px`, [rtl ? 'right' : 'left']: `${Math.round(rtl ? stageW - at[i].x : at[i].x)}px` } },
+  h('i', { class: 'os-ftag-ln' }), h('b', { class: 'os-ftag-n num', text: floorNo(i, n) }), h('span', { class: 'os-ftag-t', text: f.label })));
+  box.append(...tags);
+  // أعرض وسم: المسافة بعد الخط + الرقم (+ المسافة والاسم لو ظاهر)؛ والخط من حافة المبنى للعمود = gap
+  const need = () => Math.max(...tags.map((el) => {
+    const nb = el.children[1], tt = el.children[2], sp = parseFloat(getComputedStyle(el).columnGap) || 0;
+    return sp + nb.getBoundingClientRect().width + (getComputedStyle(tt).display === 'none' ? 0 : sp + tt.scrollWidth);
+  }));
+  let gap = -1;
+  for (const [mode, min] of [['', 22], ['tight', 14], ['nums', 6]]) {
+    for (const el of tags) { el.classList.toggle('tight', mode === 'tight'); el.classList.toggle('nums', mode === 'nums'); }
+    const g = Math.min(gapMax, room - need());
+    if (g >= min) { gap = g; break; }
+  }
+  if (gap < 0) { for (const el of tags) el.remove(); return; }
+  const col = rtl ? outer - gap : outer + gap;
+  tags.forEach((el, i) => { el.firstChild.style.width = `${Math.round(Math.abs(at[i].x - col))}px`; });
+}
+/** مستطيلات الغرف تتداخل عند البلاطة (الأرضية مايلة بالمنظور): اللافتة تنزل تحت أسفل أي غرفة فوقها بعرضها هي (بعد ما
+ * انعرف مقاسها) — عشان ما تاخذ ضغطة الغرفة اللي فوق، وما تنزل لنص غرفتها */
+function dropPlates(plates, plan, rects) {
+  const box = $('signs').getBoundingClientRect();
+  const spans = plates.map((p) => { const b = p.el.getBoundingClientRect(); return [b.left - box.left, b.right - box.left]; });
+  plates.forEach((p, i) => {
+    if (!p.fi || !p.el.isConnected) return;
+    let y = p.y;
+    for (const up of plan.floors[p.fi - 1].rooms) {
+      const u = rects[up.id];
+      if (u && u.w > 0 && u.left < spans[i][1] && u.left + u.w > spans[i][0]) y = Math.max(y, u.top + u.h);
+    }
+    y = Math.min(y, p.r.top + p.r.h * 0.3);
+    if (y > p.y + 0.5) p.el.style.top = `${Math.round(y - p.r.top)}px`;
+  });
+}
+/** اللافتات المبرّزة (بطاقتها تحت الماوس أو مركّزة): معرّفات غرف، و«f:فريق» = وسم دوره */
+let osHot = new Set();
+/** غرف الشريحة الحالية: أزرار شفافة فوق غرف المشهد (تركيز + لافتة باسم القسم وحالته) + أرقام الأدوار وأسماء الفرق بالمقر */
 function renderHits(rs) {
   const box = $('signs');
   if (!osScene || !show3d() || !heroPlan) { box.replaceChildren(); return; }
   rs = rs || roomStates(deskStates());
-  let rects = {};
-  try { rects = Object.fromEntries(arr(osScene.rooms()).filter((r) => r && r.id).map((r) => [r.id, r])); } catch (e) { fail3d(e); return; }
+  let rects = {}, floors = [];
+  try {
+    rects = Object.fromEntries(arr(osScene.rooms()).filter((r) => r && r.id).map((r) => [r.id, r]));
+    floors = arr(osScene.floors());
+  } catch (e) { fail3d(e); return; }
   const keep = focusState();
-  put(box, planRooms(heroPlan).filter((id) => rects[id] && rects[id].w > 0 && rects[id].h > 0).map((id) => {
+  const plan = heroPlan;
+  const kind = plan.kind === 'hq' ? 'hq' : 'team';
+  // التحديد بالمقر ما له معنى (ضغطة الغرفة تفتح شريحة فريقها): بس بشرائح الفرق اللي فيها أكثر من غرفة
+  const multi = kind === 'team' && planRooms(plan).length > 1;
+  const rtl = document.documentElement.dir === 'rtl';
+  const lines = floorLines(floors, rtl);
+  const stageW = box.clientWidth || $('stage').clientWidth;
+  const ok = (r) => r && r.w > 0 && r.h > 0;
+  const plates = [];
+  const hits = [];
+  plan.floors.forEach((f, fi) => f.rooms.forEach((room) => {
+    const id = room.id;
     const r = rects[id];
+    if (!ok(r)) return;
     const s = rs[id] || {};
-    return h('button', { type: 'button', class: `os-hit${state.desk === id ? ' sel' : ''}${r.w < 72 || r.h < 48 ? ' sm' : ''}`, id: `desk-${id}`, 'aria-pressed': String(state.desk === id), 'aria-label': roomLabel(id, s),
-      style: { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.w)}px`, height: `${Math.round(r.h)}px` }, onclick: () => roomClick(id) }, roomBadge(s));
+    const sel = state.desk === id;
+    // اللافتة معلّقة تحت البلاطة بزاوية الغرفة جهة النص: أعلاها على خط السقف المايل (مو فوق البلاطة) — كلها داخل
+    // غرفتها، فما تاخذ ضغطة الغرفة اللي فوقها، وعرضها ما يتعدّى الغرفة
+    const l = lines[fi];
+    const inset = r.w < 60 ? 1 : r.w < 90 ? 3 : 6;
+    const cx = rtl ? r.left + r.w - inset : r.left + inset;
+    const y = Math.min(Math.max(l ? l.yAt(cx, r.top) : r.top, r.top), r.top + r.h * 0.3);
+    const el = h('span', { class: `os-plate ${kind}${multi && sel ? ' sel' : ''}${osHot.has(id) ? ' hot' : ''}`, dir: rtl ? 'rtl' : 'ltr', 'aria-hidden': 'true', 'data-hot': id,
+      style: { top: `${Math.round(y - r.top)}px`, maxWidth: `${Math.max(0, Math.floor(r.w - 2 * inset))}px`, [rtl ? 'right' : 'left']: `${inset}px` } });
+    const names = plateNames(id, kind);
+    plates.push({ el, id, r, y, fi, names, ps: plateState(id, s), steps: plateSteps(kind, names) });
+    hits.push(h('button', { type: 'button', class: `os-hit${sel ? ' sel' : ''}`, id: `desk-${id}`, 'aria-pressed': String(sel), 'aria-label': roomLabel(id, s, names),
+      style: { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.w)}px`, height: `${Math.round(r.h)}px` }, onclick: () => roomClick(id) }, el));
   }));
+  put(box, hits);
+  fitPlates(plates);
+  dropPlates(plates, plan, rects);
+  floorTags(box, plan, floors, rtl, stageW);
   restoreFocus(keep);
 }
 /** المبنى المسطّح (بدون WebGL أو بزر 2D): نفس الخطة كصفوف وغرف */
@@ -3274,13 +3520,19 @@ function renderFlat(plan, rs, loading) {
           : h('span', { class: 'os-cell-rm', text: list.empty || '—' })) : null,
     ];
   };
+  // نفس كلام لافتات المشهد: المقر = الاسم القصير والرقم، والفريق = الاسم الكامل والحالة مكتوبة («٢ ينتظرك»)؛
+  // الفريق بالجوال (غرفة لكل دور) = القصير مثل لافتات المشهد لما تضيق
+  const kind = hq ? 'hq' : 'team';
+  const narrow = !hq && !single && matchMedia('(max-width: 560px)').matches;
   const cell = (r) => {
     const s = rs[r.id] || {};
     const k = r.screens.find((x) => x.type === 'kpis');
     const lines = k ? arr(k.items).slice(0, single ? 4 : hq ? 1 : 2) : [];
     const alert = r.status === 'idle' && num(s.alert) > 0;
-    return h('button', { type: 'button', class: `os-cell ${r.status}${alert ? ' alert' : ''}${state.desk === r.id ? ' sel' : ''}`, id: `desk-${r.id}`, 'aria-pressed': String(state.desk === r.id), 'aria-label': roomLabel(r.id, s), onclick: () => roomClick(r.id) },
-      h('span', { class: 'os-cell-h' }, h('i', { class: 'os-dot' }), h('span', { class: 'os-cell-l', text: r.label }), roomBadge(s)),
+    const ps = plateState(r.id, s);
+    const names = plateNames(r.id, kind);
+    return h('button', { type: 'button', class: `os-cell ${r.status}${alert ? ' alert' : ''}${state.desk === r.id ? ' sel' : ''}`, id: `desk-${r.id}`, 'aria-pressed': String(state.desk === r.id), 'aria-label': roomLabel(r.id, s, names), onclick: () => roomClick(r.id) },
+      h('span', { class: 'os-cell-h' }, icon(plateIcon(r.id), 'os-cell-ic'), h('span', { class: 'os-cell-l', text: names[narrow ? names.length - 1 : 0] }), plateChip(ps, !hq)),
       lines.length ? h('span', { class: 'os-cell-ks' }, lines.map(kpi)) : null,
       extra(r));
   };
@@ -3289,8 +3541,8 @@ function renderFlat(plan, rs, loading) {
   put(g, h('div', { class: `os-fb${hq ? ' hq' : ''}${single ? ' single' : ''}` },
     h('div', { class: 'os-fb-cube', 'aria-hidden': 'true' }, osMark()),
     h('div', { class: 'os-fb-roof' }, icon(plan.roof.icon), h('span', { text: plan.roof.title })),
-    h('div', { class: 'os-fb-floors' }, plan.floors.map((f) => h('div', { class: 'os-fb-floor' },
-      hq ? h('span', { class: 'os-fb-fl', text: f.label }) : null,
+    h('div', { class: 'os-fb-floors' }, plan.floors.map((f, i) => h('div', { class: 'os-fb-floor' },
+      hq ? h('span', { class: 'os-fb-fl' }, h('b', { class: 'num', text: floorNo(i, plan.floors.length) }), h('span', { text: f.label })) : null,
       h('div', { class: 'os-fb-rooms' }, f.rooms.map(cell))))),
     h('div', { class: 'os-fb-base', 'aria-hidden': 'true' })),
   why ? h('p', { class: 'os-fb-note', text: t(why) }) : null);
@@ -3404,11 +3656,10 @@ function drawLinks() {
   const NS = 'http://www.w3.org/2000/svg';
   const el = (tag, attrs) => { const x = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) x.setAttribute(k, v); return x; };
   const r1 = (v) => Math.round(v * 10) / 10;
-  const hot = document.activeElement && document.activeElement.closest && document.activeElement.closest('#osCards .os-card');
   svg.replaceChildren(...lines.map((l) => {
     const ex = l.cx + (l.tx - l.cx) * (l.f === undefined ? 0.5 : l.f);
     const d = l.ty === l.cy ? `M${r1(l.cx)} ${r1(l.cy)}H${r1(l.tx)}` : `M${r1(l.cx)} ${r1(l.cy)}H${r1(ex)}V${r1(l.ty)}H${r1(l.tx)}`;
-    return el('path', { class: `os-link${hot === cards[l.i] ? ' on' : ''}`, id: `os-link-${l.i}`, d });
+    return el('path', { class: `os-link${l.i === osCardHov || l.i === osCardFoc ? ' on' : ''}`, id: `os-link-${l.i}`, d });
   }), ...lines.map((l) => el('circle', { class: 'os-link-dot', cx: r1(l.tx), cy: r1(l.ty), r: 2.5 })));
 }
 
@@ -3431,8 +3682,9 @@ function renderHero() {
       const sig = JSON.stringify(plan);
       if (sig !== osPlanSig) { osScene.show(plan); osPlanSig = sig; osLayoutFrames = 2; }
       const ids = planRooms(plan);
-      // التحديد بس لو فيه أكثر من غرفة (المدير والمهندسين غرفة وحدة: الإطار البرتقالي ما يضيف شي)
-      osScene.update(Object.fromEntries(ids.map((id) => [id, { waiting: num(rs[id] && rs[id].waiting), working: num(rs[id] && rs[id].working), alert: num(rs[id] && rs[id].alert) }])), ids.length > 1 && ids.includes(state.desk) ? state.desk : null);
+      // التحديد بس لو فيه أكثر من غرفة (المدير والمهندسين غرفة وحدة: الإطار البرتقالي ما يضيف شي)، وبالمقر لا
+      // (ضغطة الغرفة هناك تفتح شريحة فريقها — إطار ثابت على المدير يتلخبط مع تبريز البطاقات)
+      osScene.update(Object.fromEntries(ids.map((id) => [id, { waiting: num(rs[id] && rs[id].waiting), working: num(rs[id] && rs[id].working), alert: num(rs[id] && rs[id].alert) }])), plan.kind !== 'hq' && ids.length > 1 && ids.includes(state.desk) ? state.desk : null);
       kick();
     } catch (e) { fail3d(e); return; }
   }
@@ -4421,7 +4673,7 @@ function createCompanyOS(canvas, opts) {
     c.strokeStyle = 'rgba(241,85,29,0.35)';
     c.lineWidth = Math.max(1, u * 0.7);
     c.strokeRect(c.lineWidth / 2, c.lineWidth / 2, w - c.lineWidth, h - c.lineWidth);
-    const pad = 8 * u;
+    const pad = 6 * u;
     const ar = ARX.test(text);
     const al = L.rtl ? 'right' : 'left';
     const x = L.rtl ? w - pad : pad;
@@ -4431,8 +4683,9 @@ function createCompanyOS(canvas, opts) {
     const maxW = w - 2 * pad;
     const extraH = extra && extra.length ? Math.min(extra.length, 3) * 9 * u : 0;
     const availH = h - 2 * pad - extraH;
-    // سطر أو سطرين، أيهم يطلع أكبر
-    let lines = [t], size = fitSize(c, t, availH * 0.62, maxW, weight, fam, 4);
+    // النص يعبّي اللوحة (الجدار الجانبي يبان مضغوط): سطر أو سطرين، أيهم يطلع أكبر. Anton حروفه كبيرة (~٧٠٪ من المقاس)
+    const k1 = ar ? 0.7 : 0.98, k2 = ar ? 0.4 : 0.5;
+    let lines = [t], size = fitSize(c, t, availH * k1, maxW, weight, fam, 4);
     const words = t.split(' ');
     if (words.length > 1) {
       c.font = `${weight} 20px ${fam}`;
@@ -4444,11 +4697,11 @@ function createCompanyOS(canvas, opts) {
       }
       const two = best.two;
       {
-        const s2 = Math.min(availH * 0.4, ...two.map((ln) => fitSize(c, ln, availH * 0.4, maxW, weight, fam, 4)));
-        if (s2 > size * 1.15) { lines = two; size = s2; }
+        const s2 = Math.min(availH * k2, ...two.map((ln) => fitSize(c, ln, availH * k2, maxW, weight, fam, 4)));
+        if (s2 > size * 1.12) { lines = two; size = s2; }
       }
     }
-    const lh = size * (ar ? 1.18 : 1.02);
+    const lh = size * (ar ? 1.2 : 0.98);
     const blockH = lines.length * lh;
     let y = pad + (availH - blockH) / 2 + lh / 2;
     for (const ln of lines) { tx(c, ln, x, y, { size, weight, fam, color: SC.orange, align: al, ls: ar ? 0 : size * 0.02 }); y += lh; }
@@ -4459,20 +4712,6 @@ function createCompanyOS(canvas, opts) {
         ey += 9 * u;
       }
     }
-  }
-  /** شريط اسم الغرفة فوق الشاشات (المقر) */
-  function drawStrip(c, w, h, text, L) {
-    c.fillStyle = '#16120F';
-    c.fillRect(0, 0, w, h);
-    c.fillStyle = 'rgba(241,85,29,0.5)';
-    c.fillRect(0, h - Math.max(1, h * 0.05), w, Math.max(1, h * 0.05));
-    const pad = h * 0.32;
-    const sq = h * 0.2;
-    const ar = ARX.test(text);
-    c.fillStyle = SC.orange;
-    if (L.rtl) c.fillRect(w - pad - sq, h / 2 - sq / 2, sq, sq); else c.fillRect(pad, h / 2 - sq / 2, sq, sq);
-    const size = fitSize(c, text, h * 0.5, w - 2 * pad - sq * 2, ar ? 700 : 600, ar ? FK : FM, h * 0.28);
-    tx(c, text, L.rtl ? w - pad - sq * 1.9 : pad + sq * 1.9, h / 2, { size, weight: ar ? 700 : 600, color: SC.orange, align: L.rtl ? 'right' : 'left', upper: true, ls: size * 0.06 });
   }
   /** لوحة «الرؤية» بغرفة المدير */
   function drawVision(c, w, h, text, L) {
@@ -4841,12 +5080,13 @@ function createCompanyOS(canvas, opts) {
     }
     // اللوحات النصية (أطلس لكل غرفة) + لافتة السطح + شعار المكعب
     buildAtlases();
-    const signW = (rx1 - rx0) * 0.94, signH = ROOF * 0.8;
+    // شرائح الفرق: اللافتة بالجزء العلوي من واجهة السقف — تحتها لافتة الغرفة العليا (لافتات الأقسام بالصفحة) على حافة السقف
+    const signW = (rx1 - rx0) * 0.94, signH = ROOF * (d.hq ? 0.8 : 0.64), signY = yTop + ROOF * (d.hq ? 0.5 : 0.6);
     b.sign = { w: signW, h: signH, canvas: null, tex: null };
     b.sign.mat = new T3.MeshBasicMaterial({ transparent: true, toneMapped: false, depthWrite: false });
     b.mats.push(b.sign.mat);
     const sm = meshOf(new T3.PlaneGeometry(signW, signH), b.sign.mat, false, false);
-    sm.position.set(((rx0 + rx1) / 2) * M, yTop + ROOF / 2, rz1 + 0.006);
+    sm.position.set(((rx0 + rx1) / 2) * M, signY, rz1 + 0.006);
     b.logo = { size: CUBE * 0.62 };
     b.logo.mat = new T3.MeshBasicMaterial({ transparent: true, toneMapped: false, depthWrite: false });
     b.mats.push(b.logo.mat);
@@ -4946,15 +5186,8 @@ function createCompanyOS(canvas, opts) {
       const FHr = y1 - y0;
       const [vlo, vhi] = band(R);
       const hqSmall = d.hq;
-      let top = Math.min(y1 - (hqSmall ? 0.16 : 0.24), vhi - 0.06);
-      // شريط الاسم فوق الشاشات (المقر)
-      if (hqSmall) {
-        const sh = 0.34;
-        if (top - sh - 0.55 > Math.max(vlo, y0 + 1.15)) {
-          R.panels.push({ kind: 'strip', u: (u0 + u1) / 2, y: top - sh / 2, z: zb + 0.03, w: rw - 0.5, h: sh, wall: 'back' });
-          top -= sh + 0.1;
-        }
-      }
+      // اسم الغرفة بالمقر: لافتة الصفحة على البلاطة فوق الغرفة (بدل شريط صغير فوق الشاشات ما ينقرا)
+      const top = Math.min(y1 - (hqSmall ? 0.16 : 0.24), vhi - 0.06);
       const floorLo = y0 + (hqSmall ? 1.32 : 1.36);
       let bot = Math.max(floorLo, vlo + 0.1, top - (hqSmall ? 1.25 : 2.0));
       if (top - bot < 0.55) bot = top - 0.55;
@@ -4999,16 +5232,26 @@ function createCompanyOS(canvas, opts) {
           u += ws[i] + gap;
         });
       }
-      // لوحة الاسم على الجدار الجانبي المصمت + «الرؤية» للمدير
+      // لوحة الاسم على الجدار الجانبي المصمت + «الرؤية» للمدير. الجدار الجانبي يبان مايل (مضغوط بالعرض)، فاللوحة تاخذ
+      // أغلب الجدار بين الشاشة/«الرؤية» الجانبية ومقدّمة الغرفة، وارتفاعها من فوق النبتة الأمامية لتحت لافتة الغرفة
+      // (لافتة الصفحة معلّقة تحت السقف بنفس الزاوية). بس بالغرفة الوحدة (المدير، المهندسين — الدور عالي وفيه مكان تحت
+      // اللافتة)؛ المقر وشرائح الأدوار: لافتة الصفحة هي اسم الغرفة (لوحة تحتها مباشرة = اسم مكرر نصّه مغطّى)
       if (R.solid) {
-        const ph = Math.min(FHr * 0.5, 1.6), pw = Math.min(D * 0.42, 2.5);
-        const py = Math.min(y1 - 0.35 - ph / 2, Math.max(y0 + 1.45 + ph / 2, (top + bot) / 2));
-        const extra = R.type === 'eng' ? ((R.screens.find((s) => s.type === 'flow') || {}).steps || []) : null;
-        const side = R.panels.some((p) => p.late);
-        R.panels.push({ kind: 'label', text: R.floorLabel || R.label, extra, u: u0 + 0.03, y: py, z: zb + D * (side ? 0.64 : 0.5), w: Math.min(pw, side ? D * 0.4 : pw), h: ph, wall: 'side' });
+        let sideEnd = zb + D * 0.16;
+        for (const p of R.panels) if (p.wall === 'side') sideEnd = Math.max(sideEnd, p.z + p.w / 2 + 0.18);
         if (R.type === 'ceo' && D >= 4.6 && !meet) {
           const vw = Math.min(1.25, D * 0.22), vh = Math.min(FHr * 0.42, vw * 1.3);
           R.panels.push({ kind: 'vision', text: R.vision, u: u0 + 0.052, y: Math.min(y1 - 0.3 - vh / 2, y0 + 1.5 + vh / 2), z: zb + 0.45 + vw / 2, w: vw, h: vh, wall: 'side', frame: true });
+          sideEnd = Math.max(sideEnd, zb + 0.45 + vw + 0.18);
+        }
+        if (d.single) {
+          const zEnd = zf - 0.32;
+          const pw = Math.max(1.2, Math.min(zEnd - sideEnd, 4.2));
+          const yLo = y0 + 1.3, yHi = y1 - 0.72;
+          const ph = Math.max(0.8, Math.min(yHi - yLo, d.single ? 2.5 : 2.2));
+          const py = Math.min(yHi - ph / 2, Math.max(yLo + ph / 2, (top + bot) / 2));
+          const extra = R.type === 'eng' ? ((R.screens.find((s) => s.type === 'flow') || {}).steps || []) : null;
+          R.panels.push({ kind: 'label', text: R.floorLabel || R.label, extra, u: u0 + 0.03, y: py, z: Math.min(zEnd - pw / 2, Math.max(sideEnd + pw / 2, zb + D * 0.58)), w: pw, h: ph, wall: 'side' });
         }
       }
       // الإطارات السود ورا الشاشات
@@ -5409,7 +5652,6 @@ function createCompanyOS(canvas, opts) {
         if (p.kind === 'screen') drawScreen(c, w, h, p.s, L);
         else if (p.kind === 'composite') { L.u = h / 100; L.pad = 5 * L.u; drawComposite(c, w, h, p.list, L); }
         else if (p.kind === 'label') drawLabel(c, w, h, p.text || '', L, p.extra);
-        else if (p.kind === 'strip') drawStrip(c, w, h, R.label || '', L);
         else if (p.kind === 'vision') drawVision(c, w, h, p.text || (P.lang === 'ar' ? 'نخلّي الرياضة أسهل وأقرب لكل الناس.' : 'Make fitness easier for everyone.'), L);
       } catch (e) { /* لوحة وحدة ما توقف الباقي */ }
       c.restore();

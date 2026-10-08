@@ -14,6 +14,11 @@
   --os-screen-text: var(--screen-text, #F4F4F0);
   --os-screen-muted: var(--screen-muted, rgba(244, 244, 240, 0.6));
   --os-idle: var(--screen-up, #3DDC84);
+  /* لافتات الأقسام على المبنى: حبة فاتحة بالثيمين (مثل لوحات المعماريين) بحبر غامق */
+  --os-plate: #FAFAF7;
+  --os-plate-ink: #121212;
+  --os-plate-mute: #56564F;
+  --os-plate-line: rgba(18, 18, 18, 0.16);
 }
 :root[lang="en"] .os, :root[lang="en"] .os-brand, :root[lang="en"] .os-status, :root[lang="en"] .os-today { --os-ls: 0.05em; }
 /* بالعربي الكوفي أول: مسافات الخط أحادي العرض تفرّق الكلمات العربية. الأرقام تبقى IBM Plex Mono (--os-num) */
@@ -106,6 +111,8 @@
 .os-card-ic svg.ic { width: 28px; height: 28px; stroke-width: 1.5; }
 .os-card-m { display: contents; }
 .os-card-t { grid-area: t; min-width: 0; font-family: var(--os-mono); font-size: 13px; font-weight: 700; line-height: 1.3; letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* رقم الدور ببطاقات المقر (نفس أرقام الأدوار جنب المبنى) */
+.os-card-n { margin-inline-end: 8px; font: 600 11px/1 var(--os-num); letter-spacing: 0.06em; color: var(--accent-ink, #B83D0E); }
 .os-card-d { grid-area: d; min-width: 0; font-family: var(--os-mono); font-size: 11px; line-height: 1.45; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .os-card > .os-chip { grid-area: chip; }
 .os-chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding-inline: 7px; border-radius: 999px; background: var(--chip, rgba(0, 0, 0, 0.06)); color: var(--muted); font: 600 10.5px/1 var(--os-mono); white-space: nowrap; letter-spacing: 0; }
@@ -128,12 +135,62 @@
 .os-hit { position: absolute; pointer-events: auto; border: 0; padding: 0; margin: 0; background: transparent; border-radius: 6px; cursor: pointer; }
 .os-hit:hover { background: rgba(241, 85, 29, 0.07); box-shadow: inset 0 0 0 1px rgba(241, 85, 29, 0.45); }
 .os-hit:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 0; box-shadow: 0 0 0 4px var(--focus, var(--os-acc)), inset 0 0 0 2px var(--focus, var(--os-acc)); background: rgba(255, 255, 255, 0.1); }
-.os-badge { position: absolute; top: -11px; left: -11px; min-width: 22px; height: 22px; padding-inline: 6px; border-radius: 11px; background: var(--os-acc); color: #1A0B04; font: 700 12px/22px var(--os-num); text-align: center; box-shadow: 0 0 0 2px var(--os-shell), 0 2px 10px rgba(241, 85, 29, 0.4); pointer-events: none; }
-.os-badge.work { background: var(--work, #FEA94F); color: #1A1205; box-shadow: 0 0 0 2px var(--os-shell), 0 2px 10px rgba(254, 169, 79, 0.4); }
-.os-badge.alert { background: var(--info-ink, #2C54A6); color: var(--bg, #F2F2EF); box-shadow: 0 0 0 2px var(--os-shell), 0 2px 10px rgba(44, 84, 166, 0.35); }
-:root[dir="rtl"] .os-hit .os-badge { left: auto; right: -11px; }
-.os-hit.sm .os-badge { top: -9px; left: -9px; min-width: 18px; height: 18px; padding-inline: 4px; font-size: 10.5px; line-height: 18px; }
-:root[dir="rtl"] .os-hit.sm .os-badge { left: auto; right: -9px; }
+/* لافتة القسم: معلّقة تحت البلاطة بزاوية الغرفة جهة النص (top من الصفحة = خط السقف المايل) — كلها داخل غرفتها، عرضها ما يتعدّى الغرفة */
+.os-plate { position: absolute; z-index: 1; display: inline-flex; align-items: center; gap: 5px; height: 24px; padding-inline: 7px; box-sizing: border-box; max-width: 100%;
+  border-radius: 6px; border: 1px solid var(--os-plate-line); background: var(--os-plate); color: var(--os-plate-ink); white-space: nowrap; letter-spacing: 0;
+  box-shadow: 0 1px 1px rgba(18, 18, 18, 0.1), 0 4px 12px -4px rgba(18, 18, 18, 0.38); transition: border-color 0.12s, box-shadow 0.12s, background-color 0.12s; }
+.os-plate svg.os-pl-ic { flex: none; width: 14px; height: 14px; color: var(--os-acc); stroke-width: 2; }
+.os-pl-t { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 700 12px/1.6 var(--os-mono); color: inherit; }
+:root[lang="en"] .os-pl-t { font-weight: 600; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+/* الحالة: ينتظرك برتقالي بأرقام غامقة، يشتغل كهرماني، تحتاج نظرة أزرق، هادي نقطة (المقر) أو «هادي» */
+.os-pl-c { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 16px; min-width: 16px; padding-inline: 5px; border-radius: 999px; box-sizing: border-box;
+  font: 700 10.5px/1 var(--os-num); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.os-pl-c.wait { background: #F1551D; color: #1A0B04; }
+.os-pl-c.work { background: #FEA94F; color: #1A1205; }
+.os-pl-c.alert { background: #2C54A6; color: #FFFFFF; }
+.os-pl-c.idle { background: #ECECE6; color: var(--os-plate-mute); }
+.os-pl-c.idle i { width: 6px; height: 6px; border-radius: 50%; background: #2FAE69; flex: none; }
+.os-pl-c.dot { width: 7px; height: 7px; min-width: 0; padding: 0; background: #2FAE69; box-shadow: 0 0 0 2.5px rgba(47, 174, 105, 0.2); }
+/* شريحة الفريق (غرفة كبيرة بكل دور): الاسم الكامل أكبر والحالة مكتوبة */
+.os-plate.team { height: 30px; gap: 7px; padding-inline: 9px; border-radius: 7px; }
+.os-plate.team svg.os-pl-ic { width: 16px; height: 16px; }
+.os-plate.team .os-pl-t { font-size: 13.5px; }
+:root[lang="en"] .os-plate.team { height: 28px; }
+:root[lang="en"] .os-plate.team .os-pl-t { font-size: 11.5px; }
+.os-plate.team .os-pl-c:not(.num):not(.dot) { height: 20px; padding-inline: 8px; font: 700 11px/1 var(--os-mono); }
+:root[lang="en"] .os-plate.team .os-pl-c:not(.num):not(.dot) { font-weight: 600; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+.os-plate.team .os-pl-c.num { height: 18px; min-width: 18px; font-size: 11.5px; }
+/* غرفة ضيقة (الجوال): أصغر بدون أيقونة، وبعدها الرقم يطلع شارة معلّقة تحت زاوية اللافتة (داخل غرفتها، ما يغطي الاسم)
+ * والاسم ياخذ العرض كله؛ tiny = آخر درجة قبل «…» (الشاشات الأضيق من ٣٦٠) */
+.os-plate.xs { height: 19px; gap: 3px; padding-inline: 4px; border-radius: 5px; }
+.os-plate.xs .os-pl-t { font-size: 10.5px; }
+:root[lang="en"] .os-plate.xs .os-pl-t { font-size: 10px; letter-spacing: 0.02em; }
+.os-plate.xs .os-pl-c:not(.dot) { height: 14px; min-width: 14px; padding-inline: 3px; font-size: 9.5px; }
+.os-plate.xs.corner { padding-inline: 2px; }
+.os-plate.xs.corner .os-pl-c { position: absolute; bottom: -15px; inset-inline-end: 0; box-shadow: 0 0 0 1.5px var(--os-plate); }
+.os-plate.xs.corner .os-pl-c.dot { bottom: -8px; inset-inline-end: 2px; }
+.os-plate.xs.tiny .os-pl-t { font-size: 9.5px; }
+:root[lang="en"] .os-plate.xs.tiny .os-pl-t { font-size: 9px; letter-spacing: 0; }
+/* المختارة (شرائح الفرق بس): إطار برتقالي وخلفية دافية، والمرور على الغرفة أو بطاقتها (أو التركيز) يبرّزها بإطار وظل */
+.os-plate.sel { border-color: var(--os-acc); background: #FFF4EE; box-shadow: 0 0 0 1px var(--os-acc), 0 4px 14px -4px rgba(241, 85, 29, 0.6); }
+.os-plate.sel .os-pl-t { color: #9E330B; }
+.os-hit:hover .os-plate, .os-hit:focus-visible .os-plate, .os-plate.hot { border-color: var(--os-acc); box-shadow: 0 0 0 1px var(--os-acc), 0 6px 16px -4px rgba(18, 18, 18, 0.5); }
+/* أرقام الأدوار وأسماء الفرق (المقر): عمود ملاحظات على الجهة البعيدة برا المبنى بخط قصير لحافة الدور.
+ * tight = خط أصغر لو المسافة ضيقة، nums = الأرقام بس (الجوال؛ الاسم بالبطاقة اللي فيها نفس الرقم) */
+.os-ftag { position: absolute; display: flex; align-items: center; gap: 8px; transform: translateY(-50%); white-space: nowrap; pointer-events: none; color: var(--text); }
+.os-ftag-ln { position: relative; flex: none; height: 1.25px; background: var(--os-acc); opacity: 0.7; }
+.os-ftag-ln::before { content: ""; position: absolute; top: 50%; inset-inline-start: -2.5px; width: 5px; height: 5px; border-radius: 50%; background: var(--os-acc); transform: translateY(-50%); }
+.os-ftag-n { flex: none; font: 600 11px/1 var(--os-num); letter-spacing: 0.06em; color: var(--accent-ink, #B83D0E); }
+.os-ftag-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 700 13px/1.6 var(--os-mono); color: var(--text); }
+:root[lang="en"] .os-ftag-t { font-weight: 600; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.os-ftag.hot .os-ftag-ln { opacity: 1; height: 2px; }
+.os-ftag.hot .os-ftag-t, .os-ftag.hot .os-ftag-n { color: var(--accent-ink, #B83D0E); }
+.os-ftag.tight { gap: 6px; }
+.os-ftag.tight .os-ftag-t { font-size: 11.5px; }
+:root[lang="en"] .os-ftag.tight .os-ftag-t { font-size: 10.5px; letter-spacing: 0.02em; }
+.os-ftag.nums { gap: 4px; }
+.os-ftag.nums .os-ftag-t { display: none; }
+.os-ftag.nums .os-ftag-n { font-size: 12px; font-weight: 700; }
 .os-links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 2; }
 .os-link { fill: none; stroke: var(--os-acc); stroke-width: 1.25; opacity: 0.7; stroke-linejoin: round; }
 .os-link.on { opacity: 1; stroke-width: 2; }
@@ -158,19 +215,22 @@
 .os-fb-floor { display: flex; gap: 6px; align-items: stretch; min-width: 0; padding-bottom: 6px; border-bottom: 3px solid rgba(18, 18, 18, 0.07); }
 .os-fb-floor:last-child { border-bottom: 0; padding-bottom: 0; }
 .os-fb-fl { flex: none; width: 78px; display: grid; place-items: center; padding: 6px; border-radius: 4px; background: var(--os-screen); color: var(--os-acc); text-align: center;
-  font: 700 10.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow-wrap: anywhere; }
+  font: 700 10.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow-wrap: normal; }
+:root[lang="en"] .os-fb-fl { font-size: 9.5px; letter-spacing: 0; }
+.os-fb-fl b { display: block; margin-bottom: 3px; color: var(--os-screen-muted); font: 600 10px/1 var(--os-num); letter-spacing: 0.06em; }
 .os-fb-rooms { flex: 1; min-width: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
 .os-cell { position: relative; min-width: 0; min-height: 62px; display: flex; flex-direction: column; justify-content: flex-start; gap: 5px; padding: 8px 9px 9px; border: 0; border-radius: 4px; text-align: start;
   background: linear-gradient(180deg, var(--os-screen-2), var(--os-screen)); color: var(--os-screen-text); box-shadow: inset 0 -3px 0 rgba(254, 169, 79, 0.18); }
 .os-cell:hover { box-shadow: inset 0 -3px 0 rgba(254, 169, 79, 0.18), inset 0 0 0 1px rgba(241, 85, 29, 0.6); }
 .os-cell.sel { box-shadow: inset 0 -3px 0 var(--os-acc), inset 0 0 0 1.5px var(--os-acc); }
-.os-cell-h { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.os-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--os-idle); flex: none; }
-.os-cell.waiting .os-dot { background: var(--os-acc); box-shadow: 0 0 0 3px rgba(241, 85, 29, 0.25); }
-.os-cell.working .os-dot { background: var(--work, #FEA94F); }
-.os-cell.alert .os-dot { background: #6E9BFF; box-shadow: 0 0 0 3px rgba(110, 155, 255, 0.25); }
-.os-cell-l { flex: 1; min-width: 0; color: var(--os-acc); font: 700 11.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.os-cell .os-badge { position: static; min-width: 18px; height: 18px; padding-inline: 5px; font-size: 10.5px; line-height: 18px; box-shadow: none; flex: none; }
+.os-cell-h { display: flex; align-items: center; gap: 6px; min-width: 0; container-type: inline-size; }
+.os-cell-h svg.os-cell-ic { flex: none; width: 15px; height: 15px; color: var(--os-acc); stroke-width: 1.9; }
+.os-cell-l { flex: 1; min-width: 0; color: var(--os-acc); font: 700 11.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: normal; }
+@container (max-width: 100px) { .os-cell-h svg.os-cell-ic { display: none; } }
+.os-cell .os-pl-c:not(.num):not(.dot) { height: 19px; padding-inline: 7px; font: 700 10.5px/1 var(--os-mono); }
+:root[lang="en"] .os-cell .os-pl-c:not(.num):not(.dot) { font-weight: 600; font-size: 9.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+.os-cell .os-pl-c.num { height: 18px; min-width: 18px; }
 /* أرقام الغرفة مثل شاشة: العنوان صغير فوق والرقم كبير تحته، عمودين جنب بعض */
 .os-cell-ks { display: flex; flex-wrap: wrap; gap: 4px 22px; margin-top: auto; min-width: 0; }
 .os-cell-k { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 100%; font: 500 10px/1.35 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; color: var(--os-screen-muted); }
@@ -285,6 +345,13 @@
   .os-today-g { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
+  /* المقر بالجوال: المسرح أطول عشان المبنى يكبر وغرف الدور الرابع (٤ مكاتب) تتسع لأسمائها */
+  .os-stage[data-shape="hq"]:not(.flat) { aspect-ratio: 1 / 1.16; }
+  .os-plate.team { height: 26px; gap: 6px; padding-inline: 7px; }
+  .os-plate.team .os-pl-t { font-size: 12.5px; }
+  :root[lang="en"] .os-plate.team { height: 24px; }
+  :root[lang="en"] .os-plate.team .os-pl-t { font-size: 10.5px; }
+  .os-plate.team .os-pl-c:not(.num):not(.dot) { height: 18px; padding-inline: 7px; font-size: 10.5px; }
   .os-h { font-size: clamp(38px, 12.5vw, 60px); }
   :root[lang="ar"] .os-h { font-size: clamp(34px, 10.5vw, 52px); }
   .os-rule { margin: 14px 0 10px; }
@@ -304,10 +371,13 @@
   .os-fb.hq .os-cell { min-height: 46px; }
   .os-fb.hq .os-cell-ks { display: none; }
   /* المقر بالجوال: ٤ غرف بالدور، فالشارة على الزاوية والاسم ياخذ العرض كله */
-  .os-fb.hq .os-dot { display: none; }
+  .os-fb.hq .os-cell-ic { display: none; }
   .os-fb.hq .os-cell { padding-top: 8px; justify-content: center; }
-  .os-fb.hq .os-cell .os-badge { position: absolute; top: -6px; left: auto; right: auto; inset-inline-end: -4px; box-shadow: 0 0 0 2px var(--os-shell); }
-  .os-fb.hq .os-cell-l { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .os-fb.hq .os-cell .os-pl-c { position: absolute; top: -6px; left: auto; right: auto; inset-inline-end: -4px; box-shadow: 0 0 0 2px var(--os-shell); }
+  .os-fb.hq .os-cell .os-pl-c.dot { top: -3px; inset-inline-end: -2px; }
+  .os-fb-fl { display: flex; align-items: center; gap: 6px; }
+  .os-fb-fl b { margin: 0; }
+  .os-fb.hq .os-cell-l { text-overflow: clip; }
   .os-cell-l { font-size: 10.5px; }
   .os-fb-roof { font-size: 19px; padding: 9px 10px 8px; }
   :root[lang="ar"] .os-fb-roof { font-size: 17px; }

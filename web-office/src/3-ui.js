@@ -615,8 +615,13 @@ function teamState(id, rs) {
   return teamRooms(id).reduce((a, r) => { const s = rs[r] || {}; a.waiting += num(s.waiting); a.working += num(s.working); a.alert += num(s.alert); return a; }, { waiting: 0, working: 0, alert: 0 });
 }
 const roomName = (id) => (id === 'eng' ? t('os_s_eng') : t(`desk_${id}`));
-const roomLabel = (id, s) => {
-  const a = t('a11y_desk', { name: roomName(id), w: num(s && s.waiting), p: num(s && s.working) });
+/** الاسم المقروء للغرفة: الأسماء الظاهرة (اللافتة بكل درجاتها أو البطاقة) أول، بعدها اسم المكتب — بدون تكرار.
+ * عشان اللي يقول اللي يشوفه («اضغط التقارير») يلقى الزر */
+const roomLabel = (id, s, shown) => {
+  const low = (x) => str(x).toLowerCase();
+  const names = [];
+  for (const x of [...arr(shown), roomName(id)]) if (x && !names.some((y) => low(y).includes(low(x)))) names.push(x);
+  const a = t('a11y_desk', { name: names.join(' · '), w: num(s && s.waiting), p: num(s && s.working) });
   return s && num(s.alert) > 0 ? `${a}${state.lang === 'ar' ? '، ' : ', '}${t('n_alert', { n: num(s.alert) })}` : a;
 };
 function stateChip(s) {
@@ -626,13 +631,29 @@ function stateChip(s) {
   return h('span', { class: 'os-chip idle' }, h('i'), t('os_c_idle'));
 }
 const textChip = (cls, text) => h('span', { class: `os-chip ${cls}` }, h('i'), text);
-/** شارة الغرفة فوق المبنى: ينتظرك (برتقالي) وإلا يشتغل (كهرماني) وإلا تحتاج نظرة (أزرق) */
-function roomBadge(s) {
-  const b = (cls, v) => h('span', { class: `os-badge${cls} num`, 'aria-hidden': 'true', text: v > 99 ? '99+' : String(v) });
-  if (s && s.waiting) return b('', s.waiting);
-  if (s && s.working) return b(' work', s.working);
-  if (s && num(s.alert) > 0) return b(' alert', num(s.alert));
-  return null;
+
+// ---------- لافتات الأقسام على المبنى (نفس الأسماء والحالة بالمشهد وبالمبنى المسطّح) ----------
+/** أسماء الغرفة على لافتتها بالترتيب (لو الأول ما كفّى عرض الغرفة ناخذ اللي بعده): المقر = القصير، الفريق = الكامل ثم القصير */
+function plateNames(id, kind) {
+  if (id === 'eng') return [t('os_s_eng')];
+  if (id === 'lead') return kind === 'hq' ? [t('os_s_ceo')] : [t('os_room_ceo'), t('os_s_ceo')];
+  return kind === 'hq' ? [t(`sign_${id}`)] : [t(`desk_${id}`), t(`sign_${id}`)];
+}
+const plateIcon = (id) => (id === 'eng' ? 'code' : DESK[id] ? DESK[id].icon : 'cube');
+/** حالة اللافتة: ينتظرك (برتقالي) وإلا يشتغل (كهرماني) وإلا تحتاج نظرة (أزرق) وإلا هادي. المهندسين قبل ما تنحمّل طلباتهم: none */
+function plateState(id, s) {
+  if (id === 'eng' && !engCounts().loaded) return { cls: 'none', n: 0 };
+  if (s && num(s.waiting)) return { cls: 'wait', n: num(s.waiting), key: 'os_c_wait' };
+  if (s && num(s.working)) return { cls: 'work', n: num(s.working), key: 'os_c_work' };
+  if (s && num(s.alert)) return { cls: 'alert', n: num(s.alert), key: 'os_c_alert' };
+  return { cls: 'idle', n: 0, key: 'os_c_idle' };
+}
+/** شريحة الحالة: worded = «٢ ينتظرك» / «هادي»، وإلا الرقم بس (والهادي نقطة صغيرة) */
+function plateChip(ps, worded) {
+  if (ps.cls === 'none') return h('span', { class: 'os-pl-c idle num', text: '—' });
+  if (ps.cls === 'idle') return worded ? h('span', { class: 'os-pl-c idle' }, h('i'), t('os_c_idle')) : h('span', { class: 'os-pl-c dot' });
+  const v = ps.n > 99 ? '99+' : fmt(ps.n);
+  return worded ? h('span', { class: `os-pl-c ${ps.cls}`, text: t(ps.key, { n: v }) }) : h('span', { class: `os-pl-c ${ps.cls} num`, text: v });
 }
 
 // ---------- الخطة اللي ينبني منها المبنى (نفس الخطة للمشهد وللمبنى المسطّح) ----------
@@ -725,8 +746,8 @@ function buildPlan(sid, rs, o) {
       const people = rooms.length === 1 ? (team.id === 'ceo' ? 1 : 2) : rooms.length === 2 ? 2 : 1;
       return { id: team.id, label: t(`os_s_${team.id}`), rooms: rooms.map((r) => osRoom(r, rs, o, true, people)) };
     });
-  } else if (sid === 'ceo') plan.floors = [{ id: 'lead', label: t('desk_lead'), rooms: [osRoom('lead', rs, o, false, 1)] }];
-  else if (sid === 'eng') plan.floors = [{ id: 'eng', label: t('os_roof_eng'), rooms: [osRoom('eng', rs, o, false, 3)] }];
+  } else if (sid === 'ceo') plan.floors = [{ id: 'lead', label: t('os_room_ceo'), rooms: [osRoom('lead', rs, o, false, 1)] }];
+  else if (sid === 'eng') plan.floors = [{ id: 'eng', label: t('os_s_eng'), rooms: [osRoom('eng', rs, o, false, 3)] }];
   else plan.floors = OS_SLIDE[sid].desks.map((d) => ({ id: d, label: t(`sign_${d}`), rooms: [osRoom(d, rs, o, false, 3)] }));
   return plan;
 }
@@ -743,14 +764,18 @@ function openApp(where) {
   const f = where === 'form' ? target : target.querySelector('button:not(:disabled), a[href]');
   (f || $('topApp')).focus({ preventScroll: true });
 }
+/** رقم الدور بخانتين: أعلى دور = العدد، وأسفل دور = ٠١ */
+const floorNo = (i, n) => String(n - i).padStart(2, '0');
 function heroCards(sid, rs, o) {
   if (sid === 'hq') {
     // المهندسين: الطلبات تتحمّل لما تفتح شريحتهم (أو تبويب «التطبيق») — قبلها «—» مو «هادي»
     const engOff = !engCounts().loaded;
-    return OS_TEAMS.map((team) => {
+    // رقم الدور (٠٦ فوق … ٠١ تحت) نفس أرقام الأدوار جنب المبنى — بالجوال الأرقام بس جنب المبنى والأسماء هنا
+    return OS_TEAMS.map((team, i) => {
       const chip = team.id === 'eng' && engOff ? textChip('idle', '—') : stateChip(teamState(team.id, rs));
-      return { id: team.id, icon: team.icon, title: t(`os_s_${team.id}`), desc: t(`os_cd_${team.id}`), chip,
-        label: `${t('os_open_team', { name: t(`os_s_${team.id}`) })} · ${chip.textContent}`, onClick: () => { setSlide(team.id); focusSlide(); } };
+      const fl = floorNo(i, OS_TEAMS.length);
+      return { id: team.id, icon: team.icon, title: t(`os_s_${team.id}`), num: fl, desc: t(`os_cd_${team.id}`), chip,
+        label: `${t('os_open_team', { name: t(`os_s_${team.id}`) })} · ${t('os_floor_n', { n: fl })} · ${chip.textContent}`, onClick: () => { setSlide(team.id); focusSlide(); } };
     });
   }
   if (sid === 'ceo') {
@@ -782,21 +807,42 @@ function heroCards(sid, rs, o) {
     ];
   }
   return OS_SLIDE[sid].desks.map((d) => ({ id: d, icon: DESK[d].icon, title: t(`sign_${d}`), desc: t(`os_cd_${d}`), chip: stateChip(rs[d]), sel: state.desk === d,
-    label: roomLabel(d, rs[d]), onClick: () => selectDesk(d) }));
+    label: roomLabel(d, rs[d], [t(`sign_${d}`)]), onClick: () => selectDesk(d) }));
 }
-/** المرور على بطاقة (أو التركيز عليها) يبرّز خطها */
-function hiLink(i, on) { const p = $(`os-link-${i}`); if (p) p.classList.toggle('on', on); }
+/** وش تبرّز كل بطاقة بالمبنى: المقر = غرف الفريق ووسم دوره، الفريق = غرفة المكتب، المدير/المهندسين = غرفتهم */
+let osCardHot = [];
+let osCardHov = -1, osCardFoc = -1; // البطاقة تحت الماوس والمركّزة
+/** المرور على بطاقة (أو التركيز عليها بالكيبورد: why = 'f') يبرّز خطها ولافتات غرفها */
+function hiLink(i, on, why) {
+  if (why === 'f') osCardFoc = on ? i : osCardFoc === i ? -1 : osCardFoc;
+  else osCardHov = on ? i : osCardHov === i ? -1 : osCardHov;
+  syncHot();
+}
+/** تركيز بالكيبورد (مو ضغطة ماوس) */
+const focusRing = (el) => { try { return el.matches(':focus-visible'); } catch (e) { return true; } };
+function syncHot() {
+  const on = [osCardHov, osCardFoc].filter((i) => i >= 0);
+  osHot = new Set(on.flatMap((i) => osCardHot[i] || []));
+  for (const p of $('osLinks').querySelectorAll('.os-link')) p.classList.toggle('on', on.includes(Number(p.id.replace('os-link-', ''))));
+  for (const el of $('signs').querySelectorAll('[data-hot]')) el.classList.toggle('hot', osHot.has(el.dataset.hot));
+}
 function renderCards(sid, rs, o) {
   const keep = focusState();
   const list = heroCards(sid, rs, o);
+  osCardHot = list.map((c) => (sid === 'hq' ? [...teamRooms(c.id), `f:${c.id}`] : sid === 'ceo' || sid === 'eng' ? teamRooms(sid) : [c.id]));
   $('osCards').classList.toggle('many', list.length > 4);
   put($('osCards'), list.map((c, i) => h('button', { type: 'button', class: `os-card${c.sel ? ' sel' : ''}`, id: `os-card-${c.id}`, 'aria-pressed': c.sel === undefined ? null : String(!!c.sel),
     'aria-label': c.label ? `${c.label} — ${c.desc}` : null, onclick: c.onClick,
-    onmouseenter: () => hiLink(i, true), onmouseleave: () => hiLink(i, false), onfocus: () => hiLink(i, true), onblur: () => hiLink(i, false) },
+    onmouseenter: () => hiLink(i, true), onmouseleave: () => hiLink(i, false), onfocus: (e) => hiLink(i, focusRing(e.currentTarget), 'f'), onblur: () => hiLink(i, false, 'f') },
   h('span', { class: 'os-card-ic' }, icon(c.icon)),
-  h('span', { class: 'os-card-m' }, h('span', { class: 'os-card-t', text: c.title }), h('span', { class: 'os-card-d', text: c.desc })),
+  h('span', { class: 'os-card-m' }, h('span', { class: 'os-card-t' }, c.num ? h('b', { class: 'os-card-n num', text: c.num }) : null, c.title), h('span', { class: 'os-card-d', text: c.desc })),
   c.chip)));
+  // البطاقات انرسمت من جديد: التبريز للي تحت الماوس أو المركّزة الحين بس
+  const cards = [...$('osCards').children];
+  osCardHov = cards.findIndex((c) => c.matches(':hover'));
   restoreFocus(keep);
+  osCardFoc = cards.findIndex((c) => c === document.activeElement && focusRing(c));
+  osHot = new Set([osCardHov, osCardFoc].filter((i) => i >= 0).flatMap((i) => osCardHot[i] || []));
 }
 
 // ---------- الشريط والعنوان وخط سير العمل والأرقام ----------
@@ -907,20 +953,148 @@ function renderFoot(rs, o) {
 // ---------- المبنى: المشهد ثلاثي الأبعاد أو المسطّح ----------
 let heroPlan = null;
 let osPlanSig = '';
-/** غرف الشريحة الحالية: أزرار شفافة فوق غرف المشهد (تركيز + شارة ينتظرك) */
+/** خط سقف الفتحة الأمامية لكل دور على الشاشة (من floors()): الحافة جهة النص = زاوية الواجهة عند الجدار المصمت، والمستطيل
+ * = حدود الفتحة. الخط مايل بالمنظور: لو زاوية جهة النص هي الأعلى فأعلى كل غرفة (rooms) هو زاويتها جهة النص، وإلا نقيس
+ * على الخط من الحافة لأعلى المستطيل بالجهة البعيدة */
+function floorLines(floors, rtl) {
+  const side = rtl ? 'r' : 'l';
+  const ok = (e) => Array.isArray(e) && e.length >= 4 && e.every(Number.isFinite);
+  return floors.map((f) => {
+    const e = f && f.edge && f.edge[side], r = f && f.rect;
+    if (!ok(e) || !r || ![r.left, r.top, r.w, r.h].every(Number.isFinite)) return null;
+    const xFar = rtl ? r.left : r.left + r.w;
+    const copyTop = e[1] <= r.top + 1;
+    return { yAt: (x, roomTop) => (copyTop ? roomTop : e[1] + ((r.top - e[1]) * (x - e[0])) / (xFar - e[0] || 1)) };
+  });
+}
+/** محتوى اللافتة لدرجة «v» من درجات التصغير: { name, worded, icon, xs, corner, tiny } */
+function fillPlate(p, v) {
+  const name = h('span', { class: 'os-pl-t', text: p.names[Math.min(v.name, p.names.length - 1)] });
+  p.el.classList.toggle('xs', !!v.xs);
+  p.el.classList.toggle('corner', !!v.corner);
+  p.el.classList.toggle('tiny', !!v.tiny);
+  put(p.el, v.icon ? icon(plateIcon(p.id), 'os-pl-ic') : null, name, plateChip(p.ps, v.worded));
+  p.name = name;
+}
+/** درجات اللافتة من الأوضح للأصغر: الفريق = الاسم الكامل بحالة مكتوبة ← القصير ← الرقم بس ← بدون أيقونة ← أصغر؛
+ * المقر = القصير بالرقم ← بدون أيقونة ← أصغر. آخرها: الرقم شارة تحت زاوية اللافتة والاسم ياخذ العرض كله (ويصغر شوي
+ * لو لازم). بعدها «…» من CSS (اللافتة ما تطلع عن عرض غرفتها أبد) */
+function plateSteps(kind, names) {
+  const xs = { name: 1, worded: false, icon: false, xs: true };
+  const tail = [xs, Object.assign({}, xs, { corner: true }), Object.assign({}, xs, { corner: true, tiny: true })];
+  if (kind === 'hq') return [{ name: 0, worded: false, icon: true }, { name: 0, worded: false, icon: false }, ...tail];
+  const steps = [{ name: 0, worded: true, icon: true }];
+  if (names.length > 1) steps.push({ name: 1, worded: true, icon: true });
+  steps.push({ name: 1, worded: false, icon: true }, { name: 1, worded: false, icon: false }, ...tail);
+  return steps;
+}
+/** نقيس كل اللافتات مرة وحدة بكل درجة (قراءة بعد كتابة الكل = حساب تخطيط واحد بكل درجة). بعدها كل لافتات الشريحة
+ * تاخذ نفس الدرجة (أصغر وحدة احتاجتها) عشان المبنى كله يبان بنفس الشكل: نفس المقاس، والأيقونات كلها أو ولا وحدة */
+function fitPlates(plates) {
+  let left = plates.filter((p) => p.el.isConnected);
+  for (let step = 0; left.length; step++) {
+    for (const p of left) { p.step = Math.min(step, p.steps.length - 1); fillPlate(p, p.steps[p.step]); }
+    left = left.filter((p) => step < p.steps.length - 1 && (p.name.scrollWidth > p.name.clientWidth + 0.5 || p.el.scrollWidth > p.el.clientWidth + 0.5));
+  }
+  const top = Math.max(0, ...plates.map((p) => p.step || 0));
+  for (const p of plates) if (p.el.isConnected && (p.step || 0) < top) { p.step = Math.min(top, p.steps.length - 1); fillPlate(p, p.steps[p.step]); }
+}
+/** أرقام الأدوار وأسماء الفرق (المقر بس): عمود على الجهة البعيدة (عكس عمود النص) برا المبنى، بخط قصير لحافة كل دور
+ * عند ربعها العلوي (بعيد عن النباتات اللي تحت). كل الوسوم بنفس الشكل: الاسم كامل ← خط أصغر ← الرقم بس (الجوال والشاشة
+ * الضيقة الطويلة — الاسم بالبطاقة اللي فيها نفس الرقم). ما ينقص اسم أبد، وما يغطي غرفة لأنه برا المبنى */
+function floorTags(box, plan, floors, rtl, stageW) {
+  if (plan.kind !== 'hq' || floors.length !== plan.floors.length) return;
+  const far = rtl ? 'l' : 'r';
+  const ok = (e) => Array.isArray(e) && e.length >= 4 && e.every(Number.isFinite);
+  const es = floors.map((f) => f && f.edge && f.edge[far]);
+  if (!es.every(ok)) return;
+  const at = es.map((e) => ({ x: e[0] + (e[2] - e[0]) / 4, y: e[1] + (e[3] - e[1]) / 4 }));
+  const outer = rtl ? Math.min(...at.map((a) => a.x)) : Math.max(...at.map((a) => a.x));
+  const room = (rtl ? outer : stageW - outer) - 4;
+  const bw = Math.max(...floors.map((f) => (f && f.rect ? f.rect.w : 0)));
+  const gapMax = Math.max(22, Math.min(52, bw * 0.1));
+  const n = plan.floors.length;
+  const tags = plan.floors.map((f, i) => h('span', { class: `os-ftag${osHot.has(`f:${f.id}`) ? ' hot' : ''}`, id: `os-ftag-${f.id}`, dir: rtl ? 'rtl' : 'ltr', 'aria-hidden': 'true', 'data-hot': `f:${f.id}`,
+    style: { top: `${Math.round(at[i].y)}px`, [rtl ? 'right' : 'left']: `${Math.round(rtl ? stageW - at[i].x : at[i].x)}px` } },
+  h('i', { class: 'os-ftag-ln' }), h('b', { class: 'os-ftag-n num', text: floorNo(i, n) }), h('span', { class: 'os-ftag-t', text: f.label })));
+  box.append(...tags);
+  // أعرض وسم: المسافة بعد الخط + الرقم (+ المسافة والاسم لو ظاهر)؛ والخط من حافة المبنى للعمود = gap
+  const need = () => Math.max(...tags.map((el) => {
+    const nb = el.children[1], tt = el.children[2], sp = parseFloat(getComputedStyle(el).columnGap) || 0;
+    return sp + nb.getBoundingClientRect().width + (getComputedStyle(tt).display === 'none' ? 0 : sp + tt.scrollWidth);
+  }));
+  let gap = -1;
+  for (const [mode, min] of [['', 22], ['tight', 14], ['nums', 6]]) {
+    for (const el of tags) { el.classList.toggle('tight', mode === 'tight'); el.classList.toggle('nums', mode === 'nums'); }
+    const g = Math.min(gapMax, room - need());
+    if (g >= min) { gap = g; break; }
+  }
+  if (gap < 0) { for (const el of tags) el.remove(); return; }
+  const col = rtl ? outer - gap : outer + gap;
+  tags.forEach((el, i) => { el.firstChild.style.width = `${Math.round(Math.abs(at[i].x - col))}px`; });
+}
+/** مستطيلات الغرف تتداخل عند البلاطة (الأرضية مايلة بالمنظور): اللافتة تنزل تحت أسفل أي غرفة فوقها بعرضها هي (بعد ما
+ * انعرف مقاسها) — عشان ما تاخذ ضغطة الغرفة اللي فوق، وما تنزل لنص غرفتها */
+function dropPlates(plates, plan, rects) {
+  const box = $('signs').getBoundingClientRect();
+  const spans = plates.map((p) => { const b = p.el.getBoundingClientRect(); return [b.left - box.left, b.right - box.left]; });
+  plates.forEach((p, i) => {
+    if (!p.fi || !p.el.isConnected) return;
+    let y = p.y;
+    for (const up of plan.floors[p.fi - 1].rooms) {
+      const u = rects[up.id];
+      if (u && u.w > 0 && u.left < spans[i][1] && u.left + u.w > spans[i][0]) y = Math.max(y, u.top + u.h);
+    }
+    y = Math.min(y, p.r.top + p.r.h * 0.3);
+    if (y > p.y + 0.5) p.el.style.top = `${Math.round(y - p.r.top)}px`;
+  });
+}
+/** اللافتات المبرّزة (بطاقتها تحت الماوس أو مركّزة): معرّفات غرف، و«f:فريق» = وسم دوره */
+let osHot = new Set();
+/** غرف الشريحة الحالية: أزرار شفافة فوق غرف المشهد (تركيز + لافتة باسم القسم وحالته) + أرقام الأدوار وأسماء الفرق بالمقر */
 function renderHits(rs) {
   const box = $('signs');
   if (!osScene || !show3d() || !heroPlan) { box.replaceChildren(); return; }
   rs = rs || roomStates(deskStates());
-  let rects = {};
-  try { rects = Object.fromEntries(arr(osScene.rooms()).filter((r) => r && r.id).map((r) => [r.id, r])); } catch (e) { fail3d(e); return; }
+  let rects = {}, floors = [];
+  try {
+    rects = Object.fromEntries(arr(osScene.rooms()).filter((r) => r && r.id).map((r) => [r.id, r]));
+    floors = arr(osScene.floors());
+  } catch (e) { fail3d(e); return; }
   const keep = focusState();
-  put(box, planRooms(heroPlan).filter((id) => rects[id] && rects[id].w > 0 && rects[id].h > 0).map((id) => {
+  const plan = heroPlan;
+  const kind = plan.kind === 'hq' ? 'hq' : 'team';
+  // التحديد بالمقر ما له معنى (ضغطة الغرفة تفتح شريحة فريقها): بس بشرائح الفرق اللي فيها أكثر من غرفة
+  const multi = kind === 'team' && planRooms(plan).length > 1;
+  const rtl = document.documentElement.dir === 'rtl';
+  const lines = floorLines(floors, rtl);
+  const stageW = box.clientWidth || $('stage').clientWidth;
+  const ok = (r) => r && r.w > 0 && r.h > 0;
+  const plates = [];
+  const hits = [];
+  plan.floors.forEach((f, fi) => f.rooms.forEach((room) => {
+    const id = room.id;
     const r = rects[id];
+    if (!ok(r)) return;
     const s = rs[id] || {};
-    return h('button', { type: 'button', class: `os-hit${state.desk === id ? ' sel' : ''}${r.w < 72 || r.h < 48 ? ' sm' : ''}`, id: `desk-${id}`, 'aria-pressed': String(state.desk === id), 'aria-label': roomLabel(id, s),
-      style: { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.w)}px`, height: `${Math.round(r.h)}px` }, onclick: () => roomClick(id) }, roomBadge(s));
+    const sel = state.desk === id;
+    // اللافتة معلّقة تحت البلاطة بزاوية الغرفة جهة النص: أعلاها على خط السقف المايل (مو فوق البلاطة) — كلها داخل
+    // غرفتها، فما تاخذ ضغطة الغرفة اللي فوقها، وعرضها ما يتعدّى الغرفة
+    const l = lines[fi];
+    const inset = r.w < 60 ? 1 : r.w < 90 ? 3 : 6;
+    const cx = rtl ? r.left + r.w - inset : r.left + inset;
+    const y = Math.min(Math.max(l ? l.yAt(cx, r.top) : r.top, r.top), r.top + r.h * 0.3);
+    const el = h('span', { class: `os-plate ${kind}${multi && sel ? ' sel' : ''}${osHot.has(id) ? ' hot' : ''}`, dir: rtl ? 'rtl' : 'ltr', 'aria-hidden': 'true', 'data-hot': id,
+      style: { top: `${Math.round(y - r.top)}px`, maxWidth: `${Math.max(0, Math.floor(r.w - 2 * inset))}px`, [rtl ? 'right' : 'left']: `${inset}px` } });
+    const names = plateNames(id, kind);
+    plates.push({ el, id, r, y, fi, names, ps: plateState(id, s), steps: plateSteps(kind, names) });
+    hits.push(h('button', { type: 'button', class: `os-hit${sel ? ' sel' : ''}`, id: `desk-${id}`, 'aria-pressed': String(sel), 'aria-label': roomLabel(id, s, names),
+      style: { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.w)}px`, height: `${Math.round(r.h)}px` }, onclick: () => roomClick(id) }, el));
   }));
+  put(box, hits);
+  fitPlates(plates);
+  dropPlates(plates, plan, rects);
+  floorTags(box, plan, floors, rtl, stageW);
   restoreFocus(keep);
 }
 /** المبنى المسطّح (بدون WebGL أو بزر 2D): نفس الخطة كصفوف وغرف */
@@ -944,13 +1118,19 @@ function renderFlat(plan, rs, loading) {
           : h('span', { class: 'os-cell-rm', text: list.empty || '—' })) : null,
     ];
   };
+  // نفس كلام لافتات المشهد: المقر = الاسم القصير والرقم، والفريق = الاسم الكامل والحالة مكتوبة («٢ ينتظرك»)؛
+  // الفريق بالجوال (غرفة لكل دور) = القصير مثل لافتات المشهد لما تضيق
+  const kind = hq ? 'hq' : 'team';
+  const narrow = !hq && !single && matchMedia('(max-width: 560px)').matches;
   const cell = (r) => {
     const s = rs[r.id] || {};
     const k = r.screens.find((x) => x.type === 'kpis');
     const lines = k ? arr(k.items).slice(0, single ? 4 : hq ? 1 : 2) : [];
     const alert = r.status === 'idle' && num(s.alert) > 0;
-    return h('button', { type: 'button', class: `os-cell ${r.status}${alert ? ' alert' : ''}${state.desk === r.id ? ' sel' : ''}`, id: `desk-${r.id}`, 'aria-pressed': String(state.desk === r.id), 'aria-label': roomLabel(r.id, s), onclick: () => roomClick(r.id) },
-      h('span', { class: 'os-cell-h' }, h('i', { class: 'os-dot' }), h('span', { class: 'os-cell-l', text: r.label }), roomBadge(s)),
+    const ps = plateState(r.id, s);
+    const names = plateNames(r.id, kind);
+    return h('button', { type: 'button', class: `os-cell ${r.status}${alert ? ' alert' : ''}${state.desk === r.id ? ' sel' : ''}`, id: `desk-${r.id}`, 'aria-pressed': String(state.desk === r.id), 'aria-label': roomLabel(r.id, s, names), onclick: () => roomClick(r.id) },
+      h('span', { class: 'os-cell-h' }, icon(plateIcon(r.id), 'os-cell-ic'), h('span', { class: 'os-cell-l', text: names[narrow ? names.length - 1 : 0] }), plateChip(ps, !hq)),
       lines.length ? h('span', { class: 'os-cell-ks' }, lines.map(kpi)) : null,
       extra(r));
   };
@@ -959,8 +1139,8 @@ function renderFlat(plan, rs, loading) {
   put(g, h('div', { class: `os-fb${hq ? ' hq' : ''}${single ? ' single' : ''}` },
     h('div', { class: 'os-fb-cube', 'aria-hidden': 'true' }, osMark()),
     h('div', { class: 'os-fb-roof' }, icon(plan.roof.icon), h('span', { text: plan.roof.title })),
-    h('div', { class: 'os-fb-floors' }, plan.floors.map((f) => h('div', { class: 'os-fb-floor' },
-      hq ? h('span', { class: 'os-fb-fl', text: f.label }) : null,
+    h('div', { class: 'os-fb-floors' }, plan.floors.map((f, i) => h('div', { class: 'os-fb-floor' },
+      hq ? h('span', { class: 'os-fb-fl' }, h('b', { class: 'num', text: floorNo(i, plan.floors.length) }), h('span', { text: f.label })) : null,
       h('div', { class: 'os-fb-rooms' }, f.rooms.map(cell))))),
     h('div', { class: 'os-fb-base', 'aria-hidden': 'true' })),
   why ? h('p', { class: 'os-fb-note', text: t(why) }) : null);
@@ -1074,11 +1254,10 @@ function drawLinks() {
   const NS = 'http://www.w3.org/2000/svg';
   const el = (tag, attrs) => { const x = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) x.setAttribute(k, v); return x; };
   const r1 = (v) => Math.round(v * 10) / 10;
-  const hot = document.activeElement && document.activeElement.closest && document.activeElement.closest('#osCards .os-card');
   svg.replaceChildren(...lines.map((l) => {
     const ex = l.cx + (l.tx - l.cx) * (l.f === undefined ? 0.5 : l.f);
     const d = l.ty === l.cy ? `M${r1(l.cx)} ${r1(l.cy)}H${r1(l.tx)}` : `M${r1(l.cx)} ${r1(l.cy)}H${r1(ex)}V${r1(l.ty)}H${r1(l.tx)}`;
-    return el('path', { class: `os-link${hot === cards[l.i] ? ' on' : ''}`, id: `os-link-${l.i}`, d });
+    return el('path', { class: `os-link${l.i === osCardHov || l.i === osCardFoc ? ' on' : ''}`, id: `os-link-${l.i}`, d });
   }), ...lines.map((l) => el('circle', { class: 'os-link-dot', cx: r1(l.tx), cy: r1(l.ty), r: 2.5 })));
 }
 
@@ -1101,8 +1280,9 @@ function renderHero() {
       const sig = JSON.stringify(plan);
       if (sig !== osPlanSig) { osScene.show(plan); osPlanSig = sig; osLayoutFrames = 2; }
       const ids = planRooms(plan);
-      // التحديد بس لو فيه أكثر من غرفة (المدير والمهندسين غرفة وحدة: الإطار البرتقالي ما يضيف شي)
-      osScene.update(Object.fromEntries(ids.map((id) => [id, { waiting: num(rs[id] && rs[id].waiting), working: num(rs[id] && rs[id].working), alert: num(rs[id] && rs[id].alert) }])), ids.length > 1 && ids.includes(state.desk) ? state.desk : null);
+      // التحديد بس لو فيه أكثر من غرفة (المدير والمهندسين غرفة وحدة: الإطار البرتقالي ما يضيف شي)، وبالمقر لا
+      // (ضغطة الغرفة هناك تفتح شريحة فريقها — إطار ثابت على المدير يتلخبط مع تبريز البطاقات)
+      osScene.update(Object.fromEntries(ids.map((id) => [id, { waiting: num(rs[id] && rs[id].waiting), working: num(rs[id] && rs[id].working), alert: num(rs[id] && rs[id].alert) }])), plan.kind !== 'hq' && ids.length > 1 && ids.includes(state.desk) ? state.desk : null);
       kick();
     } catch (e) { fail3d(e); return; }
   }

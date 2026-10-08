@@ -586,7 +586,7 @@ function createCompanyOS(canvas, opts) {
     c.strokeStyle = 'rgba(241,85,29,0.35)';
     c.lineWidth = Math.max(1, u * 0.7);
     c.strokeRect(c.lineWidth / 2, c.lineWidth / 2, w - c.lineWidth, h - c.lineWidth);
-    const pad = 8 * u;
+    const pad = 6 * u;
     const ar = ARX.test(text);
     const al = L.rtl ? 'right' : 'left';
     const x = L.rtl ? w - pad : pad;
@@ -596,8 +596,9 @@ function createCompanyOS(canvas, opts) {
     const maxW = w - 2 * pad;
     const extraH = extra && extra.length ? Math.min(extra.length, 3) * 9 * u : 0;
     const availH = h - 2 * pad - extraH;
-    // سطر أو سطرين، أيهم يطلع أكبر
-    let lines = [t], size = fitSize(c, t, availH * 0.62, maxW, weight, fam, 4);
+    // النص يعبّي اللوحة (الجدار الجانبي يبان مضغوط): سطر أو سطرين، أيهم يطلع أكبر. Anton حروفه كبيرة (~٧٠٪ من المقاس)
+    const k1 = ar ? 0.7 : 0.98, k2 = ar ? 0.4 : 0.5;
+    let lines = [t], size = fitSize(c, t, availH * k1, maxW, weight, fam, 4);
     const words = t.split(' ');
     if (words.length > 1) {
       c.font = `${weight} 20px ${fam}`;
@@ -609,11 +610,11 @@ function createCompanyOS(canvas, opts) {
       }
       const two = best.two;
       {
-        const s2 = Math.min(availH * 0.4, ...two.map((ln) => fitSize(c, ln, availH * 0.4, maxW, weight, fam, 4)));
-        if (s2 > size * 1.15) { lines = two; size = s2; }
+        const s2 = Math.min(availH * k2, ...two.map((ln) => fitSize(c, ln, availH * k2, maxW, weight, fam, 4)));
+        if (s2 > size * 1.12) { lines = two; size = s2; }
       }
     }
-    const lh = size * (ar ? 1.18 : 1.02);
+    const lh = size * (ar ? 1.2 : 0.98);
     const blockH = lines.length * lh;
     let y = pad + (availH - blockH) / 2 + lh / 2;
     for (const ln of lines) { tx(c, ln, x, y, { size, weight, fam, color: SC.orange, align: al, ls: ar ? 0 : size * 0.02 }); y += lh; }
@@ -624,20 +625,6 @@ function createCompanyOS(canvas, opts) {
         ey += 9 * u;
       }
     }
-  }
-  /** شريط اسم الغرفة فوق الشاشات (المقر) */
-  function drawStrip(c, w, h, text, L) {
-    c.fillStyle = '#16120F';
-    c.fillRect(0, 0, w, h);
-    c.fillStyle = 'rgba(241,85,29,0.5)';
-    c.fillRect(0, h - Math.max(1, h * 0.05), w, Math.max(1, h * 0.05));
-    const pad = h * 0.32;
-    const sq = h * 0.2;
-    const ar = ARX.test(text);
-    c.fillStyle = SC.orange;
-    if (L.rtl) c.fillRect(w - pad - sq, h / 2 - sq / 2, sq, sq); else c.fillRect(pad, h / 2 - sq / 2, sq, sq);
-    const size = fitSize(c, text, h * 0.5, w - 2 * pad - sq * 2, ar ? 700 : 600, ar ? FK : FM, h * 0.28);
-    tx(c, text, L.rtl ? w - pad - sq * 1.9 : pad + sq * 1.9, h / 2, { size, weight: ar ? 700 : 600, color: SC.orange, align: L.rtl ? 'right' : 'left', upper: true, ls: size * 0.06 });
   }
   /** لوحة «الرؤية» بغرفة المدير */
   function drawVision(c, w, h, text, L) {
@@ -1006,12 +993,13 @@ function createCompanyOS(canvas, opts) {
     }
     // اللوحات النصية (أطلس لكل غرفة) + لافتة السطح + شعار المكعب
     buildAtlases();
-    const signW = (rx1 - rx0) * 0.94, signH = ROOF * 0.8;
+    // شرائح الفرق: اللافتة بالجزء العلوي من واجهة السقف — تحتها لافتة الغرفة العليا (لافتات الأقسام بالصفحة) على حافة السقف
+    const signW = (rx1 - rx0) * 0.94, signH = ROOF * (d.hq ? 0.8 : 0.64), signY = yTop + ROOF * (d.hq ? 0.5 : 0.6);
     b.sign = { w: signW, h: signH, canvas: null, tex: null };
     b.sign.mat = new T3.MeshBasicMaterial({ transparent: true, toneMapped: false, depthWrite: false });
     b.mats.push(b.sign.mat);
     const sm = meshOf(new T3.PlaneGeometry(signW, signH), b.sign.mat, false, false);
-    sm.position.set(((rx0 + rx1) / 2) * M, yTop + ROOF / 2, rz1 + 0.006);
+    sm.position.set(((rx0 + rx1) / 2) * M, signY, rz1 + 0.006);
     b.logo = { size: CUBE * 0.62 };
     b.logo.mat = new T3.MeshBasicMaterial({ transparent: true, toneMapped: false, depthWrite: false });
     b.mats.push(b.logo.mat);
@@ -1111,15 +1099,8 @@ function createCompanyOS(canvas, opts) {
       const FHr = y1 - y0;
       const [vlo, vhi] = band(R);
       const hqSmall = d.hq;
-      let top = Math.min(y1 - (hqSmall ? 0.16 : 0.24), vhi - 0.06);
-      // شريط الاسم فوق الشاشات (المقر)
-      if (hqSmall) {
-        const sh = 0.34;
-        if (top - sh - 0.55 > Math.max(vlo, y0 + 1.15)) {
-          R.panels.push({ kind: 'strip', u: (u0 + u1) / 2, y: top - sh / 2, z: zb + 0.03, w: rw - 0.5, h: sh, wall: 'back' });
-          top -= sh + 0.1;
-        }
-      }
+      // اسم الغرفة بالمقر: لافتة الصفحة على البلاطة فوق الغرفة (بدل شريط صغير فوق الشاشات ما ينقرا)
+      const top = Math.min(y1 - (hqSmall ? 0.16 : 0.24), vhi - 0.06);
       const floorLo = y0 + (hqSmall ? 1.32 : 1.36);
       let bot = Math.max(floorLo, vlo + 0.1, top - (hqSmall ? 1.25 : 2.0));
       if (top - bot < 0.55) bot = top - 0.55;
@@ -1164,16 +1145,26 @@ function createCompanyOS(canvas, opts) {
           u += ws[i] + gap;
         });
       }
-      // لوحة الاسم على الجدار الجانبي المصمت + «الرؤية» للمدير
+      // لوحة الاسم على الجدار الجانبي المصمت + «الرؤية» للمدير. الجدار الجانبي يبان مايل (مضغوط بالعرض)، فاللوحة تاخذ
+      // أغلب الجدار بين الشاشة/«الرؤية» الجانبية ومقدّمة الغرفة، وارتفاعها من فوق النبتة الأمامية لتحت لافتة الغرفة
+      // (لافتة الصفحة معلّقة تحت السقف بنفس الزاوية). بس بالغرفة الوحدة (المدير، المهندسين — الدور عالي وفيه مكان تحت
+      // اللافتة)؛ المقر وشرائح الأدوار: لافتة الصفحة هي اسم الغرفة (لوحة تحتها مباشرة = اسم مكرر نصّه مغطّى)
       if (R.solid) {
-        const ph = Math.min(FHr * 0.5, 1.6), pw = Math.min(D * 0.42, 2.5);
-        const py = Math.min(y1 - 0.35 - ph / 2, Math.max(y0 + 1.45 + ph / 2, (top + bot) / 2));
-        const extra = R.type === 'eng' ? ((R.screens.find((s) => s.type === 'flow') || {}).steps || []) : null;
-        const side = R.panels.some((p) => p.late);
-        R.panels.push({ kind: 'label', text: R.floorLabel || R.label, extra, u: u0 + 0.03, y: py, z: zb + D * (side ? 0.64 : 0.5), w: Math.min(pw, side ? D * 0.4 : pw), h: ph, wall: 'side' });
+        let sideEnd = zb + D * 0.16;
+        for (const p of R.panels) if (p.wall === 'side') sideEnd = Math.max(sideEnd, p.z + p.w / 2 + 0.18);
         if (R.type === 'ceo' && D >= 4.6 && !meet) {
           const vw = Math.min(1.25, D * 0.22), vh = Math.min(FHr * 0.42, vw * 1.3);
           R.panels.push({ kind: 'vision', text: R.vision, u: u0 + 0.052, y: Math.min(y1 - 0.3 - vh / 2, y0 + 1.5 + vh / 2), z: zb + 0.45 + vw / 2, w: vw, h: vh, wall: 'side', frame: true });
+          sideEnd = Math.max(sideEnd, zb + 0.45 + vw + 0.18);
+        }
+        if (d.single) {
+          const zEnd = zf - 0.32;
+          const pw = Math.max(1.2, Math.min(zEnd - sideEnd, 4.2));
+          const yLo = y0 + 1.3, yHi = y1 - 0.72;
+          const ph = Math.max(0.8, Math.min(yHi - yLo, d.single ? 2.5 : 2.2));
+          const py = Math.min(yHi - ph / 2, Math.max(yLo + ph / 2, (top + bot) / 2));
+          const extra = R.type === 'eng' ? ((R.screens.find((s) => s.type === 'flow') || {}).steps || []) : null;
+          R.panels.push({ kind: 'label', text: R.floorLabel || R.label, extra, u: u0 + 0.03, y: py, z: Math.min(zEnd - pw / 2, Math.max(sideEnd + pw / 2, zb + D * 0.58)), w: pw, h: ph, wall: 'side' });
         }
       }
       // الإطارات السود ورا الشاشات
@@ -1574,7 +1565,6 @@ function createCompanyOS(canvas, opts) {
         if (p.kind === 'screen') drawScreen(c, w, h, p.s, L);
         else if (p.kind === 'composite') { L.u = h / 100; L.pad = 5 * L.u; drawComposite(c, w, h, p.list, L); }
         else if (p.kind === 'label') drawLabel(c, w, h, p.text || '', L, p.extra);
-        else if (p.kind === 'strip') drawStrip(c, w, h, R.label || '', L);
         else if (p.kind === 'vision') drawVision(c, w, h, p.text || (P.lang === 'ar' ? 'نخلّي الرياضة أسهل وأقرب لكل الناس.' : 'Make fitness easier for everyone.'), L);
       } catch (e) { /* لوحة وحدة ما توقف الباقي */ }
       c.restore();
