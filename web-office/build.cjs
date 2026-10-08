@@ -7,7 +7,8 @@ const path = require('path');
 
 const DIR = __dirname;
 const read = (f) => fs.readFileSync(path.join(DIR, f), 'utf8');
-const css = read('src/style.css').trim();
+// style-os.css (واجهة نظام الشركة) بعد style.css عشان يستخدم رموزه ويغلب عليه
+const css = ['src/style.css', 'src/style-os.css'].map((f) => read(f).trim()).join('\n\n');
 const markup = read('src/markup.html').trim();
 const js = ['src/1-i18n.js', 'src/1b-i18n-app.js', 'src/2-core.js', 'src/3-ui.js', 'src/4-scene.js', 'src/5-app.js', 'src/6-main.js'].map(read).join('\n');
 const sample = JSON.parse(read('sample.json'));

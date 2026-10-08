@@ -1,0 +1,318 @@
+/* نظام الشركة: واجهة تبويب المكتب (الشعار والحالة، شريط الفرق، العنوان والبطاقات، المبنى، الخطوط، خط سير العمل)
+   يجي بعد style.css ويستخدم رموزه (القيم الاحتياطية بس لو رمز ناقص). كل الألوان رموز تشتغل بالفاتح والداكن */
+.os, .os-brand, .os-status, .os-today {
+  --os-mono: var(--font-mono, "IBM Plex Mono", "Noto Kufi Arabic", ui-monospace, monospace);
+  --os-disp: var(--font-display-en, "Anton", "IBM Plex Sans", sans-serif);
+  --os-disp-ar: var(--font-display-ar, "Noto Kufi Arabic", sans-serif);
+  --os-acc: var(--accent, #F1551D);
+  --os-tick: var(--tick, var(--accent, #F1551D));
+  --os-shell: var(--shell, #FFFFFF);
+  --os-shell-ink: #121212; /* حبر على الغلاف الأبيض (الغلاف فاتح بالثيمين) */
+  --os-screen: var(--screen, #101211);
+  --os-screen-2: var(--screen-2, #171A19);
+  --os-screen-line: var(--screen-line, rgba(255, 255, 255, 0.08));
+  --os-screen-text: var(--screen-text, #F4F4F0);
+  --os-screen-muted: var(--screen-muted, rgba(244, 244, 240, 0.6));
+  --os-idle: var(--screen-up, #3DDC84);
+}
+:root[lang="en"] .os, :root[lang="en"] .os-brand, :root[lang="en"] .os-status, :root[lang="en"] .os-today { --os-ls: 0.05em; }
+/* بالعربي الكوفي أول: مسافات الخط أحادي العرض تفرّق الكلمات العربية. الأرقام تبقى IBM Plex Mono (--os-num) */
+.os, .os-brand, .os-status, .os-today { --os-num: "IBM Plex Mono", ui-monospace, monospace; }
+:root[lang="ar"] .os, :root[lang="ar"] .os-brand, :root[lang="ar"] .os-status, :root[lang="ar"] .os-today { --os-mono: "Noto Kufi Arabic", "IBM Plex Mono", ui-monospace, sans-serif; }
+
+/* ---------- الشعار والحالة (الشريط العلوي) ---------- */
+.os-brand { gap: 12px; }
+.os-brand .logo.os-mark { width: 38px; height: 38px; border-radius: 0; background: none; box-shadow: none; color: var(--os-acc); display: grid; place-items: center; flex: none; }
+.os-brand .logo.os-mark svg { width: 36px; height: 36px; }
+.os-brand h1 { margin: 0; font-family: var(--os-mono); font-size: 17px; font-weight: 700; line-height: 1.2; letter-spacing: var(--os-ls, 0); text-transform: uppercase; color: var(--text); }
+.os-brand .sub { margin: 3px 0 0; font-family: var(--os-mono); font-size: 12.5px; font-weight: 500; line-height: 1.2; letter-spacing: var(--os-ls, 0); text-transform: uppercase; color: var(--accent-ink, #B83D0E); }
+:root[lang="ar"] .os-brand h1 { font-family: var(--os-disp-ar); font-weight: 800; font-size: 18px; }
+:root[lang="ar"] .os-brand .sub { font-family: var(--os-disp-ar); font-weight: 600; }
+.os-status .conn { height: auto; padding: 4px 0; background: none; border: 0; border-radius: 0; gap: 7px; font-family: var(--os-mono); font-size: 12px; font-weight: 600; letter-spacing: var(--os-ls, 0); text-transform: uppercase; color: var(--text); white-space: nowrap; }
+.os-status .os-k { color: var(--muted); font-weight: 500; }
+.os-status .conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); box-shadow: none; animation: none; }
+.os-status .conn.live .dot { background: var(--os-acc); box-shadow: 0 0 0 3px var(--wait-bg, rgba(241, 85, 29, 0.16)); }
+.os-status .conn.live.warn .dot { background: var(--work, #FEA94F); box-shadow: 0 0 0 3px var(--work-bg, rgba(254, 169, 79, 0.2)); }
+.os-status .conn.connecting .dot { background: var(--work, #FEA94F); animation: osPulse 1.2s ease-in-out infinite; }
+.os-status .conn.sample .dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--os-acc); }
+.os-status .conn.error .dot, .os-status .conn.stale .dot { background: var(--fail, #C23A12); }
+.os-status .updated { font-family: var(--os-mono); font-size: 11.5px; color: var(--muted); }
+@keyframes osPulse { 50% { opacity: 0.35; } }
+
+/* ---------- الواجهة ---------- */
+.os {
+  position: relative; display: flex; flex-direction: column; gap: 14px; padding: 14px 18px 14px; min-width: 0;
+  /* علامات الزوايا البرتقالية */
+  background:
+    linear-gradient(var(--os-tick) 0 0) left top / 16px 1.5px no-repeat, linear-gradient(var(--os-tick) 0 0) left top / 1.5px 16px no-repeat,
+    linear-gradient(var(--os-tick) 0 0) right top / 16px 1.5px no-repeat, linear-gradient(var(--os-tick) 0 0) right top / 1.5px 16px no-repeat,
+    linear-gradient(var(--os-tick) 0 0) left bottom / 16px 1.5px no-repeat, linear-gradient(var(--os-tick) 0 0) left bottom / 1.5px 16px no-repeat,
+    linear-gradient(var(--os-tick) 0 0) right bottom / 16px 1.5px no-repeat, linear-gradient(var(--os-tick) 0 0) right bottom / 1.5px 16px no-repeat;
+}
+
+/* شريط الفرق */
+.os-strip { position: relative; z-index: 3; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.os-chips { display: flex; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 3px; margin: -3px; scroll-behavior: smooth; }
+.os-chips::-webkit-scrollbar { display: none; }
+.os-tab { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding-inline: 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted);
+  font-family: var(--os-mono); font-size: 12px; font-weight: 600; letter-spacing: var(--os-ls, 0); text-transform: uppercase; white-space: nowrap; }
+.os-tab svg.ic { color: var(--os-acc); }
+.os-tab:hover { border-color: var(--line-strong); color: var(--text); }
+.os-tab[aria-current="true"] { background: var(--text); border-color: var(--text); color: var(--bg); }
+.os-tab-b { min-width: 19px; height: 19px; padding-inline: 5px; border-radius: 10px; background: var(--os-acc); color: #1A0B04; font: 700 11px/19px var(--os-num); text-align: center; letter-spacing: 0; }
+.os-nav { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--text); display: grid; place-items: center; padding: 0; }
+.os-nav:hover { border-color: var(--os-acc); color: var(--os-acc); }
+.os-count { flex: none; height: 26px; padding-inline: 11px; border-radius: 999px; background: var(--chip, rgba(0, 0, 0, 0.06)); color: var(--muted); font: 600 12px/26px var(--os-num); white-space: nowrap; direction: ltr; }
+
+/* الشبكة: عمود النص (~38%) والمبنى (~62%). بالعربي العمود الأول يمين لحاله */
+.os-grid {
+  position: relative; display: grid; min-width: 0;
+  grid-template-columns: minmax(0, 33fr) minmax(0, 67fr);
+  grid-template-areas: "head stage" "cards stage" "ver flow";
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  column-gap: clamp(20px, 3vw, 48px); row-gap: 14px;
+}
+.os-head { grid-area: head; min-width: 0; padding-top: 2px; }
+.os-h { margin: 0; color: var(--text); font-family: var(--os-disp); font-weight: 400; font-size: clamp(48px, 5.5vw, 104px); line-height: 0.92; letter-spacing: 0.005em; text-transform: uppercase; overflow-wrap: anywhere; }
+.os-h > span { display: block; }
+.os-h-b { white-space: nowrap; } /* الكلمة الملوّنة ونقطتها ما ينفصلون */
+.os-h em { font-style: normal; color: var(--os-acc); }
+:root[lang="ar"] .os-h { font-family: var(--os-disp-ar); font-weight: 900; font-size: clamp(40px, 4.6vw, 84px); line-height: 1.16; letter-spacing: 0; }
+/* العنوان على قد عمود النص: أطول كلمة («OPERATIONS» ≈ 4.5em، «المهندسين.» ≈ 6.1em) ما تنكسر بالشاشات المتوسطة */
+@supports (container-type: inline-size) {
+  .os-head { container-type: inline-size; }
+  .os-h { font-size: min(clamp(48px, 5.5vw, 104px), 21cqi); }
+  :root[lang="ar"] .os-h { font-size: min(clamp(40px, 4.6vw, 84px), 15cqi); }
+}
+.os-rule { display: block; width: 44px; height: 3px; background: var(--os-acc); margin: 18px 0 12px; }
+.os-tag { margin: 0; font-family: var(--os-mono); font-size: 15px; font-weight: 500; line-height: 1.5; color: var(--text); }
+.os-tag > span { display: block; }
+.os-tag-b { color: var(--accent-ink, #B83D0E); }
+
+/* البطاقات */
+.os-cards { grid-area: cards; display: flex; flex-direction: column; gap: 8px; min-width: 0; width: 100%; max-width: 400px; align-self: start; }
+/* المقر: ٦ بطاقات أقصر شوي عشان العمود ما يطول عن المبنى (وخط سير العمل يبقى بأول شاشة) */
+.os-cards.many { gap: 6px; }
+.os-cards.many .os-card { min-height: 52px; padding-block: 6px; }
+.os-card {
+  display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; grid-template-areas: "ic t chip" "ic d d"; column-gap: 12px; row-gap: 2px; align-items: center;
+  width: 100%; min-height: 58px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); text-align: start;
+  box-shadow: 0 1px 2px rgba(18, 18, 18, 0.04);
+}
+.os-card:hover { border-color: var(--line-strong); }
+.os-card.sel { border-color: var(--os-acc); box-shadow: inset 3px 0 0 var(--os-acc); }
+:root[dir="rtl"] .os-card.sel { box-shadow: inset -3px 0 0 var(--os-acc); }
+.os-card-ic { grid-area: ic; width: 38px; height: 38px; display: grid; place-items: center; color: var(--os-acc); }
+.os-card-ic svg.ic { width: 28px; height: 28px; stroke-width: 1.5; }
+.os-card-m { display: contents; }
+.os-card-t { grid-area: t; min-width: 0; font-family: var(--os-mono); font-size: 13px; font-weight: 700; line-height: 1.3; letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.os-card-d { grid-area: d; min-width: 0; font-family: var(--os-mono); font-size: 11px; line-height: 1.45; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.os-card > .os-chip { grid-area: chip; }
+.os-chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding-inline: 7px; border-radius: 999px; background: var(--chip, rgba(0, 0, 0, 0.06)); color: var(--muted); font: 600 10.5px/1 var(--os-mono); white-space: nowrap; letter-spacing: 0; }
+.os-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.os-chip.wait { background: var(--wait-bg); color: var(--wait-ink); }
+.os-chip.work { background: var(--work-bg); color: var(--work-ink); }
+.os-chip.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.os-chip.alert { background: var(--info-bg); color: var(--info-ink); }
+.os-chip.idle i { background: var(--faint); }
+.os-chip.plain { background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--text); }
+.os-chip.plain i { background: var(--os-acc); }
+
+/* المبنى */
+.os-stage { grid-area: stage; position: relative; min-width: 0; align-self: stretch;
+  /* أقل شي على قد الشاشة؛ ولو عمود النص (العنوان + البطاقات) أطول، المسرح يطول معه (المبنى ما يصغر عنه) */
+  min-height: clamp(480px, calc(100vh - var(--os-top, 240px) - 66px), 760px);
+  min-height: clamp(480px, calc(100svh - var(--os-top, 240px) - 66px), 760px); }
+.os-stage > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.os-hits { position: absolute; inset: 0; pointer-events: none; direction: ltr; z-index: 1; }
+.os-hit { position: absolute; pointer-events: auto; border: 0; padding: 0; margin: 0; background: transparent; border-radius: 6px; cursor: pointer; }
+.os-hit:hover { background: rgba(241, 85, 29, 0.07); box-shadow: inset 0 0 0 1px rgba(241, 85, 29, 0.45); }
+.os-hit:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 0; box-shadow: 0 0 0 4px var(--focus, var(--os-acc)), inset 0 0 0 2px var(--focus, var(--os-acc)); background: rgba(255, 255, 255, 0.1); }
+.os-badge { position: absolute; top: -11px; left: -11px; min-width: 22px; height: 22px; padding-inline: 6px; border-radius: 11px; background: var(--os-acc); color: #1A0B04; font: 700 12px/22px var(--os-num); text-align: center; box-shadow: 0 0 0 2px var(--os-shell), 0 2px 10px rgba(241, 85, 29, 0.4); pointer-events: none; }
+.os-badge.work { background: var(--work, #FEA94F); color: #1A1205; box-shadow: 0 0 0 2px var(--os-shell), 0 2px 10px rgba(254, 169, 79, 0.4); }
+.os-badge.alert { background: var(--info-ink, #2C54A6); color: var(--bg, #F2F2EF); box-shadow: 0 0 0 2px var(--os-shell), 0 2px 10px rgba(44, 84, 166, 0.35); }
+:root[dir="rtl"] .os-hit .os-badge { left: auto; right: -11px; }
+.os-hit.sm .os-badge { top: -9px; left: -9px; min-width: 18px; height: 18px; padding-inline: 4px; font-size: 10.5px; line-height: 18px; }
+:root[dir="rtl"] .os-hit.sm .os-badge { left: auto; right: -9px; }
+.os-links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 2; }
+.os-link { fill: none; stroke: var(--os-acc); stroke-width: 1.25; opacity: 0.7; stroke-linejoin: round; }
+.os-link.on { opacity: 1; stroke-width: 2; }
+.os-link-dot { fill: var(--os-acc); }
+.os-note { position: absolute; inset-inline: 0; bottom: 10px; text-align: center; font-family: var(--os-mono); font-size: 12px; color: var(--muted); }
+.os-stage.flat .os-links, .os-stage.flat .os-hits { display: none; }
+
+/* المبنى المسطّح (بدون WebGL أو زر 2D) */
+.os-flat { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 2% 5%; overflow: auto; }
+/* margin-block: auto = بالنص، ولو المبنى أطول من المسرح يبدأ من فوق (ما ينقص سقفه) */
+.os-fb { position: relative; width: min(100%, 660px); margin-top: auto; display: flex; flex-direction: column; align-items: stretch; filter: drop-shadow(0 14px 28px rgba(18, 18, 18, 0.12)); }
+.os-flat > :last-child { margin-bottom: auto; }
+/* الشاشات العريضة: المبنى المسطّح جنب عمود النص (مثل المشهد) */
+@media (min-width: 1000px) { .os-flat { align-items: flex-start; padding-inline: 4% 2%; } }
+.os-fb-cube { align-self: center; width: 84px; height: 66px; margin-bottom: -1px; background: var(--os-shell); border-radius: 4px 4px 0 0; display: grid; place-items: center; box-shadow: inset 0 -1px 0 rgba(18, 18, 18, 0.08); }
+.os-fb-cube svg { width: 42px; height: 42px; fill: none; stroke: var(--os-acc); stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+.os-fb-roof { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 16px 10px; background: var(--os-shell); border-radius: 10px 10px 0 0; color: var(--os-shell-ink);
+  font-family: var(--os-disp); font-size: 24px; line-height: 1.1; letter-spacing: 0.02em; text-transform: uppercase; border-bottom: 1px solid rgba(18, 18, 18, 0.08); }
+:root[lang="ar"] .os-fb-roof { font-family: var(--os-disp-ar); font-weight: 800; font-size: 21px; letter-spacing: 0; }
+.os-fb-roof svg.ic { color: var(--os-acc); width: 24px; height: 24px; stroke-width: 1.6; }
+.os-fb-floors { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; background: var(--os-shell); }
+.os-fb-floor { display: flex; gap: 6px; align-items: stretch; min-width: 0; padding-bottom: 6px; border-bottom: 3px solid rgba(18, 18, 18, 0.07); }
+.os-fb-floor:last-child { border-bottom: 0; padding-bottom: 0; }
+.os-fb-fl { flex: none; width: 78px; display: grid; place-items: center; padding: 6px; border-radius: 4px; background: var(--os-screen); color: var(--os-acc); text-align: center;
+  font: 700 10.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow-wrap: anywhere; }
+.os-fb-rooms { flex: 1; min-width: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.os-cell { position: relative; min-width: 0; min-height: 62px; display: flex; flex-direction: column; justify-content: flex-start; gap: 5px; padding: 8px 9px 9px; border: 0; border-radius: 4px; text-align: start;
+  background: linear-gradient(180deg, var(--os-screen-2), var(--os-screen)); color: var(--os-screen-text); box-shadow: inset 0 -3px 0 rgba(254, 169, 79, 0.18); }
+.os-cell:hover { box-shadow: inset 0 -3px 0 rgba(254, 169, 79, 0.18), inset 0 0 0 1px rgba(241, 85, 29, 0.6); }
+.os-cell.sel { box-shadow: inset 0 -3px 0 var(--os-acc), inset 0 0 0 1.5px var(--os-acc); }
+.os-cell-h { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.os-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--os-idle); flex: none; }
+.os-cell.waiting .os-dot { background: var(--os-acc); box-shadow: 0 0 0 3px rgba(241, 85, 29, 0.25); }
+.os-cell.working .os-dot { background: var(--work, #FEA94F); }
+.os-cell.alert .os-dot { background: #6E9BFF; box-shadow: 0 0 0 3px rgba(110, 155, 255, 0.25); }
+.os-cell-l { flex: 1; min-width: 0; color: var(--os-acc); font: 700 11.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.os-cell .os-badge { position: static; min-width: 18px; height: 18px; padding-inline: 5px; font-size: 10.5px; line-height: 18px; box-shadow: none; flex: none; }
+/* أرقام الغرفة مثل شاشة: العنوان صغير فوق والرقم كبير تحته، عمودين جنب بعض */
+.os-cell-ks { display: flex; flex-wrap: wrap; gap: 4px 22px; margin-top: auto; min-width: 0; }
+.os-cell-k { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 100%; font: 500 10px/1.35 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; color: var(--os-screen-muted); }
+.os-cell-k > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.os-cell-k b { color: var(--os-screen-text); font: 600 19px/1.2 var(--os-num); font-variant-numeric: tabular-nums; }
+.os-fb.hq .os-cell-k b { font-size: 14px; }
+/* المقر المسطّح (٦ أدوار): الرقم جنب عنوانه بسطر واحد والمكعب أصغر — المبنى كله داخل المسرح */
+.os-fb.hq .os-cell-k { flex-direction: row; align-items: baseline; gap: 8px; }
+.os-fb.hq .os-cell-k > span { flex: 1; }
+.os-fb.hq .os-cell { gap: 3px; padding-block: 7px 8px; }
+.os-fb.hq .os-fb-floors { gap: 5px; }
+.os-fb.hq .os-fb-floor { padding-bottom: 5px; }
+.os-fb.hq .os-fb-cube { width: 70px; height: 50px; }
+.os-fb.hq .os-fb-cube svg { width: 34px; height: 34px; }
+.os-fb.hq .os-fb-roof { padding-block: 9px 8px; }
+.os-cell-k b.txt { font: 600 12.5px/1.35 var(--os-mono); letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.os-fb.hq .os-cell { min-height: 54px; }
+/* غرفة وحدة (المدير، المهندسين): غرفة طويلة فيها الأرقام وخط البناء والقائمة */
+.os-fb.single .os-cell { min-height: 300px; padding: 14px 16px 16px; gap: 14px; justify-content: flex-start; }
+.os-fb.single .os-cell-l { font-size: 13px; }
+.os-fb.single .os-cell-ks { margin-top: 0; gap: 10px 28px; }
+.os-fb.single .os-cell-k b { font-size: 24px; }
+.os-cell-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font: 600 11px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; color: var(--os-screen-text); }
+.os-cell-step { display: inline-flex; align-items: center; gap: 8px; }
+.os-cell-step i { font-style: normal; color: var(--os-acc); }
+.os-cell-list { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--os-screen-line); }
+.os-cell-lt { font: 600 10px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; color: var(--os-screen-muted); }
+.os-cell-row { display: flex; align-items: center; gap: 8px; min-width: 0; font: 500 11.5px/1.35 var(--os-mono); color: var(--os-screen-text); }
+.os-cell-row i { width: 6px; height: 6px; border-radius: 50%; background: var(--os-screen-muted); flex: none; }
+.os-cell-row.wait i { background: var(--os-acc); }
+.os-cell-row.work i { background: var(--work, #FEA94F); }
+.os-cell-row.ok i { background: var(--os-idle); }
+.os-cell-rt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.os-cell-rm { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--os-screen-muted); font: 500 10.5px/1.35 var(--os-mono); }
+.os-fb-base { height: 16px; margin-inline: -16px; background: var(--os-shell); border-radius: 0 0 6px 6px; box-shadow: inset 0 -3px 0 var(--os-acc), 0 6px 18px rgba(241, 85, 29, 0.18); }
+.os-fb-note { margin: 0; font-family: var(--os-mono); font-size: 11.5px; color: var(--muted); text-align: center; max-width: 520px; }
+
+/* خط سير العمل وشريحة الإصدار */
+/* بالشاشات العريضة يبدأ من جهة النص ويتحرك تحت نص المبنى (placeFlow يحط margin-inline-start) */
+.os-flow { grid-area: flow; justify-self: start; align-self: start; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: thin; margin-top: -20px;
+  padding: 12px 24px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); box-shadow: 0 1px 2px rgba(18, 18, 18, 0.04), 0 10px 24px -14px rgba(18, 18, 18, 0.18); }
+.os-steps { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 14px; white-space: nowrap; }
+.os-step { display: inline-flex; align-items: center; gap: 9px; color: var(--text); font: 600 12px/1.2 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; }
+.os-step > svg.ic { width: 24px; height: 24px; color: var(--os-acc); stroke-width: 1.5; }
+.os-arr { display: inline-flex; color: var(--text); margin-inline-end: 6px; }
+.os-arr svg.ic { width: 30px; height: 20px; stroke-width: 1.3; }
+.os-step-n { padding: 2px 6px; border-radius: 6px; background: var(--chip, rgba(0, 0, 0, 0.06)); color: var(--text); font: 700 11px/1.2 var(--os-num); letter-spacing: 0; }
+.os-step-n.wait { background: var(--wait-bg); color: var(--wait-ink); }
+.os-step-n.work { background: var(--work-bg); color: var(--work-ink); }
+.os-step-n.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.os-ver { grid-area: ver; justify-self: start; align-self: end; display: inline-flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(241, 85, 29, 0.5);
+  font: 500 11.5px/1.35 var(--os-mono); letter-spacing: var(--os-ls, 0); color: var(--text); }
+.os-ver-ic { color: var(--os-acc); font-weight: 700; font-size: 17px; direction: ltr; unicode-bidi: isolate; }
+.os-ver-t { display: flex; flex-direction: column; }
+.os-ver-b { color: var(--accent-ink, #B83D0E); }
+.os-caret { font-style: normal; animation: osBlink 1.1s steps(1) infinite; }
+@keyframes osBlink { 50% { opacity: 0; } }
+
+/* السطر الأخير: الألوان، 3D/2D، والأرقام */
+.os-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding-top: 12px; border-top: 1px dashed var(--line-strong); }
+.os-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font: 500 11.5px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; color: var(--muted); }
+.os-lg { display: inline-flex; align-items: center; gap: 6px; }
+.os-lg i { width: 9px; height: 9px; border-radius: 2px; background: var(--os-idle); }
+.os-lg.wait i { background: var(--os-acc); }
+.os-lg.work i { background: var(--work, #FEA94F); }
+.os-lg.alert i { background: var(--info-ink, #2C54A6); }
+.os-view { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); }
+.os-view button { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding-inline: 10px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: 600 11.5px/1 var(--os-mono); }
+.os-view button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.os-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-inline-start: auto; min-width: 0; }
+.os-stat { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font: 500 11.5px/1.3 var(--os-mono); white-space: nowrap; }
+.os-stat b { color: var(--text); font: 700 15px/1.2 var(--os-num); font-variant-numeric: tabular-nums; }
+.os-stat b.txt { font-family: var(--os-mono); font-size: 13.5px; }
+.os-stat.wait b { color: var(--wait-ink); }
+.os-stat.work b { color: var(--work-ink); }
+
+/* اليوم للحين (تحت الواجهة) */
+.os-today { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+.os-today-t { margin: 0; display: inline-flex; align-items: center; gap: 8px; font: 700 12px/1.3 var(--os-mono); letter-spacing: var(--os-ls, 0); text-transform: uppercase; color: var(--text); white-space: nowrap; }
+.os-today-t::before { content: ""; width: 8px; height: 8px; background: var(--os-acc); flex: none; }
+.os-today-g { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px 16px; }
+.os-today-i { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.os-today-i b { font: 700 19px/1.2 var(--os-num); font-variant-numeric: tabular-nums; color: var(--text); }
+.os-today-i span { font-size: 11px; line-height: 1.35; color: var(--muted); }
+.os-today-i.hot b { color: var(--wait-ink); }
+
+/* تبديل الشريحة: ظهور تدريجي ١٨٠ms */
+@keyframes osIn { from { opacity: 0; } to { opacity: 1; } }
+.os-grid.os-in .os-head, .os-grid.os-in .os-cards, .os-grid.os-in .os-flow, .os-grid.os-in .os-stage > canvas, .os-grid.os-in .os-flat, .os-grid.os-in .os-links { animation: osIn 180ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .os-caret, .os-status .conn.connecting .dot { animation: none; }
+  .os-grid.os-in * { animation: none !important; }
+  .os-chips { scroll-behavior: auto; }
+}
+
+/* أقل من ١٠٠٠: فوق بعض (العنوان ← المبنى ← البطاقات ← خط العمل)، بدون خطوط */
+@media (max-width: 999px) {
+  .os { padding: 12px 12px 12px; }
+  .os-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "stage" "cards" "flow" "ver"; grid-template-rows: none; row-gap: 14px; }
+  .os-stage { height: auto; min-height: 0; align-self: start; aspect-ratio: 1 / 1.05; max-height: 86vh; width: 100%; justify-self: center; }
+  /* أدوار كثيرة = مبنى طويل (المسرح أطول عشان ما يصغر)، وغرفة وحدة = عريض */
+  .os-stage[data-shape="tall"] { aspect-ratio: 1 / 1.32; }
+  .os-stage[data-shape="mid"] { aspect-ratio: 1 / 1.12; }
+  .os-stage[data-shape="wide"] { aspect-ratio: 1 / 0.92; }
+  /* المسطّح بالجوال: طوله على قد المبنى (بدون تمرير داخلي) */
+  .os-stage.flat { aspect-ratio: auto; max-height: none; }
+  .os-stage.flat .os-flat { position: relative; inset: auto; padding: 4px 8px 0; overflow: visible; }
+  .os-cards { max-width: none; }
+  .os-flow { justify-self: stretch; margin-top: 0; }
+  .os-links { display: none; }
+  .os-stats { margin-inline-start: 0; }
+  .os-today-g { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .os-h { font-size: clamp(38px, 12.5vw, 60px); }
+  :root[lang="ar"] .os-h { font-size: clamp(34px, 10.5vw, 52px); }
+  .os-rule { margin: 14px 0 10px; }
+  .os-tag { font-size: 13.5px; }
+  .os-tab { height: 32px; padding-inline: 10px; }
+  .os-count { display: none; }
+  .os-fb-floor { flex-direction: column; gap: 4px; }
+  .os-fb-fl { width: auto; place-items: center start; padding: 3px 8px; font-size: 10px; }
+  .os-steps { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); row-gap: 10px; column-gap: 10px; white-space: normal; }
+  .os-step:nth-child(odd) .os-arr { display: none; }
+  .os-arr svg.ic { width: 20px; height: 16px; }
+  .os-flow { padding: 10px 14px; }
+  .os-today { flex-direction: column; align-items: stretch; }
+  .os-fb-floors { padding: 6px 6px 8px; gap: 5px; }
+  .os-fb-rooms { gap: 4px; }
+  .os-cell { padding: 6px 6px 7px; min-height: 52px; }
+  .os-fb.hq .os-cell { min-height: 46px; }
+  .os-fb.hq .os-cell-ks { display: none; }
+  /* المقر بالجوال: ٤ غرف بالدور، فالشارة على الزاوية والاسم ياخذ العرض كله */
+  .os-fb.hq .os-dot { display: none; }
+  .os-fb.hq .os-cell { padding-top: 8px; justify-content: center; }
+  .os-fb.hq .os-cell .os-badge { position: absolute; top: -6px; left: auto; right: auto; inset-inline-end: -4px; box-shadow: 0 0 0 2px var(--os-shell); }
+  .os-fb.hq .os-cell-l { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .os-cell-l { font-size: 10.5px; }
+  .os-fb-roof { font-size: 19px; padding: 9px 10px 8px; }
+  :root[lang="ar"] .os-fb-roof { font-size: 17px; }
+  .os-fb-cube { width: 64px; height: 50px; }
+  .os-fb-cube svg { width: 32px; height: 32px; }
+  .os-fb-base { margin-inline: -8px; }
+  .os-stat { padding: 4px 8px; }
+}

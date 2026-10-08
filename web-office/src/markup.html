@@ -1,15 +1,15 @@
 <div class="app" id="app">
   <header class="top">
-    <div class="brand">
-      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19 12 4l8 15" fill="none" stroke="#F8EDDA" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.2 13.5h7.6" stroke="#FEA94F" stroke-width="2.6" stroke-linecap="round"/></svg></span>
+    <div class="brand os-brand">
+      <span class="logo os-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20 12 4l8 16" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.9 14.2h8.2" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg></span>
       <div class="brand-text"><h1 id="title">مكتب أرك أب</h1><p class="sub" id="subtitle"></p></div>
     </div>
     <div class="top-tabs" role="tablist" id="topTabs" aria-label="">
       <button type="button" role="tab" id="topOffice" aria-controls="officeView" aria-selected="true"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg><span id="topOfficeL">المكتب</span></button>
       <button type="button" role="tab" id="topApp" aria-controls="appView" aria-selected="false" tabindex="-1"><svg class="ic sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2"/></svg><span id="topAppL">التطبيق</span></button>
     </div>
-    <div class="top-status">
-      <span class="conn connecting" id="conn" role="status"><span class="dot"></span><span id="connText"></span></span>
+    <div class="top-status os-status">
+      <span class="conn connecting" id="conn" role="status"><span class="os-k" id="connLbl"></span><span class="dot"></span><span id="connText"></span></span>
       <span class="updated" id="updated"></span>
     </div>
     <div class="controls">
@@ -26,28 +26,43 @@
   <div class="banner" id="banner" hidden></div>
 
   <div class="view" id="officeView" role="tabpanel" aria-labelledby="topOffice">
+  <section class="os" id="os" aria-labelledby="osTitle">
+    <div class="os-strip">
+      <button type="button" class="os-nav" id="osPrev"></button>
+      <div class="os-chips" id="osChips" role="group"></div>
+      <button type="button" class="os-nav" id="osNext"></button>
+      <span class="os-count num" id="osCount"></span>
+    </div>
+    <div class="os-grid" id="osGrid">
+      <div class="os-head">
+        <h2 class="os-h" id="osTitle"></h2>
+        <span class="os-rule" aria-hidden="true"></span>
+        <p class="os-tag" id="osTag"></p>
+      </div>
+      <div class="os-cards" id="osCards"></div>
+      <div class="os-stage" id="stage">
+        <canvas id="cv" aria-hidden="true"></canvas>
+        <div class="os-hits" id="signs"></div>
+        <div class="os-flat" id="grid2d" hidden></div>
+        <div class="os-note" id="stageNote" hidden></div>
+        <svg class="os-links" id="osLinks" aria-hidden="true"></svg>
+      </div>
+      <div class="os-flow" id="osFlow"></div>
+      <div class="os-ver" aria-hidden="true"><span class="os-ver-ic">&gt;_</span><span class="os-ver-t"><span id="osVerA"></span><span class="os-ver-b"><span id="osVerB"></span><i class="os-caret">_</i></span></span></div>
+    </div>
+    <div class="os-foot">
+      <div class="os-legend" id="legend"></div>
+      <div class="os-view" role="group" id="viewTg">
+        <button type="button" id="view3d" data-view="3d" aria-pressed="true"></button>
+        <button type="button" id="viewGrid" data-view="grid" aria-pressed="false"></button>
+      </div>
+      <div class="os-stats" id="stageFoot"></div>
+    </div>
+  </section>
+  <section class="os-today" id="todayStrip" aria-labelledby="todayT"></section>
+
   <main class="main" id="main">
     <section class="panel" id="deskPanel" aria-labelledby="deskName"></section>
-    <section class="stage-col" id="stageCol" aria-labelledby="stageTitle">
-      <div class="stage-head">
-        <h2 id="stageTitle"></h2>
-        <div class="right">
-          <div class="legend" id="legend"></div>
-          <div class="view-tg" role="group" id="viewTg">
-            <button type="button" id="view3d" data-view="3d" aria-pressed="true"></button>
-            <button type="button" id="viewGrid" data-view="grid" aria-pressed="false"></button>
-          </div>
-        </div>
-      </div>
-      <div class="stage" id="stage">
-        <canvas id="cv" aria-hidden="true"></canvas>
-        <div class="signs" id="signs"></div>
-        <div class="grid2d" id="grid2d" hidden></div>
-        <div class="stage-note" id="stageNote" hidden></div>
-      </div>
-      <div class="stage-foot" id="stageFoot"></div>
-      <div class="today" id="todayStrip"></div>
-    </section>
     <section class="panel" id="taskPanel" aria-labelledby="tasksTitle"></section>
   </main>
 

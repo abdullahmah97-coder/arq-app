@@ -254,12 +254,16 @@ async function runAgent(desk) {
 }
 
 // ===================== اختيار المكتب واللغة والثيم =====================
+/** يختار المكتب (لوحته تحت). لو الشريحة الحالية فريق ما فيه هالمكتب، نروح لشريحة فريقه (المقر يبقى المقر) */
 function selectDesk(id) {
   if (!DESK[id]) return;
   state.desk = id;
   store('desk', id);
+  const moved = state.slide !== 'hq' && !teamRooms(state.slide).includes(id) && switchSlide(teamOf(id));
   renderAll();
-  if (window.matchMedia('(max-width: 760px)').matches) $('deskPanel').scrollIntoView({ behavior: smooth(), block: 'start' });
+  if (moved) revealTab();
+  // الواجهة فوق بعض (أقل من ١٠٠٠): ننزل للوحة المكتب
+  if (window.matchMedia('(max-width: 999px)').matches) $('deskPanel').scrollIntoView({ behavior: smooth(), block: 'start' });
 }
 function applyLang() {
   const root = document.documentElement;
@@ -272,56 +276,146 @@ function applyTheme() {
 }
 
 // ===================== الرسم =====================
-let office3d = null;
+/** المبنى ثلاثي الأبعاد (createCompanyOS في 4-scene.js) — null = المبنى المسطّح */
+let osScene = null;
+let osLook = ''; // «الثيم|الاتجاه» اللي عند المشهد
+let osLayoutFrames = 0; // بعد show/resize: نعيد أماكن الأزرار والخطوط بعد كم إطار (المشهد يحسب الكاميرا وقت الرسم)
 let raf = 0;
 let stageVisible = true;
+let observed = false;
 const reducedMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+const pageDir = () => (document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr');
 function renderAll() {
   renderTop();
   renderBanner();
-  renderStageMeta();
+  syncStageTop();
+  renderHero();
   renderDeskPanel();
   renderTasks();
   renderDash();
   if (state.sheet) renderSheet();
   renderApp();
-  if (office3d) { try { office3d.update(deskStates(), state.desk); kick(); } catch (e) { fail3d(e); } }
+}
+/** الثيم والاتجاه للمشهد (بس لو تغيّروا) */
+function syncSceneLook() {
+  if (!osScene) return;
+  const theme = currentTheme(), dir = pageDir();
+  if (osLook === `${theme}|${dir}`) return;
+  const [pt, pd] = osLook.split('|');
+  try {
+    if (pt !== theme) osScene.setTheme(theme);
+    if (pd !== dir) osScene.setDir(dir);
+    osLook = `${theme}|${dir}`;
+    $('stage').dataset.look = osLook; // للفحص: وش الثيم والاتجاه اللي عند المشهد
+    osLayoutFrames = 2;
+    kick();
+  } catch (e) { fail3d(e); }
 }
 function loop(now) {
   raf = 0;
-  if (!office3d || document.hidden || !stageVisible || state.view !== '3d') return;
-  try { office3d.frame(reducedMotion() ? 0 : now / 1000); } catch (e) { fail3d(e); return; }
+  if (!osScene || document.hidden || !stageVisible || !show3d() || state.top !== 'office') return;
+  try { osScene.frame(reducedMotion() ? 0 : now / 1000); } catch (e) { fail3d(e); return; }
+  if (osLayoutFrames > 0) { osLayoutFrames--; renderHits(); drawLinks(); }
+  const note = $('stageNote');
+  const ready = sceneReady();
+  if (!note.hidden && ready) note.hidden = true;
   if (!reducedMotion()) raf = requestAnimationFrame(loop);
+  // تقليل الحركة: إطارات ثابتة بس لين تنحسب الأماكن ويجهز المشهد (الخطوط وصلت وانرسمت الشاشات)
+  else if (osLayoutFrames > 0 || !ready) raf = requestAnimationFrame(loop);
 }
 function kick() { if (!raf) raf = requestAnimationFrame(loop); }
+/** WebGL ما اشتغل أو طاح: نرجع للمبنى المسطّح (وزر 3D يتقفل). السبب للنص تحت المبنى:
+ * net = three.js ما تحمّل، lost = WebGL انفقد (يرجع لو المتصفح رجّعه)، device = غير كذا */
 function fail3d(e) {
-  if (office3d) { try { office3d.dispose(); } catch (x) { /* خلاص */ } }
-  office3d = null;
+  const had = osScene;
+  osScene = null;
+  osPlanSig = '';
   state.can3d = false;
-  if (e && window.console) console.warn('office 3D off:', e && e.message);
-  renderStageMeta();
+  const msg = str(e && e.message);
+  state.no3d = /^three_/.test(msg) ? 'net' : msg === 'context_lost' ? 'lost' : 'device';
+  if (had) { try { had.dispose(); } catch (x) { /* خلاص */ } }
+  // three.js ما وصل (محجوب/تأخّر) أو WebGL انفقد مؤقتاً: متوقّع والمسطّح يكفي — التحذير بس لأعطال المشهد نفسه
+  if (e && state.no3d === 'device' && window.console) console.warn('office 3D off:', msg);
+  renderHero();
+}
+/** الشاشة بدقة ثانية (نقلت النافذة لشاشة ثانية): نعيد مقاس المشهد ونتابع الدقة الجديدة */
+let dprMq = null;
+function watchDpr() {
+  try {
+    if (dprMq) dprMq.removeEventListener('change', onDpr);
+    dprMq = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    dprMq.addEventListener('change', onDpr);
+  } catch (e) { /* متصفح قديم */ }
+}
+function onDpr() { watchDpr(); layoutStage(); }
+/** مكان المسرح من فوق الصفحة (--os-top): ارتفاعه = الشاشة ناقص اللي فوقه، عشان خط سير العمل يبان بدون تمرير
+ * (شريط البيانات التجريبية يزيد اللي فوق) */
+let osTop = -1;
+function syncStageTop() {
+  const st = $('stage');
+  if (!st || state.top !== 'office') return;
+  const top = Math.round(st.getBoundingClientRect().top + window.scrollY);
+  if (top === osTop || top < 0) return;
+  osTop = top;
+  document.documentElement.style.setProperty('--os-top', `${top}px`);
+}
+/** مقاس المسرح تغيّر (أو اللغة/الشريحة): مقاس المشهد، أزرار الغرف، والخطوط */
+let osSize = '';
+let osAlign = -1;
+/** الشاشات العريضة: المبنى جنب عمود النص (خطوط أقصر)، وبالجوال بالنص */
+function syncAlign() {
+  const a = matchMedia('(min-width: 1000px)').matches ? 1 : 0;
+  if (!osScene || a === osAlign || typeof osScene.setAlign !== 'function') return false;
+  osScene.setAlign(a);
+  osAlign = a;
+  return true;
 }
 function layoutStage() {
-  const stage = $('stage');
-  const r = stage.getBoundingClientRect();
-  if (!office3d || r.width < 10 || r.height < 10) return;
-  office3d.resize(Math.round(r.width), Math.round(r.height));
-  stage.classList.toggle('compact', office3d.ppu() < 30);
-  renderSigns(deskStates());
-  kick();
+  syncStageTop();
+  const r = $('stage').getBoundingClientRect();
+  const size = `${Math.round(r.width)}x${Math.round(r.height)}@${window.devicePixelRatio || 1}`;
+  try { if (syncAlign()) { osLayoutFrames = 2; kick(); } } catch (e) { fail3d(e); return; }
+  if (osScene && r.width >= 10 && r.height >= 10 && size !== osSize) {
+    try { osScene.resize(Math.round(r.width), Math.round(r.height)); } catch (e) { fail3d(e); return; }
+    osSize = size;
+    osLayoutFrames = 2;
+    kick();
+  }
+  renderHits();
+  drawLinks();
 }
 function init3d() {
-  if (office3d || !state.can3d) return;
+  if (osScene || !state.can3d) return;
   try {
     const cv = $('cv');
-    cv.addEventListener('webglcontextlost', (e) => { e.preventDefault(); fail3d(new Error('context_lost')); });
-    office3d = createOffice3D(cv);
-    office3d.update(deskStates(), state.desk);
+    if (!observed) {
+      cv.addEventListener('webglcontextlost', (e) => { e.preventDefault(); fail3d(new Error('context_lost')); });
+      // المتصفح رجّع WebGL (مثلاً بعد ما رجعت للتبويب): نرجع الـ 3D
+      cv.addEventListener('webglcontextrestored', () => { if (!osScene && state.no3d === 'lost') { state.can3d = true; state.no3d = null; init3d(); } });
+    }
+    const theme = currentTheme(), dir = pageDir();
+    // onRedraw: المشهد أعاد رسم الشاشات (وصلت الخطوط) → إطار جديد (مع تقليل الحركة ما فيه حلقة رسم) ونخفي «نجهّز المبنى…»
+    osScene = createCompanyOS(cv, { theme, dir, onRedraw: () => { osLayoutFrames = Math.max(osLayoutFrames, 1); kick(); } });
+    osLook = `${theme}|${dir}`;
+    $('stage').dataset.look = osLook;
+    osPlanSig = '';
+    osAlign = -1;
+    syncAlign();
+    const r = $('stage').getBoundingClientRect();
+    osSize = '';
+    if (r.width >= 10 && r.height >= 10) { osScene.resize(Math.round(r.width), Math.round(r.height)); osSize = `${Math.round(r.width)}x${Math.round(r.height)}@${window.devicePixelRatio || 1}`; }
   } catch (e) { fail3d(e); return; }
-  if ('ResizeObserver' in window) new ResizeObserver(() => layoutStage()).observe($('stage'));
-  if ('IntersectionObserver' in window) {
-    new IntersectionObserver((en) => { stageVisible = en.some((x) => x.isIntersecting); if (stageVisible) kick(); }).observe($('stage'));
+  if (!observed) {
+    observed = true;
+    if ('ResizeObserver' in window) { const ro = new ResizeObserver(() => layoutStage()); ro.observe($('stage')); ro.observe($('osCards')); }
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver((en) => { stageVisible = en.some((x) => x.isIntersecting); if (stageVisible) kick(); }).observe($('stage'));
+    }
+    // الخطوط (الشاشات وعمود النص) تتغيّر مقاساتها لما توصل
+    try { document.fonts.ready.then(() => layoutStage()); document.fonts.addEventListener('loadingdone', () => layoutStage()); } catch (e) { /* متصفح قديم */ }
+    watchDpr();
   }
+  renderHero();
   layoutStage();
 }
 
@@ -333,7 +427,7 @@ function startTimers() {
   refreshTimer = setInterval(() => { if (!document.hidden && state.top === 'office' && autoRefreshOk() && !state.sheet) refresh(); }, REFRESH_MS);
   startAppTimer();
   // الأوقات النسبية («قبل دقيقة») تتحدّث كل ٣٠ ثانية بدون استعلام
-  clockTimer = setInterval(() => { if (!document.hidden) { renderTop(); renderTasks(); renderStageMeta(); } }, 30_000);
+  clockTimer = setInterval(() => { if (!document.hidden) { renderTop(); renderTasks(); renderHero(); } }, 30_000);
 }
 function stopTimers() { clearInterval(refreshTimer); clearInterval(clockTimer); clearTimeout(pollTimer); clearInterval(appTimer); }
 /** التحديث التلقائي: مع الاتصال الحي، أو لو Supabase ما ردّ (حتى لو ما وصلت بيانات للحين) — مرة وحدة كل دقيقة بالكثير.
@@ -344,17 +438,32 @@ const autoRefreshOk = () => !!mcp && (state.mode === 'live' || (state.mode === '
 function bind() {
   $('days7').addEventListener('click', () => setDays(7));
   $('days30').addEventListener('click', () => setDays(30));
-  $('refreshBtn').addEventListener('click', () => (state.top === 'app' ? appRefresh() : refresh(true)));
+  $('refreshBtn').addEventListener('click', () => {
+    if (state.top === 'app') { appRefresh(); return; }
+    if (state.slide === 'eng') syncEng(true);
+    refresh(true);
+  });
   $('langBtn').addEventListener('click', () => { state.lang = state.lang === 'ar' ? 'en' : 'ar'; store('lang', state.lang); applyLang(); renderAll(); layoutStage(); });
   $('themeBtn').addEventListener('click', () => { state.theme = currentTheme() === 'dark' ? 'light' : 'dark'; store('theme', state.theme); applyTheme(); renderTop(); });
   for (const b of [$('view3d'), $('viewGrid')]) {
     b.addEventListener('click', () => {
       state.view = b.dataset.view === 'grid' ? 'grid' : '3d';
       store('view', state.view);
-      renderStageMeta();
+      renderHero();
       if (state.view === '3d') layoutStage();
     });
   }
+  // شريط الفرق: السابق/التالي، والأسهم داخل الواجهة (بالعربي «التالي» يسار) — بدون ما ناخذ الأسهم من الحقول
+  $('osPrev').addEventListener('click', () => stepSlide(-1));
+  $('osNext').addEventListener('click', () => stepSlide(1));
+  $('os').addEventListener('keydown', (e) => {
+    if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.target && e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+    e.preventDefault();
+    const onTab = e.target && e.target.classList && e.target.classList.contains('os-tab');
+    stepSlide((e.key === 'ArrowRight') !== (pageDir() === 'rtl') ? 1 : -1);
+    if (onTab || !document.activeElement || document.activeElement === document.body) { const b = $(`os-tab-${state.slide}`); if (b) b.focus(); }
+  });
   const dlg = $('sheet');
   // وقت الاعتماد/الرفض الورقة ما تنقفل (Esc أو برّا الورقة) لين يوصل الرد
   const sheetBusy = () => !!(state.sheet && state.sheet.busy);
@@ -369,6 +478,9 @@ function bind() {
   });
   bindApp();
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderTop()); } catch (e) { /* متصفح قديم */ }
+  // تقليل الحركة انطفى/اشتغل من إعدادات الجهاز: نرجّع حلقة الرسم (أو إطار ثابت)
+  try { matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => kick()); } catch (e) { /* متصفح قديم */ }
+  window.addEventListener('resize', () => syncStageTop());
 }
 function setDays(d) {
   if (state.days === d) return;
@@ -392,13 +504,15 @@ function start() {
   bind();
   applyTop();
   renderAll();
-  // three.js يتحمّل async: لو وصل قبلنا نبدأ على طول، وإلا ننتظر حدث التحميل (ولو فشل نعرض البطاقات)
+  revealTab();
+  // three.js يتحمّل async: لو وصل قبلنا نبدأ على طول، وإلا ننتظر حدث التحميل (ولو فشل نعرض المبنى المسطّح)
   const tag = document.getElementById('three-js');
   if (typeof THREE !== 'undefined') init3d();
   else if (tag) {
-    tag.addEventListener('load', () => { init3d(); renderStageMeta(); });
+    tag.addEventListener('load', () => init3d());
     tag.addEventListener('error', () => fail3d(new Error('three_blocked')));
-    setTimeout(() => { if (!office3d && typeof THREE === 'undefined') fail3d(new Error('three_timeout')); }, 12_000);
+    setTimeout(() => { if (!osScene && state.can3d) { state.slow3d = true; renderHero(); } }, 1200);
+    setTimeout(() => { if (!osScene && typeof THREE === 'undefined') fail3d(new Error('three_timeout')); }, 12_000);
   } else fail3d(new Error('three_missing'));
   startTimers();
   if (!hasClaude) return;

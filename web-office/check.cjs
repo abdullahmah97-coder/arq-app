@@ -43,6 +43,19 @@ scripts.forEach((m, i) => {
   try { execFileSync(process.execPath, ['--check', f], { stdio: 'pipe' }); pass(`node --check inline script #${i + 1} (${(body.length / 1024).toFixed(0)} KB)`); }
   catch (e) { bad(`node --check inline script #${i + 1}`, String(e.stderr || e.message).slice(0, 400)); }
 });
+// واجهة نظام الشركة: style-os.css بعد style.css وبدون @import، عناصر الواجهة موجودة، والمسرح القديم انشال من الكود
+{
+  const osCss = fs.readFileSync(path.join(__dirname, 'src/style-os.css'), 'utf8');
+  expect(!/@import/.test(osCss), 'style-os.css has no @import');
+  const iBase = html.indexOf('/* مكتب أرك أب على الويب'), iOs = html.indexOf(osCss.trim().slice(0, 60));
+  expect(iBase >= 0 && iOs > iBase, 'style-os.css is built in after style.css');
+  const ids = ['os', 'osChips', 'osPrev', 'osNext', 'osCount', 'osTitle', 'osTag', 'osCards', 'stage', 'cv', 'signs', 'grid2d', 'stageNote', 'osLinks', 'osFlow', 'legend', 'view3d', 'viewGrid', 'stageFoot', 'todayStrip', 'connLbl', 'deskPanel', 'taskPanel'];
+  const missingIds = ids.filter((id) => !html.includes(`id="${id}"`));
+  expect(!missingIds.length, 'hero markup has every id the page script uses', missingIds.join(', '));
+  const pageJs = ['src/2-core.js', 'src/3-ui.js', 'src/5-app.js', 'src/6-main.js'].map((f) => fs.readFileSync(path.join(__dirname, f), 'utf8')).join('\n');
+  const old = ['createOffice3D', 'renderSigns', 'renderGrid', 'renderStageMeta', 'stage-col', 'card2d', 'desk-hit'].filter((x) => pageJs.includes(x) || html.slice(html.indexOf('<div class="app"'), html.indexOf('<script')).includes(x));
+  expect(!old.length, 'old stage code paths are gone (scene API is createCompanyOS)', old.join(', '));
+}
 // النصوص: كل مفتاح له عربي وإنجليزي، ونفس المتغيرات {…} بالاثنين، وكل t('…') بالكود له نص
 {
   const vm = require('vm');

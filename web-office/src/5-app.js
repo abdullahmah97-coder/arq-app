@@ -601,6 +601,8 @@ async function checkStatuses({ only = null, manual = false } = {}) {
           if (only) rs.msg = t('req_status_new', { s: t(`rs_${status}`) });
         } catch (e) { rs.err = friendly(e, 'request'); } finally { if (mine) rs.busy = null; }
       } else if (only && !moved) rs.msg = info.status ? t('req_status_same') : t('req_status_unknown');
+      // فحص ثاني (الفحص العام) سبقنا وحدّث نفس الطلب للحالة اللي قرأناها: نقول وش صارت بدل ما نسكت
+      else if (only && cur && cur.status !== r.status && cur.status === status && rs.busy !== 'cancel') rs.msg = t('req_status_new', { s: t(`rs_${status}`) });
     }
     if (only) rs.busy = null;
     if (stop) break;

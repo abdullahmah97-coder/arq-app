@@ -136,8 +136,13 @@ function renderTop() {
   const conn = $('conn');
   const stale = state.mode === 'live' && state.conn && state.conn.kind === 'unavailable';
   const m = stale ? 'stale' : state.mode;
-  conn.className = `conn ${m}`;
-  $('connText').textContent = t(m === 'error' && state.isSample ? 'conn_error_sample' : `conn_${m}`);
+  // «كل الأنظمة تعمل» بس لو مباشر وأرقام المكتب والمهام انحمّلت وما فيه أعطال بالتطبيق اليوم.
+  // قسم ما انحمّل (خطأ من القاعدة): «يعمل · بعض البيانات ما انحمّلت» — ما نقول «كل شي تمام» وحنا ما نعرف
+  const partial = m === 'live' && (!state.data || !!state.errs.overview || !!state.errs.tasks);
+  const errs = m === 'live' && !partial ? n(state.data, 'activity.errors.today') : 0;
+  conn.className = `conn ${m}${errs > 0 || partial ? ' warn' : ''}`;
+  $('connLbl').textContent = t('os_status');
+  $('connText').textContent = partial ? t('os_st_partial') : errs > 0 ? t('os_st_errors', { n: fmt(errs) }) : t(m === 'error' && state.isSample ? 'conn_error_sample' : `conn_${m}`);
   // «آخر تحديث» = آخر مرة وصلت نتيجة office_overview (حتى لو الاتصال انقطع بعدها)، وما نعرضه أبد مع بيانات تجريبية
   const liveShown = !state.isSample && (state.mode === 'live' || state.mode === 'error') && (state.data || state.tasks);
   $('updated').textContent = state.top === 'app' ? (liveShown && app.reqAt ? t('app_updated', { t: ago(new Date(app.reqAt).toISOString()) }) : '')
@@ -160,6 +165,7 @@ function renderTop() {
   lb.textContent = t('lang_switch');
   lb.setAttribute('lang', state.lang === 'ar' ? 'en' : 'ar');
   const dark = currentTheme() === 'dark';
+  syncSceneLook();
   const tb = $('themeBtn');
   tb.replaceChildren(icon(dark ? 'sun' : 'moon'));
   tb.setAttribute('aria-label', t(dark ? 'theme_to_light' : 'theme_to_dark'));
@@ -587,80 +593,581 @@ function renderTasks() {
   restoreFocus(keep);
 }
 
-// ===================== المسرح: اللوحات والبطاقات والملخص =====================
-function renderStageMeta() {
-  $('stageTitle').textContent = t('office');
-  $('legend').replaceChildren(
-    h('span', null, h('i', { style: { background: '#F1551D' } }), t('legend_wait')),
-    h('span', null, h('i', { style: { background: '#FEA94F' } }), t('legend_work')),
-    h('span', null, h('i', { style: { background: '#8FD19E' } }), t('legend_idle')));
+// ===================== نظام الشركة: الواجهة فوق المكتب =====================
+// شريط الفرق ← العنوان والبطاقات ← المبنى (createCompanyOS أو المبنى المسطّح) ← خط سير العمل ← الأرقام
+const show3d = () => state.view === '3d' && state.can3d;
+const osClip = (s, max) => { const a = Array.from(str(s).replace(/\s+/g, ' ').trim()); return a.length > max ? `${a.slice(0, max - 1).join('')}…` : a.join(''); };
+/** عدّادات طلبات التعديل (غرفة المهندسين)؛ loaded = false لو ما انحمّلت للحين */
+function engCounts() {
+  const c = { sent: 0, working: 0, needs_you: 0, review: 0, done: 0, failed: 0, cancelled: 0, open: 0, loaded: Array.isArray(app.requests) };
+  for (const r of arr(app.requests)) if (c[r.status] !== undefined) c[r.status]++;
+  c.open = c.sent + c.working + c.needs_you + c.review;
+  return c;
+}
+/** حالة كل غرفة: المكاتب من deskStates، وغرفة المهندسين من الطلبات (ينتظرك = يحتاج ردّك أو جاهز للمراجعة) */
+function roomStates(st) {
+  const e = engCounts();
+  return Object.assign({}, st, { eng: { waiting: e.needs_you + e.review, working: e.working, done: e.done, alert: e.failed } });
+}
+/** حالة الفريق: مجموع غرفه (المدير = كل اللي ينتظرك) */
+function teamState(id, rs) {
+  if (id === 'ceo') return rs.lead;
+  return teamRooms(id).reduce((a, r) => { const s = rs[r] || {}; a.waiting += num(s.waiting); a.working += num(s.working); a.alert += num(s.alert); return a; }, { waiting: 0, working: 0, alert: 0 });
+}
+const roomName = (id) => (id === 'eng' ? t('os_s_eng') : t(`desk_${id}`));
+const roomLabel = (id, s) => {
+  const a = t('a11y_desk', { name: roomName(id), w: num(s && s.waiting), p: num(s && s.working) });
+  return s && num(s.alert) > 0 ? `${a}${state.lang === 'ar' ? '، ' : ', '}${t('n_alert', { n: num(s.alert) })}` : a;
+};
+function stateChip(s) {
+  if (s.waiting) return h('span', { class: 'os-chip wait' }, h('i'), t('os_c_wait', { n: fmt(s.waiting) }));
+  if (s.working) return h('span', { class: 'os-chip work' }, h('i'), t('os_c_work', { n: fmt(s.working) }));
+  if (s.alert) return h('span', { class: 'os-chip alert' }, h('i'), t('os_c_alert', { n: fmt(s.alert) }));
+  return h('span', { class: 'os-chip idle' }, h('i'), t('os_c_idle'));
+}
+const textChip = (cls, text) => h('span', { class: `os-chip ${cls}` }, h('i'), text);
+/** شارة الغرفة فوق المبنى: ينتظرك (برتقالي) وإلا يشتغل (كهرماني) وإلا تحتاج نظرة (أزرق) */
+function roomBadge(s) {
+  const b = (cls, v) => h('span', { class: `os-badge${cls} num`, 'aria-hidden': 'true', text: v > 99 ? '99+' : String(v) });
+  if (s && s.waiting) return b('', s.waiting);
+  if (s && s.working) return b(' work', s.working);
+  if (s && num(s.alert) > 0) return b(' alert', num(s.alert));
+  return null;
+}
+
+// ---------- الخطة اللي ينبني منها المبنى (نفس الخطة للمشهد وللمبنى المسطّح) ----------
+/** فرق رقم عن الفترة السابقة: up = الاتجاه زين (true) أو شين (false) أو محايد (null) */
+function deltaOf(cur, prev, dir) {
+  const d = cur - prev;
+  if (!d || !Number.isFinite(d)) return {};
+  const pct = prev > 0 ? Math.round((Math.abs(d) / prev) * 100) : null;
+  return { delta: `${d > 0 ? '+' : '−'}${pct === null ? fmt(Math.abs(d)) : `${fmt(pct)}%`}`, up: dir === 0 ? null : (d > 0) === (dir > 0) };
+}
+/** أرقام الشاشة من deskMetrics (نفس أرقام لوحة المكتب) */
+function kpiItems(id, o, max) {
+  const has = !!state.data;
+  return deskMetrics(id, o).filter((m) => typeof m.v === 'number' || (m.v && Array.from(str(m.v)).length <= 18)).slice(0, max).map((m) => {
+    const it = { label: osClip(m.k, 28), value: typeof m.v === 'number' ? (has ? fmt(m.v) : '—') : str(m.v) };
+    return has && typeof m.v === 'number' && typeof m.prev === 'number' ? Object.assign(it, deltaOf(m.v, m.prev, m.dir === undefined ? 1 : m.dir)) : it;
+  });
+}
+const OS_SERIES = { lead: ['activity.active_users', 'k_active'], clubs: ['activity.checkins', 'k_checkins'], activity: ['activity.signups', 'k_signups'], community: ['community.posts', 'k_posts'] };
+function chartScreen(id, o) {
+  const def = OS_SERIES[id];
+  if (!def || !state.data) return null;
+  const series = id === 'community' ? arr(get(o, 'community.daily')).map((x) => num(x && x.posts)) : arr(get(o, `${def[0]}.daily`)).map((x) => num(x && x.n));
+  if (series.length < 2) return null;
+  const cur = n(o, `${def[0]}.cur`);
+  return Object.assign({ type: 'chart', title: t(def[1]), value: fmt(cur), series }, deltaOf(cur, n(o, `${def[0]}.prev`), 1));
+}
+/** قائمة الشاشة: مهام الوكيل المفتوحة أول، وإلا قائمة المكتب نفسه */
+function listScreen(id, o) {
+  const d = DESK[id];
+  const L4 = (title, rows, empty) => ({ type: 'list', title, rows: rows.slice(0, 4), empty: empty || t('nothing_here') });
+  if (id === 'lead') {
+    const st = deskStates();
+    const brief = arr(state.tasks).filter((x) => x.kind === 'daily_brief' && isObj(x.output)).sort((a, b) => str(b.created_at).localeCompare(str(a.created_at)))[0];
+    const pr = brief ? arr(brief.output.priorities) : [];
+    if (pr.length) return L4(t('daily_brief'), pr.map((p) => ({ text: osClip(L(p.text), 34), meta: t(`sign_${deskOf(str(p.desk))}`), tone: 'wait' })));
+    return L4(t('os_sc_queue'), DESKS.filter((x) => x.id !== 'lead' && st[x.id].waiting).sort((a, b) => st[b.id].waiting - st[a.id].waiting)
+      .map((x) => ({ text: t(`sign_${x.id}`), meta: t('os_sc_wait_n', { n: fmt(st[x.id].waiting) }), tone: 'wait' })), t('empty_waiting'));
+  }
+  if (d.kinds.length) {
+    return L4(t('os_sc_requests'), arr(get(o, 'partners.items')).filter((x) => x && d.kinds.includes(x.kind)).map((x) => {
+      const at = x.agent_task && isOpenStatus(x.agent_task.status) ? x.agent_task : null;
+      return { text: osClip(x.name || t('anon'), 30), meta: at ? t(at.status === 'waiting_approval' ? 'agent_ready' : 'agent_reviewing') : ago(x.created_at), tone: at && at.status !== 'waiting_approval' ? 'work' : 'wait' };
+    }));
+  }
+  if (id === 'reports') {
+    return L4(t('reports_new'), arr(get(o, 'reports.latest_new')).map((r) => ({ text: osClip(r.message, 34), meta: t(`cat_${['bug', 'idea', 'design', 'other'].includes(r.category) ? r.category : 'other'}`), tone: 'wait' })));
+  }
+  const open = arr(state.tasks).filter((x) => deskOf(x.desk) === id && (phase(x) === 'waiting' || phase(x) === 'working'));
+  if (open.length) return L4(t('os_sc_queue'), open.map((x) => ({ text: osClip(taskName(x), 34), meta: t(phase(x) === 'waiting' ? 'st_waiting' : 'st_in_progress'), tone: phase(x) === 'waiting' ? 'wait' : 'work' })));
+  switch (id) {
+    case 'bookings': return L4(t('attention'), arr(get(o, 'bookings.attention')).map((a) => ({ text: osClip(a.name || t('anon'), 30), meta: t(`att_${a.kind}`) !== `att_${a.kind}` ? osClip(t(`att_${a.kind}`), 30) : str(a.kind), tone: a.priority === 1 ? 'wait' : 'work' })), t('att_none'));
+    case 'orders': return L4(t('low_stock'), arr(get(o, 'store.products.low_stock_items')).map((x) => ({ text: osClip(x.product, 30), meta: num(x.stock) === 0 ? t('sold_out') : t('in_stock', { n: fmt(num(x.stock)) }), tone: num(x.stock) === 0 ? 'wait' : 'work' })), t('v_none'));
+    case 'marketing': return L4(t('upcoming_events'), arr(get(o, 'marketing.events.upcoming')).map((e) => ({ text: osClip(state.lang === 'en' && e.title_en ? e.title_en : e.title, 32), meta: fmtDate(e.starts_on), tone: 'ok' })), t('no_events'));
+    case 'ai': return L4(t('ai_usage'), ['meal_photo', 'barcode', 'plan', 'office'].map((k) => ({ text: t(`uk_${k}`), meta: fmt(n(o, `ai.usage.${k}.uses_cur`)), tone: 'ok' })));
+    case 'activity': return L4(t('top_errors'), arr(get(o, 'activity.errors.top')).map((e) => ({ text: osClip(e.kind, 30), meta: fmt(num(e.n)), tone: 'wait' })), t('v_none'));
+    case 'community': return L4(t('moderation'), arr(get(o, 'community.moderation.latest')).map((m) => ({ text: osClip(m.target_name || t('gym_review'), 30), meta: t(`reason_${m.reason}`) !== `reason_${m.reason}` ? t(`reason_${m.reason}`) : str(m.reason), tone: m.status === 'new' ? 'wait' : 'ok' })), t('v_none'));
+    default: return L4(t('os_sc_queue'), [], t('empty_waiting'));
+  }
+}
+const roomType = (id) => (id === 'lead' ? 'ceo' : id === 'eng' ? 'eng' : 'team');
+const roomStatus = (s) => (s && s.waiting ? 'waiting' : s && s.working ? 'working' : 'idle');
+/** شاشات غرفة المهندسين: خط البناء، آخر الطلبات، والأرقام */
+function engScreens(small) {
+  const e = engCounts();
+  const v = (x) => (e.loaded ? fmt(x) : '—');
+  if (small) return [{ type: 'kpis', title: t('os_sc_kpis'), items: [{ label: t('os_sc_open'), value: v(e.open) }, { label: t('rs_review'), value: v(e.review) }] }];
+  const tone = { needs_you: 'wait', review: 'wait', working: 'work', done: 'ok' };
+  const rows = arr(app.requests).slice(0, 4).map((r) => ({ text: osClip(r.title, 34), meta: t(`rs_${REQ_STATUSES.includes(r.status) ? r.status : 'sent'}`), tone: tone[r.status] }));
+  return [
+    { type: 'flow', title: t('os_sc_pipeline'), steps: [0, 1, 2, 3].map((i) => t(`os_f_eng_${i}`)) },
+    { type: 'list', title: t('os_sc_latest'), rows, empty: e.loaded ? t('os_sc_none') : app.reqErr ? osClip(app.reqErr.msg, 40) : appCanLoad() ? t('loading') : '—' },
+    { type: 'kpis', title: t('os_sc_kpis'), items: [{ label: t('rs_working'), value: v(e.working) }, { label: t('rs_needs_you'), value: v(e.needs_you) }, { label: t('rs_review'), value: v(e.review) }, { label: t('rs_done'), value: v(e.done) }] },
+  ];
+}
+function osRoom(id, rs, o, small, people) {
+  const room = { id, label: id === 'eng' ? t('os_s_eng') : t(`sign_${id}`), type: roomType(id), people, status: roomStatus(rs[id]) };
+  if (id === 'lead') room.vision = t('os_vision'); // لوحة «الرؤية» بغرفة المدير
+  if (id === 'eng') room.screens = engScreens(small);
+  else if (small) room.screens = [{ type: 'kpis', title: t('os_sc_kpis'), items: kpiItems(id, o, 2) }];
+  else room.screens = [{ type: 'kpis', title: t('os_sc_kpis'), items: kpiItems(id, o, 4) }, chartScreen(id, o), listScreen(id, o)].filter(Boolean);
+  return room;
+}
+/** خطة الشريحة لـ scene.show(): المقر = ٦ أدوار (فريق بكل دور)، والفريق = دور لكل مكتب */
+function buildPlan(sid, rs, o) {
+  const plan = { key: sid, kind: sid === 'hq' ? 'hq' : 'team', lang: state.lang, roof: { title: t(`os_roof_${sid}`), icon: OS_SLIDE[sid].icon } };
+  if (sid === 'hq') {
+    plan.floors = OS_TEAMS.map((team) => {
+      const rooms = teamRooms(team.id);
+      const people = rooms.length === 1 ? (team.id === 'ceo' ? 1 : 2) : rooms.length === 2 ? 2 : 1;
+      return { id: team.id, label: t(`os_s_${team.id}`), rooms: rooms.map((r) => osRoom(r, rs, o, true, people)) };
+    });
+  } else if (sid === 'ceo') plan.floors = [{ id: 'lead', label: t('desk_lead'), rooms: [osRoom('lead', rs, o, false, 1)] }];
+  else if (sid === 'eng') plan.floors = [{ id: 'eng', label: t('os_roof_eng'), rooms: [osRoom('eng', rs, o, false, 3)] }];
+  else plan.floors = OS_SLIDE[sid].desks.map((d) => ({ id: d, label: t(`sign_${d}`), rooms: [osRoom(d, rs, o, false, 3)] }));
+  return plan;
+}
+const planRooms = (plan) => (plan ? plan.floors.flatMap((f) => f.rooms.map((r) => r.id)) : []);
+
+// ---------- البطاقات (عمود النص) ----------
+/** تبويب «التطبيق»: نموذج طلب جديد أو قائمة الطلبات */
+function openApp(where) {
+  showTop('app');
+  const sec = $('reqSec');
+  const target = where === 'form' ? $('reqFTitle') : sec && sec.querySelector('.req-list');
+  if (!target) return;
+  target.scrollIntoView({ behavior: smooth(), block: where === 'form' ? 'center' : 'start' });
+  const f = where === 'form' ? target : target.querySelector('button:not(:disabled), a[href]');
+  (f || $('topApp')).focus({ preventScroll: true });
+}
+function heroCards(sid, rs, o) {
+  if (sid === 'hq') {
+    // المهندسين: الطلبات تتحمّل لما تفتح شريحتهم (أو تبويب «التطبيق») — قبلها «—» مو «هادي»
+    const engOff = !engCounts().loaded;
+    return OS_TEAMS.map((team) => {
+      const chip = team.id === 'eng' && engOff ? textChip('idle', '—') : stateChip(teamState(team.id, rs));
+      return { id: team.id, icon: team.icon, title: t(`os_s_${team.id}`), desc: t(`os_cd_${team.id}`), chip,
+        label: `${t('os_open_team', { name: t(`os_s_${team.id}`) })} · ${chip.textContent}`, onClick: () => { setSlide(team.id); focusSlide(); } };
+    });
+  }
+  if (sid === 'ceo') {
+    const st = rs.lead;
+    const working = DESKS.reduce((a, d) => a + num(rs[d.id].working), 0);
+    const oldest = get(o, 'office.oldest_waiting_at');
+    const brief = arr(state.tasks).filter((x) => x.kind === 'daily_brief' && isObj(x.output)).sort((a, b) => str(b.created_at).localeCompare(str(a.created_at)))[0];
+    const run = state.run && state.run.desk === 'lead' && (state.run.phase === 'queued' || state.run.phase === 'waiting');
+    const lead = () => selectDesk('lead');
+    return [
+      { id: 'ceo-wait', icon: 'target', title: t('os_ceo_wait'), desc: t('os_ceo_wait_d'), chip: st.waiting ? stateChip({ waiting: st.waiting }) : stateChip({}), onClick: lead },
+      { id: 'ceo-work', icon: 'users', title: t('os_ceo_work'), desc: t('os_ceo_work_d'), chip: stateChip({ working }), onClick: lead },
+      { id: 'ceo-old', icon: 'clock', title: t('os_ceo_old'), desc: t('os_ceo_old_d'), chip: oldest ? textChip('wait', ago(oldest)) : textChip('idle', t('v_none')), onClick: lead },
+      { id: 'ceo-brief', icon: 'sparkles', title: t('os_ceo_brief'), desc: t('os_ceo_brief_d'),
+        chip: run ? textChip('work', t('st_in_progress')) : brief ? textChip('ok', t('os_ceo_brief_ready', { t: ago(brief.created_at) })) : textChip('plain', t('os_ceo_brief_run')),
+        onClick: () => { selectDesk('lead'); if (canAct()) runAgent('lead'); } },
+    ];
+  }
+  if (sid === 'eng') {
+    const e = engCounts();
+    // ما انحمّلت: «…» وهي تتحمّل، و«—» لو ما فيه اتصال أو فشلت
+    const none = () => textChip('idle', !app.reqErr && appCanLoad() ? '…' : '—');
+    const cnt = (x, key, cls) => (!e.loaded ? none() : x ? textChip(cls, t(key, { n: fmt(x) })) : stateChip({}));
+    return [
+      { id: 'eng-new', icon: 'pen', title: t('os_eng_new'), desc: t('os_eng_new_d'), chip: textChip('plain', t('os_eng_new_go')), onClick: () => openApp('form') },
+      { id: 'eng-build', icon: 'code', title: t('os_eng_build'), desc: !e.loaded && app.reqErr ? osClip(app.reqErr.msg, 90) : t('os_eng_build_d'), chip: e.loaded && e.needs_you ? textChip('wait', `${t('rs_needs_you')} · ${fmt(e.needs_you)}`) : cnt(e.working, 'os_c_work', 'work'), onClick: () => openApp('list') },
+      { id: 'eng-review', icon: 'eye', title: t('os_eng_review'), desc: t('os_eng_review_d'), chip: cnt(e.review, 'os_c_wait', 'wait'), onClick: () => openApp('list') },
+      { id: 'eng-done', icon: 'merge', title: t('os_eng_done'), desc: t('os_eng_done_d'), chip: cnt(e.done, 'os_eng_n', 'ok'), onClick: () => openApp('list') },
+    ];
+  }
+  return OS_SLIDE[sid].desks.map((d) => ({ id: d, icon: DESK[d].icon, title: t(`sign_${d}`), desc: t(`os_cd_${d}`), chip: stateChip(rs[d]), sel: state.desk === d,
+    label: roomLabel(d, rs[d]), onClick: () => selectDesk(d) }));
+}
+/** المرور على بطاقة (أو التركيز عليها) يبرّز خطها */
+function hiLink(i, on) { const p = $(`os-link-${i}`); if (p) p.classList.toggle('on', on); }
+function renderCards(sid, rs, o) {
+  const keep = focusState();
+  const list = heroCards(sid, rs, o);
+  $('osCards').classList.toggle('many', list.length > 4);
+  put($('osCards'), list.map((c, i) => h('button', { type: 'button', class: `os-card${c.sel ? ' sel' : ''}`, id: `os-card-${c.id}`, 'aria-pressed': c.sel === undefined ? null : String(!!c.sel),
+    'aria-label': c.label ? `${c.label} — ${c.desc}` : null, onclick: c.onClick,
+    onmouseenter: () => hiLink(i, true), onmouseleave: () => hiLink(i, false), onfocus: () => hiLink(i, true), onblur: () => hiLink(i, false) },
+  h('span', { class: 'os-card-ic' }, icon(c.icon)),
+  h('span', { class: 'os-card-m' }, h('span', { class: 'os-card-t', text: c.title }), h('span', { class: 'os-card-d', text: c.desc })),
+  c.chip)));
+  restoreFocus(keep);
+}
+
+// ---------- الشريط والعنوان وخط سير العمل والأرقام ----------
+function renderStrip(rs) {
+  const i = OS_SLIDES.findIndex((s) => s.id === state.slide);
+  const box = $('osChips');
+  box.setAttribute('aria-label', t('os_slides'));
+  const keep = focusState();
+  put(box, OS_SLIDES.map((s) => {
+    const w = s.id === 'hq' ? 0 : teamState(s.id, rs).waiting;
+    const name = t(`os_s_${s.id}`);
+    return h('button', { type: 'button', class: 'os-tab', id: `os-tab-${s.id}`, 'aria-current': s.id === state.slide ? 'true' : null,
+      'aria-label': w ? `${name} · ${t('os_c_wait', { n: fmt(w) })}` : name, onclick: () => setSlide(s.id) },
+    icon(s.icon, 'sm'), h('span', { class: 'os-tab-l', text: name }), w ? h('span', { class: 'os-tab-b num', 'aria-hidden': 'true', text: w > 99 ? '99+' : fmt(w) }) : null);
+  }));
+  restoreFocus(keep);
+  const prev = $('osPrev'), next = $('osNext');
+  prev.replaceChildren(icon('arrowStart', 'sm flip')); next.replaceChildren(icon('arrowEnd', 'sm flip'));
+  prev.setAttribute('aria-label', t('os_prev')); prev.title = t('os_prev');
+  next.setAttribute('aria-label', t('os_next')); next.title = t('os_next');
+  $('osCount').textContent = t('os_count', { n: fmt(i + 1), m: fmt(OS_SLIDES.length) });
+}
+/** الشريحة الحالية تبان داخل الشريط (يتمرر لحاله بالجوال) */
+function revealTab() {
+  const box = $('osChips'), b = $(`os-tab-${state.slide}`);
+  if (!box || !b || box.scrollWidth <= box.clientWidth) return;
+  const cr = box.getBoundingClientRect(), br = b.getBoundingClientRect();
+  if (br.left < cr.left) box.scrollLeft -= cr.left - br.left + 12;
+  else if (br.right > cr.right) box.scrollLeft += br.right - cr.right + 12;
+}
+function renderCopy(sid) {
+  const a = t(`os_h_${sid}_a`), b = t(`os_h_${sid}_b`), c = t(`os_h_${sid}_c`);
+  const tail = /^[.\s]*$/.test(c); // نقطة بس: تلحق الكلمة الملوّنة بنفس السطر
+  // كلمتين قصار بسطر واحد مثل ملصق المدير («THE CEO.»، «THE ARQ») — العنوان أقصر والبطاقات تبان كلها
+  const join = Array.from(`${a}${b}`).length <= 7;
+  put($('osTitle'), join ? null : h('span', { class: 'os-h-a', text: a }), h('span', { class: 'os-h-b' }, join ? `${a} ` : null, h('em', { text: b }), tail ? c : null), tail ? null : h('span', { class: 'os-h-c', text: c }));
+  put($('osTag'), h('span', { text: t(`os_t_${sid}_a`, { n: fmt(DESKS.length) }) }), ' ', h('span', { class: 'os-tag-b', text: t(`os_t_${sid}_b`) }));
+}
+const OS_FLOW = {
+  hq: ['sparkles', 'clock', 'check', 'rocket'], ceo: ['eye', 'target', 'users', 'trend'], partners: ['inbox', 'scan', 'check', 'userPlus'],
+  ops: ['calendar', 'clock', 'play', 'chart'], community: ['flag', 'filter', 'wrench', 'archive'], growth: ['bulb', 'pen', 'check', 'send', 'chart'], eng: ['inbox', 'code', 'eye', 'merge'],
+};
+/** رقم حي اختياري لكل خطوة: { n, tone } */
+function flowCounts(sid, rs, o) {
+  const has = !!state.data;
+  const c = (v, tone) => (has && typeof v === 'number' ? { n: v, tone } : null);
+  const team = sid === 'hq' || sid === 'eng' ? null : teamState(sid, rs);
+  const working = DESKS.reduce((a, d) => a + num(rs[d.id].working), 0);
+  switch (sid) {
+    case 'hq': return [c(working, 'work'), c(rs.lead.waiting, 'wait')];
+    case 'ceo': return [null, c(rs.lead.waiting, 'wait')];
+    case 'partners': return [c(n(o, 'partners.pending_total')), c(team.working, 'work'), c(team.waiting, 'wait')];
+    case 'ops': return [c(n(o, 'bookings.venue_bookings.created.cur')), c(arr(get(o, 'bookings.attention')).length, 'work')];
+    case 'community': return [c(n(o, 'reports.by_status.new'), 'wait'), c(n(o, 'reports.by_status.seen'), 'work'), c(n(o, 'reports.by_status.fixed'), 'ok')];
+    case 'growth': return [null, c(team.working, 'work'), c(team.waiting, 'wait'), c(n(o, 'marketing.nudges.cur')), c(n(o, 'marketing.ad_stats.cur.views'))];
+    case 'eng': { const e = engCounts(); return e.loaded ? [{ n: e.sent }, { n: e.working, tone: 'work' }, { n: e.review, tone: 'wait' }, { n: e.done, tone: 'ok' }] : []; }
+    default: return [];
+  }
+}
+/** سهم طويل رفيع بين الخطوات (مثل المرجع) — ينعكس بالعربي */
+function longArrow() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 36 24');
+  svg.setAttribute('class', 'ic flip');
+  svg.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS(NS, 'path');
+  p.setAttribute('d', 'M2 12h31M27.5 6.5 33 12l-5.5 5.5');
+  svg.append(p);
+  return svg;
+}
+function renderFlow(sid, rs, o) {
+  const counts = flowCounts(sid, rs, o);
+  put($('osFlow'), h('ol', { class: 'os-steps' }, OS_FLOW[sid].map((ic, i) => {
+    const c = counts[i];
+    return h('li', { class: 'os-step' }, i ? h('span', { class: 'os-arr', 'aria-hidden': 'true' }, longArrow()) : null,
+      icon(ic), h('span', { class: 'os-step-l', text: t(`os_f_${sid}_${i}`) }), c ? h('b', { class: `os-step-n num${c.tone ? ` ${c.tone}` : ''}`, text: fmt(c.n) }) : null);
+  })));
+}
+function renderFoot(rs, o) {
+  put($('legend'), [['wait', 'legend_wait'], ['work', 'legend_work'], ['alert', 'legend_alert'], ['idle', 'legend_idle']].map(([k, key]) => h('span', { class: `os-lg ${k}` }, h('i'), t(key))));
   const v3 = $('view3d'), vg = $('viewGrid');
-  v3.replaceChildren(icon('cube', 'sm')); vg.replaceChildren(icon('grid', 'sm'));
-  v3.setAttribute('aria-label', t('view_3d')); v3.title = t('view_3d');
-  vg.setAttribute('aria-label', t('view_grid')); vg.title = t('view_grid');
-  const show3d = state.view === '3d' && state.can3d;
-  v3.setAttribute('aria-pressed', String(show3d)); vg.setAttribute('aria-pressed', String(!show3d));
+  v3.replaceChildren(icon('cube', 'sm'), h('span', { text: '3D' }));
+  vg.replaceChildren(icon('grid', 'sm'), h('span', { text: '2D' }));
+  v3.setAttribute('aria-label', `3D — ${t('view_3d')}`); v3.title = t('view_3d');
+  vg.setAttribute('aria-label', `2D — ${t('view_grid')}`); vg.title = t('view_grid');
+  v3.setAttribute('aria-pressed', String(show3d())); vg.setAttribute('aria-pressed', String(!show3d()));
   v3.disabled = !state.can3d;
-  const st = deskStates();
-  const o = state.data || {};
-  const working = DESKS.reduce((a, d) => a + st[d.id].working, 0);
+  $('viewTg').setAttribute('aria-label', `${t('view_3d')} / ${t('view_grid')}`);
+  const working = DESKS.reduce((a, d) => a + num(rs[d.id].working), 0);
   const oldest = get(o, 'office.oldest_waiting_at');
   put($('stageFoot'),
-    h('span', { class: 'stat wait' }, h('b', { text: fmt(st.lead.waiting) }), t('sum_waiting')),
-    h('span', { class: 'stat work' }, h('b', { text: fmt(working) }), t('sum_working')),
-    oldest ? h('span', { class: 'stat' }, h('b', { class: 'num', text: ago(oldest) }), t('sum_oldest')) : null,
-    h('span', { class: 'stat' }, h('b', { text: fmt(n(o, 'ai.office_tasks_today')) }), t('sum_today_tasks')));
+    h('span', { class: 'os-stat wait' }, h('b', { class: 'num', text: fmt(rs.lead.waiting) }), t('sum_waiting')),
+    h('span', { class: 'os-stat work' }, h('b', { class: 'num', text: fmt(working) }), t('sum_working')),
+    oldest ? h('span', { class: 'os-stat' }, h('b', { class: 'txt', text: ago(oldest) }), t('sum_oldest')) : null,
+    h('span', { class: 'os-stat' }, h('b', { class: 'num', text: fmt(n(o, 'ai.office_tasks_today')) }), t('sum_today_tasks')));
+  $('osVerA').textContent = t('os_ver_a');
+  $('osVerB').textContent = t('os_ver_b');
   const today = [
     ['k_signups', 'activity.signups.today'], ['k_checkins', 'activity.checkins.today'], ['k_workouts', 'activity.workouts.today'],
     ['k_vbookings', 'bookings.venue_bookings.created.today'], ['k_messages', 'community.chats.messages.today'], ['k_errors', 'activity.errors.today'],
   ];
-  put($('todayStrip'), h('h3', { class: 'today-t', text: t('today_so_far') }),
-    h('div', { class: 'today-g' }, today.map(([k, path]) => h('div', { class: `today-i${path === 'activity.errors.today' && n(o, path) > 0 ? ' hot' : ''}` },
-      h('b', { text: state.data ? fmt(n(o, path)) : '—' }), h('span', { text: t(k) })))));
-  renderSigns(st);
-  renderGrid(st);
+  put($('todayStrip'), h('h3', { class: 'os-today-t', id: 'todayT', text: t('today_so_far') }),
+    h('div', { class: 'os-today-g' }, today.map(([k, path]) => h('div', { class: `os-today-i${path === 'activity.errors.today' && n(o, path) > 0 ? ' hot' : ''}` },
+      h('b', { class: 'num', text: state.data ? fmt(n(o, path)) : '—' }), h('span', { text: t(k) })))));
 }
 
-/** محتوى اللوحة فوق كل مكتب */
-function signContent(d, s) {
-  return h('span', { class: 'sign' }, icon(d.icon), h('span', { class: 'lbl', text: t(`sign_${d.id}`) }),
-    s.waiting ? h('span', { class: 'cnt', text: s.waiting > 99 ? '99+' : String(s.waiting) })
-      : s.working ? h('span', { class: 'cnt work', text: String(s.working) })
-        : s.alert ? h('span', { class: 'alert', title: t('legend_alert') }) : h('span', { class: 'okd' }));
-}
-function renderSigns(st) {
+// ---------- المبنى: المشهد ثلاثي الأبعاد أو المسطّح ----------
+let heroPlan = null;
+let osPlanSig = '';
+/** غرف الشريحة الحالية: أزرار شفافة فوق غرف المشهد (تركيز + شارة ينتظرك) */
+function renderHits(rs) {
   const box = $('signs');
-  if (!office3d || state.view !== '3d' || !state.can3d) { box.replaceChildren(); return; }
+  if (!osScene || !show3d() || !heroPlan) { box.replaceChildren(); return; }
+  rs = rs || roomStates(deskStates());
+  let rects = {};
+  try { rects = Object.fromEntries(arr(osScene.rooms()).filter((r) => r && r.id).map((r) => [r.id, r])); } catch (e) { fail3d(e); return; }
   const keep = focusState();
-  const spots = office3d.spots();
-  box.replaceChildren(...spots.map((p) => {
-    const d = DESK[p.id];
-    const s = st[p.id];
-    return h('button', { type: 'button', class: 'desk-hit', id: `desk-${p.id}`, 'aria-pressed': String(state.desk === p.id),
-      'aria-label': t('a11y_desk', { name: t(`desk_${p.id}`), w: s.waiting, p: s.working }),
-      style: { left: `${p.left}px`, top: `${p.top}px`, width: `${p.w}px`, height: `${p.h}px` }, onclick: () => selectDesk(p.id) }, signContent(d, s));
+  put(box, planRooms(heroPlan).filter((id) => rects[id] && rects[id].w > 0 && rects[id].h > 0).map((id) => {
+    const r = rects[id];
+    const s = rs[id] || {};
+    return h('button', { type: 'button', class: `os-hit${state.desk === id ? ' sel' : ''}${r.w < 72 || r.h < 48 ? ' sm' : ''}`, id: `desk-${id}`, 'aria-pressed': String(state.desk === id), 'aria-label': roomLabel(id, s),
+      style: { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top)}px`, width: `${Math.round(r.w)}px`, height: `${Math.round(r.h)}px` }, onclick: () => roomClick(id) }, roomBadge(s));
   }));
   restoreFocus(keep);
 }
-function renderGrid(st) {
+/** المبنى المسطّح (بدون WebGL أو بزر 2D): نفس الخطة كصفوف وغرف */
+function renderFlat(plan, rs, loading) {
   const g = $('grid2d');
-  const show = state.view === 'grid' || !state.can3d;
-  g.hidden = !show;
-  $('stage').classList.toggle('gridmode', show);
-  const note = $('stageNote');
-  if (note) { note.hidden = show || !!office3d; note.textContent = t('loading_3d'); }
-  $('cv').style.visibility = show ? 'hidden' : 'visible';
-  if (!show) { g.replaceChildren(); return; }
   const keep = focusState();
-  const order = [...DESKS].sort((a, b) => (a.id === 'lead' ? -1 : b.id === 'lead' ? 1 : 0));
-  put(g, ...order.map((d) => {
-    const s = st[d.id];
-    const cls = s.waiting ? 'wait' : s.working ? 'work' : '';
-    return h('button', { type: 'button', class: `card2d ${cls}`, id: `card-${d.id}`, 'aria-pressed': String(state.desk === d.id), onclick: () => selectDesk(d.id) },
-      h('span', { class: 'n' }, icon(d.icon), t(`sign_${d.id}`)),
-      h('span', { class: 'm', text: [s.waiting ? t('n_waiting', { n: fmt(s.waiting) }) : null, s.working ? t('n_working', { n: fmt(s.working) }) : null, s.alert ? t('n_alert', { n: fmt(s.alert) }) : null].filter(Boolean).join(' · ') || t('idle') }));
-  }), state.can3d ? null : h('div', { class: 'small', style: { gridColumn: '1 / -1', color: 'var(--stage-muted)' }, text: t('no3d') }));
+  const hq = plan.kind === 'hq';
+  // غرفة وحدة (المدير، المهندسين): غرفة طويلة فيها كل الأرقام + خط البناء + القائمة (بدل شريط رفيع بنص فراغ)
+  const single = plan.floors.length === 1 && plan.floors[0].rooms.length === 1;
+  const kpi = (it) => h('span', { class: 'os-cell-k' }, h('span', { text: it.label }),
+    // رقم = كبير بخط الأرقام، ونص («مو شغّالة للحين») = أصغر بخط الواجهة
+    h('b', { class: /^[\d\s.,%+−\-—KMB]+$/.test(str(it.value)) ? 'num' : 'txt', text: it.value }));
+  const extra = (r) => {
+    if (!single) return null;
+    const flow = r.screens.find((x) => x.type === 'flow');
+    const list = r.screens.find((x) => x.type === 'list');
+    return [
+      flow ? h('span', { class: 'os-cell-flow' }, arr(flow.steps).map((st, i) => h('span', { class: 'os-cell-step' }, i ? h('i', { 'aria-hidden': 'true', text: state.lang === 'ar' ? '←' : '→' }) : null, st))) : null,
+      list ? h('span', { class: 'os-cell-list' }, h('span', { class: 'os-cell-lt', text: list.title }),
+        arr(list.rows).length ? arr(list.rows).slice(0, 4).map((x) => h('span', { class: `os-cell-row ${x.tone || ''}` }, h('i'), h('span', { class: 'os-cell-rt', text: x.text }), x.meta ? h('span', { class: 'os-cell-rm', text: x.meta }) : null))
+          : h('span', { class: 'os-cell-rm', text: list.empty || '—' })) : null,
+    ];
+  };
+  const cell = (r) => {
+    const s = rs[r.id] || {};
+    const k = r.screens.find((x) => x.type === 'kpis');
+    const lines = k ? arr(k.items).slice(0, single ? 4 : hq ? 1 : 2) : [];
+    const alert = r.status === 'idle' && num(s.alert) > 0;
+    return h('button', { type: 'button', class: `os-cell ${r.status}${alert ? ' alert' : ''}${state.desk === r.id ? ' sel' : ''}`, id: `desk-${r.id}`, 'aria-pressed': String(state.desk === r.id), 'aria-label': roomLabel(r.id, s), onclick: () => roomClick(r.id) },
+      h('span', { class: 'os-cell-h' }, h('i', { class: 'os-dot' }), h('span', { class: 'os-cell-l', text: r.label }), roomBadge(s)),
+      lines.length ? h('span', { class: 'os-cell-ks' }, lines.map(kpi)) : null,
+      extra(r));
+  };
+  // ليش مسطّح: three.js يتحمّل، أو ما تحمّل (شبكة)، أو الجهاز ما يدعم/فقد WebGL
+  const why = loading ? 'os_3d_loading' : state.can3d ? null : state.no3d === 'net' ? 'no3d_net' : state.no3d === 'lost' ? 'no3d_lost' : 'no3d';
+  put(g, h('div', { class: `os-fb${hq ? ' hq' : ''}${single ? ' single' : ''}` },
+    h('div', { class: 'os-fb-cube', 'aria-hidden': 'true' }, osMark()),
+    h('div', { class: 'os-fb-roof' }, icon(plan.roof.icon), h('span', { text: plan.roof.title })),
+    h('div', { class: 'os-fb-floors' }, plan.floors.map((f) => h('div', { class: 'os-fb-floor' },
+      hq ? h('span', { class: 'os-fb-fl', text: f.label }) : null,
+      h('div', { class: 'os-fb-rooms' }, f.rooms.map(cell))))),
+    h('div', { class: 'os-fb-base', 'aria-hidden': 'true' })),
+  why ? h('p', { class: 'os-fb-note', text: t(why) }) : null);
   restoreFocus(keep);
+}
+/** شعار أرك: شيفرون A مع خط برتقالي */
+function osMark() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const [d, cls] of [['M4 20 12 4l8 16', 'a'], ['M7.9 14.2h8.2', 'b']]) {
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', d); p.setAttribute('class', cls);
+    svg.append(p);
+  }
+  return svg;
+}
+function sceneReady() { try { return !!osScene && osScene.ready() !== false; } catch (e) { return true; } }
+/** شكل المبنى (للجوال: المسرح يطول مع الأدوار الكثيرة ويقصر مع الغرفة الوحدة) */
+const planShape = (plan) => (plan.kind === 'hq' ? 'hq' : plan.floors.length >= 3 ? 'tall' : plan.floors.length === 2 ? 'mid' : 'wide');
+function renderStageMode(plan, rs) {
+  // three.js أو المشهد ما جهز بعد مهلة قصيرة (state.slow3d): نعرض المسطّح لين يجهز، بعدها نبدّل للـ 3D
+  const loading = show3d() && !osScene && !!state.slow3d;
+  const flat = !show3d() || loading;
+  const g = $('grid2d');
+  $('stage').dataset.shape = planShape(plan);
+  g.hidden = !flat;
+  $('stage').classList.toggle('flat', flat);
+  $('cv').style.visibility = flat ? 'hidden' : 'visible';
+  // «نجهّز المبنى…» لين يجهز المشهد (three.js يتحمّل، والخطوط وشاشات المبنى ما انرسمت للحين)
+  const note = $('stageNote');
+  note.hidden = flat || sceneReady();
+  note.textContent = t('loading_3d');
+  if (flat) renderFlat(plan, rs, loading); else g.replaceChildren();
+}
+
+/** الخطوط البرتقالية من البطاقات لحافة المبنى (جهة عمود النص) — بس بالشاشات العريضة مع 3D */
+/** خط سير العمل تحت المبنى بالضبط (الشاشات العريضة): المبنى لاصق بجهة النص فنحسب نصّه من حواف الأدوار أو المبنى المسطّح */
+function placeFlow(floors) {
+  const fl = $('osFlow');
+  const wide = matchMedia('(min-width: 1000px)').matches && state.top === 'office';
+  const sr = $('stage').getBoundingClientRect();
+  let x0 = Infinity, x1 = -Infinity;
+  if (wide && show3d()) {
+    for (const f of floors) for (const e of [f && f.edge && f.edge.l, f && f.edge && f.edge.r]) if (Array.isArray(e) && Number.isFinite(e[0]) && Number.isFinite(e[2])) { x0 = Math.min(x0, e[0], e[2]); x1 = Math.max(x1, e[0], e[2]); }
+  } else if (wide) {
+    const fb = document.querySelector('#grid2d .os-fb');
+    if (fb) { const r = fb.getBoundingClientRect(); x0 = r.left - sr.left; x1 = r.right - sr.left; }
+  }
+  if (!(x1 > x0) || !sr.width) { fl.style.marginInlineStart = ''; return; }
+  const fw = fl.getBoundingClientRect().width;
+  const mid = document.documentElement.dir === 'rtl' ? sr.width - (x0 + x1) / 2 : (x0 + x1) / 2;
+  fl.style.marginInlineStart = `${Math.round(Math.max(0, Math.min(sr.width - fw, mid - fw / 2)))}px`;
+}
+/** كل بطاقة بمستوى دورها (مثل الملصقات: الخطوط شبه أفقية) — بس لو بطاقة لكل دور. الزيادة تنزل البطاقات
+ * (margin-top) بدون ما يطلع العمود تحت المسرح؛ ولو ما كفّت المسافة نقلّلها بنفس النسبة */
+function alignCards(cards, floors, side) {
+  const box = $('osCards');
+  for (const c of box.children) if (c.style.marginTop) c.style.marginTop = '';
+  if (cards.length < 2 || floors.length !== cards.length) return;
+  const sr = $('stage').getBoundingClientRect();
+  const rs = cards.map((c) => c.getBoundingClientRect());
+  const ms = [];
+  let shift = 0;
+  cards.forEach((c, i) => {
+    const e = floors[i] && floors[i].edge && floors[i].edge[side];
+    const want = Array.isArray(e) && e.every(Number.isFinite) ? sr.top + (e[1] + e[3]) / 2 - rs[i].height / 2 : -Infinity;
+    const m = Math.max(0, want - (rs[i].top + shift));
+    ms.push(m);
+    shift += m;
+  });
+  const room = sr.bottom - 8 - rs[rs.length - 1].bottom;
+  const k = shift > room ? Math.max(0, room) / shift : 1;
+  cards.forEach((c, i) => { const m = Math.round(ms[i] * k); if (m > 0) c.style.marginTop = `${m}px`; });
+}
+function drawLinks() {
+  const svg = $('osLinks');
+  const on = !!osScene && show3d() && !!heroPlan && state.top === 'office' && matchMedia('(min-width: 1000px)').matches;
+  let floors = [];
+  if (on) { try { floors = arr(osScene.floors()); } catch (e) { floors = []; } }
+  placeFlow(floors);
+  const cards = on ? [...$('osCards').children] : [];
+  const rtl = document.documentElement.dir === 'rtl';
+  const side = rtl ? 'r' : 'l';
+  alignCards(cards, floors, side);
+  if (!floors.length || !cards.length) { svg.replaceChildren(); return; }
+  const sr = $('stage').getBoundingClientRect();
+  const single = floors.length === 1;
+  const lines = cards.map((c, i) => {
+    const f = floors[Math.min(i, floors.length - 1)];
+    const e = f && f.edge && f.edge[side];
+    if (!Array.isArray(e) || e.length < 4 || !e.every(Number.isFinite)) return null;
+    const k = single ? (i + 1) / (cards.length + 1) : 0.5;
+    const r = c.getBoundingClientRect();
+    const cy = r.top + r.height / 2 - sr.top;
+    let ty = e[1] + (e[3] - e[1]) * k;
+    // كوع صغير (أقل من ١٢ بكسل) يبان كأنه خط مكسور: لو مستوى البطاقة على حافة الدور نخليه مستقيم، وإلا كوع واضح
+    const lo = Math.min(e[1], e[3]) + 4, hi = Math.max(e[1], e[3]) - 4;
+    if (Math.abs(ty - cy) < 12) {
+      if (cy >= lo && cy <= hi) ty = cy;
+      else { const t2 = cy + (ty >= cy ? 12 : -12); if (t2 >= lo && t2 <= hi) ty = t2; }
+    }
+    const at = e[3] !== e[1] ? (ty - e[1]) / (e[3] - e[1]) : 0;
+    return { i, cx: (rtl ? r.left : r.right) - sr.left, cy, tx: e[0] + (e[2] - e[0]) * at, ty };
+  }).filter(Boolean);
+  // الكوع: الخطوط النازلة تقرب من البطاقة كل ما نزلنا، والطالعة تبعد (عشان ما تتقاطع)
+  const down = lines.filter((l) => l.ty > l.cy + 1), up = lines.filter((l) => l.ty < l.cy - 1);
+  down.forEach((l, j) => { l.f = down.length > 1 ? 0.72 - (0.44 * j) / (down.length - 1) : 0.5; });
+  up.forEach((l, j) => { l.f = up.length > 1 ? 0.28 + (0.44 * j) / (up.length - 1) : 0.5; });
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs) => { const x = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) x.setAttribute(k, v); return x; };
+  const r1 = (v) => Math.round(v * 10) / 10;
+  const hot = document.activeElement && document.activeElement.closest && document.activeElement.closest('#osCards .os-card');
+  svg.replaceChildren(...lines.map((l) => {
+    const ex = l.cx + (l.tx - l.cx) * (l.f === undefined ? 0.5 : l.f);
+    const d = l.ty === l.cy ? `M${r1(l.cx)} ${r1(l.cy)}H${r1(l.tx)}` : `M${r1(l.cx)} ${r1(l.cy)}H${r1(ex)}V${r1(l.ty)}H${r1(l.tx)}`;
+    return el('path', { class: `os-link${hot === cards[l.i] ? ' on' : ''}`, id: `os-link-${l.i}`, d });
+  }), ...lines.map((l) => el('circle', { class: 'os-link-dot', cx: r1(l.tx), cy: r1(l.ty), r: 2.5 })));
+}
+
+/** يرسم الواجهة كلها ويبني الخطة ويعطيها للمشهد (المشهد يعيد رسم الشاشات بس لو نفس الغرف) */
+function renderHero() {
+  const keep = focusState();
+  syncEng();
+  const o = state.data || {};
+  const rs = roomStates(deskStates());
+  const sid = OS_SLIDE[state.slide] ? state.slide : 'hq';
+  renderStrip(rs);
+  renderCopy(sid);
+  renderCards(sid, rs, o);
+  renderFlow(sid, rs, o);
+  renderFoot(rs, o);
+  const plan = buildPlan(sid, rs, o);
+  heroPlan = plan;
+  if (osScene) {
+    try {
+      const sig = JSON.stringify(plan);
+      if (sig !== osPlanSig) { osScene.show(plan); osPlanSig = sig; osLayoutFrames = 2; }
+      const ids = planRooms(plan);
+      // التحديد بس لو فيه أكثر من غرفة (المدير والمهندسين غرفة وحدة: الإطار البرتقالي ما يضيف شي)
+      osScene.update(Object.fromEntries(ids.map((id) => [id, { waiting: num(rs[id] && rs[id].waiting), working: num(rs[id] && rs[id].working), alert: num(rs[id] && rs[id].alert) }])), ids.length > 1 && ids.includes(state.desk) ? state.desk : null);
+      kick();
+    } catch (e) { fail3d(e); return; }
+  }
+  renderHits(rs);
+  renderStageMode(plan, rs);
+  drawLinks();
+  restoreFocus(keep);
+}
+/** بيانات غرفة المهندسين: المعاينة من sample.json، والحي يتحمّل مرة لما تفتح شريحة المهندسين (ما نوقف الشريحة عليه) */
+let engTry = 0;
+function syncEng(force) {
+  appSyncMode();
+  // وهي ظاهرة: أول مرة، وبعدها مرة بالدقيقة بالكثير (مع تحديث المكتب) — ولو فشلت نعيد بعد دقيقة. force = زر «تحديث»
+  if (state.top !== 'office' || state.slide !== 'eng' || app.isSample || app.reqLoading || !appCanLoad()) return;
+  if (!force && Array.isArray(app.requests) && Date.now() - app.reqAt < REFRESH_MS) return;
+  if (!force && engTry && Date.now() - engTry < REFRESH_MS) return;
+  engTry = Date.now();
+  loadRequests().then(() => { if (state.top === 'office') renderHero(); });
+}
+
+// ---------- التنقل ----------
+let fadeTimer = 0;
+/** يبدّل الشريحة بدون رسم (مع ظهور تدريجي ١٨٠ms، وبدونه مع تقليل الحركة). يرجّع true لو تغيّرت */
+function switchSlide(id) {
+  if (!OS_SLIDE[id] || state.slide === id) return false;
+  state.slide = id;
+  store('slide', id);
+  if (!reducedMotion()) {
+    const g = $('osGrid');
+    g.classList.remove('os-in'); void g.offsetWidth; g.classList.add('os-in');
+    clearTimeout(fadeTimer); fadeTimer = setTimeout(() => g.classList.remove('os-in'), 260);
+  }
+  return true;
+}
+function setSlide(id) {
+  const changed = switchSlide(id);
+  // فريق ما فيه المكتب المختار: نختار أول مكتب فيه (لوحة المكتب تحت تتبع الشريحة). المقر والمهندسين بدون مكاتب
+  const desks = changed ? teamDesks(id) : [];
+  if (desks.length && !desks.includes(state.desk)) { state.desk = desks[0]; store('desk', state.desk); renderAll(); }
+  else renderHero();
+  if (changed) revealTab();
+}
+/** بعد تبديل الشريحة من بطاقة: البطاقة انشالت والتركيز ضاع → أول بطاقة بالشريحة الجديدة */
+function focusSlide() {
+  const a = document.activeElement;
+  if (a && a !== document.body && a.isConnected) return;
+  const c = $('osCards').querySelector('.os-card') || $(`os-tab-${state.slide}`);
+  if (c) c.focus({ preventScroll: true });
+}
+function stepSlide(dir) {
+  const i = OS_SLIDES.findIndex((s) => s.id === state.slide);
+  setSlide(OS_SLIDES[(i + dir + OS_SLIDES.length) % OS_SLIDES.length].id);
+}
+/** ضغطة غرفة: بالمقر تفتح شريحة فريقها (وتختار المكتب)، وبالفريق تختار المكتب، والمهندسين يفتحون الطلبات */
+function roomClick(id) {
+  if (id === 'eng') { if (state.slide === 'hq') setSlide('eng'); else openApp('list'); return; }
+  if (!DESK[id]) return;
+  if (state.slide === 'hq') {
+    state.desk = id; store('desk', id);
+    switchSlide(teamOf(id));
+    renderAll();
+    revealTab();
+    return;
+  }
+  selectDesk(id);
 }
 
 // ===================== لوحات الأقسام =====================

@@ -32,26 +32,45 @@ const CONN_CODES = {
   user_changed: 'user_changed',
 };
 
-// المكاتب: شبكة ٥×٣ على الأرضية، المدير في النص، والزاوية القريبة من الكاميرا (٢،١) جلسة استراحة
-// row -1 = آخر المكتب (فوق بالشاشة)، row 1 = أقرب للكاميرا. نفس ألوان القمصان بالتطبيق + ألوان للمكاتب الجديدة
+// المكاتب: أيقونة كل مكتب ولونه (نفس ألوان القمصان بالتطبيق + ألوان للمكاتب الجديدة) وأنواع الشركاء اللي يستقبلها
 const DESKS = [
-  { id: 'clubs', icon: 'building', col: -2, row: -1, shirt: '#F1551D', kinds: ['club'] },
-  { id: 'stores', icon: 'store', col: -1, row: -1, shirt: '#5B8DEF', kinds: ['store'] },
-  { id: 'coaches', icon: 'user', col: 0, row: -1, shirt: '#2E9E6A', kinds: ['coach'] },
-  { id: 'care', icon: 'medkit', col: 1, row: -1, shirt: '#3FA7A0', kinds: ['center', 'venue'] },
-  { id: 'bookings', icon: 'calendar', col: 2, row: -1, shirt: '#C9822B', kinds: [] },
-  { id: 'reports', icon: 'bug', col: -2, row: 0, shirt: '#E06C75', kinds: [] },
-  { id: 'lead', icon: 'briefcase', col: 0, row: 0, shirt: '#0A332D', kinds: [] },
-  { id: 'orders', icon: 'bag', col: 2, row: 0, shirt: '#B98A1E', kinds: [] },
-  { id: 'marketing', icon: 'megaphone', col: -2, row: 1, shirt: '#FEA94F', kinds: [] },
-  { id: 'activity', icon: 'users', col: -1, row: 1, shirt: '#8E6CC8', kinds: [] },
-  { id: 'community', icon: 'chat', col: 0, row: 1, shirt: '#C2588F', kinds: [] },
-  { id: 'ai', icon: 'sparkles', col: 1, row: 1, shirt: '#2F4B3C', kinds: [] },
+  { id: 'clubs', icon: 'building', shirt: '#F1551D', kinds: ['club'] },
+  { id: 'stores', icon: 'store', shirt: '#5B8DEF', kinds: ['store'] },
+  { id: 'coaches', icon: 'user', shirt: '#2E9E6A', kinds: ['coach'] },
+  { id: 'care', icon: 'medkit', shirt: '#3FA7A0', kinds: ['center', 'venue'] },
+  { id: 'bookings', icon: 'calendar', shirt: '#C9822B', kinds: [] },
+  { id: 'reports', icon: 'bug', shirt: '#E06C75', kinds: [] },
+  { id: 'lead', icon: 'briefcase', shirt: '#0A332D', kinds: [] },
+  { id: 'orders', icon: 'bag', shirt: '#B98A1E', kinds: [] },
+  { id: 'marketing', icon: 'megaphone', shirt: '#FEA94F', kinds: [] },
+  { id: 'activity', icon: 'users', shirt: '#8E6CC8', kinds: [] },
+  { id: 'community', icon: 'chat', shirt: '#C2588F', kinds: [] },
+  { id: 'ai', icon: 'sparkles', shirt: '#2F4B3C', kinds: [] },
 ];
 const DESK = Object.fromEntries(DESKS.map((d) => [d.id, d]));
 const KIND_DESK = { club: 'clubs', store: 'stores', coach: 'coaches', center: 'care', venue: 'care' };
+
+// نظام الشركة: شرائح المكتب (المقر = كل الفرق، وبعدها شريحة لكل فريق). أدوار المبنى من فوق لتحت
+// eng ما هو مكتب: غرفته تعرض طلبات التعديل من تبويب «التطبيق»
+const OS_SLIDES = [
+  { id: 'hq', icon: 'cube', desks: [] },
+  { id: 'ceo', icon: 'briefcase', desks: ['lead'] },
+  { id: 'partners', icon: 'building', desks: ['clubs', 'stores', 'coaches', 'care'] },
+  { id: 'ops', icon: 'gear', desks: ['activity', 'bookings', 'orders'] },
+  { id: 'community', icon: 'chat', desks: ['community', 'reports'] },
+  { id: 'growth', icon: 'megaphone', desks: ['marketing', 'ai'] },
+  { id: 'eng', icon: 'code', desks: [] },
+];
+const OS_SLIDE = Object.fromEntries(OS_SLIDES.map((s) => [s.id, s]));
+const OS_TEAMS = OS_SLIDES.filter((s) => s.id !== 'hq');
+/** غرف الفريق (مكاتبه، أو غرفة المهندسين) */
+const teamRooms = (id) => (id === 'eng' ? ['eng'] : OS_SLIDE[id] ? OS_SLIDE[id].desks : []);
+/** الفريق اللي فيه المكتب */
+const teamOf = (desk) => (OS_TEAMS.find((s) => s.desks.includes(desk)) || OS_SLIDE.ceo).id;
 /** مكتب «المتدربين» بالتطبيق صار مكتب «النشاط» بالويب */
 const deskOf = (id) => (id === 'users' ? 'activity' : DESK[id] ? id : 'lead');
+/** مكاتب شريحة الفريق (المقر والمهندسين: ولا شي) */
+const teamDesks = (id) => (id === 'hq' || id === 'eng' || !OS_SLIDE[id] ? [] : OS_SLIDE[id].desks);
 
 // ===================== أدوات صغيرة =====================
 const $ = (id) => document.getElementById(id);
@@ -117,6 +136,23 @@ const ICONS = {
   play: 'M6 4l14 8-14 8z', up: 'M12 19V5M5 12l7-7 7 7', down: 'M12 5v14M19 12l-7 7-7-7',
   arrowEnd: 'M5 12h14M12 5l7 7-7 7', db: 'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
   eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  // نظام الشركة: أيقونات الشرائح وخط سير العمل
+  arrowStart: 'M19 12H5M12 19l-7-7 7-7',
+  gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
+  chart: 'M4 20V11M10 20V5M16 20v-7M2 20h20',
+  trend: 'M23 6l-9.5 9.5-5-5L1 18M17 6h6v6',
+  rocket: 'M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9a2.2 2.2 0 0 0-2.9-.1zM12 15l-3-3a22 22 0 0 1 2-4A12.9 12.9 0 0 1 22 2c0 2.7-.8 7.5-6 11a22.4 22.4 0 0 1-4 2zM9 12H4s.6-3 2-4c1.6-1.1 5 0 5 0M12 15v5s3-.6 4-2c1.1-1.6 0-5 0-5',
+  flag: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7',
+  target: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z',
+  filter: 'M22 3H2l8 9.5V19l4 2v-8.5z',
+  wrench: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z',
+  archive: 'M21 8v13H3V8M1 3h22v5H1zM10 12h4',
+  bulb: 'M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z',
+  userPlus: 'M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM20 8v6M23 11h-6',
+  merge: 'M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21V9a9 9 0 0 0 9 9',
+  terminal: 'M4 17l6-6-6-6M12 19h8',
+  scan: 'M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10',
 };
 function icon(name, cls = '') {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -139,13 +175,19 @@ const state = {
   lang: store('lang') === 'en' ? 'en' : 'ar',
   theme: savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : null,
   days: store('days') === '30' ? 30 : 7,
-  desk: DESK[store('desk')] ? store('desk') : 'lead',
+  desk: deskOf(store('desk')),
   tab: ['all', 'waiting', 'working', 'done'].includes(store('tab')) ? store('tab') : 'waiting',
   deskOnly: store('deskOnly') === '1',
   view: store('view') === 'grid' ? 'grid' : '3d',
+  /** شريحة نظام الشركة الظاهرة (OS_SLIDES) */
+  slide: OS_SLIDE[store('slide')] ? store('slide') : 'hq',
   /** التبويب العلوي: office (المكتب) | app (التطبيق) */
   top: store('top') === 'app' ? 'app' : 'office',
   can3d: true,
+  /** ليش 3D طافي: net (three.js ما تحمّل) | lost (WebGL انفقد) | device */
+  no3d: null,
+  /** three.js/المشهد تأخّر: نعرض المبنى المسطّح وهو يتحمّل */
+  slow3d: false,
   /** connecting | live | sample | error */
   mode: 'connecting',
   conn: null, // { kind, raw } لما يكون فيه مشكلة اتصال
@@ -166,6 +208,8 @@ const state = {
   needAdmin: false,
   fresh: new Set(),
 };
+// شريحة فريق محفوظة مع مكتب من فريق ثاني (نسخ قديمة): نبدأ بأول مكتب في الفريق
+if (teamDesks(state.slide).length && !teamDesks(state.slide).includes(state.desk)) state.desk = teamDesks(state.slide)[0];
 let mcp = null;
 
 /** «الحين»: مع البيانات التجريبية الوقت هو وقت إنشائها (عشان «قبل كم دقيقة» تطلع منطقية) */
