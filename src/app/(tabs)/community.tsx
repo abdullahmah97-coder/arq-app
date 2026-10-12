@@ -17,6 +17,7 @@ import { Button, Empty, H, IconButton, ProfileButton, Row, Segmented } from '@/c
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
 import { deletePost } from '@/lib/posts';
+import { rescreenMine } from '@/lib/safety';
 import { canPublish, RANKS } from '@/lib/ranks';
 import { saveReaction, withReaction, type ReactionKey, type ReactTarget } from '@/lib/reactions';
 import { deleteTip, likeTip, loadPrograms, loadTips, type Tip, type UserProgram } from '@/lib/social';
@@ -63,6 +64,8 @@ export default function Community() {
 
   const load = useCallback(async (before?: string) => {
     if (!before) void loadOpenSleep(userId);
+    // صوري اللي علق فحصها (انقطع النت مثلاً): نحاول مرة ثانية بهدوء
+    if (!before) void rescreenMine(userId).catch(() => {});
     try {
       const rows = await loadTimeline(before);
       setDone(rows.length < TIMELINE_PAGE);

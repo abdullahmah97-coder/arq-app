@@ -167,6 +167,8 @@ function RootNavigator() {
         <Stack.Screen name="owner-ai-limits" options={{ title: t('aiLimits.title') }} />
         <Stack.Screen name="owner-users" options={{ title: t('adminUsers.title') }} />
         <Stack.Screen name="owner-verify" options={{ title: t('verify.title') }} />
+        <Stack.Screen name="owner-safety" options={{ title: t('safety.queueTitle') }} />
+        <Stack.Screen name="blocked" options={{ title: t('safety.blockedListTitle') }} />
         <Stack.Screen name="book/index" options={{ title: t('book.title') }} />
         <Stack.Screen name="book/[id]" options={{ title: '' }} />
         <Stack.Screen name="bookings" options={{ title: t('book.myBookings') }} />

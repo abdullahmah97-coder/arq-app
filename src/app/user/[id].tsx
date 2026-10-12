@@ -1,20 +1,23 @@
-// حساب مستخدم آخر: متابعة، صداقة، ورتبته وبرامجه ونصائحه
+// حساب مستخدم آخر: متابعة، صداقة، ورتبته وبرامجه ونصائحه. و⋯ فوق: بلاغ عن الحساب أو حظره
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Alert, Pressable, View } from 'react-native';
 import { gymName } from '@/components/GymPicker';
+import { SafetySheet } from '@/components/safety/SafetySheet';
 import { ProfileView } from '@/components/social/ProfileView';
-import { Button, Empty, Loading, Row, Screen } from '@/components/ui';
+import { Button, Card, Empty, Loading, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { acceptRequest, relationTo, removeFriendship, sendRequest, type Relation } from '@/lib/friends';
 import { useLocalized } from '@/lib/i18n';
 import { canMessage } from '@/lib/messages';
 import { isAdmin, setCoach } from '@/lib/owner';
 import { follow, isFollowing, unfollow, type PublicProfile } from '@/lib/social';
+import { isBlockedByMe, unblockUser } from '@/lib/safety';
 import { errorKey, supabase } from '@/lib/supabase';
 import type { Gym } from '@/lib/types';
-import { space } from '@/theme';
+import { colors, space } from '@/theme';
 
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,6 +32,8 @@ export default function UserProfile() {
   const [admin, setAdmin] = useState(false);
   useEffect(() => { isAdmin().then(setAdmin).catch(() => {}); }, []);
   const [busy, setBusy] = useState<'follow' | 'friend' | null>(null);
+  const [blocked, setBlocked] = useState(false);
+  const [menu, setMenu] = useState(false);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
@@ -38,8 +43,8 @@ export default function UserProfile() {
       const { data: g } = await supabase.from('gyms').select('*').eq('id', data.gym_id).single();
       setGym(g as Gym);
     }
-    const [r, f, m] = await Promise.all([relationTo(userId, id), isFollowing(userId, id), canMessage(userId, id)]);
-    setRel(r); setFollowing(f); setMutual(m);
+    const [r, f, m, b] = await Promise.all([relationTo(userId, id), isFollowing(userId, id), canMessage(userId, id), isBlockedByMe(userId, id)]);
+    setRel(r); setFollowing(f); setMutual(m); setBlocked(b);
   }, [id, userId]);
 
   // عند الرجوع للصفحة (مثلاً بعد قبول طلب الصداقة) تتحدث الأزرار
@@ -82,8 +87,20 @@ export default function UserProfile() {
 
   return (
     <Screen edges={['bottom']}>
-      <Stack.Screen options={{ title: `@${p.username}` }} />
-      <ProfileView p={p} me={userId} gymLabel={gym ? gymName(gym, lng) : null} actions={self ? null : (
+      <Stack.Screen options={{ title: `@${p.username}`, headerRight: self ? undefined : () => (
+        <Pressable onPress={() => setMenu(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('safety.more')}
+          style={({ pressed }) => ({ padding: 4, opacity: pressed ? 0.6 : 1 })}>
+          <Ionicons name="ellipsis-horizontal" size={22} color={colors.text} />
+        </Pressable>
+      ) }} />
+      <ProfileView p={p} me={userId} gymLabel={gym ? gymName(gym, lng) : null} actions={self ? null : blocked ? (
+        <Card style={{ gap: space.sm }}>
+          <T semibold>{t('safety.youBlocked', { name: p.full_name || `@${p.username}` })}</T>
+          <T size="sm" muted style={{ lineHeight: 21 }}>{t('safety.youBlockedHint')}</T>
+          <Button variant="secondary" icon="lock-open-outline" title={t('safety.unblock')}
+            onPress={async () => { try { await unblockUser(p.id); load(); } catch (e) { Alert.alert(t(errorKey(e))); } }} />
+        </Card>
+      ) : (
         <View style={{ gap: space.sm }}>
         <Row gap={space.md}>
           <View style={{ flex: 1 }}>
@@ -102,6 +119,8 @@ export default function UserProfile() {
         ) : null}
         </View>
       )} />
+      <SafetySheet target={menu ? { type: 'user', id: p.id, userId: p.id, name: p.full_name || `@${p.username}` } : null}
+        blockedByMe={blocked} onClose={() => setMenu(false)} onBlocked={() => load()} onUnblocked={() => load()} />
     </Screen>
   );
 }

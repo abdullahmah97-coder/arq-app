@@ -16,12 +16,14 @@ import { CoachCheck } from './social/RankBadge';
 import { MomentAvatar, MomentBubble, momentText, NIGHT, ReactionPicker, ReactionPill, ReactorsStrip } from './timeline/Moments';
 import { Card, Row, T } from './ui';
 
-export const PostCard = memo(function PostCard({ post, onReact, onReactors, onDelete, isMine }: {
+export const PostCard = memo(function PostCard({ post, onReact, onReactors, onDelete, isMine, onMore }: {
   post: FeedPost;
   onReact: (next: ReactionKey | null) => void;
   onReactors: () => void;
   onDelete?: (p: FeedPost) => void;
   isMine?: boolean;
+  /** «⋯» على منشور شخص ثاني: بلاغ أو حظر */
+  onMore?: () => void;
 }) {
   const { t } = useTranslation();
   const { lng } = useLocalized();
@@ -53,7 +55,19 @@ export const PostCard = memo(function PostCard({ post, onReact, onReactors, onDe
             <Ionicons name="trash-outline" size={18} color={colors.muted} />
           </Pressable>
         ) : null}
+        {onMore ? (
+          <Pressable hitSlop={10} onPress={onMore} accessibilityRole="button" accessibilityLabel={t('safety.more')}>
+            <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
+          </Pressable>
+        ) : null}
       </Row>
+
+      {meta.hidden || meta.screen ? (
+        <Row gap={6} style={{ marginHorizontal: space.md, marginBottom: space.sm, padding: space.sm, borderRadius: radius.md, backgroundColor: colors.cardAlt }}>
+          <Ionicons name={meta.hidden ? 'eye-off-outline' : 'hourglass-outline'} size={16} color={colors.muted} />
+          <T size="xs" muted style={{ flex: 1, lineHeight: 18 }}>{t(meta.hidden ? 'safety.flagHidden' : meta.screen === 'blocked' ? 'safety.flagBlocked' : 'safety.flagPending')}</T>
+        </Row>
+      ) : null}
 
       {kind === 'wake' || kind === 'sleep' ? (
         <MomentBanner kind={kind} headline={headline} sub={sub} />

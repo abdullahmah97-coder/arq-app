@@ -1975,7 +1975,11 @@
     "message_deleted": "This message was deleted.",
     "empty_message": "The message is empty.",
     "message_too_long": "That message is too long (1000 characters max).",
-    "docs_required": "Add the commercial registration and club license with their photos. Update the app if you don't see these fields."
+    "docs_required": "Add the commercial registration and club license with their photos. Update the app if you don't see these fields.",
+    "content_blocked": "This text has words that break our community guidelines. Edit it and try again.",
+    "blocked_user": "You can't interact with this account.",
+    "account_suspended": "Your account is temporarily restricted from posting, commenting and messaging for breaking our community guidelines.",
+    "target_not_found": "We couldn't find that. It may have been deleted."
   },
   "trust": {
     "liveNow_one": "1 person here now",
@@ -3742,7 +3746,7 @@
   "privacyPolicy": {
     "title": "Privacy Policy",
     "intro": "Your privacy is central to ARQ. This policy explains what data we collect and why, who we share it with, how we protect it and your rights over it, under the Personal Data Protection Law of the Kingdom of Saudi Arabia.",
-    "version": "Version 1.0 · Last updated 4 October 2026",
+    "version": "Version 1.1 · Last updated 12 October 2026",
     "sections": [
       {
         "icon": "person-circle-outline",
@@ -3762,12 +3766,12 @@
       {
         "icon": "camera-outline",
         "title": "Photos",
-        "body": "• Meal photos are sent for analysis only and are not stored.\n• Progress photos and InBody reports are stored privately; nobody sees them except your coach, if you allow it.\n• Photos in posts and chats are seen by the people you share them with."
+        "body": "• Meal photos are sent for analysis only and are not stored.\n• Progress photos and InBody reports are stored privately; nobody sees them except your coach, if you allow it.\n• Photos in posts and chats are seen by the people you share them with. Post photos are checked automatically before your friends see them, to make sure they follow our community guidelines."
       },
       {
         "icon": "sparkles-outline",
         "title": "Artificial intelligence",
-        "body": "We use Anthropic’s Claude to analyse meal photos and nutrition labels, read InBody reports, build training and meal plans and answer in the AI coach. We send only what each request needs, such as the photo or your goals, level and activity summary, never your email or login details, and Anthropic does not use it to train its models."
+        "body": "We use Anthropic’s Claude to analyse meal photos and nutrition labels, read InBody reports, build training and meal plans, answer in the AI coach, and check post photos before your friends see them. We send only what each request needs, such as the photo or your goals, level and activity summary, never your email or login details, and Anthropic does not use it to train its models."
       },
       {
         "icon": "eye-outline",
@@ -3797,7 +3801,7 @@
       {
         "icon": "time-outline",
         "title": "Retention and deletion",
-        "body": "We keep your data while your account exists. You can delete your account from your profile under “Delete account”; your data and photos are then permanently deleted, except what the law requires us to keep for a set period, such as financial transaction records."
+        "body": "We keep your data while your account exists. You can delete your account from your profile under “Delete account”; your data and photos are then permanently deleted, except what the law requires us to keep for a set period, such as financial transaction records. If you report something, or something you posted is reported, we keep the report and a copy of the content so we can review it; these are deleted when the account is deleted."
       },
       {
         "icon": "hand-left-outline",
@@ -3822,6 +3826,170 @@
     ],
     "contact": "Questions about your privacy, or want a copy of your data? Message us from inside ARQ.",
     "link": "Privacy Policy"
+  },
+  "safety": {
+    "more": "More options",
+    "reportWhat": "Report this {{what}}",
+    "reportUser": "Report account",
+    "what_post": "post",
+    "what_comment": "comment",
+    "what_checkin_comment": "comment",
+    "what_message": "message",
+    "what_user": "account",
+    "whyTitle": "Why are you reporting this {{what}}?",
+    "whyHint": "Reports are confidential — we never tell anyone who reported them. We review every report within 24 hours.",
+    "reason_harassment": "Harassment or bullying",
+    "reason_hate": "Hate or racism",
+    "reason_sexual": "Sexual content or nudity",
+    "reason_violence": "Violence or threats",
+    "reason_self_harm": "Self-harm",
+    "reason_spam": "Spam or scam",
+    "reason_other": "Something else",
+    "reason_unscreened": "Photo not checked",
+    "otherTitle": "What's wrong?",
+    "otherHint": "Tell us briefly what happened.",
+    "otherPlaceholder": "Describe the problem…",
+    "send": "Send report",
+    "thanksTitle": "Thanks for reporting 🙏",
+    "thanksBody": "We'll review it within 24 hours. If it breaks our community guidelines, we'll remove it and act on the account. We won't tell them you reported it.",
+    "thanksHidden": "Thank you. We've hidden it from everyone because several people reported it, and we'll review it within 24 hours.",
+    "block": "Block",
+    "blockName": "Block {{name}}",
+    "blockQ": "Block {{name}}?",
+    "blockExplain": "They won't be able to message you or see or comment on your posts, and you won't see theirs. Your friendship and follows are removed, and any coaching between you ends. We won't tell them you blocked them.",
+    "blockedTitle": "{{name}} is blocked",
+    "blockedBody": "You can unblock them anytime from Profile → Blocked accounts.",
+    "unblock": "Unblock",
+    "unblockName": "Unblock {{name}}",
+    "unblockQ": "Unblock {{name}}?",
+    "unblockExplain": "They'll be able to see your public posts and send you a friend request again. Your earlier friendship and follows won't come back on their own.",
+    "blockedListTitle": "Blocked accounts",
+    "blockedListHint": "People you block can't message you or see or comment on your posts, and they aren't told you blocked them.",
+    "blockedListEmpty": "You haven't blocked anyone.",
+    "youBlocked": "You blocked {{name}}",
+    "youBlockedHint": "You can't see each other's posts, and they can't message you or comment on your posts.",
+    "longPressHint": "Long-press to report or block",
+    "flagPending": "This photo is being checked. Your friends will see it as soon as it’s cleared.",
+    "flagBlocked": "This photo breaks our community guidelines, so only you can see it. Delete it, or message us if you think we got it wrong.",
+    "flagHidden": "This post is hidden from others because it may break our community guidelines. Message us if you think that’s a mistake.",
+    "checkingPhoto": "Checking your photo…",
+    "postFootnote": "Photos are checked before your friends see them. By posting you agree to our community guidelines.",
+    "screenBlockedTitle": "We can't post this photo",
+    "screenBlocked": "This photo breaks our community guidelines. Please choose another one.",
+    "screenBlockedWhy": "This photo breaks our community guidelines: {{why}}\nPlease choose another one.",
+    "screenLimit": "You've reached today's photo-check limit. Try again tomorrow, or post without a photo.",
+    "screenLaterTitle": "Post saved",
+    "screenLater": "We couldn't check the photo just now. You can see your post now; your friends will see it once the photo is checked.",
+    "gateTitle": "ARQ community guidelines",
+    "gateIntro": "Before your first post or comment: ARQ is a place to train and cheer each other on, and we all keep it that way.",
+    "gateZero": "Zero tolerance for objectionable content and abusive users: we remove violations within 24 hours of a report and suspend the accounts behind them.",
+    "gateReadAll": "Read the full community guidelines",
+    "gateAccept": "I agree",
+    "queueTitle": "Community reports",
+    "queueHint": "Everything people have reported, plus photos stuck in checking for over 15 minutes. Act within 24 hours of a report (an App Store requirement).",
+    "tabOpen": "Open",
+    "tabAll": "All",
+    "tabTerms": "Blocked words",
+    "queueEmpty": "No open reports 👌",
+    "queueEmptyAll": "No reports yet.",
+    "unscreened": "Photo stuck in checking",
+    "isHidden": "Hidden",
+    "isSuspended": "Account suspended",
+    "hasPhoto": "Has a photo",
+    "hasVideo": "Has a video",
+    "approve": "Approve photo",
+    "hide": "Hide",
+    "restore": "Restore",
+    "suspendExplain": "They can't post, comment or send messages while suspended. We'll tell them how long it lasts.",
+    "unsuspend": "Lift suspension",
+    "dismiss": "Dismiss",
+    "termsHint": "Words blocked in posts and comments. We match whole words and ignore diacritics, stretched and repeated letters.",
+    "termPlaceholder": "Word or phrase",
+    "add": "Add",
+    "removeTermQ": "Remove “{{term}}” from blocked words?",
+    "removeTermHint": "Long-press a word to remove it",
+    "ownerSubHint": "User reports and photos stuck in checking",
+    "ownerSubNone": "Nothing waiting 👌",
+    "reportsN_one": "{{count}} report",
+    "reportsN_other": "{{count}} reports",
+    "suspendDays_one": "Suspend {{count}} day",
+    "suspendDays_other": "Suspend {{count}} days",
+    "suspendQ_one": "Suspend {{name}} for {{count}} day?",
+    "suspendQ_other": "Suspend {{name}} for {{count}} days?",
+    "ownerOpen_one": "{{count}} open report",
+    "ownerOpen_other": "{{count}} open reports",
+    "ownerStuck_one": "{{count}} photo stuck",
+    "ownerStuck_other": "{{count}} photos stuck",
+    "rules": [
+      {
+        "icon": "heart-outline",
+        "text": "Respect others: no bullying, harassment, insults, racism or hate."
+      },
+      {
+        "icon": "shirt-outline",
+        "text": "Workout photos and sportswear are fine — no nudity or sexual content."
+      },
+      {
+        "icon": "warning-outline",
+        "text": "No violence or threats, and don't encourage self-harm, dangerous diets or banned substances."
+      },
+      {
+        "icon": "lock-closed-outline",
+        "text": "Don't share anyone's details or photos without their permission — including at the gym."
+      },
+      {
+        "icon": "megaphone-outline",
+        "text": "No spam, scams or impersonation."
+      },
+      {
+        "icon": "flag-outline",
+        "text": "See something abusive? Tap ⋯ on a post or profile, or long-press a comment or message, to report it or block the person."
+      }
+    ]
+  },
+  "communityGuidelines": {
+    "title": "Community Guidelines",
+    "link": "Community guidelines",
+    "intro": "ARQ is a community for training and encouragement. These guidelines apply to posts, photos, comments, messages and profiles, and by posting or commenting you agree to them. We have zero tolerance for objectionable content and abusive users.",
+    "version": "Version 1.0 · Last updated 12 October 2026",
+    "sections": [
+      {
+        "icon": "heart-outline",
+        "title": "Respect first",
+        "body": "• No bullying, harassment, threats or insults.\n• No hate, racism or mocking anyone for their origin, religion, gender, looks, weight or disability.\n• Criticise ideas, not people, and encourage others whatever their level."
+      },
+      {
+        "icon": "image-outline",
+        "title": "Photos and content",
+        "body": "• Workout, sportswear and progress photos are welcome.\n• No nudity, sexual content or sexual innuendo.\n• No violence, gore or weapons, and no promoting drugs or banned performance-enhancing substances.\n• No encouraging self-harm, eating disorders, or dangerous diets or training."
+      },
+      {
+        "icon": "lock-closed-outline",
+        "title": "Other people's privacy",
+        "body": "• Don't share anyone's phone number, address or other personal details.\n• Don't post photos of other people, at the gym or anywhere else, without their permission."
+      },
+      {
+        "icon": "megaphone-outline",
+        "title": "Spam and scams",
+        "body": "• No ads, spammy links or repeated messages.\n• No impersonating people or organisations, and no scams."
+      },
+      {
+        "icon": "flag-outline",
+        "title": "Reporting and blocking",
+        "body": "• On any post or profile: tap ⋯, then Report or Block.\n• On a comment or message: long-press it, then choose.\n• Reports are confidential: we never tell anyone who reported them.\n• People you block can't message you or see or comment on your posts, and you won't see theirs. You can unblock them from Profile → Blocked accounts."
+      },
+      {
+        "icon": "shield-checkmark-outline",
+        "title": "How we keep ARQ safe",
+        "body": "• We check post photos automatically before your friends see them, and block abusive words in posts and comments.\n• We review every report within 24 hours.\n• When several people report something, we hide it straight away until we've reviewed it."
+      },
+      {
+        "icon": "hammer-outline",
+        "title": "If you break the guidelines",
+        "body": "Depending on how serious it is, we hide or remove the content and temporarily stop the account from posting, commenting and messaging. Repeated or serious violations can lead to the account being closed. We may report content that puts someone in danger or breaks the law to the authorities."
+      }
+    ],
+    "contact": "Questions about these guidelines, or want to appeal a decision? Message us from inside ARQ."
   },
   "tour": {
     "replay": "App tour",

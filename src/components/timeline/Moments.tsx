@@ -162,6 +162,9 @@ export const MomentRow = memo(function MomentRow({ it, mine, pickerOpen, last, o
             </Text>
             {headline ? <T style={{ lineHeight: 24 }} numberOfLines={2}>{headline}</T> : null}
             {it.item_type === 'post' && it.caption ? <T style={{ lineHeight: 24 }} numberOfLines={8}>{it.caption}</T> : null}
+            {mine && it.item_type === 'post' && (it.meta?.hidden || it.meta?.screen) ? (
+              <T size="xs" muted style={{ lineHeight: 18 }}>{it.meta.hidden ? '⚠️ ' : '⏳ '}{t(it.meta.hidden ? 'safety.flagHidden' : it.meta.screen === 'blocked' ? 'safety.flagBlocked' : 'safety.flagPending')}</T>
+            ) : null}
             {sub ? <T size="xs" muted style={{ lineHeight: 18, marginTop: 2 }}>{sub}</T> : null}
           </View>
           <ReactionPill value={it.my_reaction} open={pickerOpen} onToggle={() => onPicker(pickerOpen ? null : itemKey(it))} />
