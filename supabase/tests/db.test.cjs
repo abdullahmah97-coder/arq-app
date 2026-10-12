@@ -45,6 +45,8 @@ grant usage on schema public, auth, storage to authenticated;
                  revoke insert, update, delete on public.app_admins from authenticated;`);
   console.log('ok   migration + seed applied');
 
+  // حسابات قائمة (مقبولة): موافقة الإدارة على التسجيل موقّفة هنا، واختبارها في approval.test.cjs
+  await q(`update app_settings set value = '{"enabled": false}' where key = 'signup_approval'`);
   await q(`insert into auth.users (id, raw_user_meta_data) values
     ($1, '{"username":"ahmed","full_name":"Ahmed","gender":"male"}'), ($2, '{"username":"sara","gender":"female"}'), ($3, '{}')`, [A, B, C]);
   const gs = await q('select gender from health_profiles order by gender nulls last');

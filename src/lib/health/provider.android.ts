@@ -12,7 +12,7 @@ import {
   SleepStageType,
   type Permission,
 } from 'react-native-health-connect';
-import { avg, dayRange, hrZoneMinutes, lastDays, sleepWindow, summarizeSleep, type SleepKind, type SleepSegment } from './aggregate';
+import { avg, dayRange, hrZoneMinutes, lastDays, restingFromSleep, sleepWindow, summarizeSleep, type SleepKind, type SleepSegment } from './aggregate';
 import type { HealthProvider } from './provider-types';
 import type { DailyHealth } from './types';
 
@@ -63,12 +63,16 @@ async function readDay(day: string, age: number, granted: Set<string>): Promise<
   const hrs = (hr?.records ?? []).flatMap((r) => r.samples.map((x) => ({ t: Date.parse(x.time), bpm: x.beatsPerMinute })));
   const hrvVals = (hrv?.records ?? []).map((r) => r.heartRateVariabilityMillis);
   const hrvAvg = avg(hrvVals);
+  // ساعات مثل شاومي (Mi Fitness) ما تكتب «نبض الراحة»: نحسبه من نبض الليل
+  const rhrVal = rhr && rhr.BPM_AVG ? rhr.BPM_AVG : null;
+  const rhrEst = rhrVal == null ? restingFromSleep(hrs, segs) : null;
   return {
     day,
     steps: steps ? Math.round(steps.COUNT_TOTAL) : null,
     active_kcal: kcal ? Math.round(kcal.ACTIVE_CALORIES_TOTAL.inKilocalories) : null,
     distance_m: dist ? Math.round(dist.DISTANCE.inMeters) : null,
-    resting_hr: rhr && rhr.BPM_AVG ? rhr.BPM_AVG : null,
+    resting_hr: rhrVal ?? rhrEst,
+    rhr_estimated: rhrVal == null && rhrEst != null,
     hrv_ms: hrvAvg == null ? null : Math.round(hrvAvg * 10) / 10,
     avg_hr: avg(hrs.map((h) => h.bpm)),
     hr_zone_min: hrs.length > 20 ? hrZoneMinutes(hrs, age) : null,

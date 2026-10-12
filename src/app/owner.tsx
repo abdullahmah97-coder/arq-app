@@ -27,6 +27,8 @@ import { loadCalorieAlertConfig, type CalorieAlertConfig } from '@/lib/nutrition
 import { loadAiLimits, type AiLimits } from '@/lib/aiLimits';
 import { adminUserStats, type AdminUserStats } from '@/lib/adminUsers';
 import { verifiedCount } from '@/lib/verify';
+import { safetyCounts } from '@/lib/safety';
+import { signupCount } from '@/lib/approval';
 import { KIND_ICON, PARTNER_KINDS, partnerOverview, type Overview, type PartnerKind } from '@/lib/partners';
 import { snapshotFrom } from '@/lib/office';
 import { waitingTotal } from '@/lib/officeCore';
@@ -52,6 +54,8 @@ export default function Owner() {
   const [aiLim, setAiLim] = useState<AiLimits | null>(null);
   const [users, setUsers] = useState<AdminUserStats | null>(null);
   const [verifiedN, setVerifiedN] = useState<number | null>(null);
+  const [safety, setSafety] = useState<{ open: number; unscreened: number } | null>(null);
+  const [signups, setSignups] = useState<number | null>(null);
   // الإعلانات والفعاليات وصلت (قبلها ما نحسب تنبيهات "ما فيه إعلان/فعالية" في رقم المكتب)
   const [loaded, setLoaded] = useState(false);
 
@@ -64,6 +68,8 @@ export default function Owner() {
     loadAiLimits().then(setAiLim).catch(() => {});
     adminUserStats().then(setUsers).catch(() => {});
     verifiedCount().then(setVerifiedN).catch(() => {});
+    safetyCounts().then(setSafety).catch(() => {});
+    signupCount().then(setSignups).catch(() => {});
     const [r, b, o, v, a, ev] = await Promise.all([
       loadReports().catch(() => [] as Report[]), loadBrandRequests().catch(() => [] as Brand[]), loadOffers().catch(() => [] as Offer[]),
       partnerOverview().catch(() => ({})), listLaunchAds().catch(() => [] as LaunchAdRow[]), listAllEvents().catch(() => [] as LocalEvent[]),
@@ -96,10 +102,21 @@ export default function Owner() {
         <Stat n={count('new')} label={t('owner.newReports')} color={STATUS_COLOR.new} />
       </View>
 
+      {/* طلبات التسجيل: كل حساب جديد ينتظر موافقتك قبل ما يدخل التطبيق */}
+      <OwnerLink icon="person-add" title={t('approval.queueTitle')}
+        sub={signups == null ? t('approval.ownerSubHint') : signups ? t('approval.ownerSub', { count: signups }) : t('approval.ownerSubNone')}
+        onPress={() => router.push('/owner-signups')} />
+
       {/* مكتب أرك أب: نفس الأقسام كمكتب ثلاثي الأبعاد، وكل اللي ينتظر موافقتك عليه علامة */}
       <OwnerLink icon="business" title={t('office.title')}
         sub={officeWaiting ? t('office.entrySubWaiting', { n: officeWaiting }) : t('office.entrySub')}
         onPress={() => router.push('/owner-office')} />
+
+      {/* بلاغات المجتمع: المحتوى المبلّغ عنه والصور اللي علق فحصها (شرط App Store: الرد خلال ٢٤ ساعة) */}
+      <OwnerLink icon="flag" title={t('safety.queueTitle')}
+        sub={!safety ? t('safety.ownerSubHint') : !safety.open && !safety.unscreened ? t('safety.ownerSubNone')
+          : [safety.open ? t('safety.ownerOpen', { count: safety.open }) : null, safety.unscreened ? t('safety.ownerStuck', { count: safety.unscreened }) : null].filter(Boolean).join(' · ')}
+        onPress={() => router.push('/owner-safety')} />
 
       {/* المالك بس: الأجزاء اللي أخفاها عن المستخدمين بالضغط المطوّل */}
       <HiddenPartsCard />

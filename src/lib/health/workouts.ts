@@ -64,7 +64,9 @@ export function toMinutes(q: Q, start: Date | string, end: Date | string): numbe
 }
 
 /** تمرين من Apple Watch؟ (الجهاز أو نوع المنتج فيه Watch) */
-export const isWatch = (...hints: (string | null | undefined)[]) => hints.some((h) => !!h && /watch/i.test(h));
+// ساعة أو سوار: الاسم فيه Watch أو Band، أو تطبيق ساعة معروف (Mi Fitness لشاومي، Zepp لأمازفت، Huawei Health…)
+export const isWatch = (...hints: (string | null | undefined)[]) =>
+  hints.some((h) => !!h && /watch|band|xiaomi|redmi|amazfit|zepp|huawei|honor|mi fitness|garmin|fitbit|whoop|oura|polar|coros|suunto/i.test(h));
 
 /** ملخص أسبوع التمارين الخارجية للبطاقة */
 export function weekSummary(ws: ExternalWorkout[], now = Date.now()) {

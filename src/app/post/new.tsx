@@ -3,9 +3,14 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import { useGuidelinesGate } from '@/components/safety/Guidelines';
 import { Button, Input, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
+import { useLocalized } from '@/lib/i18n';
 import { pickImage, type PickedImage } from '@/lib/images';
+import { deletePost } from '@/lib/posts';
+import { screenPost } from '@/lib/safety';
+import type { FeedPost } from '@/lib/types';
 import { errorKey, supabase, uploadImage } from '@/lib/supabase';
 import { colors, radius } from '@/theme';
 import { goBackOrHome } from '@/lib/nav';
@@ -21,6 +26,9 @@ export default function NewPost() {
   const [todayCheckIn, setTodayCheckIn] = useState<string | null>(params.checkIn ?? null);
   const [attach, setAttach] = useState(!!params.checkIn);
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const { lng } = useLocalized();
+  const gate = useGuidelinesGate();
 
   useEffect(() => {
     if (params.mode !== 'photo') return;
@@ -39,22 +47,38 @@ export default function NewPost() {
 
   const submit = async () => {
     if (!image && !caption.trim()) return Alert.alert(t('errors.required'));
+    if (!(await gate.ensure())) return;
     setBusy(true);
     try {
       const path = image ? await uploadImage('posts', userId, image.uri, image.mimeType) : null;
-      const { error } = await supabase.from('posts').insert({
+      const { data, error } = await supabase.from('posts').insert({
         user_id: userId,
         image_path: path,
         caption: caption.trim() || null,
         visibility,
         check_in_id: attach ? todayCheckIn : null,
-      });
+      }).select('id').single();
       if (error) throw error;
+      if (!path) { goBackOrHome(); return; }
+
+      // الصورة تنفحص قبل ما تبان لأصدقائك (تبان لك على طول)
+      setChecking(true);
+      const r = await screenPost(data.id);
+      const drop = () => deletePost({ id: data.id, image_path: path } as FeedPost).catch(() => {});
+      if (r.screen === 'ok') { goBackOrHome(); return; }
+      if (r.screen === 'blocked') {
+        await drop();
+        const why = r.reason?.[lng];
+        Alert.alert(t('safety.screenBlockedTitle'), why ? t('safety.screenBlockedWhy', { why }) : t('safety.screenBlocked'));
+        return; // يبقى هنا عشان يغيّر الصورة
+      }
+      if (r.error === 'rate_limited') { await drop(); Alert.alert(t('safety.screenLimit')); return; }
+      Alert.alert(t('safety.screenLaterTitle'), t('safety.screenLater'));
       goBackOrHome();
     } catch (e) {
       Alert.alert(t(errorKey(e)));
     } finally {
-      setBusy(false);
+      setBusy(false); setChecking(false);
     }
   };
 
@@ -80,8 +104,11 @@ export default function NewPost() {
             <Switch value={attach} onValueChange={setAttach} trackColor={{ true: colors.primary }} />
           </Row>
         ) : null}
+        {checking ? <T size="sm" muted center>{t('safety.checkingPhoto')}</T> : null}
         <Button title={t('feed.post')} icon="send" onPress={submit} loading={busy} />
+        <T size="xs" muted center style={{ lineHeight: 18 }}>{t('safety.postFootnote')}</T>
       </Screen>
+      {gate.modal}
     </KeyboardAvoidingView>
   );
 }

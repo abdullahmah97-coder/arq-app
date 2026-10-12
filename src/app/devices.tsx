@@ -3,12 +3,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { ImageBackground } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Logo } from '@/brand/Brand';
 import { Button, Card, Row, T, type IconName } from '@/components/ui';
-import { useHealth } from '@/lib/health';
+import { useHealth, type DailyHealth } from '@/lib/health';
+import { timeAgo } from '@/lib/dates';
+import { useLocalized } from '@/lib/i18n';
 import { brand, colors, space, TAB_BAR_SPACE } from '@/theme';
 
 // مع ساعة أبل: وش يشتغل بدون تطبيق ساعة منفصل
@@ -16,6 +18,17 @@ const WATCH: [IconName, string][] = [
   ['hourglass-outline', 'watch.feat_rest'], ['chatbubble-ellipses-outline', 'watch.feat_reply'],
   ['walk-outline', 'watch.feat_workouts'], ['heart-outline', 'watch.feat_session'], ['calendar-outline', 'watch.feat_bookings'],
   ['nutrition-outline', 'watch.feat_kcal'], ['notifications-outline', 'watch.feat_quiet'],
+];
+
+// وش وصلنا من الساعة فعلاً (آخر ٣٠ يوم) — يبيّن وين المشكلة لو «ما فيه مزامنة»
+type Metric = { key: string; icon: IconName; has: (d: DailyHealth) => boolean; missingHint?: string; estHint?: (d: DailyHealth) => boolean };
+const METRICS: Metric[] = [
+  { key: 'health.steps', icon: 'footsteps', has: (d) => (d.steps ?? 0) > 0 },
+  { key: 'health.recvHeartRate', icon: 'heart', has: (d) => d.avg_hr != null },
+  { key: 'health.rhr', icon: 'heart-circle', has: (d) => d.resting_hr != null, estHint: (d) => !!d.rhr_estimated },
+  { key: 'health.hrv', icon: 'pulse', has: (d) => d.hrv_ms != null, missingHint: 'health.recvNoHrv' },
+  { key: 'health.sleep', icon: 'moon', has: (d) => !!d.sleep },
+  { key: 'health.recvStages', icon: 'bed', has: (d) => !!d.sleep?.stages },
 ];
 
 const READS: [IconName, string][] = [
@@ -30,6 +43,18 @@ export default function Devices() {
   const android = Platform.OS === 'android';
   const native = ios || android;
   const realConnected = h.status === 'connected' && h.source !== 'demo';
+  const { lng } = useLocalized();
+  const [xiaomi, setXiaomi] = useState(false);
+  const received = useMemo(() => {
+    // آخر يوم في القراءة = اليوم (القراءة تنتهي باليوم)، واللي قبله = أمس
+    const today = h.days[h.days.length - 1]?.day;
+    const yesterday = h.days[h.days.length - 2]?.day;
+    return METRICS.map((m) => {
+      const last = [...h.days].reverse().find(m.has);
+      const when = !last ? null : last.day === today ? t('health.recvToday') : last.day === yesterday ? t('health.recvYesterday') : timeAgo(`${last.day}T12:00:00`, lng);
+      return { m, last, when };
+    });
+  }, [h.days, t, lng]);
 
   const connect = async () => {
     setBusy(true);
@@ -79,6 +104,50 @@ export default function Devices() {
         </Card>
       ) : null}
 
+      {realConnected ? (
+        <Card style={{ gap: space.sm }}>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Row><Ionicons name="checkmark-done" size={18} color={brand.green} /><T bold>{t('health.recvTitle')}</T></Row>
+            {h.lastSync ? <T size="xs" muted>{timeAgo(h.lastSync.toISOString(), lng)}</T> : null}
+          </Row>
+          {received.map(({ m, last, when }) => (
+            <View key={m.key} style={{ gap: 2 }}>
+              <Row gap={10}>
+                <Ionicons name={m.icon} size={16} color={last ? brand.orange : colors.muted} />
+                <T size="sm" style={{ flex: 1 }}>{t(m.key)}</T>
+                <Ionicons name={last ? 'checkmark-circle' : 'close-circle-outline'} size={16} color={last ? brand.green : colors.muted} />
+                <T size="xs" muted>{when ?? t('health.recvNone')}</T>
+              </Row>
+              {last && m.estHint?.(last) ? <T size="xs" muted style={{ lineHeight: 18, marginStart: 26 }}>{t('health.recvRhrEst')}</T> : null}
+              {!last && m.missingHint ? <T size="xs" muted style={{ lineHeight: 18, marginStart: 26 }}>{t(m.missingHint)}</T> : null}
+            </View>
+          ))}
+          <T size="xs" muted style={{ lineHeight: 19 }}>{t('health.recvFooter')}</T>
+        </Card>
+      ) : null}
+
+      {native ? (
+        <Card style={{ gap: space.sm }}>
+          <Pressable onPress={() => setXiaomi((x) => !x)} accessibilityRole="button" accessibilityState={{ expanded: xiaomi }}>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Row><Ionicons name="watch-outline" size={18} color={brand.orange} /><T bold>{t('health.xiaomiTitle')}</T></Row>
+              <Ionicons name={xiaomi ? 'chevron-up' : 'chevron-down'} size={18} color={colors.muted} />
+            </Row>
+          </Pressable>
+          {xiaomi ? (
+            <View style={{ gap: space.sm }}>
+              {(t(ios ? 'health.xiaomiStepsIos' : 'health.xiaomiStepsAndroid', { returnObjects: true }) as string[]).map((step, i) => (
+                <Row key={step} gap={10} style={{ alignItems: 'flex-start' }}>
+                  <View style={styles.stepNum}><T size="xs" bold color={brand.cream}>{i + 1}</T></View>
+                  <T size="sm" style={{ flex: 1, lineHeight: 21 }}>{step}</T>
+                </Row>
+              ))}
+              <T size="xs" muted style={{ lineHeight: 19 }}>{t('health.xiaomiNote')}</T>
+            </View>
+          ) : null}
+        </Card>
+      ) : null}
+
       {!android ? (
         <Card style={{ gap: space.sm }}>
           <Row><Ionicons name="watch" size={18} color={brand.orange} /><T bold>{t('watch.featuresTitle')}</T></Row>
@@ -124,4 +193,5 @@ const styles = StyleSheet.create({
   srcIcon: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   dot: { width: 12, height: 12, borderRadius: 6 },
   chip: { backgroundColor: colors.cardAlt, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  stepNum: { width: 20, height: 20, borderRadius: 10, backgroundColor: brand.orange, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
 });

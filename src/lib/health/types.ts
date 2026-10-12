@@ -27,6 +27,8 @@ export interface DailyHealth {
   active_kcal: number | null;
   distance_m?: number | null;
   resting_hr: number | null;
+  /** نبض الراحة محسوب من نبض الليل (الساعة ما ترسله جاهز، مثل شاومي) */
+  rhr_estimated?: boolean;
   /** HRV بالملّي ثانية (Apple = SDNN، Health Connect = RMSSD) */
   hrv_ms: number | null;
   avg_hr?: number | null;

@@ -1,6 +1,6 @@
 // محادثة خاصة (مثل الواتساب): فقاعات بذيل، الوقت وعلامات القراءة داخل الفقاعة، وفواصل الأيام.
 // ضغطة مطوّلة على رسالة: تعديل (رسالتي خلال ١٥ دقيقة) أو حذف (لدي، أو لدى الجميع خلال يومين).
-// ⋮ فوق: عرض الملف أو حذف المحادثة من عندي. مفتوحة بين الأصدقاء (بعد قبول الطلب) أو المدرب ومتدربه —
+// ⋮ فوق: عرض الملف، بلاغ أو حظر، أو حذف المحادثة من عندي. وبلاغ عن رسالة وصلتك من الضغطة المطوّلة. مفتوحة بين الأصدقاء (بعد قبول الطلب) أو المدرب ومتدربه —
 // لو مقفلة: زر طلب الصداقة (أو قبوله). وفيها صور وفيديو (دقيقة كحد أقصى).
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -18,6 +18,7 @@ import { BUBBLE_SHADOW, Bubble, DayChip, uiIsRTL, type BubbleStatus } from '@/co
 import { ChatBackdrop } from '@/components/chat/ChatBackdrop';
 import { ChatSheet, type SheetAction } from '@/components/chat/ChatSheet';
 import { VideoViewer } from '@/components/chat/ChatVideo';
+import { SafetySheet, type SafetyTarget } from '@/components/safety/SafetySheet';
 import { Avatar, Button, Row, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { dayKey, dayLabel } from '@/lib/chatFormat';
@@ -69,6 +70,8 @@ export default function Chat() {
   // قائمة الخيارات تطلع من تحت: نقفل الكيبورد عشان ما يغطيها
   const setSheet = useCallback((x: Sheet | null) => { if (x) Keyboard.dismiss(); setSheetState(x); }, []);
   const [editing, setEditing] = useState<UIMessage | null>(null);
+  /** بلاغ عن رسالة أو حساب، أو حظر (قائمة الأمان) */
+  const [safety, setSafety] = useState<{ target: SafetyTarget; startAt: 'reasons' | 'block' } | null>(null);
   const [showDown, setShowDown] = useState(false);
   /** «تم النسخ» تحت المحادثة لثانية ونص */
   const [copied, setCopied] = useState(false);
@@ -320,6 +323,8 @@ export default function Chat() {
       actions: [
         ...(!m.deleted_at && m.body.trim() ? [{ key: 'copy', label: t('chat.copy'), icon: 'copy-outline' as const, onPress: () => copyMsg(m) }] : []),
         ...(canEditMessage(m, userId) && m.body.trim() ? [{ key: 'edit', label: t('chat.edit'), icon: 'create-outline' as const, onPress: () => startEdit(m) }] : []),
+        ...(!mine && !m.deleted_at ? [{ key: 'report', label: t('safety.reportWhat', { what: t('safety.what_message') }), icon: 'flag-outline' as const,
+          onPress: () => { setSheet(null); later(() => setSafety({ target: { type: 'message', id: m.id, userId: m.sender, name }, startAt: 'reasons' })); } }] : []),
         { key: 'delete', label: t('chat.delete'), icon: 'trash-outline', destructive: true, onPress: () => setSheet({ kind: 'del', m }) },
       ],
     };
@@ -339,6 +344,10 @@ export default function Chat() {
       title: name,
       actions: [
         { key: 'profile', label: t('chat.viewProfile'), icon: 'person-circle-outline', onPress: () => { setSheet(null); later(openProfile); } },
+        { key: 'reportUser', label: t('safety.reportUser'), icon: 'flag-outline',
+          onPress: () => { setSheet(null); later(() => setSafety({ target: { type: 'user', id: other, userId: other, name }, startAt: 'reasons' })); } },
+        { key: 'block', label: t('safety.blockName', { name }), icon: 'ban-outline', destructive: true,
+          onPress: () => { setSheet(null); later(() => setSafety({ target: { type: 'user', id: other, userId: other, name }, startAt: 'block' })); } },
         { key: 'delChat', label: t('chat.deleteChat'), icon: 'trash-outline', destructive: true, onPress: () => setSheet({ kind: 'delChat' }) },
       ],
     };
@@ -471,6 +480,8 @@ export default function Chat() {
       </KeyboardAvoidingView>
 
       <ChatSheet visible={!!sheet} onClose={() => setSheet(null)} {...sheetView} />
+      <SafetySheet target={safety?.target ?? null} startAt={safety?.startAt} onClose={() => setSafety(null)}
+        onBlocked={() => { if (router.canGoBack()) router.back(); else router.replace('/messages'); }} />
       <VideoViewer uri={video} onClose={() => setVideo(null)} />
 
       {/* عرض الصورة كاملة */}

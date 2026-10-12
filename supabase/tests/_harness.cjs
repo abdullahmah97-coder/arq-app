@@ -54,6 +54,8 @@ async function setup() {
                  revoke insert, update, delete on public.app_admins from authenticated;
                  revoke update on public.post_likes, public.checkin_likes from authenticated;
                  grant update (emoji) on public.post_likes, public.checkin_likes to authenticated;`);
+  // مستخدمين الاختبار حسابات قائمة (مقبولة): موافقة الإدارة على التسجيل موقّفة هنا، واختبارها في approval.test.cjs
+  await q(`update app_settings set value = '{"enabled": false}' where key = 'signup_approval'`);
   await q(`insert into auth.users (id, raw_user_meta_data) values
     ($1, '{"username":"ahmed","full_name":"Ahmed","gender":"male"}'),
     ($2, '{"username":"sara","full_name":"Sara","gender":"female"}'),
