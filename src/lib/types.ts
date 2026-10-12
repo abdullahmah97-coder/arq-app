@@ -28,6 +28,8 @@ export interface Profile {
   is_coach: boolean;
   /** وقت موافقته على إرشادات المجتمع (قبل أول منشور أو تعليق) */
   guidelines_at?: string | null;
+  /** موافقة الإدارة على الحساب: الجديد pending لين يقبله المشرف (rejected = انرفض) */
+  approval?: 'pending' | 'approved' | 'rejected';
   /** مالك التطبيق (هو بس): شارة «المالك» وكل صلاحيات النشر وإخفاء أجزاء التطبيق */
   is_owner?: boolean;
   /** مين يشوفني في النادي: gym (الموجودين معي + الأصدقاء) | friends | hidden */

@@ -13,6 +13,7 @@ import { HeaderBack } from '@/components/HeaderBack';
 import { ScreenErrorBoundary } from '@/components/ScreenErrorBoundary';
 import { SleepGate } from '@/components/timeline/SleepGate';
 import { Button, Loading, T } from '@/components/ui';
+import { isApproved } from '@/lib/approval';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { flushLastFatal, installGlobalErrorLogger } from '@/lib/events';
 import { HealthProvider } from '@/lib/health';
@@ -54,7 +55,8 @@ function RootNavigator() {
   const { t } = useTranslation();
   const navReady = !!useRootNavigationState()?.key;
   // إشعارات الجوال: ربط الجهاز بالحساب وفتح الصفحة لما تضغط إشعار (بعد ما يجهز التنقّل)
-  usePushSetup(!!session && !!profile?.onboarded && !loading, navReady);
+  // (وكمان للحساب اللي ينتظر الموافقة: عشان يوصله إشعار «تم قبول حسابك»)
+  usePushSetup(!!session && !loading && (!!profile?.onboarded || !isApproved(profile)), navReady);
 
   // ننتظر لين نعرف حالة الدخول (بدل ما تومض صفحة تسجيل الدخول عند كل فتح)
   if (loading) return <Loading />;
@@ -62,6 +64,8 @@ function RootNavigator() {
 
   const signedIn = !!session;
   const onboarded = !!profile?.onboarded;
+  // حساب جديد ما وافق عليه المشرف للحين: شاشة الانتظار بس
+  const approved = isApproved(profile);
 
   return (
     <View style={{ flex: 1 }}>
@@ -86,11 +90,15 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
 
-      <Stack.Protected guard={signedIn && !onboarded}>
+      <Stack.Protected guard={signedIn && !approved}>
+        <Stack.Screen name="pending" options={{ headerShown: false }} />
+      </Stack.Protected>
+
+      <Stack.Protected guard={signedIn && approved && !onboarded}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       </Stack.Protected>
 
-      <Stack.Protected guard={signedIn && onboarded}>
+      <Stack.Protected guard={signedIn && approved && onboarded}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="post/new" options={{ title: t('feed.newPost'), presentation: 'modal' }} />
         <Stack.Screen name="post/[id]" options={{ title: t('feed.comments') }} />
@@ -168,6 +176,7 @@ function RootNavigator() {
         <Stack.Screen name="owner-users" options={{ title: t('adminUsers.title') }} />
         <Stack.Screen name="owner-verify" options={{ title: t('verify.title') }} />
         <Stack.Screen name="owner-safety" options={{ title: t('safety.queueTitle') }} />
+        <Stack.Screen name="owner-signups" options={{ title: t('approval.queueTitle') }} />
         <Stack.Screen name="blocked" options={{ title: t('safety.blockedListTitle') }} />
         <Stack.Screen name="book/index" options={{ title: t('book.title') }} />
         <Stack.Screen name="book/[id]" options={{ title: '' }} />
@@ -177,7 +186,7 @@ function RootNavigator() {
       </Stack.Protected>
     </Stack>
     {/* بعد «تصبحون على خير»: شاشة الليل فوق التطبيق كله لين «صباح الخير» */}
-    {session && onboarded ? <SleepGate uid={session.user.id} /> : null}
+    {session && onboarded && approved ? <SleepGate uid={session.user.id} /> : null}
     </View>
   );
 }

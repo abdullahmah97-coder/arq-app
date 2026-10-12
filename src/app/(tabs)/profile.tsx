@@ -16,6 +16,7 @@ import { deleteMyAccount } from '@/lib/account';
 import { unreadCount } from '@/lib/messages';
 import { ownerCounts } from '@/lib/owner';
 import { safetyCounts } from '@/lib/safety';
+import { signupCount } from '@/lib/approval';
 import { unregisterPush } from '@/lib/push';
 import { clearSleepSchedule } from '@/lib/sleep';
 import { colors, space, THEMES, type ThemeId } from '@/theme';
@@ -44,11 +45,11 @@ export default function ProfileTab() {
   const [owner, setOwner] = useState<{ reports: number; brands: number; safety: number } | null>(null);
   useFocusEffect(useCallback(() => {
     refreshProfile(); setReloadKey((k) => k + 1);
-    // للمشرف: رقم واحد لكل اللي ينتظره (تقارير المختبرين، طلبات المتاجر، بلاغات المجتمع)
+    // للمشرف: رقم واحد لكل اللي ينتظره (تقارير المختبرين، طلبات المتاجر، بلاغات المجتمع، طلبات التسجيل)
     ownerCounts().then(async (c) => {
       if (!c) { setOwner(null); return; }
-      const s = await safetyCounts().catch(() => null);
-      setOwner({ ...c, safety: s ? s.open + s.unscreened : 0 });
+      const [s, n] = await Promise.all([safetyCounts().catch(() => null), signupCount().catch(() => 0)]);
+      setOwner({ ...c, safety: (s ? s.open + s.unscreened : 0) + n });
     }).catch(() => {});
   }, [refreshProfile]));
 

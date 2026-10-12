@@ -651,8 +651,9 @@ revoke all on function public.admin_safety_act(text, uuid, text, integer, text) 
 grant execute on function public.admin_safety_act(text, uuid, text, integer, text) to authenticated;
 
 -- ---------- حد يومي لفحص الصور (نفس جدول ai_usage) ----------
+-- «office» (وكيل مكتب أرك أب، ٨٠ باليوم لكل أدمن) مطبّق على الخادم من فرع المكتب: نحافظ عليه هنا عشان ما ينكسر
 alter table public.ai_usage drop constraint if exists ai_usage_kind_check;
-alter table public.ai_usage add constraint ai_usage_kind_check check (kind in ('meal_photo', 'barcode', 'plan', 'moderation'));
+alter table public.ai_usage add constraint ai_usage_kind_check check (kind in ('meal_photo', 'barcode', 'plan', 'office', 'moderation'));
 
 create or replace function public.ai_take(p_kind text)
 returns integer
@@ -667,6 +668,7 @@ begin
     when 'meal_photo' then coalesce((s->>'meal_photos_per_day')::int, 25)
     when 'barcode' then coalesce((s->>'barcode_per_day')::int, 2)
     when 'plan' then 8
+    when 'office' then 80
     when 'moderation' then coalesce((s->>'moderation_per_day')::int, 40)
   end;
   if cap is null then raise exception 'bad_status'; end if;

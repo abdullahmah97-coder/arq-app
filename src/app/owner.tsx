@@ -28,6 +28,7 @@ import { loadAiLimits, type AiLimits } from '@/lib/aiLimits';
 import { adminUserStats, type AdminUserStats } from '@/lib/adminUsers';
 import { verifiedCount } from '@/lib/verify';
 import { safetyCounts } from '@/lib/safety';
+import { signupCount } from '@/lib/approval';
 import { KIND_ICON, PARTNER_KINDS, partnerOverview, type Overview, type PartnerKind } from '@/lib/partners';
 import { snapshotFrom } from '@/lib/office';
 import { waitingTotal } from '@/lib/officeCore';
@@ -54,6 +55,7 @@ export default function Owner() {
   const [users, setUsers] = useState<AdminUserStats | null>(null);
   const [verifiedN, setVerifiedN] = useState<number | null>(null);
   const [safety, setSafety] = useState<{ open: number; unscreened: number } | null>(null);
+  const [signups, setSignups] = useState<number | null>(null);
   // الإعلانات والفعاليات وصلت (قبلها ما نحسب تنبيهات "ما فيه إعلان/فعالية" في رقم المكتب)
   const [loaded, setLoaded] = useState(false);
 
@@ -67,6 +69,7 @@ export default function Owner() {
     adminUserStats().then(setUsers).catch(() => {});
     verifiedCount().then(setVerifiedN).catch(() => {});
     safetyCounts().then(setSafety).catch(() => {});
+    signupCount().then(setSignups).catch(() => {});
     const [r, b, o, v, a, ev] = await Promise.all([
       loadReports().catch(() => [] as Report[]), loadBrandRequests().catch(() => [] as Brand[]), loadOffers().catch(() => [] as Offer[]),
       partnerOverview().catch(() => ({})), listLaunchAds().catch(() => [] as LaunchAdRow[]), listAllEvents().catch(() => [] as LocalEvent[]),
@@ -98,6 +101,11 @@ export default function Owner() {
         <Stat n={liveAll} label={t('partners.livePartners')} color={STATUS_COLOR.fixed} />
         <Stat n={count('new')} label={t('owner.newReports')} color={STATUS_COLOR.new} />
       </View>
+
+      {/* طلبات التسجيل: كل حساب جديد ينتظر موافقتك قبل ما يدخل التطبيق */}
+      <OwnerLink icon="person-add" title={t('approval.queueTitle')}
+        sub={signups == null ? t('approval.ownerSubHint') : signups ? t('approval.ownerSub', { count: signups }) : t('approval.ownerSubNone')}
+        onPress={() => router.push('/owner-signups')} />
 
       {/* مكتب أرك أب: نفس الأقسام كمكتب ثلاثي الأبعاد، وكل اللي ينتظر موافقتك عليه علامة */}
       <OwnerLink icon="business" title={t('office.title')}

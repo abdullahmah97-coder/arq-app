@@ -74,7 +74,7 @@ export const SERVER_CODES = new Set([
   'too_late', 'bad_slot', 'slot_taken', 'class_full', 'venue_unavailable', 'too_many_bookings', 'too_early', 'bad_sport',
   'bad_username', 'name_too_long', 'username_taken', 'cannot_delete_self', 'cannot_delete_admin', 'not_trainee',
   'quiet_hours', 'nudge_not_found',
-  'content_blocked', 'blocked_user', 'account_suspended', 'target_not_found',
+  'content_blocked', 'blocked_user', 'account_suspended', 'target_not_found', 'not_approved', 'cannot_change_self',
   'edit_window_passed', 'delete_window_passed', 'message_deleted', 'empty_message', 'message_too_long',
 ]);
 

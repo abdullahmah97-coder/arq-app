@@ -507,8 +507,8 @@
     "refresh": "Sync now",
     "privacy": "Your raw health data stays private. Friends only see your step count, for step challenges.",
     "unavailable": "No health data source on this device. On Android, install Health Connect from Google Play.",
-    "watches_ios": "Apple Watch · WHOOP · Oura · Garmin · Fitbit",
-    "watches_android": "Pixel Watch · Galaxy Watch · Fitbit · WHOOP · Garmin · Oura",
+    "watches_ios": "Apple Watch · Xiaomi · Huawei · Amazfit · Garmin · WHOOP · Oura",
+    "watches_android": "Galaxy Watch · Pixel Watch · Xiaomi · Fitbit · Garmin · WHOOP · Oura",
     "via_ios": "Anything that writes to the Health app on iPhone",
     "via_android": "Anything that writes to Health Connect on Android",
     "howTitle": "How is recovery scored?",
@@ -525,7 +525,29 @@
     "noSleep": "No sleep recorded last night",
     "components": "Recovery breakdown",
     "strainBand": "Your target band",
-    "zoneN": "Z{{n}}"
+    "zoneN": "Z{{n}}",
+    "recvTitle": "What we receive from your watch",
+    "recvToday": "Today",
+    "recvYesterday": "Yesterday",
+    "recvNone": "Not received",
+    "recvHeartRate": "Heart rate",
+    "recvStages": "Sleep stages",
+    "recvNoHrv": "Xiaomi and some other watches don’t send HRV to Health, so we score your recovery from resting heart rate and sleep.",
+    "recvRhrEst": "Worked out from your heart rate while asleep (your watch doesn’t send it).",
+    "recvFooter": "“Not received” means your watch or its app isn’t sending it to Health, or the permission is off. See “Xiaomi watch” below.",
+    "xiaomiTitle": "Xiaomi watch (Mi Fitness)",
+    "xiaomiNote": "Xiaomi sends steps, heart rate, sleep and workouts, but not HRV: we score recovery from resting heart rate (worked out from your night-time heart rate if needed) and sleep. If nothing arrives: turn off Low Power Mode, update Mi Fitness, then open it and wait for the sync to finish.",
+    "xiaomiStepsIos": [
+      "In Mi Fitness: Profile → Third-party data → Apple Health, and turn on all data.",
+      "In the Health app on your iPhone: tap your picture at the top → Privacy → Apps → Mi Fitness, and turn everything on.",
+      "In the same place (Health → Privacy → Apps) → ARQ, and turn on all the data we read.",
+      "Each morning open Mi Fitness so the watch syncs (last night’s sleep arrives after the sync), then tap “Refresh” here."
+    ],
+    "xiaomiStepsAndroid": [
+      "In Mi Fitness: Profile → Third-party data → Health Connect, and turn on all data.",
+      "In ARQ: tap “Connect” above and allow every type in Health Connect.",
+      "Each morning open Mi Fitness so the watch syncs (last night’s sleep arrives after the sync), then tap “Refresh” here."
+    ]
   },
   "store": {
     "title": "Stores",
@@ -1979,7 +2001,9 @@
     "content_blocked": "This text has words that break our community guidelines. Edit it and try again.",
     "blocked_user": "You can't interact with this account.",
     "account_suspended": "Your account is temporarily restricted from posting, commenting and messaging for breaking our community guidelines.",
-    "target_not_found": "We couldn't find that. It may have been deleted."
+    "target_not_found": "We couldn't find that. It may have been deleted.",
+    "not_approved": "Your account is waiting for approval. You can use the app as soon as it’s approved.",
+    "cannot_change_self": "You can’t change your own account’s status."
   },
   "trust": {
     "liveNow_one": "1 person here now",
@@ -3990,6 +4014,44 @@
       }
     ],
     "contact": "Questions about these guidelines, or want to appeal a decision? Message us from inside ARQ."
+  },
+  "approval": {
+    "pendingTitle": "Your account is under review",
+    "pendingBody": "Thanks for joining ARQ! We review every new account ourselves to keep the community safe and respectful. We'll notify you as soon as you're approved, then you can finish setting up your account.",
+    "rejectedTitle": "Your account wasn’t approved",
+    "rejectedBody": "Sorry, we couldn't approve your account right now. You can delete your account below, and your data will be permanently removed.",
+    "signedInAs": "Signed in as {{name}}",
+    "notifyMe": "Notify me when I’m approved",
+    "notifyOn": "We’ll notify you as soon as you’re approved",
+    "checkNow": "Check again",
+    "stillPending": "Still under review — we check automatically every so often.",
+    "queueTitle": "Sign-up requests",
+    "queueHint": "Every new account waits for your approval before it can use the app. Approved people get a notification and finish setting up; rejected ones can't get in.",
+    "settingTitle": "Approve new accounts yourself",
+    "settingOn": "On: every new account waits for your approval.",
+    "settingOff": "Off: new accounts get into the app straight away.",
+    "offQ": "Stop approving new accounts?",
+    "offExplain": "Anyone who signs up from now on gets in straight away. People already waiting stay in the queue until you approve them.",
+    "turnOff": "Turn off",
+    "tabPending": "Waiting",
+    "tabRejected": "Rejected",
+    "tabApproved": "Approved",
+    "empty": "No new sign-ups 👌",
+    "emptyOther": "Nothing here.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approveAll": "Approve all",
+    "rejectQ": "Reject {{name}}?",
+    "rejectExplain": "They won't be able to use the app and can delete their account. You can still approve them later from Rejected.",
+    "partnerAccount": "Partner account",
+    "signedUp": "Signed up {{ago}}",
+    "decided": "Updated {{ago}}",
+    "ownerSubHint": "New accounts waiting for your approval",
+    "ownerSubNone": "No new sign-ups",
+    "approveAllQ_one": "Approve {{count}} account?",
+    "approveAllQ_other": "Approve {{count}} accounts?",
+    "ownerSub_one": "{{count}} account waiting for you",
+    "ownerSub_other": "{{count}} accounts waiting for you"
   },
   "tour": {
     "replay": "App tour",
