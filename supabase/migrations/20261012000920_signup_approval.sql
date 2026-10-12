@@ -30,8 +30,7 @@ begin
   return new;
 end $$;
 revoke all on function public._signup_approval_default() from public, anon, authenticated;
-drop trigger if exists signup_approval_default on public.profiles;
-create trigger signup_approval_default before insert on public.profiles for each row execute function public._signup_approval_default();
+create or replace trigger signup_approval_default before insert on public.profiles for each row execute function public._signup_approval_default();
 
 create or replace function public._is_approved(p_uid uuid)
 returns boolean language sql stable security definer set search_path = public as $$
@@ -62,8 +61,7 @@ begin
     'club_requests', 'coach_links', 'coach_profiles', 'ai_usage', 'content_reports'
   ] loop
     if to_regclass('public.' || t) is not null then
-      execute format('drop trigger if exists zz_require_approved on public.%I', t);
-      execute format('create trigger zz_require_approved before insert on public.%I for each row execute function public._require_approved()', t);
+      execute format('create or replace trigger zz_require_approved before insert on public.%I for each row execute function public._require_approved()', t);
     end if;
   end loop;
 end $$;
@@ -83,8 +81,7 @@ begin
   return new;
 end $$;
 revoke all on function public._signup_notify() from public, anon, authenticated;
-drop trigger if exists signup_notify on public.profiles;
-create trigger signup_notify after insert on public.profiles for each row execute function public._signup_notify();
+create or replace trigger signup_notify after insert on public.profiles for each row execute function public._signup_notify();
 
 -- ---------- لوحة الإدارة ----------
 create or replace function public.admin_signups(p_status text default 'pending', p_limit integer default 100)

@@ -47,7 +47,7 @@ ok(db.posts.get(id).screen === 'ok' && db.posts.get(id).hidden_at === null, 'sav
 ok(parts()[0].type === 'image' && parts()[0].source.media_type === 'image/png' && parts()[0].source.data.length > 10, 'the image is sent to the model');
 ok(/content moderator for ARQ/.test(parts()[1].text) && /If you are unsure, allow it/.test(parts()[1].text), 'rules prompt is sent');
 ok(/shirtless men training/.test(parts()[1].text), 'normal gym photos are explicitly allowed');
-ok(db.rpcCalls.at(-1)?.fn === 'ai_take' && db.rpcCalls.at(-1)?.args?.p_kind === 'moderation', 'daily cap reserved as moderation');
+ok(db.rpcCalls.at(-1)?.fn === 'moderation_quota', 'daily photo-check cap checked before the model');
 
 // ٢) مخالفة ← blocked ومخفي، والسبب يرجع للتطبيق
 reply = 'Here you go: {"allow": false, "category": "nudity", "reason_ar": "فيها عري", "reason_en": "Contains nudity"}';

@@ -91,8 +91,8 @@ Deno.serve(async (req) => {
     .eq('id', post.id).eq('screen', 'pending');
   if (!post.image_path) { await settle('ok'); return json({ screen: 'ok' }); }
 
-  // الحد اليومي (يتحجز قبل الاتصال بالذكاء الاصطناعي)
-  const { error: qErr } = await supabase.rpc('ai_take', { p_kind: 'moderation' });
+  // الحد اليومي: عدد منشوراتك اللي فيها صورة آخر ٢٤ ساعة (قبل الاتصال بالذكاء الاصطناعي)
+  const { error: qErr } = await supabase.rpc('moderation_quota');
   if (qErr) {
     const limited = /rate_limited/.test(qErr.message);
     return json({ error: limited ? 'rate_limited' : 'ai_failed' }, limited ? 429 : 500);

@@ -92,7 +92,12 @@ const { setup } = require('./_harness.cjs');
   check('queue: a photo stuck in checking reaches the admin', q1.some((r) => r.target_id === stuck && r.reasons.includes('unscreened')));
   await as(U.E, `select admin_safety_act('post', $1, 'approve')`, [stuck]);
   check('queue: approving it shows it to friends', !!(await feedOf(U.D, stuck)));
-  check('ai_take knows the moderation kind', Number((await as(U.C, `select ai_take('moderation') v`))[0].v) === 39);
+  // حد فحص الصور: ٤٠ منشور فيه صورة آخر ٢٤ ساعة (كل منشور ينفحص مرة)
+  const imgPosts = Number((await q(`select count(*) n from posts where user_id = $1 and image_path is not null and created_at > now() - interval '1 day'`, [U.C]))[0].n);
+  check('photo-check quota counts your photo posts', Number((await as(U.C, `select moderation_quota() v`))[0].v) === 40 - imgPosts);
+  await q(`insert into posts (user_id, image_path, visibility) select $1::uuid, $1::text || '/q' || g || '.jpg', 'friends' from generate_series(1, $2::int) g`, [U.C, 41 - imgPosts]);
+  await expectErr('photo-check quota: the 41st photo in a day is refused', () => as(U.C, `select moderation_quota()`), /rate_limited/);
+  await q(`delete from posts where user_id = $1 and image_path like '%/q%.jpg'`, [U.C]);
 
   // ---------- الإبلاغ ----------
   await expectErr('report: not your own content', () => as(U.A, `select report_content('post', $1, 'spam')`, [pub]), /not_allowed/);

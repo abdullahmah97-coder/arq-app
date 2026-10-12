@@ -21,9 +21,12 @@ create table if not exists public.user_blocks (
 );
 create index if not exists user_blocks_blocked on public.user_blocks (blocked, blocker);
 alter table public.user_blocks enable row level security;
-drop policy if exists blocks_own on public.user_blocks;
 -- تشوف بس اللي أنت حظرتهم (ومحد يعرف إنه انحظر). الإضافة والحذف من الدوال تحت بس
-create policy blocks_own on public.user_blocks for select to authenticated using (blocker = auth.uid());
+do $p$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'user_blocks' and policyname = 'blocks_own') then
+    create policy blocks_own on public.user_blocks for select to authenticated using (blocker = auth.uid());
+  end if;
+end $p$;
 revoke insert, update, delete on public.user_blocks from authenticated, anon;
 
 create table if not exists public.content_reports (
@@ -47,8 +50,11 @@ create index if not exists content_reports_target on public.content_reports (tar
 create index if not exists content_reports_status on public.content_reports (status, created_at desc);
 create index if not exists content_reports_reporter on public.content_reports (reporter, created_at desc);
 alter table public.content_reports enable row level security;
-drop policy if exists reports_read on public.content_reports;
-create policy reports_read on public.content_reports for select to authenticated using (reporter = auth.uid() or is_admin());
+do $p$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'content_reports' and policyname = 'reports_read') then
+    create policy reports_read on public.content_reports for select to authenticated using (reporter = auth.uid() or is_admin());
+  end if;
+end $p$;
 revoke insert, update, delete on public.content_reports from authenticated, anon;
 
 -- الإيقاف عن النشر (جدول خاص: محد يشوفه إلا صاحبه والمشرف)
@@ -60,8 +66,11 @@ create table if not exists public.suspensions (
   created_at timestamptz not null default now()
 );
 alter table public.suspensions enable row level security;
-drop policy if exists suspensions_read on public.suspensions;
-create policy suspensions_read on public.suspensions for select to authenticated using (user_id = auth.uid() or is_admin());
+do $p$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'suspensions' and policyname = 'suspensions_read') then
+    create policy suspensions_read on public.suspensions for select to authenticated using (user_id = auth.uid() or is_admin());
+  end if;
+end $p$;
 revoke insert, update, delete on public.suspensions from authenticated, anon;
 
 -- الكلمات الممنوعة (يضيفها ويشيلها المشرف من لوحة إدارة التطبيق)
@@ -71,8 +80,11 @@ create table if not exists public.moderation_terms (
   created_at timestamptz not null default now()
 );
 alter table public.moderation_terms enable row level security;
-drop policy if exists terms_admin on public.moderation_terms;
-create policy terms_admin on public.moderation_terms for all to authenticated using (is_admin()) with check (is_admin());
+do $p$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'moderation_terms' and policyname = 'terms_admin') then
+    create policy terms_admin on public.moderation_terms for all to authenticated using (is_admin()) with check (is_admin());
+  end if;
+end $p$;
 
 -- ---------- الأعمدة ----------
 -- screen: صورة المنشور تنفحص قبل ما تبان للناس (pending ← ok أو blocked). المنشورات القديمة ok
@@ -113,8 +125,9 @@ grant execute on function public.is_suspended(uuid) to authenticated;
 
 -- توحيد النص قبل المقارنة: حروف صغيرة، بدون تشكيل وتطويل، الألف والياء والتاء المربوطة بشكل واحد،
 -- الأرقام العربية لاتينية، والحرف المكرر ٣ مرات وأكثر يصير حرف واحد (كلللب ← كلب)
+-- (الأقواس: U+064B إلى U+065F تشكيل، و U+0670 ألف خنجرية، و U+0640 تطويل؛ الأرقام العربية U+0660+ ما تنشال)
 create or replace function public._norm_text(t text)
-returns text language sql immutable as $$
+returns text language sql immutable set search_path = public as $$
   select regexp_replace(
            translate(regexp_replace(lower(coalesce(t, '')), '[ً-ٰٟـ]', '', 'g'),
                      'أإآٱىةؤئ٠١٢٣٤٥٦٧٨٩', 'اااايهوي0123456789'),
@@ -139,7 +152,7 @@ grant execute on function public._text_violation(text) to authenticated;
 
 -- علامات المنشور لصاحبه بس (عشان يعرف إن منشوره قيد الفحص أو انخفى): تنضاف لـ meta
 create or replace function public._post_flags(p_screen text, p_hidden timestamptz)
-returns jsonb language sql immutable as $$
+returns jsonb language sql immutable set search_path = public as $$
   select case when p_hidden is not null then jsonb_build_object('hidden', true)
               when p_screen is distinct from 'ok' then jsonb_build_object('screen', p_screen)
               else '{}'::jsonb end;
@@ -148,7 +161,7 @@ $$;
 -- ---------- الحماية عند الكتابة ----------
 -- (بدون security definer عشان current_user يكون دور المستخدم. الدوال اللي تكتب بصلاحية الخادم ما تتقيّد)
 create or replace function public._posts_safety_ins()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 begin
   if current_user in ('authenticated', 'anon') then
     if is_suspended(new.user_id) then raise exception 'account_suspended'; end if;
@@ -158,11 +171,10 @@ begin
   if new.kind = 'post' and _text_violation(new.caption) is not null then raise exception 'content_blocked'; end if;
   return new;
 end $$;
-drop trigger if exists posts_safety_ins on public.posts;
-create trigger posts_safety_ins before insert on public.posts for each row execute function public._posts_safety_ins();
+create or replace trigger posts_safety_ins before insert on public.posts for each row execute function public._posts_safety_ins();
 
 create or replace function public._posts_safety_upd()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 begin
   if current_user in ('authenticated', 'anon') then
     if new.screen is distinct from old.screen or new.hidden_at is distinct from old.hidden_at
@@ -175,11 +187,10 @@ begin
   end if;
   return new;
 end $$;
-drop trigger if exists posts_safety_upd on public.posts;
-create trigger posts_safety_upd before update on public.posts for each row execute function public._posts_safety_upd();
+create or replace trigger posts_safety_upd before update on public.posts for each row execute function public._posts_safety_upd();
 
 create or replace function public._comments_safety()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 declare v_owner uuid;
 begin
   if current_user in ('authenticated', 'anon') then
@@ -195,13 +206,11 @@ begin
   if _text_violation(new.body) is not null then raise exception 'content_blocked'; end if;
   return new;
 end $$;
-drop trigger if exists comments_safety on public.comments;
-create trigger comments_safety before insert on public.comments for each row execute function public._comments_safety();
-drop trigger if exists checkin_comments_safety on public.checkin_comments;
-create trigger checkin_comments_safety before insert on public.checkin_comments for each row execute function public._comments_safety();
+create or replace trigger comments_safety before insert on public.comments for each row execute function public._comments_safety();
+create or replace trigger checkin_comments_safety before insert on public.checkin_comments for each row execute function public._comments_safety();
 
 create or replace function public._hidden_guard()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 begin
   if current_user in ('authenticated', 'anon')
      and (new.hidden_at is distinct from old.hidden_at or new.hidden_reason is distinct from old.hidden_reason) then
@@ -209,23 +218,20 @@ begin
   end if;
   return new;
 end $$;
-drop trigger if exists comments_hidden_guard on public.comments;
-create trigger comments_hidden_guard before update on public.comments for each row execute function public._hidden_guard();
-drop trigger if exists checkin_comments_hidden_guard on public.checkin_comments;
-create trigger checkin_comments_hidden_guard before update on public.checkin_comments for each row execute function public._hidden_guard();
+create or replace trigger comments_hidden_guard before update on public.comments for each row execute function public._hidden_guard();
+create or replace trigger checkin_comments_hidden_guard before update on public.checkin_comments for each row execute function public._hidden_guard();
 
 create or replace function public._messages_safety()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 begin
   if is_blocked_pair(new.sender, new.recipient) then raise exception 'blocked_user'; end if;
   if current_user in ('authenticated', 'anon') and is_suspended(new.sender) then raise exception 'account_suspended'; end if;
   return new;
 end $$;
-drop trigger if exists messages_safety on public.messages;
-create trigger messages_safety before insert on public.messages for each row execute function public._messages_safety();
+create or replace trigger messages_safety before insert on public.messages for each row execute function public._messages_safety();
 
 create or replace function public._relation_block_guard()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 begin
   -- (كل جدول بفرعه: plpgsql يقرأ حقول new وقت التنفيذ، والجدولين أعمدتهم مختلفة)
   if tg_table_name = 'follows' then
@@ -235,10 +241,8 @@ begin
   end if;
   return new;
 end $$;
-drop trigger if exists follows_block_guard on public.follows;
-create trigger follows_block_guard before insert on public.follows for each row execute function public._relation_block_guard();
-drop trigger if exists friendships_block_guard on public.friendships;
-create trigger friendships_block_guard before insert on public.friendships for each row execute function public._relation_block_guard();
+create or replace trigger follows_block_guard before insert on public.follows for each row execute function public._relation_block_guard();
+create or replace trigger friendships_block_guard before insert on public.friendships for each row execute function public._relation_block_guard();
 
 -- ---------- القراءة ----------
 -- المنشور ما يبان بين اثنين بينهم حظر (المحتوى نفسه، والتعليقات والتفاعلات عليه)
@@ -248,13 +252,11 @@ returns boolean language sql stable security definer set search_path = public as
       or ((p_visibility = 'public' or are_friends(p_owner, auth.uid())) and not is_blocked_pair(p_owner, auth.uid()));
 $$;
 
-drop policy if exists posts_read on public.posts;
-create policy posts_read on public.posts for select to authenticated
+alter policy posts_read on public.posts
   using (can_see_post(user_id, visibility)
          and (user_id = auth.uid() or is_admin() or (screen = 'ok' and hidden_at is null)));
 
-drop policy if exists comments_read on public.comments;
-create policy comments_read on public.comments for select to authenticated
+alter policy comments_read on public.comments
   using (exists (select 1 from posts p where p.id = post_id and can_see_post(p.user_id, p.visibility))
          and (user_id = auth.uid() or is_admin() or (hidden_at is null and not is_blocked_pair(user_id, auth.uid()))));
 
@@ -271,8 +273,7 @@ returns boolean language sql stable security definer set search_path = public as
     ));
 $$;
 
-drop policy if exists cicomments_read on public.checkin_comments;
-create policy cicomments_read on public.checkin_comments for select to authenticated
+alter policy cicomments_read on public.checkin_comments
   using (can_see_checkin(check_in_id)
          and (user_id = auth.uid() or is_admin() or (hidden_at is null and not is_blocked_pair(user_id, auth.uid()))));
 
@@ -650,36 +651,23 @@ end $$;
 revoke all on function public.admin_safety_act(text, uuid, text, integer, text) from public, anon;
 grant execute on function public.admin_safety_act(text, uuid, text, integer, text) to authenticated;
 
--- ---------- حد يومي لفحص الصور (نفس جدول ai_usage) ----------
--- «office» (وكيل مكتب أرك أب، ٨٠ باليوم لكل أدمن) مطبّق على الخادم من فرع المكتب: نحافظ عليه هنا عشان ما ينكسر
-alter table public.ai_usage drop constraint if exists ai_usage_kind_check;
-alter table public.ai_usage add constraint ai_usage_kind_check check (kind in ('meal_photo', 'barcode', 'plan', 'office', 'moderation'));
-
-create or replace function public.ai_take(p_kind text)
-returns integer
-language plpgsql volatile security definer set search_path = public as $$
+-- ---------- حد يومي لفحص الصور ----------
+-- كل منشور فيه صورة ينفحص مرة وحدة، فالحد = ٤٠ منشور فيه صورة آخر ٢٤ ساعة لكل مستخدم.
+-- (بدون جدول ai_usage: ما نلمس قيود أنواعه اللي يستخدمها وكيل المكتب على الخادم)
+create or replace function public.moderation_quota()
+returns integer language plpgsql stable security definer set search_path = public as $$
 declare
-  s jsonb := (select value from app_settings where key = 'ai_limits');
-  cap int;
+  cap constant int := 40;
   used int;
 begin
   if auth.uid() is null then raise exception 'not_authenticated'; end if;
-  cap := case p_kind
-    when 'meal_photo' then coalesce((s->>'meal_photos_per_day')::int, 25)
-    when 'barcode' then coalesce((s->>'barcode_per_day')::int, 2)
-    when 'plan' then 8
-    when 'office' then 80
-    when 'moderation' then coalesce((s->>'moderation_per_day')::int, 40)
-  end;
-  if cap is null then raise exception 'bad_status'; end if;
-  perform pg_advisory_xact_lock(hashtext('ai_take:' || auth.uid()::text || ':' || p_kind));
-  select count(*) into used from ai_usage where user_id = auth.uid() and kind = p_kind and created_at > now() - interval '1 day';
-  if used >= cap then raise exception 'rate_limited'; end if;
-  insert into ai_usage (user_id, kind) values (auth.uid(), p_kind);
-  return cap - used - 1;
+  select count(*) into used from posts where user_id = auth.uid() and image_path is not null and created_at > now() - interval '1 day';
+  -- المنشور اللي ينفحص الحين محسوب، فالحد يتعدى لما يزيد العدد عنه
+  if used > cap then raise exception 'rate_limited'; end if;
+  return cap - used;
 end $$;
-revoke all on function public.ai_take(text) from public, anon;
-grant execute on function public.ai_take(text) to authenticated;
+revoke all on function public.moderation_quota() from public, anon;
+grant execute on function public.moderation_quota() to authenticated;
 
 -- ---------- الكلمات الممنوعة: بداية (المشرف يزيد ويشيل من لوحة إدارة التطبيق) ----------
 -- كلمات كاملة أو عبارات، بعد التوحيد (_norm_text). كلمات تجي بمعنى عادي (مثل «كلب» و«حمار») ما تنمنع إلا مع «يا».
