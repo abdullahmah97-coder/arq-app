@@ -142,6 +142,8 @@ export interface AutoModStats {
   server_ready: boolean;
   queued: number; checked_24h: number; flagged_24h: number; errors_24h: number; used_24h: number;
   last_error: string | null; last_at: string | null; open_flags: number;
+  /** المالك بس يغيّر الإعداد؛ أي مشرف ثاني يوقف بس */
+  can_edit: boolean;
 }
 
 export async function autoModStats(): Promise<AutoModStats> {
@@ -156,6 +158,7 @@ export async function autoModStats(): Promise<AutoModStats> {
     last_error: typeof o.last_error === 'string' ? o.last_error : null,
     last_at: typeof o.last_at === 'string' ? o.last_at : null,
     open_flags: n('open_flags'),
+    can_edit: o.can_edit === true,
   };
 }
 

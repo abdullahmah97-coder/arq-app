@@ -5,6 +5,7 @@ const { setup } = require('./_harness.cjs');
 (async () => {
   const { q, as, check, expectErr, U, gym, visit } = await setup();
   const ADMIN = U.E;
+  await q(`update profiles set is_owner = true where id = $1`, [ADMIN]);
   const setting = async () => (await q(`select value from app_settings where key = 'auto_moderation'`))[0]?.value;
   const save = (uid, v) => as(uid, `update app_settings set value = $1 where key = 'auto_moderation'`, [JSON.stringify(v)]);
   const jobs = () => q(`select target_type, target_id, attempts, next_at, queued_at from moderation_jobs order by queued_at`);
@@ -27,13 +28,29 @@ const { setup } = require('./_harness.cjs');
   await expectErr('messages must be a boolean', () => save(ADMIN, { enabled: true, action: 'flag', messages: 'yes', daily_cap: 10 }), /bad_value/);
   await expectErr('enabled must be a boolean', () => save(ADMIN, { enabled: 1, action: 'flag', messages: false, daily_cap: 10 }), /bad_value/);
 
+  // مشرف ثاني (مو المالك): يوقف بس
+  const OTHER = U.D;
+  await q(`insert into app_admins (user_id) values ($1)`, [OTHER]);
+  await expectErr('another admin cannot turn it on', () => save(OTHER, { enabled: true, action: 'flag', messages: false, daily_cap: 3000 }), /not_allowed/);
+  await expectErr('another admin cannot change the mode', () => save(OTHER, { enabled: false, action: 'hide', messages: false, daily_cap: 3000 }), /not_allowed/);
+  await expectErr('another admin cannot change the cap', () => save(OTHER, { enabled: false, action: 'flag', messages: false, daily_cap: 10 }), /not_allowed/);
+  await expectErr('another admin cannot turn on messages', () => save(OTHER, { enabled: false, action: 'flag', messages: true, daily_cap: 3000 }), /not_allowed/);
+  check('stats tell the owner apart (can_edit)', (await as(ADMIN, `select admin_moderation_stats() as s`))[0].s.can_edit === true
+    && (await as(OTHER, `select admin_moderation_stats() as s`))[0].s.can_edit === false);
+
   // موقّف: ما ينضاف شي للطابور
   const offPost = (await as(U.A, `insert into posts (user_id, caption) values ($1, 'قبل التشغيل') returning id`, [U.A]))[0].id;
   check('while off nothing is queued', (await jobs()).length === 0);
 
   await save(ADMIN, { enabled: true, action: 'flag', messages: false, daily_cap: 3000, extra: 'x' });
   const s1 = await setting();
-  check('admin can turn it on; unknown keys are dropped', s1.enabled === true && !('extra' in s1), JSON.stringify(s1));
+  check('the owner can turn it on; unknown keys are dropped', s1.enabled === true && !('extra' in s1), JSON.stringify(s1));
+  await save(ADMIN, { enabled: true, action: 'flag', messages: true, daily_cap: 3000 });
+  await save(OTHER, { enabled: true, action: 'flag', messages: false, daily_cap: 3000 });
+  check('another admin can turn off message checks', (await setting()).messages === false && (await setting()).enabled === true);
+  await save(OTHER, { enabled: false, action: 'flag', messages: false, daily_cap: 3000 });
+  check('another admin can turn it off', (await setting()).enabled === false);
+  await save(ADMIN, { enabled: true, action: 'flag', messages: false, daily_cap: 3000 });
 
   // ---------- الطابور ----------
   const post = (await as(U.A, `insert into posts (user_id, caption, visibility) values ($1, 'تمرين صدر اليوم', 'public') returning id`, [U.A]))[0].id;
@@ -164,6 +181,9 @@ const { setup } = require('./_harness.cjs');
   await q(`select moderation_retry('post', $1, 'credits', 'm', $2)`, [race, rt.queued_at]);
   const cred = await jobOf('post', race);
   check('credits/auth: the attempt does not count', cred.attempts === 1);
+  await q(`select moderation_retry('post', $1, 'model', 'm', $2)`, [race, rt.queued_at]);
+  check('model gone at the provider: the attempt does not count either', (await jobOf('post', race)).attempts === cred.attempts - 1);
+  check('model gone at the provider: back in 15 minutes', (await jobOf('post', race)).next_at > new Date(Date.now() + 14 * 60e3));
   check('credits/auth: back in 15 minutes', cred.next_at > new Date(Date.now() + 14 * 60e3));
   const nLog = (await q(`select count(*)::int as n from moderation_log`))[0].n;
   await q(`select moderation_retry('post', $1, 'skipped', null, $2)`, [race, rt.queued_at]);
@@ -190,7 +210,9 @@ const { setup } = require('./_harness.cjs');
 
   // ---------- الحد اليومي ----------
   const capPost = (await as(U.B, `insert into posts (user_id, caption) values ($1, 'حد') returning id`, [U.B]))[0].id;
-  const used = (await q(`select count(*)::int as n from moderation_log where result <> 'gone'`))[0].n;
+  const used = (await q(`select _automod_used() as n`))[0].n;
+  const all = (await q(`select count(*)::int as n from moderation_log where result <> 'gone'`))[0].n;
+  check('setup failures (auth/credits/model) do not use the daily cap', used === all - 2, `${used} vs ${all}`);
   await save(ADMIN, { enabled: true, action: 'flag', messages: false, daily_cap: used });
   check('daily cap reached: claim returns nothing', (await q(`select * from moderation_claim(10)`)).length === 0);
   await save(ADMIN, { enabled: true, action: 'flag', messages: false, daily_cap: used + 1 });
@@ -220,9 +242,47 @@ const { setup } = require('./_harness.cjs');
   // ---------- الأرقام ----------
   const st = (await as(ADMIN, `select admin_moderation_stats() as s`))[0].s;
   check('stats: settings, queue and 24h numbers', st.settings.enabled === false && typeof st.queued === 'number' && st.checked_24h >= 5 && st.flagged_24h >= 4 && st.errors_24h >= 3, JSON.stringify(st));
-  check('stats: last error code', st.last_error === 'http_500', st.last_error);
+  check('stats: an old error is not shown after later successful checks', st.last_error === null, st.last_error);
+  await q(`select moderation_retry('post', $1, 'credits', 'm')`, [capPost]);
+  check('stats: a newer error is shown', (await as(ADMIN, `select admin_moderation_stats() as s`))[0].s.last_error === 'credits');
   check('stats: server not ready without vault', st.server_ready === false);
   check('stats: open flags', st.open_flags === Number((await q(`select count(*)::int as n from auto_flags where status = 'open'`))[0].n));
+
+  // ---------- مراجعة: انعدّل وانفحص من دفعة ثانية قبل ما ترجع نتيجة الأولى ----------
+  await save(ADMIN, { enabled: true, action: 'hide', messages: false, daily_cap: 3000 });
+  await q(`delete from moderation_jobs`);
+  const r2 = (await as(U.A, `insert into posts (user_id, caption, visibility) values ($1, 'نص قديم', 'public') returning id`, [U.A]))[0].id;
+  const a1 = (await q(`select * from moderation_claim(10)`)).find((x) => x.target_id === r2);
+  await as(U.A, `update posts set caption = 'نص جديد عادي' where id = $1`, [r2]);
+  const b1 = (await q(`select * from moderation_claim(10)`)).find((x) => x.target_id === r2);
+  check('the edited text is claimed again right away', !!b1 && b1.body === 'نص جديد عادي');
+  await settle('post', r2, 'safe', [], b1.queued_at);
+  const late = await settle('post', r2, 'unsafe', ['sexual'], a1.queued_at);
+  check('a late result for the old text is stale even after the new one finished', late.stale === true && !(await flagOf('post', r2)), JSON.stringify(late));
+  check('…and the edited post is not hidden', (await q(`select hidden_at from posts where id = $1`, [r2]))[0].hidden_at === null);
+
+  // ---------- مراجعة: الدور بين الكتّاب وحد الكاتب ----------
+  await q(`delete from moderation_jobs`);
+  await save(ADMIN, { enabled: true, action: 'flag', messages: false, daily_cap: 20000 });
+  for (let i = 0; i < 5; i++) await as(U.A, `insert into posts (user_id, caption) values ($1, $2)`, [U.A, `سبام ${i}`]);
+  await q(`update moderation_jobs set next_at = now() - interval '10 minutes'`);
+  const bOne = (await as(U.B, `insert into posts (user_id, caption) values ($1, 'منشور سارة') returning id`, [U.B]))[0].id;
+  const two = await q(`select * from moderation_claim(2)`);
+  check('a batch takes turns between authors (one busy author does not block others)', two.some((x) => x.target_id === bOne) && two.length === 2, JSON.stringify(two.map((x) => x.body)));
+  check('jobs remember their author', (await q(`select count(*)::int as n from moderation_jobs where author = $1`, [U.A]))[0].n === 5);
+  const before = Number((await q(`select coalesce((select n from moderation_usage where author = $1 and day = app_today()), 0) as n`, [U.B]))[0].n);
+  await settle('post', bOne, 'safe', [], two.find((x) => x.target_id === bOne).queued_at);
+  check('a finished check counts toward its author\'s day', Number((await q(`select n from moderation_usage where author = $1 and day = app_today()`, [U.B]))[0].n) === before + 1);
+  await q(`insert into moderation_usage (author, day, n) values ($1, app_today(), 200) on conflict (author, day) do update set n = 200`, [U.A]);
+  await q(`update moderation_jobs set next_at = now() - interval '1 minute'`);
+  check('an author at 200 checks today waits (others still go)', !(await q(`select * from moderation_claim(10)`)).some((x) => x.target_id && x.body?.startsWith('سبام')));
+
+  // ---------- مراجعة: نص طويل بإيموجي ----------
+  const emoji = '😡'.repeat(1000);
+  const ep = (await as(U.B, `insert into posts (user_id, caption) values ($1, $2) returning id`, [U.B, emoji]))[0].id;
+  const rE = await settle('post', ep, 'unsafe', ['unethical']);
+  const fe = await flagOf('post', ep);
+  check('a 1000-emoji caption can still be flagged (copy shortened to fit)', rE.flagged === true && fe?.snapshot?.caption?.length >= 700 * 2 - 1, JSON.stringify(rE));
 
   // حذف الحساب يحذف علاماته
   await q(`delete from auth.users where id = $1`, [U.C]);

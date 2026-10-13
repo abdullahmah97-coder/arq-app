@@ -14178,7 +14178,10 @@ grant execute on function public.office_overview(integer) to authenticated, serv
 --   * الرسائل الخاصة برا الفحص إلا لو شغّلها المالك (messages = true): نصها يروح لمزوّد خارجي ويطلع للمشرف لو انعلّم.
 --   * ما يأخر المستخدم: الإضافة تحط المحتوى في طابور (moderation_jobs)، وكل دقيقة pg_cron يصحّي دالة الخادم moderate
 --     (طلب HTTP بالخلفية عبر pg_net) وهي تفحص دفعة وترجع النتيجة بـ moderation_settle.
---   * الحد اليومي (daily_cap): عدد الفحوصات بآخر ٢٤ ساعة لكل التطبيق، عشان فاتورة Hugging Face ما تنفلت.
+--   * الحد اليومي (daily_cap): عدد الفحوصات بآخر ٢٤ ساعة لكل التطبيق، عشان فاتورة Hugging Face ما تنفلت
+--     (فشل التوكن أو الرصيد أو النموذج ما ينحسب منه). وكل كاتب ٢٠٠ فحص باليوم بالأكثر، والدفعة تبدأ بأقدم نص
+--     لكل كاتب، فواحد ينشر ويعدّل كثير ما يخلّص حد الكل ولا يأخر فحص غيره.
+--   * الإعداد للمالك بس (is_owner). أي مشرف ثاني يقدر يوقفه أو يوقف فحص الرسائل، بس ما يشغّل أو يغيّر شي.
 --   * moderation_log: سجل بدون نص وبدون أسماء (النوع، النتيجة، الفئات، النموذج، الوقت) للأرقام بس، ينحذف بعد ٩٠ يوم.
 --   أسرار vault (مرة وحدة لكل مشروع):
 --     moderation_key  ينشئه هذا الترحيل لو مو موجود.
@@ -14232,6 +14235,17 @@ begin
     end if;
     new.value := jsonb_build_object('enabled', (v->>'enabled')::boolean, 'action', v->>'action',
       'messages', (v->>'messages')::boolean, 'daily_cap', t);
+    -- المالك بس يشغّل أو يغيّر (نص الرسائل الخاصة يطلع لمزوّد خارجي). أي مشرف ثاني يقدر يوقف بس
+    -- (الخادم والقاعدة نفسها بدون مستخدم: مسموح)
+    if auth.uid() is not null and not is_owner() then
+      if tg_op <> 'UPDATE'
+         or new.value->>'action' is distinct from old.value->>'action'
+         or new.value->>'daily_cap' is distinct from old.value->>'daily_cap'
+         or ((new.value->>'enabled')::boolean and new.value->>'enabled' is distinct from old.value->>'enabled')
+         or ((new.value->>'messages')::boolean and new.value->>'messages' is distinct from old.value->>'messages') then
+        raise exception 'not_allowed';
+      end if;
+    end if;
   end if;
   return new;
 end $$;
@@ -14242,6 +14256,13 @@ returns jsonb language sql stable security definer set search_path = public as $
 $$;
 revoke all on function public._automod() from public, anon, authenticated;
 
+-- نسخة النص للمراجعة: ١٠٠٠ حرف، أو ٧٠٠ لو حروفه كبيرة (إيموجي) عشان النسخة تبقى تحت ٤٠٠٠ بايت
+create or replace function public._automod_snip(t text)
+returns text language sql immutable set search_path = public as $$
+  select case when octet_length(left(t, 1000)) <= 3000 then left(t, 1000) else left(t, 700) end;
+$$;
+revoke all on function public._automod_snip(text) from public, anon, authenticated;
+
 -- ---------- الجداول ----------
 -- الطابور: محتوى ينتظر الفحص (محد يوصله من التطبيق: الخادم بس)
 create table if not exists public.moderation_jobs (
@@ -14251,11 +14272,22 @@ create table if not exists public.moderation_jobs (
   next_at     timestamptz not null default now(),
   -- وقت آخر نص انضاف للطابور: لو انعدّل المحتوى وهو ينفحص، نتيجة النص القديم ما تمسح الفحص الجديد
   queued_at   timestamptz not null default clock_timestamp(),
+  author      uuid,  -- كاتب النص: الدفعة تتوزع على الكتّاب، ولكل كاتب حد يومي
   primary key (target_type, target_id)
 );
 create index if not exists moderation_jobs_due on public.moderation_jobs (next_at);
 alter table public.moderation_jobs enable row level security;
 revoke all on public.moderation_jobs from anon, authenticated;
+
+-- كم فحص لكل كاتب باليوم (يوم الرياض). ينحذف بعد يومين
+create table if not exists public.moderation_usage (
+  author uuid not null,
+  day    date not null,
+  n      integer not null default 0,
+  primary key (author, day)
+);
+alter table public.moderation_usage enable row level security;
+revoke all on public.moderation_usage from anon, authenticated;
 
 -- نتيجة الفحص اللي تحتاج مراجعة (وحدة لكل محتوى). يشوفها المشرف بس
 create table if not exists public.auto_flags (
@@ -14305,36 +14337,45 @@ do $p$ begin
 end $p$;
 revoke insert, update, delete on public.moderation_log from anon, authenticated;
 
+-- الفحوصات اللي تنحسب من الحد اليومي: كل نداء للمزوّد، إلا اللي فشل بسبب الإعداد (التوكن أو الرصيد أو النموذج)
+create or replace function public._automod_used()
+returns integer language sql stable security definer set search_path = public as $$
+  select count(*)::int from moderation_log
+  where created_at > now() - interval '24 hours'
+    and (result in ('safe', 'unsafe', 'controversial') or (result = 'error' and coalesce(error, '') not in ('auth', 'credits', 'model')));
+$$;
+revoke all on function public._automod_used() from public, anon, authenticated;
+
 -- ---------- الإضافة للطابور (بعد النشر أو التعديل) ----------
 -- ما توقف النشر أبداً: لو صار خطأ هنا ينكتب تحذير بالسجل والمنشور يكمّل
 create or replace function public._automod_enqueue()
 returns trigger language plpgsql security definer set search_path = public as $$
-declare s jsonb; v_type text; v_text text; v_old text;
+declare s jsonb; v_type text; v_text text; v_old text; v_author uuid;
 begin
   s := _automod();
   if not coalesce((s->>'enabled')::boolean, false) then return null; end if;
   -- (كل جدول بفرعه: plpgsql يقرأ حقول new وقت التنفيذ، والجداول أعمدتها مختلفة)
   if tg_table_name = 'posts' then
     if new.kind is distinct from 'post' then return null; end if;
-    v_type := 'post'; v_text := new.caption;
+    v_type := 'post'; v_text := new.caption; v_author := new.user_id;
     if tg_op = 'UPDATE' then v_old := old.caption; end if;
   elsif tg_table_name = 'comments' then
-    v_type := 'comment'; v_text := new.body;
+    v_type := 'comment'; v_text := new.body; v_author := new.user_id;
     if tg_op = 'UPDATE' then v_old := old.body; end if;
   elsif tg_table_name = 'checkin_comments' then
-    v_type := 'checkin_comment'; v_text := new.body;
+    v_type := 'checkin_comment'; v_text := new.body; v_author := new.user_id;
     if tg_op = 'UPDATE' then v_old := old.body; end if;
   elsif tg_table_name = 'messages' then
     if not coalesce((s->>'messages')::boolean, false) or new.deleted_at is not null then return null; end if;
-    v_type := 'message'; v_text := new.body;
+    v_type := 'message'; v_text := new.body; v_author := new.sender;
     if tg_op = 'UPDATE' then v_old := old.body; end if;
   else
     return null;
   end if;
   if btrim(coalesce(v_text, '')) = '' then return null; end if;
   if tg_op = 'UPDATE' and v_text is not distinct from v_old then return null; end if;
-  insert into moderation_jobs (target_type, target_id) values (v_type, new.id)
-  on conflict (target_type, target_id) do update set attempts = 0, next_at = now(), queued_at = clock_timestamp();
+  insert into moderation_jobs (target_type, target_id, author) values (v_type, new.id, v_author)
+  on conflict (target_type, target_id) do update set attempts = 0, next_at = now(), queued_at = clock_timestamp(), author = excluded.author;
   return null;
 exception when others then
   raise warning 'auto moderation enqueue failed: %', sqlerrm;
@@ -14352,26 +14393,34 @@ create or replace trigger messages_automod after insert or update of body on pub
   for each row execute function public._automod_enqueue();
 
 -- ---------- دوال الخادم (service_role بس) ----------
--- تاخذ دفعة من الطابور مع نصها. كل محتوى ينحجز ٣ دقايق (لو طاحت الدالة يرجع بعدها)
+-- تاخذ دفعة من الطابور مع نصها. كل محتوى ينحجز ٣ دقايق (لو طاحت الدالة يرجع بعدها).
+-- الترتيب: أقدم نص لكل كاتب أول (بالدور بين الكتّاب)، والكاتب اللي وصل حده اليومي (٢٠٠) ينتظر لبكرة.
 create or replace function public.moderation_claim(p_limit integer default 16)
 returns table (target_type text, target_id uuid, body text, attempts smallint, queued_at timestamptz)
 language plpgsql security definer set search_path = public as $$
 #variable_conflict use_column
-declare s jsonb := _automod(); v_cap int; v_used int; v_n int; v_msgs boolean;
+declare s jsonb := _automod(); v_cap int; v_n int; v_msgs boolean;
+  v_author_cap constant int := 200;
 begin
   if not coalesce((s->>'enabled')::boolean, false) then return; end if;
   v_msgs := coalesce((s->>'messages')::boolean, false);
   v_cap := coalesce((s->>'daily_cap')::int, 3000);
-  select count(*) into v_used from moderation_log where created_at > now() - interval '24 hours' and result <> 'gone';
-  v_n := least(greatest(coalesce(p_limit, 16), 1), 50, greatest(v_cap - v_used, 0));
+  v_n := least(greatest(coalesce(p_limit, 16), 1), 50, greatest(v_cap - _automod_used(), 0));
   if v_n <= 0 then return; end if;
   return query
-  with c as (
-    select j.target_type, j.target_id from moderation_jobs j
+  with ranked as (
+    select j.target_type, j.target_id, j.next_at,
+           row_number() over (partition by j.author order by j.next_at, j.queued_at) as rn
+    from moderation_jobs j
+    left join moderation_usage mu on mu.author = j.author and mu.day = app_today()
     where j.next_at <= now() and j.attempts < 6 and (v_msgs or j.target_type <> 'message')
-    order by j.next_at
+      and coalesce(mu.n, 0) < v_author_cap
+  ), c as (
+    select j.target_type, j.target_id from moderation_jobs j
+    join ranked r on r.target_type = j.target_type and r.target_id = j.target_id
+    order by r.rn, r.next_at
     limit v_n
-    for update skip locked
+    for update of j skip locked
   ), u as (
     update moderation_jobs j set attempts = j.attempts + 1, next_at = now() + interval '3 minutes'
     from c where j.target_type = c.target_type and j.target_id = c.target_id
@@ -14396,7 +14445,7 @@ create or replace function public.moderation_settle(p_type text, p_id uuid, p_re
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   s jsonb := _automod();
-  v_all text[]; v_cats text[]; v_label text := p_result; v_owner uuid; v_snap jsonb;
+  v_all text[]; v_cats text[]; v_label text := p_result; v_owner uuid; v_snap jsonb; v_author uuid;
   v_hide boolean; v_hidden boolean := false; v_was_open boolean;
   v_what_ar text := case p_type when 'post' then 'منشور' when 'message' then 'رسالة' else 'تعليق' end;
   v_what_en text := case p_type when 'post' then 'post' when 'message' then 'message' else 'comment' end;
@@ -14407,29 +14456,40 @@ begin
                  where c = any(array['violent','illegal','sexual','pii','self_harm','unethical','political','copyright','jailbreak']) order by 1);
   insert into moderation_log (target_type, result, categories, model, ms)
   values (p_type, p_result, v_all, left(p_model, 100), case when p_ms between 0 and 600000 then p_ms end);
-  -- انعدّل وهو ينفحص: نص أحدث بالطابور، فهالنتيجة قديمة (ما تمسحه ولا تعلّم عليه)
-  if p_queued_at is not null and exists (select 1 from moderation_jobs
-       where target_type = p_type and target_id = p_id and queued_at > p_queued_at) then
-    return jsonb_build_object('flagged', false, 'stale', true);
+
+  -- علامة محتملة: نقفل المحتوى أول (نفس ترتيب تعديل المستخدم: المحتوى ثم الطابور، فما يصير deadlock)،
+  -- وبعدها ما يقدر أحد يعدّله لين نخلص، فالنسخة اللي نحفظها هي النص اللي انفحص
+  if p_result in ('unsafe', 'controversial') then
+    if p_type = 'post' then
+      select po.user_id, jsonb_build_object('caption', _automod_snip(po.caption), 'image_path', po.image_path, 'kind', po.kind)
+        into v_owner, v_snap from posts po where po.id = p_id for update;
+    elsif p_type = 'comment' then
+      select c.user_id, jsonb_build_object('body', _automod_snip(c.body), 'post_id', c.post_id)
+        into v_owner, v_snap from comments c where c.id = p_id for update;
+    elsif p_type = 'checkin_comment' then
+      select c.user_id, jsonb_build_object('body', _automod_snip(c.body), 'check_in_id', c.check_in_id)
+        into v_owner, v_snap from checkin_comments c where c.id = p_id for update;
+    else
+      select m.sender, jsonb_build_object('body', _automod_snip(m.body), 'sent_at', m.created_at)
+        into v_owner, v_snap from messages m where m.id = p_id and m.deleted_at is null for update;
+    end if;
   end if;
-  delete from moderation_jobs where target_type = p_type and target_id = p_id;
+
+  -- نشيل بس النص اللي انفحص (نفس queued_at). ما لقيناه = انعدّل بعد الحجز (وانحجز من جديد أو انفحص):
+  -- هالنتيجة قديمة، ما تعلّم ولا تخفي ولا تمسح فحص النص الجديد
+  delete from moderation_jobs where target_type = p_type and target_id = p_id
+     and (p_queued_at is null or queued_at = p_queued_at)
+  returning author into v_author;
+  if not found and p_queued_at is not null then return jsonb_build_object('flagged', false, 'stale', true); end if;
+  if v_author is not null and p_result <> 'gone' then
+    insert into moderation_usage (author, day, n) values (v_author, app_today(), 1)
+    on conflict (author, day) do update set n = moderation_usage.n + 1;
+  end if;
   if p_result in ('safe', 'gone') then return jsonb_build_object('flagged', false); end if;
 
   v_cats := array(select c from unnest(v_all) c where c not in ('copyright', 'jailbreak'));
   if cardinality(v_all) > 0 and cardinality(v_cats) = 0 then return jsonb_build_object('flagged', false); end if;
   if v_cats = array['political'] then v_label := 'controversial'; end if;
-
-  if p_type = 'post' then
-    select po.user_id, jsonb_build_object('caption', left(po.caption, 1000), 'image_path', po.image_path, 'kind', po.kind)
-      into v_owner, v_snap from posts po where po.id = p_id;
-  elsif p_type = 'comment' then
-    select c.user_id, jsonb_build_object('body', c.body, 'post_id', c.post_id) into v_owner, v_snap from comments c where c.id = p_id;
-  elsif p_type = 'checkin_comment' then
-    select c.user_id, jsonb_build_object('body', c.body, 'check_in_id', c.check_in_id) into v_owner, v_snap from checkin_comments c where c.id = p_id;
-  else
-    select m.sender, jsonb_build_object('body', left(m.body, 1000), 'sent_at', m.created_at)
-      into v_owner, v_snap from messages m where m.id = p_id and m.deleted_at is null;
-  end if;
   if v_owner is null then return jsonb_build_object('flagged', false); end if;
 
   v_was_open := exists (select 1 from auto_flags where status = 'open');
@@ -14475,7 +14535,7 @@ begin
 end $$;
 
 -- فشل الفحص: يرجع للطابور بعد مهلة تكبر (٢، ٤، ٨، ١٦ دقيقة...) ويسقط بعد ٥ محاولات.
--- auth / credits (التوكن أو الرصيد): مشكلة إعداد مو مشكلة المحتوى، فالمحاولة ما تنحسب ويرجع بعد ربع ساعة.
+-- auth / credits / model (التوكن أو الرصيد أو النموذج): مشكلة إعداد مو مشكلة المحتوى، فالمحاولة ما تنحسب ويرجع بعد ربع ساعة.
 -- skipped: ما انفحص أصلاً (وقفنا الدفعة): يرجع بعد دقيقة بدون ما ينحسب ولا ينكتب بالسجل.
 -- (لو انعدّل المحتوى بعد ما انحجز، الطابور فيه النص الجديد بمحاولات جديدة: ما نلمسه)
 create or replace function public.moderation_retry(p_type text, p_id uuid, p_reason text default 'error',
@@ -14487,7 +14547,7 @@ begin
   if v_reason <> 'skipped' then
     insert into moderation_log (target_type, result, model, error) values (p_type, 'error', left(p_model, 100), v_reason);
   end if;
-  if v_reason in ('skipped', 'auth', 'credits') then
+  if v_reason in ('skipped', 'auth', 'credits', 'model') then
     update moderation_jobs
        set attempts = greatest(attempts - 1, 0),
            next_at = now() + case when v_reason = 'skipped' then interval '1 minute' else interval '15 minutes' end
@@ -14531,6 +14591,7 @@ returns void language plpgsql security definer set search_path = public as $$
 declare s jsonb := _automod(); v_url text; v_key text;
 begin
   delete from moderation_log where created_at < now() - interval '90 days';
+  delete from moderation_usage where day < app_today() - 2;
   delete from moderation_jobs where attempts >= 6 or queued_at < now() - interval '2 days'
      or (target_type = 'message' and not coalesce((s->>'messages')::boolean, false));
   if not coalesce((s->>'enabled')::boolean, false) then return; end if;
@@ -14594,10 +14655,15 @@ begin
     'checked_24h', (select count(*) from moderation_log where created_at > now() - interval '24 hours' and result in ('safe','unsafe','controversial')),
     'flagged_24h', (select count(*) from moderation_log where created_at > now() - interval '24 hours' and result in ('unsafe','controversial')),
     'errors_24h', (select count(*) from moderation_log where created_at > now() - interval '24 hours' and result = 'error'),
-    'used_24h', (select count(*) from moderation_log where created_at > now() - interval '24 hours' and result <> 'gone'),
-    'last_error', (select l.error from moderation_log l where l.result = 'error' and l.created_at > now() - interval '24 hours' order by l.created_at desc limit 1),
-    'last_at', (select max(created_at) from moderation_log where result <> 'error'),
-    'open_flags', (select count(*) from auto_flags where status = 'open'));
+    'used_24h', _automod_used(),
+    -- آخر خطأ بس لو صار بعد آخر فحص ناجح (لو رجع يشتغل ما نعرضه)
+    'last_error', (select l.error from moderation_log l
+                   where l.result = 'error' and l.created_at > now() - interval '24 hours'
+                     and l.created_at > coalesce((select max(x.created_at) from moderation_log x where x.result in ('safe','unsafe','controversial')), '-infinity')
+                   order by l.created_at desc limit 1),
+    'last_at', (select max(created_at) from moderation_log where result in ('safe','unsafe','controversial')),
+    'open_flags', (select count(*) from auto_flags where status = 'open'),
+    'can_edit', is_owner());
 end $$;
 revoke all on function public.admin_moderation_stats() from public, anon;
 grant execute on function public.admin_moderation_stats() to authenticated;

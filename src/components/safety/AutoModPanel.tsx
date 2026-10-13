@@ -43,6 +43,13 @@ export function AutoModPanel() {
     finally { setBusy(false); }
   };
 
+  const stopNow = async (v: AutoModSettings) => {
+    setBusy(true);
+    try { await saveAutoMod(v); load(); }
+    catch (e) { Alert.alert(t(errorKey(e))); }
+    finally { setBusy(false); }
+  };
+
   // التشغيل والرسائل: تأكيد قبل، لأن النص يطلع لمزوّد خارجي
   const turnOn = (v: boolean) => {
     if (!v) return setS({ ...s, enabled: false });
@@ -93,7 +100,20 @@ export function AutoModPanel() {
         {stale && !err ? <T size="sm" color={colors.danger} style={{ lineHeight: 21 }}>{t('automod.stale')}</T> : null}
       </Card>
 
-      {/* الإعداد */}
+      {/* الإعداد: للمالك بس. المشرف الثاني يقدر يوقف (الفحص كله أو الرسائل) */}
+      {!stats.can_edit ? (
+        <Card style={{ gap: space.sm }}>
+          <T size="sm" muted style={{ lineHeight: 21 }}>{t('automod.ownerOnly')}</T>
+          {stats.settings.enabled ? (
+            <Button small variant="danger" icon="pause-circle-outline" title={t('automod.turnOff')} loading={busy}
+              onPress={() => stopNow({ ...stats.settings, enabled: false })} />
+          ) : null}
+          {stats.settings.messages ? (
+            <Button small variant="secondary" icon="chatbubbles-outline" title={t('automod.messagesOff')} loading={busy}
+              onPress={() => stopNow({ ...stats.settings, messages: false })} />
+          ) : null}
+        </Card>
+      ) : (
       <Card style={{ gap: space.md }}>
         <Row>
           <View style={{ flex: 1 }}><T semibold>{t('automod.enabled')}</T><T size="xs" muted style={{ lineHeight: 19 }}>{t('automod.enabledHint')}</T></View>
@@ -112,6 +132,7 @@ export function AutoModPanel() {
         <Input label={t('automod.cap')} hint={t('automod.capHint')} value={cap} onChangeText={setCap} keyboardType="number-pad" maxLength={5} />
         <Button icon="checkmark" title={t('common.save')} loading={busy} disabled={!dirty} onPress={save} />
       </Card>
+      )}
 
       <T size="xs" muted style={{ lineHeight: 19 }}>{t('automod.footnote')}</T>
     </View>
