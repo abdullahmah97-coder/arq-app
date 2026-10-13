@@ -175,13 +175,36 @@
 ### 2) تفعيل الذكاء الاصطناعي (اختياري لكن مستحسن)
 ```bash
 npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-npx supabase secrets set ANTHROPIC_MODEL=claude-sonnet-5   # اختياري
 npx supabase functions deploy generate-plan
 npx supabase functions deploy analyze-inbody
 npx supabase functions deploy coach
+npx supabase functions deploy analyze-meal
+npx supabase functions deploy barcode-lookup
 ```
 بدون هذي الخطوة التطبيق يشتغل عادي ويولّد خطة قياسية بالقواعد.
 الحد الافتراضي 5 خطط بالذكاء الاصطناعي لكل مستخدم يومياً (للتحكم في التكلفة) — عدّله في `MAX_AI_PLANS_PER_DAY`.
+
+الدوال الخمس تكلّم Claude عن طريق الـ SDK (`npm:@anthropic-ai/sdk@0.131.0`) والأدوات المشتركة في `supabase/functions/_shared/claude.ts` (الـ CLI يجمعها مع كل دالة عند النشر؛ لو تنشر من مكان ثاني، أرفق هذا الملف). النموذج الافتراضي `claude-sonnet-5-5`، وكل شي اختياري:
+
+| الدالة | النموذج (أول واحد موجود) | الجهد (`low`/`medium`/`high`/`xhigh`/`max`) | الافتراضي |
+|---|---|---|---|
+| `analyze-meal` | `ANTHROPIC_MEAL_MODEL` ← `ANTHROPIC_MODEL` | `ANTHROPIC_MEAL_EFFORT` | `low` |
+| `barcode-lookup` | `ANTHROPIC_BARCODE_MODEL` ← `ANTHROPIC_MODEL` | `ANTHROPIC_BARCODE_EFFORT` | `medium` |
+| `analyze-inbody` | `ANTHROPIC_MODEL` | `ANTHROPIC_INBODY_EFFORT` | `low` |
+| `coach` | `ANTHROPIC_COACH_MODEL` ← `ANTHROPIC_MODEL` | `ANTHROPIC_COACH_EFFORT` | `low` |
+| `generate-plan` | `ANTHROPIC_PLAN_MODEL` ← `ANTHROPIC_MODEL` | `ANTHROPIC_PLAN_EFFORT` | `high` |
+
+```bash
+npx supabase secrets list                                   # لو فيه ANTHROPIC_MODEL=claude-sonnet-5 قديم، هو اللي ينستخدم بدل الافتراضي
+npx supabase secrets unset ANTHROPIC_MODEL                  # عشان تمشي على claude-sonnet-5-5
+npx supabase secrets set ANTHROPIC_PLAN_EFFORT=medium       # مثال: خطة أسرع لو طوّلت
+```
+- قيمة جهد غلط تنتجاهل (يرجع للافتراضي). النموذج البديل لازم يدعم `effort` والمخرجات المهيكلة (`claude-sonnet-5-5`، `claude-sonnet-5`، `claude-opus-5-5`، `claude-opus-5`، `claude-haiku-5-5`...).
+- الرجوع لنموذج بديل لو رُفض الطلب (`fallbacks: "default"`) ينرسل بس مع `claude-sonnet-5-5` و`claude-opus-5-5` و`claude-opus-5` و`claude-fable-5-1`؛ غيرها بدونه.
+- `barcode-lookup` يستخدم أداة البحث `web_search_20260209` (لازم بحث الويب مفعّل للمنظمة في Claude Console). هالأداة تشتغل بس مع Sonnet 5.5 و Sonnet 5 و Sonnet 4.6 و Opus (5.5/5/4.8/4.7/4.6) — **مو Haiku**. لو حطيت `ANTHROPIC_MODEL` على `claude-haiku-5-5` عشان التكلفة، حط `ANTHROPIC_BARCODE_MODEL=claude-sonnet-5-5` بعد، وإلا كل بحث باركود يفشل (وياخذ من الحد اليومي).
+- الجهد الافتراضي `low` للاستخراج (الوجبة و InBody) والمحادثة (المدرب) مثل الخطة المعتمدة؛ الباركود `medium` لأنه بحث بأكثر من خطوة (أداة بحث وفلترة)، والخطة `high`.
+- المدرب يبني تمارينه من مكتبة الخادم `supabase/functions/coach/library.ts` (كل تمارين التطبيق، بدون قص). لو تغيّر دليل التمارين (`src/three/catalog.ts`) حدّثها: `npx esbuild@0.25 scripts/gen-coach-library.ts --bundle --platform=node --log-level=error --outfile=node_modules/.cache/gen-coach-library.js && node node_modules/.cache/gen-coach-library.js --write` (و`npm run test:coach` يتأكد).
+- الحدود اليومية كلها من `ai_take`: `coach` ٤٠ و`inbody` ١٠ (تعدّ الطلبات نفسها)، وكل طلب يسجّل توكناته على صفه في `ai_usage` عن طريق `ai_usage_note`. هذا يحتاج ترحيل القاعدة `supabase/migrations/20261012000910_ai_metering.sql` (يضيف النوعين والأعمدة والدالة): شغّله كامل من SQL Editor (الصق الملف ← Run) أو `npx supabase db push` — **مو** عن طريق MCP `apply_migration` (ممكن يعلق على `revoke`) — مع الدوال أو قبلها (التفاصيل والتحقق بعده: `docs/office-web.md` القسم ٨.٤). قبله `coach` و`analyze-inbody` يرجعون لحدودهم القديمة (`coach_log` والتقارير المحفوظة) وتسجيل التوكنات يفشل بهدوء (سطر بالسجل بس).
 
 **وكلاء مكتب أرك أب** (زر «شغّل الوكيل» على مكاتب `/owner-office`، للإدارة بس): يحتاجون ترحيل `20261007000880_office_agents.sql` (جدول `office_tasks` و`office_decide` ونوع `office` في حد الذكاء الاصطناعي) قبل نشر الدالة:
 ```bash

@@ -1180,7 +1180,9 @@
    },
    "fixed_caps": {
     "plan": 8,
-    "office": 80
+    "office": 80,
+    "coach": 40,
+    "inbody": 10
    },
    "usage": {
     "meal_photo": {
@@ -1206,6 +1208,18 @@
      "uses_cur": 61,
      "uses_prev": 48,
      "users_cur": 1
+    },
+    "coach": {
+     "uses_today": 58,
+     "uses_cur": 388,
+     "uses_prev": 341,
+     "users_cur": 97
+    },
+    "inbody": {
+     "uses_today": 4,
+     "uses_cur": 23,
+     "uses_prev": 19,
+     "users_cur": 18
     }
    },
    "office_tasks_today": 11
@@ -2974,7 +2988,9 @@
    },
    "fixed_caps": {
     "plan": 8,
-    "office": 80
+    "office": 80,
+    "coach": 40,
+    "inbody": 10
    },
    "usage": {
     "meal_photo": {
@@ -3000,6 +3016,18 @@
      "uses_cur": 268,
      "uses_prev": 207,
      "users_cur": 1
+    },
+    "coach": {
+     "uses_today": 58,
+     "uses_cur": 1646,
+     "uses_prev": 1500,
+     "users_cur": 186
+    },
+    "inbody": {
+     "uses_today": 4,
+     "uses_cur": 101,
+     "uses_prev": 83,
+     "users_cur": 61
     }
    },
    "office_tasks_today": 11

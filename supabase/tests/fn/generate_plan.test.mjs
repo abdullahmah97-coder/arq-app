@@ -1,11 +1,14 @@
-// اختبار دالة generate-plan (الإصدار ٢) بدون إنترنت: Deno و supabase و Anthropic كلها بدائل
+// اختبار دالة generate-plan (الإصدار ٢) بدون إنترنت: Deno و supabase و Anthropic SDK كلها بدائل
 // التشغيل (من جذر المشروع):
 //   npx esbuild@0.25 supabase/functions/generate-plan/index.ts --bundle --format=esm --platform=node \
 //     --alias:npm:@supabase/supabase-js@2=./supabase/tests/fn/supabase-mock-plan.mjs \
+//     --alias:npm:@anthropic-ai/sdk@0.131.0=./supabase/tests/fn/anthropic-mock.mjs \
 //     --alias:jsr:@std/encoding@1/base64=./supabase/tests/fn/base64-shim.mjs --outfile=node_modules/.cache/fn/generate_plan.bundle.mjs
 //   npx esbuild@0.25 src/lib/plan/validate.ts --bundle --format=esm --platform=node --outfile=node_modules/.cache/fn/validate.bundle.mjs
 //   node supabase/tests/fn/generate_plan.test.mjs
 import { plan as db } from './supabase-mock-plan.mjs';
+import { anth, resetAnthropic } from './anthropic-mock.mjs';
+import { schemaProblems, schemaStats, requestProblems, hasFallback, noFallback } from './claude-checks.mjs';
 
 let handler;
 const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'anon', ANTHROPIC_API_KEY: 'k' };
@@ -13,29 +16,34 @@ const waited = [];
 globalThis.Deno = { serve: (h) => { handler = h; }, env: { get: (k) => env[k] } };
 globalThis.EdgeRuntime = { waitUntil: (p) => waited.push(p) };
 
-// Anthropic البديل: يرد حسب البرومبت (تمارين أو دفعة وجبات)، ونسجّل متى بدأ كل طلب ومتى خلص
+// Anthropic البديل (SDK): يرد حسب البرومبت (تمارين أو دفعة وجبات)، ونسجّل ترتيب كل طلب
 // الوجبات على دفعتين: mealsA = الفطور والسناك، mealsB = الغداء والعشاء (لو ما حددناهم يرد meals للثنتين)
+// الرد: كائن = JSON، نص = رد مو JSON، null = Anthropic واقف (خطأ 500)، 'TRUNCATED' = انقطع، { step } = خطوة مخصصة للبديل
 const calls = [];
 let reply = { training: null, meals: null };
-globalThis.fetch = async (url, init) => {
-  const body = JSON.parse(init.body);
+resetAnthropic();
+anth.delayMs = 60;
+anth.respond = (body) => {
   const kind = body.system.includes('TRAINING part') ? 'training' : 'meals';
   const group = kind === 'meals' ? (body.system.includes('for each slot: breakfast, snack') ? 'mealsA' : 'mealsB') : null;
-  const entry = { kind, group, body, start: Date.now(), end: null, seq: (globalThis.__seq = (globalThis.__seq ?? 0) + 1) };
-  calls.push(entry);
+  calls.push({ kind, group, body, seq: (globalThis.__seq = (globalThis.__seq ?? 0) + 1) });
   const r = group && reply[group] !== undefined ? reply[group] : reply[kind];
-  await new Promise((res) => setTimeout(res, 60));
-  entry.end = Date.now();
-  if (!r) return new Response('{"error":"down"}', { status: 529 });
-  if (r === 'TRUNCATED') return new Response(JSON.stringify({ stop_reason: 'max_tokens', usage: { output_tokens: body.max_tokens }, content: [{ type: 'text', text: '{"meals":[{"slot":"lunch","name":{"ar":"كب' }] }), { status: 200 });
-  return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: typeof r === 'string' ? r : 'Here:\n' + JSON.stringify(r) }] }), { status: 200 });
+  if (!r) return { throw: 'api' };
+  if (r === 'TRUNCATED') return { truncated: true };
+  if (typeof r === 'string') return { text: r };
+  if (r.step) return r.step;
+  return { json: r };
 };
+const logs = [];
+for (const k of ['log', 'warn', 'error']) console[k] = (...a) => logs.push(a.map(String).join(' '));
+const notes = () => db.rpcCalls.filter((c) => c.fn === 'ai_usage_note');
+const takes = () => db.rpcCalls.filter((c) => c.fn === 'ai_take');
 
 const mod = await import('../../../node_modules/.cache/fn/generate_plan.bundle.mjs');
 const { isWeeklyPlan } = await import('../../../node_modules/.cache/fn/validate.bundle.mjs');
 
 let failed = 0;
-const ok = (c, label, extra = '') => { console.log(c ? 'ok  ' : 'FAIL', label, extra); if (!c) { failed++; process.exitCode = 1; } };
+const ok = (c, label, extra = '') => { process.stdout.write(`${c ? 'ok  ' : 'FAIL'} ${label}${c ? '' : ` ${extra}`}\n`); if (!c) { failed++; process.exitCode = 1; } };
 const call = async (body, auth = 'Bearer good') => {
   const res = await handler(new Request('https://fn/generate-plan', { method: 'POST', headers: { Authorization: auth, 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   return { status: res.status, body: await res.json() };
@@ -77,7 +85,7 @@ ok(JSON.stringify(db.countFilters.at(-1)).includes('"is","data->program",null'),
 db.countError = 'db down';
 r = await call({ input, targets });
 ok(r.status === 503 && r.body.error === 'busy', 'limit check fails → stop (the limit is never skipped)');
-ok(db.rpcCalls.length === 0, 'refused requests do not use up an attempt');
+ok(takes().length === 0, 'refused requests do not use up an attempt');
 db.countError = null;
 db.aiCount = 1;
 
@@ -95,23 +103,44 @@ r = await call({ input, targets, save: true });
 ok(r.status === 200 && r.body.plan_id, 'database not migrated yet (unknown kind) → falls back to the saved-plans limit');
 db.takeError = null;
 calls.length = 0;
-const takesBefore = db.rpcCalls.length;
+const takesBefore = takes().length;
+const notesBefore = notes().length;
 r = await call({ input, targets, save: true });
-const take = db.rpcCalls.at(-1);
-ok(r.status === 200 && db.rpcCalls.length === takesBefore + 1 && take.fn === 'ai_take' && take.args.p_kind === 'plan', 'every request reserves one plan attempt');
+const take = takes().at(-1);
+ok(r.status === 200 && takes().length === takesBefore + 1 && take.args.p_kind === 'plan', 'every request reserves one plan attempt');
 ok(calls.length === 3 && calls.every((c) => c.seq > take.seq), 'the attempt is reserved before any AI call');
+// توكنات الطلبات الثلاثة تنسجّل مرة وحدة على صف المحاولة
+const pn = notes().at(-1)?.args;
+ok(notes().length === notesBefore + 1 && JSON.stringify(pn) === JSON.stringify({ p_kind: 'plan', p_model: 'claude-sonnet-5-5', p_input: 300, p_output: 150, p_cache_read: 0, p_cache_write: 0 }),
+  'one ai_usage_note per plan with the 3 calls summed', JSON.stringify(pn));
+ok(notes().at(-1).seq > Math.max(...calls.map((c) => c.seq)), 'the usage note comes after the AI calls');
 for (const x of db.rows) x.active = false;
 db.rows.length = 0;
 
 // ---- خطة كاملة (نسخة التطبيق القديمة: بدون حفظ) ----
 reply = { training: TRAINING, meals: MEALS };
 calls.length = 0;
+anth.maxInFlight = 0;
 r = await call({ input, targets, photo_path: 'someone-else/x.jpg' });
 ok(r.status === 200 && r.body.plan && !r.body.plan_id, 'old clients get the plan without saving', r.status + ' ' + JSON.stringify(r.body).slice(0, 80));
 const p = r.body.plan;
 ok(isWeeklyPlan(p), 'passes the app’s plan validator (old and new app versions)');
-ok(calls.length === 3 && calls.every((c) => c.start < Math.min(...calls.map((x) => x.end))), 'training and both meal batches are requested in parallel');
-ok(calls.find((c) => c.kind === 'training').body.max_tokens <= 4000 && calls.filter((c) => c.kind === 'meals').every((c) => c.body.max_tokens <= 5000), 'short outputs (training ≤ 4000, each meal batch ≤ 5000)');
+ok(calls.length === 3 && anth.maxInFlight === 3, 'training and both meal batches are requested in parallel', `maxInFlight=${anth.maxInFlight}`);
+ok(calls.every((c) => c.body.max_tokens === 16000) && mod.TRAINING_MAX_TOKENS === 16000 && mod.MEALS_MAX_TOKENS === 16000, 'max_tokens 16000 on every call (adaptive thinking counts toward it)');
+// الطلبات نفسها: SDK، النموذج، الجهد، المخرجات المهيكلة، fallbacks، بدون حقول ممنوعة
+ok(calls.every((c) => c.body.model === 'claude-sonnet-5-5' && hasFallback(c.body)), 'default model claude-sonnet-5-5 with server-side fallbacks');
+ok(calls.every((c) => c.body.output_config?.effort === 'high'), 'default effort high');
+ok(calls.every((c) => requestProblems(c.body).length === 0 && !('thinking' in c.body) && c.body.messages.length === 1), 'no temperature / thinking / prefill / forced tool_choice');
+ok(JSON.stringify(anth.clients.at(-1)) === JSON.stringify({ apiKey: 'k', timeout: 90000, maxRetries: 0 }), 'SDK client: 90 s, no retries (the run stays under the function limit)', JSON.stringify(anth.clients.at(-1)));
+const ts = calls.find((c) => c.kind === 'training').body.output_config.format;
+ok(ts?.type === 'json_schema' && JSON.stringify(ts.schema.required) === '["summary","days","tips","photo_notes"]' && schemaProblems(ts.schema).length === 0, 'training: structured output schema (summary, days, tips, photo_notes)', schemaProblems(ts.schema).join('; '));
+ok(JSON.stringify(ts.schema.properties.days.items.properties.ex.items.required) === '["id","sets","reps","rest"]' && ts.schema.properties.photo_notes.anyOf?.length === 2, 'training schema mirrors buildDays (rir/note optional, photo_notes nullable)');
+const sa = calls.find((c) => c.group === 'mealsA').body.output_config.format.schema;
+const sb = calls.find((c) => c.group === 'mealsB').body.output_config.format.schema;
+ok(JSON.stringify(sa.properties.meals.items.properties.slot.enum) === '["breakfast","snack"]' && JSON.stringify(sb.properties.meals.items.properties.slot.enum) === '["lunch","dinner"]', 'each meal batch schema only allows its own slots');
+ok([sa, sb].every((x) => schemaProblems(x).length === 0) && JSON.stringify(sa.properties.meals.items.properties.items.items.properties.u.enum) === '["g","ml","pc"]', 'meal schemas are valid and mirror parseMealOptions');
+ok(calls.every((c) => { const st = schemaStats(c.body.output_config.format.schema); return st.unions <= 16 && st.optional <= 24; }), 'schemas within API limits');
+ok(calls.every((c) => !/Return ONLY/.test(c.body.system)), 'prompts: no "Return ONLY" lines (structured outputs replace them)');
 // الوجبات على دفعتين: كل دفعة تطلب وجباتها بس وبسعرات حصتها
 const mA = calls.find((c) => c.group === 'mealsA')?.body.system ?? '';
 const mB = calls.find((c) => c.group === 'mealsB')?.body.system ?? '';
@@ -172,6 +201,40 @@ ok(r.status === 502, 'no valid training day → error (not an empty plan)');
 reply = { training: null, meals: MEALS };
 r = await call({ input, targets });
 ok(r.status === 502 && r.body.error === 'ai_failed', 'Anthropic down → ai_failed');
+reply = { training: { step: { throw: 'timeout' } }, meals: MEALS };
+r = await call({ input, targets });
+ok(r.status === 502 && r.body.error === 'ai_failed', 'training timeout → ai_failed');
+reply = { training: { step: { refusal: true, category: 'general_harms' } }, meals: MEALS };
+const nb = notes().length;
+r = await call({ input, targets });
+ok(r.status === 502 && r.body.error === 'ai_bad_output', 'training refused → 502 ai_bad_output (no crash)');
+ok(notes().length === nb + 1 && notes().at(-1).args.p_input === 300, 'refused and answered calls are all metered');
+reply = { training: 'TRUNCATED', meals: MEALS };
+r = await call({ input, targets });
+ok(r.status === 502 && r.body.error === 'ai_bad_output', 'training cut off at max_tokens → ai_bad_output');
+reply = { training: TRAINING, meals: MEALS, mealsA: { step: { refusal: true } } };
+r = await call({ input, targets });
+ok(r.status === 200 && r.body.meals_source === 'mixed', 'a refused meal batch falls back to templates for its slots');
+reply = { training: { step: { throw: 'rate_limit' } }, meals: null };
+const nb2 = notes().length;
+r = await call({ input, targets });
+ok(r.status === 502 && r.body.error === 'ai_failed' && notes().length === nb2, 'all calls failed → ai_failed and no usage note (nothing came back)');
+
+// ---- النموذج والجهد من البيئة ----
+reply = { training: TRAINING, meals: MEALS };
+env.ANTHROPIC_PLAN_MODEL = 'claude-sonnet-5'; env.ANTHROPIC_MODEL = 'claude-opus-5-5'; env.ANTHROPIC_PLAN_EFFORT = 'medium';
+calls.length = 0;
+r = await call({ input, targets });
+ok(r.status === 200 && calls.every((c) => c.body.model === 'claude-sonnet-5' && noFallback(c.body) && c.body.output_config.effort === 'medium'), 'ANTHROPIC_PLAN_MODEL wins, no fallbacks for it; ANTHROPIC_PLAN_EFFORT=medium');
+delete env.ANTHROPIC_PLAN_MODEL; env.ANTHROPIC_PLAN_EFFORT = 'ultra';
+calls.length = 0;
+r = await call({ input, targets });
+ok(calls.every((c) => c.body.model === 'claude-opus-5-5' && hasFallback(c.body) && c.body.output_config.effort === 'high'), 'ANTHROPIC_MODEL next; invalid effort → high');
+delete env.ANTHROPIC_MODEL; delete env.ANTHROPIC_PLAN_EFFORT;
+db.noteError = 'function ai_usage_note does not exist';
+r = await call({ input, targets });
+ok(r.status === 200 && logs.some((l) => l.includes('ai_usage_note_failed')), 'usage note fails → logged, plan still ready');
+db.noteError = null;
 
 // ---- التطبيق الجديد: الدالة تحفظ الخطة بنفسها ----
 reply = { training: TRAINING, meals: MEALS };
@@ -238,8 +301,19 @@ reply = { training: { ...TRAINING, days: [{ day: 0, focus: T('ص', 'P'), ex: [{ 
 r = await call({ input, targets });
 ok(r.status === 200 && r.body.plan.days[0].exercises.map((e) => e.exercise_id).join() === 'bench_bb,goblet_squat', 'exercise given by English name or spaced id is matched', r.body.plan?.days[0].exercises.map((e) => e.exercise_id).join());
 
+// ---- صورة الجسم (صاحب الطلب بس): تروح لطلب التمارين كصورة، والنوع اللي ما يقبله Claude يصير jpeg ----
+reply = { training: TRAINING, meals: MEALS };
+db.photo = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/heic' });
+calls.length = 0;
+r = await call({ input, targets, photo_path: 'u1/body.jpg' });
+const img = calls.find((c) => c.kind === 'training').body.messages[0].content.find((p) => p.type === 'image');
+ok(r.status === 200 && img?.source?.media_type === 'image/jpeg' && img.source.data === 'AQID' && r.body.plan.photo_notes?.en === 'Note', 'own body photo is sent as an image block and photo notes are kept');
+ok(calls.filter((c) => c.kind === 'meals').every((c) => typeof c.body.messages[0].content === 'string'), 'meal batches never get the photo');
+db.photo = null;
+
 // ---- المكتبة ----
 ok(mod.LIBRARY.length >= 150 && mod.LIBRARY.every((x) => x.length === 5 && x[3] && x[4]), 'library has every exercise with both names');
 ok(mod.libraryPrompt('home').split('\n').every((l) => !/\(.*; (bb|machine|cable)\)/.test(l)), 'home library has no barbell/machine/cable');
 
-if (!failed) console.log('\nall generate-plan tests passed');
+ok(notes().length > 3 && notes().every((c) => c.who === 'user'), 'usage notes go through the user-token client (auth.uid() finds the row)');
+process.stdout.write(failed ? `\n${failed} FAILED\n` : '\nall generate-plan tests passed\n');

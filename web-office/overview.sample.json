@@ -7,6 +7,18 @@
         "uses_prev": 1,
         "uses_today": 0
       },
+      "coach": {
+        "uses_cur": 0,
+        "users_cur": 0,
+        "uses_prev": 0,
+        "uses_today": 0
+      },
+      "inbody": {
+        "uses_cur": 0,
+        "users_cur": 0,
+        "uses_prev": 0,
+        "uses_today": 0
+      },
       "office": {
         "uses_cur": 1,
         "users_cur": 1,
@@ -32,6 +44,8 @@
     },
     "fixed_caps": {
       "plan": 8,
+      "coach": 40,
+      "inbody": 10,
       "office": 80
     },
     "office_tasks_today": 13

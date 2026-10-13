@@ -4,7 +4,9 @@
 //
 // النشر:
 //   supabase functions deploy analyze-meal
-//   (يستخدم نفس ANTHROPIC_API_KEY و ANTHROPIC_MODEL)
+//   (ANTHROPIC_API_KEY، والنموذج ANTHROPIC_MEAL_MODEL ثم ANTHROPIC_MODEL — الافتراضي claude-sonnet-5-5،
+//    والجهد ANTHROPIC_MEAL_EFFORT: low|medium|high|xhigh|max — الافتراضي low، استخراج من صورة)
+//   Claude عن طريق الـ SDK بمخرجات مهيكلة (JSON schema)، وكل طلب يسجّل توكناته على صف الحد (ai_usage_note).
 //
 // الطلب: { image: "<base64>", media_type: "image/jpeg", hint?: "وصف اختياري" }
 //   hint: وصف المستخدم للوجبة (مثلاً «شاورما دجاج بالجبن») يساعد يتعرف على الأكل والمكونات اللي ما تبان بالصورة.
@@ -12,8 +14,14 @@
 //   <user_note> بعد ما نشيل منه < و > ورموز التحكم، فما يقدر يغيّر القواعد أو شكل الرد.
 //   صورة ملصق القيم الغذائية أو علبة المنتج (من «صوّر الملصق» بعد الباركود) تنحسب أكل: يقرا الأرقام المكتوبة لحصة وحدة.
 // الرد: { items: MealItem[], confidence, note: {ar, en}, remaining }
+//   أو { error }: 405 method_not_allowed · 503 ai_not_configured · 401 unauthorized · 400 bad_json · 400 bad_image
+//   413 file_too_large · 429 rate_limited · 422 not_food · 502 ai_failed (خطأ/مهلة) · 502 ai_bad_output (رفض/انقطاع/رد غلط)
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import {
+  Anthropic, arrayOf, effortFrom, enumOf, fallbackFor, afterResponse, INT, logError, logStop, modelFrom, noteUsage, NUM, obj,
+  readJson, STR, type Message,
+} from '../_shared/claude.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +32,22 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
 const MAX_B64 = 5_000_000; // حد Claude للصورة ٥ ميقا بعد الترميز
-const TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+type ImageType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+const TYPES = new Set<string>(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+/** مهلة الطلب ومحاولة إعادة وحدة (للضغط والأعطال المؤقتة): بالأكثر قرابة دقيقتين، تحت حد الدالة */
+export const AI_TIMEOUT_MS = 55_000;
+export const MAX_RETRIES = 1;
+/** يكفي للتفكير والرد (التفكير ينحسب من max_tokens) */
+export const MAX_TOKENS = 16_000;
+
+/** شكل الرد (structured outputs) — نفس اللي تتحقق منه الدالة تحت */
+export const SCHEMA = obj({
+  items: arrayOf(obj({ name_ar: STR, name_en: STR, grams: NUM, kcal: INT, protein_g: NUM, carbs_g: NUM, fat_g: NUM })),
+  confidence: enumOf(['high', 'medium', 'low']),
+  note_ar: STR,
+  note_en: STR,
+  error: enumOf(['', 'not_food']),
+});
 
 const PROMPT = `You are a sports nutritionist estimating the nutrition of a meal from a single photo for a fitness app in Saudi Arabia.
 
@@ -37,14 +60,15 @@ Method:
 4. If the food is on a large shared platter, estimate ONE person's normal portion and say so in the note.
 5. A nutrition facts label or the packaging of a food or drink counts as food: read the printed values for ONE serving (or the whole small pack if no serving is printed) instead of estimating.
 
-Return ONLY one JSON object, no markdown:
+Answer with one JSON object in this shape:
 {"items":[{"name_ar":"اسم عربي قصير","name_en":"Short English name","grams":0,"kcal":0,"protein_g":0,"carbs_g":0,"fat_g":0}],
  "confidence":"high|medium|low",
  "note_ar":"ملاحظة قصيرة باللهجة السعودية (مثلاً: قدّرت نصيب شخص واحد، أو الزيت غير واضح)",
- "note_en":"Short note in English"}
+ "note_en":"Short note in English",
+ "error":""}
 
 Rules: at most 8 items; kcal is an integer; macros have one decimal; numbers are for the portion shown.
-If the photo shows neither food, drink nor a food label, return exactly {"error":"not_food"}.`;
+If the photo shows neither food, drink nor a food label, set "error" to "not_food" with an empty "items" list.`;
 
 const num = (v: unknown, max: number, dp = 1) => {
   const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
@@ -70,7 +94,7 @@ Deno.serve(async (req) => {
   let body: { image?: string; media_type?: string; hint?: string };
   try { body = await req.json(); } catch { return json({ error: 'bad_json' }, 400); }
   const image = (body.image ?? '').replace(/^data:[^,]+,/, '');
-  const mediaType = TYPES.has(body.media_type ?? '') ? body.media_type! : 'image/jpeg';
+  const mediaType = (TYPES.has(body.media_type ?? '') ? body.media_type! : 'image/jpeg') as ImageType;
   if (!image || !/^[A-Za-z0-9+/=\s]+$/.test(image.slice(0, 200))) return json({ error: 'bad_image' }, 400);
   if (image.length > MAX_B64) return json({ error: 'file_too_large' }, 413);
   // وصف المستخدم (اختياري، ٢٠٠ حرف): بدون < و > ورموز التحكم عشان ما يطلع من وسمه بالطلب
@@ -80,7 +104,7 @@ Deno.serve(async (req) => {
   const { data: remaining, error: qErr } = await supabase.rpc('ai_take', { p_kind: 'meal_photo' });
   if (qErr) return json({ error: /rate_limited/.test(qErr.message) ? 'rate_limited' : 'ai_failed' }, /rate_limited/.test(qErr.message) ? 429 : 500);
 
-  const content: unknown[] = [
+  const content: Anthropic.Beta.BetaContentBlockParam[] = [
     { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
     { type: 'text', text: PROMPT },
   ];
@@ -90,27 +114,29 @@ Deno.serve(async (req) => {
 Use it to identify the dish and any ingredients the photo may hide (for example cheese, sauce, oil or sugar inside a sandwich), and name the items to match it. Estimate portions from the photo unless the note states the amount (for example "half a plate" or "2 pieces"). If the note clearly contradicts what the photo shows, trust the photo.` });
   }
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: Deno.env.get('ANTHROPIC_MEAL_MODEL') ?? Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-5',
-      max_tokens: 1500,
+  const model = modelFrom('ANTHROPIC_MEAL_MODEL', 'ANTHROPIC_MODEL');
+  const client = new Anthropic({ apiKey, timeout: AI_TIMEOUT_MS, maxRetries: MAX_RETRIES });
+  let res: Message;
+  try {
+    res = await client.beta.messages.create({
+      model, max_tokens: MAX_TOKENS,
+      ...fallbackFor(model),
+      output_config: { effort: effortFrom('ANTHROPIC_MEAL_EFFORT', 'low'), format: { type: 'json_schema', schema: SCHEMA } },
       messages: [{ role: 'user', content }],
-    }),
-  });
-  if (!res.ok) {
-    console.error('anthropic_error', res.status, await res.text());
+    });
+  } catch (e) {
+    logError('analyze-meal', e);
     return json({ error: 'ai_failed' }, 502);
   }
-  const out = await res.json();
-  const raw: string = (out.content ?? []).filter((b: { type: string }) => b.type === 'text').map((b: { text: string }) => b.text).join('');
-  const s = raw.indexOf('{');
-  const e = raw.lastIndexOf('}');
-  if (s === -1 || e <= s) return json({ error: 'ai_bad_output' }, 502);
+  // التوكنات على صف الحد (بالخلفية، وفشلها ما يأثّر على الرد)
+  await afterResponse(noteUsage(supabase, 'meal_photo', [res], model));
 
-  let parsed: Record<string, unknown>;
-  try { parsed = JSON.parse(raw.slice(s, e + 1)); } catch { return json({ error: 'ai_bad_output' }, 502); }
+  const out = readJson(res);
+  if ('fail' in out) {
+    logStop('analyze-meal', res, out.fail);
+    return json({ error: 'ai_bad_output' }, 502);
+  }
+  const parsed = out.json;
   if (parsed.error === 'not_food') return json({ error: 'not_food' }, 422);
 
   const items = (Array.isArray(parsed.items) ? parsed.items : []).slice(0, 8).map((it: Record<string, unknown>) => {

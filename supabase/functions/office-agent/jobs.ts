@@ -16,11 +16,13 @@ export const SCAN = 100;
 export const MAX_PAGES = 10;
 /** حد صورة المستند: ٤ ميقا وأقل (بعد الترميز base64 تبقى تحت حد Claude للصورة) */
 export const MAX_DOC_BYTES = 3_750_000;
-/** صفوف ai_usage لآخر ٧ أيام: صفحات ١٠٠٠ (حد PostgREST الافتراضي) لين ٢٠ ألف */
+/** صفوف ai_usage لآخر ٧ أيام: صفحات ١٠٠٠ (حد PostgREST الافتراضي) لين ٢٠ ألف، لكل مجموعة أنواع لحالها */
 const USAGE_PAGE = 1000;
 const USAGE_MAX = 20_000;
-/** الحدود الثابتة بالقاعدة (ai_take): الخطة ٨ والمكتب ٨٠ باليوم */
-const FIXED_CAPS: Record<string, number> = { plan: 8, office: 80 };
+/** الأنواع اللي يقترح المكتب حدودها (لوحة التحكم): لها ميزانية صفوف لحالها عشان كثرة رسائل المدرب ما تقص أرقامها */
+const PANEL_KINDS = ['meal_photo', 'barcode'];
+/** الحدود الثابتة بالقاعدة (ai_take، ترحيل 20261012000910): الخطة ٨ والمكتب ٨٠ والمدرب ٤٠ و InBody ١٠ باليوم */
+const FIXED_CAPS: Record<string, number> = { plan: 8, office: 80, coach: 40, inbody: 10 };
 
 type ImageType = 'image/jpeg' | 'image/png' | 'image/webp';
 export interface ImageBlock { type: 'image'; source: { type: 'base64'; media_type: ImageType; data: string } }
@@ -360,19 +362,27 @@ async function aiJobs({ db }: Ctx): Promise<Job[]> {
   const current = { barcode_per_day: lim(v.barcode_per_day, 2), meal_photos_per_day: lim(v.meal_photos_per_day, 25) };
 
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const all: Row[] = [];
-  for (let from = 0; from < USAGE_MAX; from += USAGE_PAGE) {
-    const page = await rows(db.from('ai_usage').select('user_id, kind, created_at').gte('created_at', since)
-      .order('id', { ascending: true }).range(from, from + USAGE_PAGE - 1), 'ai_usage');
-    all.push(...page);
-    if (page.length < USAGE_PAGE) break;
-  }
-  const usage = aggregateUsage(all.slice(0, USAGE_MAX), { meal_photo: current.meal_photos_per_day, barcode: current.barcode_per_day, ...FIXED_CAPS });
+  /** صفوف مجموعة أنواع (لين USAGE_MAX)؛ truncated = فيه أكثر */
+  const scan = async (kinds: string[]) => {
+    const all: Row[] = [];
+    for (let from = 0; from < USAGE_MAX; from += USAGE_PAGE) {
+      const page = await rows(db.from('ai_usage').select('user_id, kind, created_at').gte('created_at', since).in('kind', kinds)
+        .order('id', { ascending: true }).range(from, from + USAGE_PAGE - 1), 'ai_usage');
+      all.push(...page);
+      if (page.length < USAGE_PAGE) break;
+    }
+    return { list: all.slice(0, USAGE_MAX), truncated: all.length >= USAGE_MAX };
+  };
+  const panel = await scan(PANEL_KINDS);
+  const fixed = await scan(Object.keys(FIXED_CAPS));
+  const all = [...panel.list, ...fixed.list];
+  const cut = [panel.truncated && 'meal_photo/barcode', fixed.truncated && 'fixed-cap kinds'].filter(Boolean).join(' and ');
+  const usage = aggregateUsage(all, { meal_photo: current.meal_photos_per_day, barcode: current.barcode_per_day, ...FIXED_CAPS });
   return [job({ desk: 'ai', kind: 'review_ai_limits', target_kind: null, target_id: null, title: null, locale: 'ar' },
     { current, usage },
     async () => ({
       images: [],
-      text: [today(), `Current limits: ${JSON.stringify(current)}`, `Usage in the last 7 days (${all.length} uses${all.length >= USAGE_MAX ? ', truncated' : ''}):\n${JSON.stringify(usage, null, 1)}`,
+      text: [today(), `Current limits: ${JSON.stringify(current)}`, `Usage in the last 7 days (${all.length} uses${cut ? `, truncated: ${cut}` : ''}):\n${JSON.stringify(usage, null, 1)}`,
         'Write the limits JSON now.'].join('\n\n'),
     }))];
 }

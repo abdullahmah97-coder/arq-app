@@ -393,8 +393,8 @@ characters), `created_at` (timestamp), `username` (string or null), `agent_task`
 |---|---|---|
 | `limits.barcode_per_day` | int | current per-user daily cap (default 2) |
 | `limits.meal_photos_per_day` | int | current per-user daily cap (default 25) |
-| `fixed_caps.plan` / `.office` | int | fixed caps: 8 AI plans a day per user, 80 office agent tasks a day per admin |
-| `usage.<kind>` for `meal_photo`, `barcode`, `plan`, `office` | `{uses_today, uses_cur, uses_prev, users_cur}` | AI calls by kind (all four keys always present); `users_cur` = distinct users in cur. `office` is the owner's agents. |
+| `fixed_caps.plan` / `.office` / `.coach` / `.inbody` | int | fixed caps (not set from the panel): 8 AI plans a day per user, 80 office agent tasks a day per admin, 40 coach messages and 10 InBody reads a day per user. `coach`/`inbody` since `20261012000910_ai_metering.sql` (section 8) |
+| `usage.<kind>` for `meal_photo`, `barcode`, `plan`, `office`, `coach`, `inbody` | `{uses_today, uses_cur, uses_prev, users_cur}` | AI calls by kind (all six keys always present); `users_cur` = distinct users in cur. `office` is the owner's agents. `coach`/`inbody` only count calls reserved through `ai_take` (from the day the `coach` and `analyze-inbody` functions switched to it; older coach messages live in `coach_log`, older InBody reads weren't metered). |
 | `office_tasks_today` | int | agent tasks created today |
 
 ### 3.10 `office`
@@ -832,3 +832,85 @@ Errors: `bad_input` (null value), `user_not_found`.
 | `update_user` | `user` | `edit` | `admin_update_user` |
 | `set_verified` | `coach` | `verify` / `unverify` | `office_admin` |
 Change requests are not logged (the table is the record).
+
+---
+
+## 8. AI metering (`20261012000910_ai_metering.sql`)
+
+### بالعربي
+كل استدعاء ذكاء اصطناعي من التطبيق يحجز صف في `ai_usage` بـ `ai_take` قبل ما يكلّم النموذج (والحد يعد الصفوف بآخر ٢٤ ساعة).
+الترحيل يضيف: (١) نوعين جداد بحد ثابت: `coach` (٤٠ رسالة باليوم) و`inbody` (١٠ قراءات باليوم)؛ (٢) أعمدة للنموذج
+والتوكنات على نفس الصف؛ (٣) `ai_usage_note`: دالة الخادم تناديها بعد رد النموذج بتوكن المستخدم، فتنكتب الأرقام على
+آخر صف حجزه هو من نفس النوع (آخر ١٥ دقيقة). لو ما فيه صف ما يصير شي، ولو فشلت الدالة ينكتب الخطأ بالسجل بس.
+التوكنات ما تأثر على الحد. `office_overview` صار يعرض `coach` و`inbody` (القسم ٣.٩) وكل شي ثاني فيه نفسه بالحرف.
+
+### 8.1 Table `public.ai_usage` — new columns
+All nullable. Rows written before this migration, and calls that failed before the model answered, keep them null.
+
+| column | type | meaning |
+|---|---|---|
+| `model` | text, ≤ 60 chars (`ai_usage_model_len`) | model id that answered |
+| `input_tokens` / `output_tokens` | int, 0–5,000,000 (`ai_usage_tokens_range`) | `usage.input_tokens` / `usage.output_tokens` |
+| `cache_read_tokens` / `cache_write_tokens` | int, 0–5,000,000 | `usage.cache_read_input_tokens` / `usage.cache_creation_input_tokens` |
+| `recorded_at` | timestamptz | when `ai_usage_note` wrote the numbers; null = not recorded yet |
+
+`kind` check (`ai_usage_kind_check`): `meal_photo`, `barcode`, `plan`, `office`, `coach`, `inbody`.
+RLS unchanged: a user reads only their own rows and can't insert, update or delete any.
+
+### 8.2 `public.ai_take(p_kind text) returns integer`
+Reserves one call (inserts the `ai_usage` row) and returns how many are left in the rolling 24 hours. Per-user, per-kind
+advisory lock, so parallel requests can't pass the cap. `authenticated` only.
+
+| kind | cap per user per rolling 24h |
+|---|---|
+| `meal_photo` | `app_settings.ai_limits.meal_photos_per_day` (default 25, 0–200) |
+| `barcode` | `app_settings.ai_limits.barcode_per_day` (default 2, 0–100) |
+| `plan` | 8 |
+| `office` | 80 |
+| `coach` | 40 |
+| `inbody` | 10 |
+
+Errors: `not_authenticated`, `bad_status` (unknown kind), `rate_limited` (cap reached; nothing recorded).
+
+### 8.3 `public.ai_usage_note(p_kind text, p_model text, p_input integer, p_output integer, p_cache_read integer, p_cache_write integer) returns void`
+Called by the edge functions with the user's token right after a model response, best-effort (an error is logged, never
+returned to the user). Writes the numbers on **the caller's most recent row of that kind created in the last 15 minutes
+with `recorded_at` null**, and sets `recorded_at = now()`. Takes the same per-user, per-kind lock as `ai_take`, so two
+answers that land together fill two different rows.
+- Counts are clamped to 0–5,000,000; a null count stays null. `p_model` is trimmed and cut to 60 characters; blank → null.
+- No matching row (another kind, older than 15 minutes, already recorded, unknown or null kind, no user) → does nothing.
+  It never raises for "no row".
+- Only ever touches the caller's own rows. `security definer`, `search_path = public`; executable by `authenticated` only.
+- Doesn't change any cap: `ai_take` counts rows, not tokens. The numbers are self-reported through the user's token, so
+  treat them as cost telemetry, not as billing.
+
+```js
+// edge function, after the model answers (supabase = client with the user's Authorization header)
+const u = msg.usage;
+const { error } = await supabase.rpc('ai_usage_note', {
+  p_kind: 'coach', p_model: msg.model, p_input: u.input_tokens, p_output: u.output_tokens,
+  p_cache_read: u.cache_read_input_tokens ?? null, p_cache_write: u.cache_creation_input_tokens ?? null,
+});
+if (error) console.error('ai_usage_note_failed', error.message);
+```
+The five functions do this through `noteUsage` in `supabase/functions/_shared/claude.ts`: it sums every response of the
+request (pause_turn continuations, the three plan calls), and when a server-side fallback ran it sums `usage.iterations`
+(the declined attempt is billed too; top-level `usage` only covers the attempt that answered) and records both models.
+
+### 8.4 Applying it
+بالعربي: شغّل الملف كامل من SQL Editor (الصق ← Run) أو `npx supabase db push`، **مو** عن طريق MCP `apply_migration`
+(يعلق على `revoke`، والتعديل على `ai_usage` يقفل الجدول لين يخلص). طبّقه مع الدوال أو قبلها.
+
+- Run the whole file in one go: SQL editor (paste → Run) or `npx supabase db push`. Do not send it through the MCP
+  `apply_migration` tool: it can hang on `revoke` statements, and the `alter table public.ai_usage` statements at the top
+  hold an exclusive lock on `ai_usage` until the transaction ends, so a hung session would block every `ai_take`.
+- The file starts with `set local lock_timeout = '5s'`: if `ai_usage` is busy the migration fails fast instead of
+  queueing live AI traffic behind it. Just run it again.
+- Apply it with or before the edge functions. Until it is applied, `coach` and `analyze-inbody` fall back to their old
+  caps and `ai_usage_note` fails quietly (a log line).
+- Check afterwards (expected `false / false / true`):
+```sql
+select has_function_privilege('anon', 'public.ai_usage_note(text,text,integer,integer,integer,integer)', 'EXECUTE') as anon_note,
+       has_function_privilege('anon', 'public.ai_take(text)', 'EXECUTE') as anon_take,
+       has_function_privilege('authenticated', 'public.ai_usage_note(text,text,integer,integer,integer,integer)', 'EXECUTE') as auth_note;
+```

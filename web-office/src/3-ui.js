@@ -550,8 +550,10 @@ function modList(o, max) {
       pill(t(`mst_${m.status}`) !== `mst_${m.status}` ? t(`mst_${m.status}`) : str(m.status), m.status === 'new' ? 'wait' : m.status === 'removed' ? 'fail' : 'plain')))) : h('div', { class: 'empty', text: t('v_none') }),
   ];
 }
+/** أنواع ai_usage (نفس ai_take): coach و inbody من ترحيل 20261012000910 */
+const AI_KINDS = ['meal_photo', 'barcode', 'coach', 'inbody', 'plan', 'office'];
 function usageBars(o) {
-  return bars(['meal_photo', 'barcode', 'plan', 'office'].map((k) => ({ label: t(`uk_${k}`), n: n(o, `ai.usage.${k}.uses_cur`), sub: '' })));
+  return bars(AI_KINDS.map((k) => ({ label: t(`uk_${k}`), n: n(o, `ai.usage.${k}.uses_cur`), sub: '' })));
 }
 
 // ===================== لوحة المهام =====================
@@ -708,7 +710,8 @@ function listScreen(id, o) {
     case 'bookings': return L4(t('attention'), arr(get(o, 'bookings.attention')).map((a) => ({ text: osClip(a.name || t('anon'), 30), meta: t(`att_${a.kind}`) !== `att_${a.kind}` ? osClip(t(`att_${a.kind}`), 30) : str(a.kind), tone: a.priority === 1 ? 'wait' : 'work' })), t('att_none'));
     case 'orders': return L4(t('low_stock'), arr(get(o, 'store.products.low_stock_items')).map((x) => ({ text: osClip(x.product, 30), meta: num(x.stock) === 0 ? t('sold_out') : t('in_stock', { n: fmt(num(x.stock)) }), tone: num(x.stock) === 0 ? 'wait' : 'work' })), t('v_none'));
     case 'marketing': return L4(t('upcoming_events'), arr(get(o, 'marketing.events.upcoming')).map((e) => ({ text: osClip(state.lang === 'en' && e.title_en ? e.title_en : e.title, 32), meta: fmtDate(e.starts_on), tone: 'ok' })), t('no_events'));
-    case 'ai': return L4(t('ai_usage'), ['meal_photo', 'barcode', 'plan', 'office'].map((k) => ({ text: t(`uk_${k}`), meta: fmt(n(o, `ai.usage.${k}.uses_cur`)), tone: 'ok' })));
+    case 'ai': return L4(t('ai_usage'), [...AI_KINDS].sort((a, b) => n(o, `ai.usage.${b}.uses_cur`) - n(o, `ai.usage.${a}.uses_cur`))
+      .map((k) => ({ text: t(`uk_${k}`), meta: fmt(n(o, `ai.usage.${k}.uses_cur`)), tone: 'ok' })));
     case 'activity': return L4(t('top_errors'), arr(get(o, 'activity.errors.top')).map((e) => ({ text: osClip(e.kind, 30), meta: fmt(num(e.n)), tone: 'wait' })), t('v_none'));
     case 'community': return L4(t('moderation'), arr(get(o, 'community.moderation.latest')).map((m) => ({ text: osClip(m.target_name || t('gym_review'), 30), meta: t(`reason_${m.reason}`) !== `reason_${m.reason}` ? t(`reason_${m.reason}`) : str(m.reason), tone: m.status === 'new' ? 'wait' : 'ok' })), t('v_none'));
     default: return L4(t('os_sc_queue'), [], t('empty_waiting'));
@@ -1478,7 +1481,7 @@ function areaBody(id, o) {
         h('div', { class: 'cols' },
           block(t('ai_usage'), h('div', { class: 'table-wrap' }, h('table', { class: 't' },
             h('thead', null, h('tr', null, ['u_kind', 'u_today', 'u_cur', 'u_prev', 'u_users'].map((k) => h('th', { scope: 'col', text: t(k) })))),
-            h('tbody', null, ['meal_photo', 'barcode', 'plan', 'office'].map((k) => h('tr', null,
+            h('tbody', null, AI_KINDS.map((k) => h('tr', null,
               h('td', { text: t(`uk_${k}`) }), h('td', { text: fmt(n(o, `ai.usage.${k}.uses_today`)) }), h('td', { text: fmt(n(o, `ai.usage.${k}.uses_cur`)) }),
               h('td', { text: fmt(n(o, `ai.usage.${k}.uses_prev`)) }), h('td', { text: fmt(n(o, `ai.usage.${k}.users_cur`)) }))))))),
           block(t('u_cur'), usageBars(o))),

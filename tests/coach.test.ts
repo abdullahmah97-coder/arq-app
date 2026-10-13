@@ -3,6 +3,8 @@ import { buildWorkout, localCoach } from '../src/lib/coach/local';
 import { EXERCISES, exerciseMuscles, findExercise, getExercise } from '../src/three/catalog';
 import { MOTIONS } from '../src/three/motions';
 import type { CoachContext } from '../src/lib/coach/types';
+import { readFileSync } from 'node:fs';
+import { COACH_LIBRARY_FILE, coachLibraryLines, coachLibrarySource } from '../scripts/gen-coach-library';
 
 let fail = 0;
 const ok = (c: boolean, m: string) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
@@ -87,6 +89,10 @@ const names: [string, string][] = [
   ['Superman', 'superman'], ['Lat Pulldown', 'lat_pulldown'], ['Dumbbell Bent Over Row', 'row_db_bent'], ['Face Pull', 'face_pull'], ['Glute Kickback', 'donkey_kick'],
 ];
 for (const [n, id] of names) ok(findExercise(n)?.id === id, `name "${n}" → ${id} (got ${findExercise(n)?.id})`);
+
+// مكتبة دالة coach (الخادم) لازم تطابق دليل التمارين في التطبيق
+ok(readFileSync(COACH_LIBRARY_FILE, 'utf8') === coachLibrarySource(), `${COACH_LIBRARY_FILE} matches the app catalog (else run scripts/gen-coach-library.ts --write)`);
+ok(coachLibraryLines().length === EXERCISES.length && coachLibraryLines().every((l) => getExercise(l.split(' | ')[0])?.id === l.split(' | ')[0]), 'every coach library id opens in the app');
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL COACH TESTS PASSED');
 if (fail) process.exit(1);

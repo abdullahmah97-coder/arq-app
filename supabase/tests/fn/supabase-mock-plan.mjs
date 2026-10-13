@@ -1,9 +1,10 @@
 // بديل supabase-js لاختبار دالة generate-plan: الخطط (صفوف حقيقية بالذاكرة)، تقارير InBody، وصورة الجسم،
 // وحجز محاولة الذكاء الاصطناعي (ai_take) — takeError يحاكي رد القاعدة (rate_limited / bad_status / عطل)
+// وتسجيل التوكنات (ai_usage_note) — noteError يحاكي فشله
 export const plan = (globalThis.__sbPlan ??= {
   aiCount: 0, countError: null, countFilters: [], updates: [], inserts: [], rows: [],
   failInsert: 0, commitThenFail: 0, failActivate: 0, inbody: new Set(), photo: null, nextId: 1,
-  rpcCalls: [], takeError: null,
+  rpcCalls: [], takeError: null, noteError: null,
 });
 
 const field = (row, col) => (col === 'data->>request_id' ? row.data?.request_id : row[col]);
@@ -22,10 +23,14 @@ function matches(row, filters) {
 export function createClient(url, key, opts = {}) {
   const auth = opts.global?.headers?.Authorization ?? '';
   const user = auth === 'Bearer good' ? { id: 'u1' } : null;
+  // who: مين نادى (user = بتوكن المستخدم). القاعدة تعتمد auth.uid(): بدون مستخدم ai_take يرفض و ai_usage_note ما يسوي شي
+  const who = user ? 'user' : opts.global ? 'anon' : 'service';
   return {
     auth: { getUser: async () => ({ data: { user } }) },
     rpc: async (fn, args) => {
-      plan.rpcCalls.push({ fn, args, seq: (globalThis.__seq = (globalThis.__seq ?? 0) + 1) });
+      plan.rpcCalls.push({ fn, args, who, seq: (globalThis.__seq = (globalThis.__seq ?? 0) + 1) });
+      if ((fn === 'ai_take' || fn === 'ai_usage_note') && who !== 'user') return { data: null, error: fn === 'ai_take' ? { message: 'not_authenticated' } : null };
+      if (fn === 'ai_usage_note' && plan.noteError) return { data: null, error: { message: plan.noteError } };
       return plan.takeError ? { data: null, error: { message: plan.takeError } } : { data: 7, error: null };
     },
     storage: { from: () => ({ download: async (p) => ({ data: plan.photo && p === 'u1/body.jpg' ? plan.photo : null, error: null }) }) },

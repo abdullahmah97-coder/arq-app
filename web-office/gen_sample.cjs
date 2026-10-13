@@ -187,12 +187,14 @@ function overview(D, tasks) {
       nudges: { today: 146, cur: Object.values(nudgeCats).reduce((a, b) => a + b, 0), prev: w(938), by_category_cur: nudgeCats, templates_active: 36, templates_paused: 2 },
     },
     ai: {
-      limits: { barcode_per_day: 2, meal_photos_per_day: 25 }, fixed_caps: { plan: 8, office: 80 },
+      limits: { barcode_per_day: 2, meal_photos_per_day: 25 }, fixed_caps: { plan: 8, office: 80, coach: 40, inbody: 10 },
       usage: {
         meal_photo: { uses_today: 96, uses_cur: w(702), uses_prev: w(655), users_cur: D === 7 ? 211 : 402 },
         barcode: { uses_today: 31, uses_cur: w(214), uses_prev: w(230), users_cur: D === 7 ? 118 : 251 },
         plan: { uses_today: 7, uses_cur: w(49), uses_prev: w(44), users_cur: D === 7 ? 41 : 133 },
         office: { uses_today: 13, uses_cur: w(61), uses_prev: w(48), users_cur: 1 },
+        coach: { uses_today: 58, uses_cur: w(388), uses_prev: w(341), users_cur: D === 7 ? 97 : 186 },
+        inbody: { uses_today: 4, uses_cur: w(23), uses_prev: w(19), users_cur: D === 7 ? 18 : 61 },
       },
       office_tasks_today: tasks.filter((t) => t.created_at.slice(0, 10) === TODAY).length,
     },

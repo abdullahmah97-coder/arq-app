@@ -47,7 +47,10 @@
    npx supabase functions deploy generate-plan
    npx supabase functions deploy analyze-inbody
    npx supabase functions deploy coach
+   npx supabase functions deploy analyze-meal
+   npx supabase functions deploy barcode-lookup
    ```
+   النموذج والجهد لكل دالة (`ANTHROPIC_*_MODEL` و`ANTHROPIC_*_EFFORT`) اختيارية — الجدول في README (قسم «تفعيل الذكاء الاصطناعي»).
 4. **الأندية:** وثّق أندية المختبرين (`verified = true` في جدول `gyms`) حتى تنحسب نقاط الحضور.
 5. من *Project Settings → API* انسخ **Project URL** و **anon key**.
 

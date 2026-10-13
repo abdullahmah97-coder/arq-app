@@ -4,13 +4,27 @@
 //
 // النشر:
 //   supabase functions deploy barcode-lookup
-//   (يستخدم نفس ANTHROPIC_API_KEY و ANTHROPIC_MODEL، و ANTHROPIC_BARCODE_MODEL اختياري)
+//   (ANTHROPIC_API_KEY، والنموذج ANTHROPIC_BARCODE_MODEL ثم ANTHROPIC_MODEL — الافتراضي claude-sonnet-5-5،
+//    والجهد ANTHROPIC_BARCODE_EFFORT: low|medium|high|xhigh|max — الافتراضي medium)
 //   بحث الويب لازم يكون مفعّل لحساب Anthropic (Console ← Privacy/Web search)
+//
+// Claude عن طريق الـ SDK مع أداة البحث web_search_20260209 (فلترة النتائج بالكود). بحث الويب يرجع اقتباسات
+// (citations) دايماً، والمخرجات المهيكلة ما تشتغل معها (400)، فنقرا JSON من نص الرد الأخير (بحذر).
+// pause_turn: نرجّع الدور مثل ما هو ونكمّل، ٣ طلبات بالأكثر وكلها تخلص قبل ١٣٠ ثانية من بداية الطلب.
+// رفض أو انقطاع أو رد بدون JSON = ai_failed وما ينحفظ شي بالذاكرة المشتركة (كان ينحفظ «ما لقيناه»).
+// أخطاء البحث ما ترمي: تجي كتلة web_search_tool_result محتواها كائن خطأ (unavailable وغيره) بدل قائمة.
+//   «ما لقيناه» ينحفظ للكل بس لو البحث اشتغل وما فيه ولا خطأ؛ والبحث ما اشتغل أبداً = ai_failed.
 //
 // الطلب: { code: "6281007035310", hint?: "اسم ناقص من Open Food Facts" }
 // الرد:  { found: true, product, confidence, source_url, cached } | { found: false, cached }
+//   أو { error }: 405 method_not_allowed · 401 unauthorized · 400 bad_json · 400 invalid_code · 503 ai_not_configured
+//   429 rate_limited · 500 ai_failed · 502 search_unavailable · 502 ai_failed
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import {
+  Anthropic, effortFrom, fallbackFor, afterResponse, logError, logStop, modelFrom, noteUsage, type ContentBlock, type Message,
+  type MessageParam,
+} from '../_shared/claude.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,6 +36,15 @@ const json = (body: unknown, status = 200) =>
 
 /** «ما لقيناه» ينعاد البحث عنه بعد أسبوع (يمكن أحد نزّل المنتج) */
 const NOT_FOUND_TTL_MS = 7 * 24 * 3600 * 1000;
+/** كل الطلبات (مع pause_turn) تخلص قبل كذا من بداية الطلب (مو البحث): حد الدالة ١٥٠ ثانية، والباقي
+ *  للدخول والذاكرة والحد اليومي قبل، وحفظ النتيجة بعد */
+export const AI_BUDGET_MS = 130_000;
+/** مهلة الطلب الواحد (أو اللي باقي من الميزانية لو أقل)، وبدون إعادة: إعادة البحث مكلفة وطويلة */
+export const AI_TIMEOUT_MS = 120_000;
+/** طلب أول + متابعتين بالأكثر بعد pause_turn */
+export const MAX_TURNS = 3;
+/** يكفي للتفكير وكود فلترة النتائج والرد */
+export const MAX_TOKENS = 16_000;
 
 /** رقم التحقق حق GS1 (EAN-8، UPC-A، EAN-13، GTIN-14) */
 export function validGtin(code: string): boolean {
@@ -83,13 +106,69 @@ export function normalize(parsed: Record<string, unknown>) {
   };
 }
 
-/** أول كائن JSON في آخر نص من رد النموذج */
-export function extractJson(content: { type: string; text?: string }[]): Record<string, unknown> | null {
-  const raw = content.filter((b) => b.type === 'text').map((b) => b.text ?? '').join('');
-  const s = raw.indexOf('{');
-  const e = raw.lastIndexOf('}');
-  if (s === -1 || e <= s) return null;
-  try { return JSON.parse(raw.slice(s, e + 1)); } catch { return null; }
+/** كل كائنات JSON الكاملة في النص (بترتيبها)، مع تجاهل الأقواس داخل النصوص */
+function jsonObjects(raw: string): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  for (let i = raw.indexOf('{'); i !== -1; i = raw.indexOf('{', i + 1)) {
+    let depth = 0, inStr = false, esc = false;
+    for (let j = i; j < raw.length; j++) {
+      const c = raw[j];
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === '{') depth++;
+      else if (c === '}' && --depth === 0) {
+        try {
+          const v = JSON.parse(raw.slice(i, j + 1));
+          if (v && typeof v === 'object' && !Array.isArray(v)) { out.push(v); i = j; }
+        } catch { /* مو JSON، نجرب القوس اللي بعده */ }
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/** أخطاء بحث ما تعني إن البحث ما اشتغل: max_uses_exceeded = خلّص الخمس بحوث وطلب زيادة */
+const SEARCH_SOFT_ERRORS = new Set(['max_uses_exceeded']);
+
+/** حالة بحث الويب بكل الردود. ok = فيه بحث رجع نتائج (قائمة، ولو فاضية)، failed = فيه بحث رجع خطأ.
+ *  لو ما فيه ولا كتلة نتائج (البحث داخل كود الفلترة) نعتمد عدّاد usage.server_tool_use */
+export function searchState(responses: readonly Pick<Message, 'content' | 'usage'>[]) {
+  let oks = 0, blocks = 0, requests = 0;
+  const errors: string[] = [];
+  for (const r of responses) {
+    requests += Number(r.usage?.server_tool_use?.web_search_requests) || 0;
+    for (const b of r.content ?? []) {
+      if (b?.type !== 'web_search_tool_result') continue;
+      blocks++;
+      if (Array.isArray(b.content)) oks++;
+      else {
+        const code = String((b.content as { error_code?: unknown } | null)?.error_code ?? 'unknown');
+        if (SEARCH_SOFT_ERRORS.has(code)) oks++;
+        else errors.push(code);
+      }
+    }
+  }
+  return { ok: oks > 0 || (blocks === 0 && requests > 0), failed: errors.length > 0, errors };
+}
+
+/** JSON الرد: نجرّب نص الجواب الأخير (بعد آخر بحث) أول ثم كل النص، وناخذ آخر كائن فيه "found" */
+export function extractJson(content: readonly { type: string; text?: string }[]): Record<string, unknown> | null {
+  const texts = (blocks: readonly { type: string; text?: string }[]) =>
+    blocks.flatMap((b) => (b.type === 'text' && typeof b.text === 'string' ? [b.text] : [])).join('');
+  let last = content.length;
+  while (last > 0 && content[last - 1].type === 'text') last--;
+  for (const raw of [texts(content.slice(last)), texts(content)]) {
+    const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    try {
+      const v = JSON.parse(trimmed);
+      if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+    } catch { /* فيه نص حول الـ JSON */ }
+    const all = jsonObjects(raw);
+    const hit = [...all].reverse().find((o) => 'found' in o) ?? all[all.length - 1];
+    if (hit) return hit;
+  }
+  return null;
 }
 
 const prompt = (code: string, hint: string | null) => `You look up packaged food and drink products by barcode for a nutrition app in Saudi Arabia.
@@ -116,35 +195,64 @@ Return ONLY one JSON object, no markdown, no commentary:
  "source_url": "https://… the page the nutrition values came from"}
 Sizes are in grams or ml for the whole pack and for one serving.`;
 
-async function askClaude(apiKey: string, code: string, hint: string | null) {
-  const model = Deno.env.get('ANTHROPIC_BARCODE_MODEL') ?? Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-5';
-  const tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5, user_location: { type: 'approximate', country: 'SA', timezone: 'Asia/Riyadh' } }];
-  const messages: { role: string; content: unknown }[] = [{ role: 'user', content: prompt(code, hint) }];
-  // بحث الويب ممكن يوقف الدور بـ pause_turn: نكمّل نفس المحادثة مرتين بالأكثر
-  for (let turn = 0; turn < 3; turn++) {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model, max_tokens: 2500, tools, messages }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      console.error('anthropic_error', res.status, body.slice(0, 500));
-      return { error: /web.?search/i.test(body) ? 'search_unavailable' : 'ai_failed' };
+/** يدوّر المنتج: بحث الويب، ونكمّل الدور لو وقف بـ pause_turn. يرجع JSON الرد وحالة البحث، أو رمز الخطأ.
+ *  deadline = آخر وقت لكل الطلبات (من بداية طلب المستخدم) */
+async function askClaude(apiKey: string, code: string, hint: string | null, db: Parameters<typeof noteUsage>[0], deadline: number) {
+  const model = modelFrom('ANTHROPIC_BARCODE_MODEL', 'ANTHROPIC_MODEL');
+  const effort = effortFrom('ANTHROPIC_BARCODE_EFFORT', 'medium');
+  const client = new Anthropic({ apiKey, timeout: AI_TIMEOUT_MS, maxRetries: 0 });
+  const tools: Anthropic.Beta.BetaToolUnion[] = [{
+    type: 'web_search_20260209', name: 'web_search', max_uses: 5,
+    user_location: { type: 'approximate', country: 'SA', timezone: 'Asia/Riyadh' },
+  }];
+  const messages: MessageParam[] = [{ role: 'user', content: prompt(code, hint) }];
+  const responses: Message[] = [];
+  try {
+    for (let turn = 0; turn < MAX_TURNS; turn++) {
+      const left = deadline - Date.now();
+      if (left < 5_000) return { error: 'ai_failed' as const, why: 'budget' };
+      let res: Message;
+      try {
+        res = await client.beta.messages.create(
+          { model, max_tokens: MAX_TOKENS, ...fallbackFor(model), output_config: { effort }, tools, messages },
+          { timeout: Math.min(AI_TIMEOUT_MS, left) },
+        );
+      } catch (e) {
+        const kind = logError('barcode-lookup', e);
+        // بحث الويب مطفي لحساب Anthropic (400 برسالة عن web search)
+        const off = e instanceof Anthropic.BadRequestError && /web.?search/i.test(String(e.message));
+        return { error: off ? 'search_unavailable' as const : 'ai_failed' as const, why: kind };
+      }
+      responses.push(res);
+      // البحث وقف بالنص: نرجّع رده مثل ما هو (بدون رسالة «كمّل») والخادم يكمل من مكانه
+      if (res.stop_reason === 'pause_turn') {
+        messages.push({ role: 'assistant', content: res.content as ContentBlock[] as Anthropic.Beta.BetaContentBlockParam[] });
+        continue;
+      }
+      if (res.stop_reason !== 'end_turn' && res.stop_reason !== 'stop_sequence') {
+        // رفض أو انقطاع: ما نعتبره «ما لقيناه» (عشان ما ينحفظ للكل)
+        logStop('barcode-lookup', res, res.stop_reason === 'refusal' ? 'refused' : res.stop_reason === 'max_tokens' ? 'truncated' : 'bad_output');
+        return { error: 'ai_failed' as const, why: res.stop_reason ?? 'stop' };
+      }
+      const parsed = extractJson(res.content);
+      if (!parsed) { logStop('barcode-lookup', res, 'no_json'); return { error: 'ai_failed' as const, why: 'no_json' }; }
+      const search = searchState(responses);
+      if (search.failed) console.warn('search_errors', JSON.stringify({ errors: search.errors.slice(0, 5), ok: search.ok }));
+      return { parsed, search };
     }
-    const out = await res.json();
-    if (out.stop_reason === 'pause_turn') {
-      messages.push({ role: 'assistant', content: out.content });
-      continue;
-    }
-    return { parsed: extractJson(out.content ?? []) };
+    logStop('barcode-lookup', responses[responses.length - 1], 'paused_too_long');
+    return { error: 'ai_failed' as const, why: 'pause_turn' };
+  } finally {
+    // التوكنات (كل الطلبات) على صف الحد، بالخلفية وفشلها ما يأثّر على الرد
+    await afterResponse(noteUsage(db, 'barcode', responses, model));
   }
-  return { error: 'ai_failed' };
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+  // ميزانية الذكاء الاصطناعي تبدأ من هنا (الدخول والذاكرة والحد اليومي ياخذون منها)
+  const started = Date.now();
 
   const url = Deno.env.get('SUPABASE_URL')!;
   const supabase = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
@@ -175,15 +283,19 @@ Deno.serve(async (req) => {
   const { data: remaining, error: qErr } = await supabase.rpc('ai_take', { p_kind: 'barcode' });
   if (qErr) return json({ error: /rate_limited/.test(qErr.message) ? 'rate_limited' : 'ai_failed' }, /rate_limited/.test(qErr.message) ? 429 : 500);
 
-  const r = await askClaude(apiKey, code, hint);
-  if (r.error) return json({ error: r.error }, 502);
-  const result = r.parsed ? normalize(r.parsed) : null;
+  // بتوكن المستخدم (مو admin): ai_usage_note يلقى صف الحد بـ auth.uid()
+  const r = await askClaude(apiKey, code, hint, supabase, started + AI_BUDGET_MS);
+  if ('error' in r) return json({ error: r.error }, 502);
+  const result = normalize(r.parsed);
+  // «ما لقيناه» والبحث ما اشتغل أبداً (كل بحث رجع خطأ): الجواب ما له قيمة، نفس فشل الذكاء الاصطناعي
+  if (!result && !r.search.ok && r.search.failed) return json({ error: 'ai_failed' }, 502);
 
   // الذاكرة المشتركة يشوفها كل المستخدمين: نحفظ فيها بس اللي ما أثّر عليه اسم جا من الجوال (ممكن يكون أي شي)
-  // وبثقة عالية. الباقي يرجع لصاحب الطلب بس.
-  const shareable = !hint && (!result || result.confidence === 'high');
+  // وبثقة عالية. و«ما لقيناه» بس لو البحث اشتغل بدون أخطاء (عشان عطل بالبحث ما يخفي المنتج أسبوع عن الكل).
+  // الباقي يرجع لصاحب الطلب بس.
+  const shareable = !hint && (result ? result.confidence === 'high' : r.search.ok && !r.search.failed);
   if (shareable) {
-    const row = result
+    const row: Record<string, unknown> = result
       ? { code, found: true, source: 'ai', product: result.product, confidence: result.confidence, source_url: result.source_url, updated_at: new Date().toISOString() }
       : { code, found: false, source: 'ai', product: null, confidence: null, source_url: null, updated_at: new Date().toISOString() };
     const { error: saveErr } = await admin.from('barcode_products').upsert(row, { onConflict: 'code' });

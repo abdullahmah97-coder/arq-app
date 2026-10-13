@@ -538,8 +538,18 @@ ok(/Usage in the last 7 days/.test(textOf(anth.requests[0])) && anth.requests[0]
 fresh({ ai_usage: Array.from({ length: 2500 }, (_, i) => use(`u${i % 40}`, 'meal_photo', day(1))) });
 anth.respond = () => ({ json: { why: { ar: 'ثابت', en: 'Keep' }, barcode_per_day: -3, meal_photos_per_day: 25 } });
 r = await call({ desk: 'ai' });
-const pages = db.queries.filter((q) => q.table === 'ai_usage').map((q) => q.range);
+const usageQs = db.queries.filter((q) => q.table === 'ai_usage');
+const pages = usageQs.filter((q) => q.filters.some(([op, c, v]) => op === 'in' && c === 'kind' && v.includes('meal_photo'))).map((q) => q.range);
 ok(same(pages, [[0, 999], [1000, 1999], [2000, 2999]]) && tasks()[0].input.usage.meal_photo.uses === 2500, 'ai_usage read in pages of 1000', JSON.stringify(pages));
+ok(usageQs.length === 4 && same(usageQs.at(-1).filters.find(([op]) => op === 'in')?.[2], ['plan', 'office', 'coach', 'inbody']), 'fixed-cap kinds are read in their own scan (coach volume can’t cut meal/barcode rows)');
+fresh({ ai_usage: [use('a', 'coach', day(1)), use('a', 'coach', day(1)), use('b', 'inbody', day(2)), use('a', 'barcode', day(1))] });
+anth.respond = () => ({ json: { why: { ar: 'ثابت', en: 'Keep' }, barcode_per_day: 2, meal_photos_per_day: 25 } });
+r = await call({ desk: 'ai' });
+ok(tasks()[0].input.usage.coach?.cap === 40 && tasks()[0].input.usage.coach.uses === 2 && tasks()[0].input.usage.inbody?.cap === 10 && tasks()[0].input.usage.barcode.uses === 1,
+  'coach (40) and inbody (10) usage shown with their fixed caps', JSON.stringify(tasks()[0].input.usage));
+fresh({ ai_usage: Array.from({ length: 2500 }, (_, i) => use(`u${i % 40}`, 'meal_photo', day(1))) });
+anth.respond = () => ({ json: { why: { ar: 'ثابت', en: 'Keep' }, barcode_per_day: -3, meal_photos_per_day: 25 } });
+r = await call({ desk: 'ai' });
 ok(same(tasks()[0].input.current, { barcode_per_day: 2, meal_photos_per_day: 25 }) && tasks()[0].output.barcode_per_day === 0, 'defaults when ai_limits is missing; negative limit → 0');
 fresh({});
 anth.respond = () => ({ json: { why: { ar: 'س', en: 'x' }, barcode_per_day: 'many', meal_photos_per_day: 25 } });
