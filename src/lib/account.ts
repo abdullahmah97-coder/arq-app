@@ -13,7 +13,15 @@ export async function removeFolder(bucket: string, prefix: string) {
   for (const d of dirs) await removeFolder(bucket, d);
 }
 
-export async function deleteMyAccount(userId: string) {
+let running: Promise<void> | null = null;
+
+/** طلب ثاني والحذف شغّال يرجع نفس العملية، بدل حذف ثاني يفشل بعد ما ينحذف الحساب */
+export function deleteMyAccount(userId: string): Promise<void> {
+  running ??= removeAccount(userId).finally(() => { running = null; });
+  return running;
+}
+
+async function removeAccount(userId: string) {
   for (const b of BUCKETS) {
     try { await removeFolder(b, userId); } catch { /* نكمل حتى لو فشل حذف ملف */ }
   }
