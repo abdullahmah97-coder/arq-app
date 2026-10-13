@@ -12,7 +12,8 @@ export const MAX_CHARS = 1000;
 export type Label = 'safe' | 'unsafe' | 'controversial';
 export interface Verdict { label: Label; categories: string[] }
 /** أسباب الفشل: auth و credits و model مشكلة إعداد (توقف الدفعة كلها)، والباقي يعاد المحتوى نفسه لاحقاً.
- *  warming: المزوّد يحمّل النموذج (أول طلب بعد فترة، model_pending_deploy): توقف الدفعة ويرجع بعد دقيقة بدون ما تنحسب محاولة */
+ *  warming: المزوّد مو جاهز للنموذج: يحمّله (أول طلب بعد فترة، 400 model_pending_deploy) أو طاقته مليانة
+ *  (503 capacity_exhausted). توقف الدفعة ويرجع بعد دقيقة بدون ما تنحسب محاولة، فما ينشال شي بدون فحص */
 export type FailReason = 'auth' | 'credits' | 'model' | 'warming' | 'http_429' | 'http_5xx' | 'http_4xx' | 'timeout' | 'network' | 'bad_output';
 export const FATAL: ReadonlySet<FailReason> = new Set(['auth', 'credits', 'model']);
 
@@ -84,7 +85,8 @@ export async function checkText(token: string, model: string, text: string, time
     }
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
-      const warming = res.status === 400 && /"code"\s*:\s*"model_pending_deploy"/.test(detail);
+      const warming = (res.status === 400 && /"code"\s*:\s*"model_pending_deploy"/.test(detail))
+        || (res.status === 503 && /"code"\s*:\s*"capacity_exhausted"/.test(detail));
       throw new GuardError(warming ? 'warming' : reasonFor(res.status), `${res.status} ${detail.slice(0, 200)}`);
     }
     let body: { choices?: { message?: { content?: unknown } }[] };

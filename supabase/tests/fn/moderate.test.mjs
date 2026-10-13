@@ -166,6 +166,10 @@ for (const [status, reason] of [[402, 'credits'], [401, 'auth'], [403, 'auth'], 
 f = await failWith({ status: 400, text: JSON.stringify({ error: { message: 'The model `Qwen/Qwen3Guard-Gen-4B` is not ready for inference yet. Please try again shortly.', type: 'invalid_request_error', code: 'model_pending_deploy' } }) }, 8);
 ok('model warming up: every job goes back as skipped (no attempt used, nothing logged)', f.retries.length === 8 && f.retries.every((x) => x.p_reason === 'skipped'), JSON.stringify(f.retries.map((x) => x.p_reason)));
 ok('model warming up: no more calls after the first wave', sent.length <= PARALLEL && f.res.body.skipped === 8 && f.res.body.failed === 0, JSON.stringify(f.res.body));
+f = await failWith({ status: 503, text: JSON.stringify({ error: { message: 'Qwen/Qwen3Guard-Gen-4B is temporarily at capacity. Please try again shortly.', type: 'server_error', code: 'capacity_exhausted', param: null } }) }, 8);
+ok('provider at capacity: same as warming (all skipped, no attempt used)', f.retries.length === 8 && f.retries.every((x) => x.p_reason === 'skipped') && sent.length <= PARALLEL);
+f = await failWith({ status: 503, text: 'Service Unavailable' });
+ok('any other 503 is still http_5xx (counts an attempt)', f.retries[0]?.p_reason === 'http_5xx');
 f = await failWith({ status: 400, text: JSON.stringify({ error: { message: 'bad', code: 'other' } }) });
 ok('another 400 is still http_4xx', f.retries[0]?.p_reason === 'http_4xx');
 
