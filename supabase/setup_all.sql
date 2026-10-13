@@ -14315,7 +14315,8 @@ do $p$ begin
     create policy auto_flags_admin on public.auto_flags for select to authenticated using (is_admin());
   end if;
 end $p$;
-revoke insert, update, delete on public.auto_flags from anon, authenticated;
+revoke insert, update, delete, truncate, references, trigger on public.auto_flags from anon, authenticated;
+revoke select on public.auto_flags from anon;
 
 -- سجل الأرقام: بدون نص وبدون أسماء أو معرّفات
 create table if not exists public.moderation_log (
@@ -14335,7 +14336,8 @@ do $p$ begin
     create policy moderation_log_admin on public.moderation_log for select to authenticated using (is_admin());
   end if;
 end $p$;
-revoke insert, update, delete on public.moderation_log from anon, authenticated;
+revoke insert, update, delete, truncate, references, trigger on public.moderation_log from anon, authenticated;
+revoke select on public.moderation_log from anon;
 
 -- الفحوصات اللي تنحسب من الحد اليومي: كل نداء للمزوّد، إلا اللي فشل بسبب الإعداد (التوكن أو الرصيد أو النموذج)
 create or replace function public._automod_used()
