@@ -9,7 +9,7 @@ import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { brand, space } from '@/theme';
 
 type Section = { icon: keyof typeof Ionicons.glyphMap; title: string; body: string };
-export type PolicyNs = 'partnerPolicy' | 'privacyPolicy';
+export type PolicyNs = 'partnerPolicy' | 'privacyPolicy' | 'communityGuidelines';
 
 export function PolicyPage({ ns, footer }: { ns: PolicyNs; footer?: ReactNode }) {
   const { t } = useTranslation();

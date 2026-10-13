@@ -15,6 +15,8 @@ import { errorKey, supabase } from '@/lib/supabase';
 import { deleteMyAccount } from '@/lib/account';
 import { unreadCount } from '@/lib/messages';
 import { ownerCounts } from '@/lib/owner';
+import { safetyCounts } from '@/lib/safety';
+import { signupCount } from '@/lib/approval';
 import { unregisterPush } from '@/lib/push';
 import { clearSleepSchedule } from '@/lib/sleep';
 import { colors, space, THEMES, type ThemeId } from '@/theme';
@@ -40,10 +42,15 @@ export default function ProfileTab() {
   const { t } = useTranslation();
   const { userId, profile, health, refreshProfile } = useUser();
   const [reloadKey, setReloadKey] = useState(0);
-  const [owner, setOwner] = useState<{ reports: number; brands: number } | null>(null);
+  const [owner, setOwner] = useState<{ reports: number; brands: number; safety: number } | null>(null);
   useFocusEffect(useCallback(() => {
     refreshProfile(); setReloadKey((k) => k + 1);
-    ownerCounts().then(setOwner).catch(() => {});
+    // للمشرف: رقم واحد لكل اللي ينتظره (تقارير المختبرين، طلبات المتاجر، بلاغات المجتمع، طلبات التسجيل)
+    ownerCounts().then(async (c) => {
+      if (!c) { setOwner(null); return; }
+      const [s, n] = await Promise.all([safetyCounts().catch(() => null), signupCount().catch(() => 0)]);
+      setOwner({ ...c, safety: (s ? s.open + s.unscreened : 0) + n });
+    }).catch(() => {});
   }, [refreshProfile]));
 
   return (
@@ -66,11 +73,13 @@ export default function ProfileTab() {
       <Hideable id="profile.membership" label={t('gymops.myMembership')}><MembershipEntry /></Hideable>
 
       <Card style={{ paddingVertical: space.xs }}>
-        {owner ? <MenuItem icon="shield-checkmark-outline" label={`${t('owner.title')}${owner.reports + owner.brands ? ` · ${owner.reports + owner.brands}` : ''}`} onPress={() => router.push('/owner')} /> : null}
+        {owner ? <MenuItem icon="shield-checkmark-outline" label={`${t('owner.title')}${owner.reports + owner.brands + owner.safety ? ` · ${owner.reports + owner.brands + owner.safety}` : ''}`} onPress={() => router.push('/owner')} /> : null}
         {isBeta ? <MenuItem icon="chatbubble-ellipses-outline" label={t('beta.feedback')} onPress={() => router.push('/feedback')} /> : null}
         <ShortcutMenu />
         <MenuItem icon="map-outline" label={t('tour.replay')} onPress={() => router.push('/tour')} />
         <MenuItem icon="lock-closed-outline" label={t('privacyPolicy.link')} onPress={() => router.push('/policy/privacy')} />
+        <MenuItem icon="people-circle-outline" label={t('communityGuidelines.link')} onPress={() => router.push('/policy/community')} />
+        <MenuItem icon="ban-outline" label={t('safety.blockedListTitle')} onPress={() => router.push('/blocked')} />
       </Card>
 
       {/* الخصوصية: مين يشوفني في المنافسة */}

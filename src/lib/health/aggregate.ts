@@ -83,3 +83,19 @@ export function hrZoneMinutes(samples: HrSample[], age: number): number[] {
 }
 
 export const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+/**
+ * نبض الراحة من نبض الليل — للساعات اللي ما تكتب «نبض الراحة» في Apple Health / Health Connect (مثل شاومي عبر Mi Fitness):
+ * متوسط أهدأ ١٠٪ من قراءات النبض وقت النوم (٣ قراءات على الأقل). يحتاج ١٠ قراءات نوم أو أكثر، وإلا null.
+ */
+export function restingFromSleep(hr: HrSample[], segs: SleepSegment[]): number | null {
+  const asleep = segs.filter((s) => s.kind !== 'in_bed' && s.kind !== 'awake');
+  const spans = asleep.length ? asleep : segs.filter((s) => s.kind === 'in_bed');
+  if (!spans.length || !hr.length) return null;
+  const vals = hr.filter((h) => h.bpm >= 30 && h.bpm <= 150 && spans.some((s) => h.t >= s.start && h.t <= s.end)).map((h) => h.bpm);
+  if (vals.length < 10) return null;
+  vals.sort((x, y) => x - y);
+  const low = vals.slice(0, Math.max(3, Math.round(vals.length * 0.1)));
+  const v = low.reduce((x, y) => x + y, 0) / low.length;
+  return v >= 35 && v <= 110 ? Math.round(v * 10) / 10 : null;
+}

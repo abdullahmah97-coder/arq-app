@@ -10,7 +10,7 @@ import {
   WorkoutActivityType,
 } from '@kingstinct/react-native-healthkit';
 import { Linking } from 'react-native';
-import { avg, dayRange, hrZoneMinutes, lastDays, sleepWindow, summarizeSleep, type SleepKind, type SleepSegment } from './aggregate';
+import { avg, dayRange, hrZoneMinutes, lastDays, restingFromSleep, sleepWindow, summarizeSleep, type SleepKind, type SleepSegment } from './aggregate';
 import type { HealthProvider, SessionWatchStats } from './provider-types';
 import type { DailyHealth } from './types';
 import { hrStats, isWatch, toKcal, toMeters, toMinutes, workoutKind, type ExternalWorkout } from './workouts';
@@ -82,12 +82,15 @@ async function readDay(day: string, age: number): Promise<DailyHealth> {
     .map((s) => ({ start: new Date(s.startDate).getTime(), end: new Date(s.endDate).getTime(), kind: SLEEP_KIND[Number(s.value)] }))
     .filter((s) => !!s.kind);
   const hrs = hr.map((s) => ({ t: new Date(s.startDate).getTime(), bpm: s.quantity }));
+  // ساعات مثل شاومي (Mi Fitness) ما تكتب «نبض الراحة»: نحسبه من نبض الليل
+  const rhrEst = rhr == null ? restingFromSleep(hrs, segs) : null;
   return {
     day,
     steps: steps == null ? null : Math.round(steps),
     active_kcal: kcal == null ? null : Math.round(kcal),
     distance_m: dist == null ? null : Math.round(dist),
-    resting_hr: rhr == null ? null : Math.round(rhr * 10) / 10,
+    resting_hr: rhr != null ? Math.round(rhr * 10) / 10 : rhrEst,
+    rhr_estimated: rhr == null && rhrEst != null,
     hrv_ms: hrv == null ? null : Math.round(hrv * 10) / 10,
     avg_hr: avg(hrs.map((h) => h.bpm)),
     hr_zone_min: hrs.length > 20 ? hrZoneMinutes(hrs, age) : null,
@@ -133,7 +136,7 @@ export const provider: HealthProvider = {
         kcal: toKcal(w.totalEnergyBurned),
         distance_m: toMeters(w.totalDistance),
         source: w.sourceRevision?.source?.name ?? null,
-        from_watch: isWatch(w.device?.model, w.device?.name, w.sourceRevision?.productType),
+        from_watch: isWatch(w.device?.model, w.device?.name, w.sourceRevision?.productType, w.sourceRevision?.source?.name),
       }))
       .filter((w) => w.minutes >= 1);
   },

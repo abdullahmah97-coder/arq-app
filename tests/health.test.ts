@@ -1,6 +1,7 @@
 // اختبار محرك الجاهزية/الإجهاد/النوم: node --experimental-strip-types tests/health.test.ts
 import { adaptWorkout, dayLoad, recoveryZone, scoreDay, sleepNeed, strainFromLoad } from '../src/lib/health/score.ts';
-import { hrZoneMinutes, mergedMinutes, summarizeSleep } from '../src/lib/health/aggregate.ts';
+import { isWatch } from '../src/lib/health/workouts.ts';
+import { hrZoneMinutes, mergedMinutes, restingFromSleep, summarizeSleep } from '../src/lib/health/aggregate.ts';
 import { dashboardRows, fitnessAge, healthMonitor, stressSeries, stressSummary } from '../src/lib/health/insights.ts';
 import type { DailyHealth } from '../src/lib/health/types.ts';
 import type { PlanDay } from '../src/lib/plan/types.ts';
@@ -123,6 +124,26 @@ ok(!!fa && fa.basis === 'vo2max' && fa.age < 35 && fa.diff < 0, `good VO2 max �
 const faLow = fitnessAge(Array.from({ length: 10 }, (_, i) => day(i + 1, { resting_hr: 78, steps: 2500 })), { age: 35, gender: 'male' });
 ok(!!faLow && faLow.basis === 'vitals' && faLow.diff > 0 && faLow.age <= 50, `high resting HR + few steps → older, capped (${JSON.stringify(faLow)})`);
 ok(fitnessAge(fitHist, { age: null, gender: null }) === null, 'no birth year → no estimate');
+
+// ساعات شاومي (Mi Fitness): ما ترسل نبض الراحة ولا HRV → نبض الراحة من نبض الليل، والجاهزية من النبض والنوم
+{
+  const t0 = Date.UTC(2026, 9, 12, 0, 0);
+  const sleepSegs = [{ start: t0, end: t0 + 6 * 3600_000, kind: 'light' as const }, { start: t0 + 6 * 3600_000, end: t0 + 7 * 3600_000, kind: 'awake' as const }];
+  // كل ٥ دقايق وقت النوم: ٥٠–٧٠، وبعد ما صحى ٩٠
+  const hrNight = Array.from({ length: 72 }, (_, i) => ({ t: t0 + i * 300_000, bpm: 50 + (i % 21) }));
+  const hrAwake = Array.from({ length: 12 }, (_, i) => ({ t: t0 + 6 * 3600_000 + i * 300_000, bpm: 90 }));
+  const r = restingFromSleep([...hrNight, ...hrAwake], sleepSegs);
+  ok(r != null && r >= 50 && r <= 52, `resting HR from the calmest night readings (${r})`);
+  ok(restingFromSleep(hrNight.slice(0, 5), sleepSegs) === null, 'too few night readings → null');
+  ok(restingFromSleep(hrNight, []) === null, 'no sleep → null');
+  ok(restingFromSleep(hrNight.map((h) => ({ ...h, bpm: 20 })), sleepSegs) === null, 'impossible values ignored');
+  // بدون HRV: الجاهزية تنحسب من نبض الراحة والنوم (مو مقصورة على ٢٠–٨٥)
+  const xiHist = Array.from({ length: 14 }, (_, i) => day(i + 1, { hrv_ms: null, resting_hr: 58 + (i % 3) }));
+  const xi = scoreDay(day(15, { hrv_ms: null, resting_hr: 52, sleep: { start: '', end: '', in_bed_min: 500, asleep_min: 480 } }), xiHist);
+  ok(xi.recovery != null && xi.recovery >= 67, `no HRV (Xiaomi): recovery from resting HR + sleep (${xi.recovery})`);
+  ok(isWatch(null, null, null, 'Mi Fitness') && isWatch('Xiaomi Smart Band 9') && isWatch('Redmi Watch 5') && !isWatch('iPhone', 'Abdullah’s iPhone'),
+    'Xiaomi bands and watches count as a watch');
+}
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL HEALTH TESTS PASSED');
 if (fail) process.exit(1);

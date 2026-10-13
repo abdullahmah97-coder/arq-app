@@ -26,6 +26,10 @@ export interface Profile {
   following_count: number;
   /** مدرب موثّق (يُمنح من الإدارة) */
   is_coach: boolean;
+  /** وقت موافقته على إرشادات المجتمع (قبل أول منشور أو تعليق) */
+  guidelines_at?: string | null;
+  /** موافقة الإدارة على الحساب: الجديد pending لين يقبله المشرف (rejected = انرفض) */
+  approval?: 'pending' | 'approved' | 'rejected';
   /** مالك التطبيق (هو بس): شارة «المالك» وكل صلاحيات النشر وإخفاء أجزاء التطبيق */
   is_owner?: boolean;
   /** مين يشوفني في النادي: gym (الموجودين معي + الأصدقاء) | friends | hidden */
@@ -123,7 +127,11 @@ export interface FeedPost {
  * تفاصيل اللحظة: at = الوقت (منبّه أرك / فتح التطبيق / وقت النوم)، src = من وين،
  * slept = كم دقيقة نام (من «تصبحون على خير» لين «صباح الخير»)، in / out = وقت الدخول والخروج من النادي
  */
-export interface MomentMeta { at?: string; src?: 'alarm' | 'open' | 'manual'; slept?: number; sleep_id?: string; in?: string; out?: string | null }
+export interface MomentMeta {
+  at?: string; src?: 'alarm' | 'open' | 'manual'; slept?: number; sleep_id?: string; in?: string; out?: string | null;
+  /** لصاحب المنشور بس: صورته قيد الفحص، أو انخفى (بلاغات أو مشرف أو فحص الصورة) */
+  screen?: 'pending' | 'blocked'; hidden?: boolean;
+}
 /** @deprecated الاسم القديم */
 export type WakeMeta = MomentMeta;
 

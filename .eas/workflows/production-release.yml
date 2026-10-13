@@ -1,0 +1,29 @@
+# نسخة المتجر (الإطلاق العام): كل ما يُرفع لفرع release على GitHub
+#   ← يبني آيفون وأندرويد بنسخة production (قناة التحديثات production، بدون شارة «تجريبي»)
+#   ← ويرفع نسخة الآيفون لـ App Store Connect (تطلع في TestFlight وتقدر تختارها للمراجعة)
+# أندرويد: ملف AAB ينزل من expo.dev ← Builds، وأول رفع لـ Google Play يكون يدوي من Play Console
+# (بعدها: npx eas-cli@latest submit -p android --profile production من جهازك اللي فيه secrets/google-play-service-account.json)
+# APP_VARIANT يجي من بروفايل production في eas.json. إضافة هالملف ما تغيّر بصمة النسخة (fingerprint).
+name: Production build & submit
+
+on:
+  push:
+    branches: ['release']
+
+jobs:
+  build_ios:
+    type: build
+    params:
+      platform: ios
+      profile: production
+  build_android:
+    type: build
+    params:
+      platform: android
+      profile: production
+  submit_ios:
+    type: submit
+    needs: [build_ios]
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production

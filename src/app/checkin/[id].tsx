@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafetySheet, type SafetyTarget } from '@/components/safety/SafetySheet';
+import { useGuidelinesGate } from '@/components/safety/Guidelines';
 import { Avatar, Empty, Row, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { timeAgo } from '@/lib/dates';
@@ -23,6 +25,8 @@ export default function CheckinComments() {
   const [list, setList] = useState<CheckinComment[] | null>(null);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [safety, setSafety] = useState<SafetyTarget | null>(null);
+  const gate = useGuidelinesGate();
   // ارتفاع الشريط العلوي الفعلي عشان خانة التعليق تطلع فوق الكيبورد بالضبط
   const headerHeight = useHeaderHeight();
   const load = useCallback(() => loadCheckinComments(String(id), phase).then(setList), [id, phase]);
@@ -30,6 +34,7 @@ export default function CheckinComments() {
 
   const send = async () => {
     if (!text.trim()) return;
+    if (!(await gate.ensure())) return;
     setBusy(true);
     const { error } = await addCheckinComment(String(id), userId, text, phase);
     setBusy(false);
@@ -46,6 +51,8 @@ export default function CheckinComments() {
         <FlatList data={list ?? []} keyExtractor={(c) => c.id} contentContainerStyle={{ padding: space.lg, gap: space.md }}
           ListEmptyComponent={list ? <Empty icon="chatbubbles-outline" text={t('presence.noComments')} /> : null}
           renderItem={({ item: c }) => (
+            <Pressable onLongPress={c.user_id === userId ? undefined : () => setSafety({ type: 'checkin_comment', id: c.id, userId: c.user_id, name: c.profiles?.full_name || c.profiles?.username || '' })}
+              delayLongPress={350} accessibilityHint={c.user_id === userId ? undefined : t('safety.longPressHint')}>
             <Row style={{ alignItems: 'flex-start' }}>
               <Pressable onPress={() => router.push({ pathname: '/user/[id]', params: { id: c.user_id } })}>
                 <Avatar size={34} uri={publicUrl('avatars', c.profiles?.avatar_url)} name={c.profiles?.full_name ?? c.profiles?.username} />
@@ -63,6 +70,7 @@ export default function CheckinComments() {
                 </Pressable>
               ) : null}
             </Row>
+            </Pressable>
           )} />
         <Row style={{ padding: space.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card }}>
           <TextInput value={text} onChangeText={setText} placeholder={t('presence.commentPh')} placeholderTextColor={colors.muted} maxLength={300}
@@ -73,6 +81,8 @@ export default function CheckinComments() {
           </Pressable>
         </Row>
       </KeyboardAvoidingView>
+      <SafetySheet target={safety} onClose={() => setSafety(null)} onBlocked={() => load()} />
+      {gate.modal}
     </SafeAreaView>
   );
 }

@@ -6,6 +6,8 @@ import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PostCard } from '@/components/PostCard';
 import { ReactionsSheet } from '@/components/timeline/ReactionsSheet';
+import { useGuidelinesGate } from '@/components/safety/Guidelines';
+import { SafetySheet, type SafetyTarget } from '@/components/safety/SafetySheet';
 import { Avatar, IconButton, Loading, Row, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { timeAgo } from '@/lib/dates';
@@ -27,6 +29,8 @@ export default function PostDetail() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [safety, setSafety] = useState<{ target: SafetyTarget; comment?: Comment } | null>(null);
+  const gate = useGuidelinesGate();
   // ارتفاع الشريط العلوي الفعلي (يختلف من جوال لجوال) عشان خانة التعليق تطلع فوق الكيبورد بالضبط
   const headerHeight = useHeaderHeight();
 
@@ -45,6 +49,7 @@ export default function PostDetail() {
   const send = async () => {
     const body = text.trim();
     if (!body) return;
+    if (!(await gate.ensure())) return;
     setSending(true);
     const { error } = await supabase.from('comments').insert({ post_id: id, user_id: userId, body });
     setSending(false);
@@ -58,6 +63,12 @@ export default function PostDetail() {
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: async () => { await supabase.from('comments').delete().eq('id', c.id); load(); } },
     ]);
+
+  // ضغطة مطوّلة على تعليق: تعليقي ← حذف، تعليق غيري ← بلاغ أو حظر (ولو المنشور لي أقدر أحذفه بعد)
+  const onCommentPress = (c: Comment) => {
+    if (c.user_id === userId) return removeComment(c);
+    setSafety({ target: { type: 'comment', id: c.id, userId: c.user_id, name: c.profiles?.username ? `@${c.profiles.username}` : '' }, comment: c });
+  };
 
   // التفاعل بالإيموجي: تحديث متفائل، ولو فشل نرجع زي ما كان
   const react = async (next: ReactionKey | null) => {
@@ -80,11 +91,13 @@ export default function PostDetail() {
           contentContainerStyle={{ padding: space.lg, gap: space.md }}
           ListHeaderComponent={
             <View style={{ marginBottom: space.md }}>
-              <PostCard post={post} onReact={react} onReactors={() => setReactorsOpen(true)} />
+              <PostCard post={post} onReact={react} onReactors={() => setReactorsOpen(true)}
+                onMore={post.user_id === userId ? undefined : () => setSafety({ target: { type: 'post', id: post.id, userId: post.user_id, name: post.full_name || `@${post.username}` } })} />
             </View>
           }
           renderItem={({ item }) => (
-            <Pressable onLongPress={() => (item.user_id === userId || post.user_id === userId) && removeComment(item)}>
+            <Pressable onLongPress={() => onCommentPress(item)} delayLongPress={350}
+              accessibilityHint={item.user_id === userId ? undefined : t('safety.longPressHint')}>
               <Row style={{ alignItems: 'flex-start' }}>
                 <Avatar size={32} uri={publicUrl('avatars', item.profiles?.avatar_url)} name={item.profiles?.username} />
                 <View style={{ flex: 1, backgroundColor: colors.card, borderRadius: radius.md, padding: space.sm }}>
@@ -108,6 +121,11 @@ export default function PostDetail() {
         </Row>
       </KeyboardAvoidingView>
       {reactorsOpen ? <ReactionsSheet target={{ type: 'post', id: post.id }} onClose={() => setReactorsOpen(false)} /> : null}
+      <SafetySheet target={safety?.target ?? null} onClose={() => setSafety(null)}
+        extra={safety?.comment && post.user_id === userId ? [{ key: 'del', label: t('common.delete'), icon: 'trash-outline', destructive: true,
+          onPress: () => { const c = safety.comment!; setSafety(null); setTimeout(() => removeComment(c), Platform.OS === 'ios' ? 450 : 60); } }] : undefined}
+        onBlocked={(uid) => { if (uid === post.user_id) goBackOrHome(); else load(); }} />
+      {gate.modal}
     </SafeAreaView>
   );
 }
