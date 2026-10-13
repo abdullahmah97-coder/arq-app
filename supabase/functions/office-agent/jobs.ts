@@ -21,7 +21,7 @@ const USAGE_PAGE = 1000;
 const USAGE_MAX = 20_000;
 /** الأنواع اللي يقترح المكتب حدودها (لوحة التحكم): لها ميزانية صفوف لحالها عشان كثرة رسائل المدرب ما تقص أرقامها */
 const PANEL_KINDS = ['meal_photo', 'barcode'];
-/** الحدود الثابتة بالقاعدة (ai_take، ترحيل 20261012000910): الخطة ٨ والمكتب ٨٠ والمدرب ٤٠ و InBody ١٠ باليوم */
+/** الحدود الثابتة بالقاعدة (ai_take، ترحيل 20261013000930): الخطة ٨ والمكتب ٨٠ والمدرب ٤٠ و InBody ١٠ باليوم */
 const FIXED_CAPS: Record<string, number> = { plan: 8, office: 80, coach: 40, inbody: 10 };
 
 type ImageType = 'image/jpeg' | 'image/png' | 'image/webp';

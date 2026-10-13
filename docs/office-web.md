@@ -393,7 +393,7 @@ characters), `created_at` (timestamp), `username` (string or null), `agent_task`
 |---|---|---|
 | `limits.barcode_per_day` | int | current per-user daily cap (default 2) |
 | `limits.meal_photos_per_day` | int | current per-user daily cap (default 25) |
-| `fixed_caps.plan` / `.office` / `.coach` / `.inbody` | int | fixed caps (not set from the panel): 8 AI plans a day per user, 80 office agent tasks a day per admin, 40 coach messages and 10 InBody reads a day per user. `coach`/`inbody` since `20261012000910_ai_metering.sql` (section 8) |
+| `fixed_caps.plan` / `.office` / `.coach` / `.inbody` | int | fixed caps (not set from the panel): 8 AI plans a day per user, 80 office agent tasks a day per admin, 40 coach messages and 10 InBody reads a day per user. `coach`/`inbody` since `20261013000930_ai_metering.sql` (section 8) |
 | `usage.<kind>` for `meal_photo`, `barcode`, `plan`, `office`, `coach`, `inbody` | `{uses_today, uses_cur, uses_prev, users_cur}` | AI calls by kind (all six keys always present); `users_cur` = distinct users in cur. `office` is the owner's agents. `coach`/`inbody` only count calls reserved through `ai_take` (from the day the `coach` and `analyze-inbody` functions switched to it; older coach messages live in `coach_log`, older InBody reads weren't metered). |
 | `office_tasks_today` | int | agent tasks created today |
 
@@ -835,7 +835,7 @@ Change requests are not logged (the table is the record).
 
 ---
 
-## 8. AI metering (`20261012000910_ai_metering.sql`)
+## 8. AI metering (`20261013000930_ai_metering.sql`)
 
 ### بالعربي
 كل استدعاء ذكاء اصطناعي من التطبيق يحجز صف في `ai_usage` بـ `ai_take` قبل ما يكلّم النموذج (والحد يعد الصفوف بآخر ٢٤ ساعة).

@@ -12416,7 +12416,7 @@ grant execute on all functions in schema office_admin to service_role;
 revoke all on function public._office_change_requests_touch() from public, anon, authenticated;
 
 
--- ===================== 20261012000910_ai_metering.sql =====================
+-- ===================== 20261013000930_ai_metering.sql =====================
 -- =====================================================================
 -- عدّاد الذكاء الاصطناعي: نعرف كل استدعاء كم كلّف، مو بس كم مرة (الموجة ١ من خطة Claude)
 --   * ai_usage: أعمدة جديدة للنموذج والتوكنات (الداخل، الطالع، المقروء من الكاش، المكتوب للكاش) ووقت تسجيلها.

@@ -2952,7 +2952,7 @@ function modList(o, max) {
       pill(t(`mst_${m.status}`) !== `mst_${m.status}` ? t(`mst_${m.status}`) : str(m.status), m.status === 'new' ? 'wait' : m.status === 'removed' ? 'fail' : 'plain')))) : h('div', { class: 'empty', text: t('v_none') }),
   ];
 }
-/** أنواع ai_usage (نفس ai_take): coach و inbody من ترحيل 20261012000910 */
+/** أنواع ai_usage (نفس ai_take): coach و inbody من ترحيل 20261013000930 */
 const AI_KINDS = ['meal_photo', 'barcode', 'coach', 'inbody', 'plan', 'office'];
 function usageBars(o) {
   return bars(AI_KINDS.map((k) => ({ label: t(`uk_${k}`), n: n(o, `ai.usage.${k}.uses_cur`), sub: '' })));

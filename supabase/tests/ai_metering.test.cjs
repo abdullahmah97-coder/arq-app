@@ -1,4 +1,4 @@
-// عدّاد الذكاء الاصطناعي (ترحيل 20261012000910_ai_metering.sql):
+// عدّاد الذكاء الاصطناعي (ترحيل 20261013000930_ai_metering.sql):
 //   أعمدة التوكنات في ai_usage، والنوعين الجداد coach (٤٠ باليوم) و inbody (١٠ باليوم) في ai_take،
 //   و ai_usage_note (تسجيل توكنات آخر صف للمستخدم نفسه)، و office_overview يعرض النوعين بدون ما يتغيّر شي ثاني.
 // التشغيل: node supabase/tests/ai_metering.test.cjs
@@ -8,7 +8,7 @@ const { setup } = require('./_harness.cjs');
 
 (async () => {
   const { db, q, as, check, expectErr, U } = await setup();
-  const MIG = path.join(__dirname, '../migrations/20261012000910_ai_metering.sql');
+  const MIG = path.join(__dirname, '../migrations/20261013000930_ai_metering.sql');
   const OLD = path.join(__dirname, '../migrations/20261008000890_office_web.sql');
   const one = async (sql, params) => (await q(sql, params))[0];
   const take = async (uid, kind) => (await as(uid, `select ai_take($1) as n`, [kind]))[0].n;
