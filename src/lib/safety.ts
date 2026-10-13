@@ -113,3 +113,51 @@ export async function removeTerm(term: string) {
   const { error } = await supabase.from('moderation_terms').delete().eq('term', term);
   if (error) throw error;
 }
+
+// ---------- الفحص الآلي للنصوص (Qwen3Guard عبر Hugging Face) ----------
+/** app_settings.auto_moderation: موقّف لين يشغّله المالك. flag = تنبيه بس، hide = يخفي «غير الآمن» مؤقتاً لين يراجعه */
+export interface AutoModSettings { enabled: boolean; action: 'flag' | 'hide'; messages: boolean; daily_cap: number }
+export const DEFAULT_AUTOMOD: AutoModSettings = { enabled: false, action: 'flag', messages: false, daily_cap: 3000 };
+export const AUTOMOD_CAP_MAX = 20000;
+
+export function parseAutoMod(v: unknown): AutoModSettings {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const cap = typeof o.daily_cap === 'number' && Number.isInteger(o.daily_cap) && o.daily_cap >= 0 && o.daily_cap <= AUTOMOD_CAP_MAX
+    ? o.daily_cap : DEFAULT_AUTOMOD.daily_cap;
+  return {
+    enabled: o.enabled === true,
+    action: o.action === 'hide' ? 'hide' : 'flag',
+    messages: o.messages === true,
+    daily_cap: cap,
+  };
+}
+
+export async function saveAutoMod(v: AutoModSettings): Promise<void> {
+  const { error } = await supabase.from('app_settings').upsert({ key: 'auto_moderation', value: v });
+  if (error) throw error;
+}
+
+export interface AutoModStats {
+  settings: AutoModSettings;
+  server_ready: boolean;
+  queued: number; checked_24h: number; flagged_24h: number; errors_24h: number; used_24h: number;
+  last_error: string | null; last_at: string | null; open_flags: number;
+}
+
+export async function autoModStats(): Promise<AutoModStats> {
+  const { data, error } = await supabase.rpc('admin_moderation_stats');
+  if (error) throw error;
+  const o = (data ?? {}) as Record<string, unknown>;
+  const n = (k: string) => Number(o[k] ?? 0) || 0;
+  return {
+    settings: parseAutoMod(o.settings),
+    server_ready: o.server_ready === true,
+    queued: n('queued'), checked_24h: n('checked_24h'), flagged_24h: n('flagged_24h'), errors_24h: n('errors_24h'), used_24h: n('used_24h'),
+    last_error: typeof o.last_error === 'string' ? o.last_error : null,
+    last_at: typeof o.last_at === 'string' ? o.last_at : null,
+    open_flags: n('open_flags'),
+  };
+}
+
+/** علامة من الفحص الآلي (بدون بلاغ من شخص) */
+export const isAutoFlag = (reasons: string[]) => reasons.some((r) => r.startsWith('auto_'));

@@ -1,0 +1,95 @@
+# الفحص الآلي للنصوص (Qwen3Guard عبر Hugging Face)
+
+البند ٨ من خطة Hugging Face (مرحلة «خلال شهر»). يضيف طبقة ثانية لأمان المجتمع فوق اللي موجود:
+
+| الطبقة | متى | وش تلقط | القرار |
+|---|---|---|---|
+| الكلمات الممنوعة (`moderation_terms`) | قبل النشر | الشتائم والكلمات الصريحة | يرفض النشر |
+| فحص صورة المنشور (`moderate-post`، Claude) | قبل ما تبان | الصور المخالفة | يحجب الصورة |
+| بلاغات الناس (`report_content`) | بعد النشر | أي شي يشوفه أحد مسيء | المشرف (أو ٣ بلاغات = إخفاء مؤقت) |
+| **الفحص الآلي للنصوص (هذا)** | بعد النشر بدقيقة تقريباً | تنمّر، تهديد، إيذاء النفس، بيانات شخصية، كراهية… حتى بدون كلمة ممنوعة | **المالك** (أو إخفاء مؤقت لو اختار وضع hide) |
+
+يبدأ **موقّف**، وما يتغيّر شي بالتطبيق لين المالك يشغّله.
+
+## ١) كيف يمشي
+
+```
+منشور أو تعليق جديد (أو انعدّل نصه)
+  └─ trigger بعد الإضافة ← moderation_jobs (الطابور)
+pg_cron كل دقيقة ← run_moderation()
+  └─ فيه شي ينتظر؟ ← pg_net يصحّي دالة moderate (مع x-moderation-key من الـ vault)
+       └─ moderation_claim(16) ← نص كل واحد
+       └─ Hugging Face: Qwen/Qwen3Guard-Gen-4B:featherless-ai ← "Safety: Unsafe / Categories: …"
+       └─ moderation_settle ← آمن: ينشال من الطابور · غير آمن/محل خلاف: auto_flags ← «بلاغات المجتمع»
+```
+
+- **وين تطلع النتيجة:** لوحة إدارة التطبيق ← بلاغات المجتمع ← «مفتوحة»، مع وسم «فحص آلي: غير آمن» أو «محل خلاف» وفئة النموذج. نفس الأزرار (إخفاء، إرجاع، إيقاف، تجاهل)، ولو بلّغ عنه شخص بعد ينضم في نفس البطاقة.
+- **الإشعار:** المشرفين يوصلهم إشعار لما الطابور الآلي يبدأ من فاضي (مو مع كل علامة)، أو لما شي ينخفى.
+- **الفئات:** عنف، شي ممنوع نظاماً، جنسي، بيانات شخصية، إيذاء النفس، إساءة/تنمّر/كراهية، سياسي.
+  - «سياسي» لحاله يطلع «محل خلاف» وما ينخفى أبداً (النموذج معاير على بيانات غير محلية).
+  - «حقوق نشر» و«Jailbreak» ما تخص المجتمع: لو ما فيه غيرها ما ينعلّم.
+- **الرسائل الخاصة:** برا الفحص إلا لو شغّلها المالك. تنفحص بنسخة 0.6B أول، واللي ما تقول عنه «آمن» تتأكد منه 4B. ما تنخفى أبداً.
+- **انعدّل وهو ينفحص:** النتيجة القديمة تنتجاهل والنص الجديد ينفحص (`queued_at`).
+- **الفشل:** يعاد بعد ٢، ٤، ٨، ١٦ دقيقة ويسقط بعد ٥ محاولات. التوكن أو الرصيد (`auth`/`credits`) أو النموذج (`model`) يوقف الدفعة كلها، وما تنحسب المحاولة، ويرجع بعد ربع ساعة.
+- **الحد اليومي:** `daily_cap` فحص بآخر ٢٤ ساعة لكل التطبيق (الافتراضي ٣٠٠٠). لما يوصل، الباقي ينتظر بالطابور (واللي له أكثر من يومين ينشال).
+
+## ٢) قرارات المالك قبل التشغيل
+
+1. **التوكن:** أنشئ توكن في huggingface.co/settings/tokens من نوع **fine-grained** وفعّل له «Make calls to Inference Providers» بس. أضفه بنفسك في Supabase ← Edge Functions ← Secrets باسم `HF_TOKEN`. **لا تلصقه في المحادثة**، ولا في `.env` أو `EXPO_PUBLIC_*`.
+2. **الرصيد:** الفحص يُحسب على رصيد حسابك في Hugging Face (Inference Providers). شيك الأسعار الحالية والاستهلاك في huggingface.co/settings/billing قبل التشغيل، وحط `daily_cap` يناسبك.
+3. **المزوّد:** النموذج يشتغل عند **featherless-ai** (المزوّد الوحيد المتاح له الحين) عن طريق Hugging Face. يعني نص المنشورات يُعالج خارج المملكة. المزوّد مثبّت في اسم النموذج، فما يتغيّر لحاله.
+4. **الوضع:** «تنبيه بس» (الافتراضي، ننصح فيه أول أسبوعين لين نعرف دقته مع اللهجة) أو «إخفاء مؤقت».
+5. **الرسائل الخاصة:** موقّفة. تشغيلها يعني نص كل رسالة يروح لمزوّد خارجي، والمشرف يقرأ الرسالة اللي تنعلّم بدون بلاغ. يحتاج إفصاح صريح.
+6. **نص الخصوصية:** وافق على التعديل المقترح تحت (القسم ٤) قبل التشغيل.
+
+الرخصة (مهارة `arq-hf-license-check`): `Qwen/Qwen3Guard-Gen-4B` و`Qwen3Guard-Gen-0.6B` برخصة Apache-2.0 وملف LICENSE موجود، والأساس Qwen3 بنفس الرخصة: **تجاري مسموح**.
+
+## ٣) النشر والتحقق
+
+```bash
+npx supabase db push                                    # أو الصق supabase/migrations/20261014000940_auto_moderation.sql في SQL Editor ← Run
+npx supabase functions deploy moderate --no-verify-jwt
+```
+```sql
+-- مرة وحدة: رابط الدالة (المفتاح moderation_key ينشئه الترحيل لحاله)
+select vault.create_secret('https://<ref>.supabase.co/functions/v1/moderate', 'moderation_url');
+
+-- التحقق
+select value from app_settings where key = 'auto_moderation';                -- enabled=false بالبداية
+select jobname, schedule from cron.job where jobname = 'arq-moderation';     -- * * * * *
+select name from vault.secrets where name in ('moderation_key', 'moderation_url');
+```
+بعد ما يضيف المالك `HF_TOKEN` ويشغّله من التطبيق: انشر تعليق تجريبي، وبعد دقيقة شيك `select result, categories, model, ms, error from moderation_log order by id desc limit 5;` ولوحة «الفحص الآلي» تعرض الأرقام وآخر خطأ.
+
+## ٤) نص الخصوصية المقترح (ينتظر موافقة المالك)
+
+يتعدّل في `docs/privacy.html` (صفحة المتاجر) و`src/app/policy/privacy.tsx` مع بعض، **قبل** التشغيل:
+
+- **الذكاء الاصطناعي** (إضافة جملة في آخر الفقرة):
+  - ع: «وعند تفعيل الفحص الآلي، نرسل نص المنشورات والتعليقات الجديدة، دون اسمك أو حسابك، إلى نموذج Qwen3Guard عبر Hugging Face (يشغّله مزوّد featherless-ai) ليكشف المحتوى المخالف لإرشادات المجتمع، ويراجع فريقنا ما يعلّمه قبل أي إجراء.»
+  - En: “When automatic checks are on, we send the text of new posts and comments, without your name or account, to the Qwen3Guard model through Hugging Face (run by the provider featherless-ai) to detect content that breaks the community guidelines, and our team reviews anything it flags before acting.”
+- **مزودو الخدمة** (إضافة اسم): «… وAnthropic وHugging Face (مع مزوّدها featherless-ai) للذكاء الاصطناعي …» / “… Anthropic and Hugging Face (with its provider featherless-ai) for AI …”
+- **لو انشغّلت الرسائل الخاصة**، جملة إضافية: «وقد تُفحص الرسائل الخاصة بالطريقة نفسها، وإذا علّم الفحص رسالة يطّلع عليها مشرف لمراجعتها.» / “Private messages may be checked the same way, and a moderator may read a flagged message to review it.”
+
+## ٥) البيانات
+
+- **يروح للمزوّد:** النص بس (١٠٠٠ حرف بالأكثر، بدون رموز التحكم). بدون اسم أو معرّف أو صورة.
+- **ينحفظ عندنا:**
+  - `moderation_jobs`: المحتوى اللي ينتظر (نوعه ومعرّفه، بدون نص). محد يوصله من التطبيق.
+  - `auto_flags`: المحتوى اللي انعلّم، مع نسخة من نصه للمراجعة (مثل البلاغ). للمشرف بس، وينحذف مع حساب صاحبه.
+  - `moderation_log`: النتيجة والفئات والنموذج والوقت، **بدون نص ولا معرّفات**. ينحذف بعد ٩٠ يوم.
+
+## ٦) الإيقاف والرجوع
+
+- **إيقاف فوري:** من التطبيق (مفتاح التشغيل)، أو `update app_settings set value = value || '{"enabled": false}' where key = 'auto_moderation';`
+- **إرجاع شي انخفى:** «إرجاع» من بلاغات المجتمع.
+- **شيل الجدولة:** `select cron.unschedule('arq-moderation');`
+- الجداول والدوال تبقى بدون أثر لو موقّف (الـ trigger يطلع على طول).
+
+## ٧) حدود معروفة
+
+- ما فيه تقييم منشور لدقته على اللهجة السعودية: نبدأ بـ «تنبيه بس» ونراجع أول ٢٠٠ نتيجة قبل وضع «إخفاء مؤقت».
+- يفحص الجديد بس، والنص بس (صور المنشورات عند `moderate-post`). صور الحسابات والرسائل والتقييمات (`gym_reviews`، `coach_reviews`) خطوة لاحقة.
+- مكتب «المجتمع» في مكتب الويب يعرض للحين بلاغات تقييمات الأندية بس؛ ربط البلاغات والفحص الآلي فيه خطوة لاحقة.
+
+الاختبارات: `node supabase/tests/auto_moderation.test.cjs` (القاعدة) و`supabase/tests/fn/moderate.test.mjs` (الدالة، طريقة التشغيل بأول الملف).

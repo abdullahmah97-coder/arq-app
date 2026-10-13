@@ -1,20 +1,21 @@
-// لوحة إدارة التطبيق ← بلاغات المجتمع: كل محتوى عليه بلاغات (مجمّع)، والصور اللي علق فحصها،
-// والكلمات الممنوعة. الإجراء يقفل كل البلاغات على نفس المحتوى، وينحفظ في سجل الإدارة.
+// لوحة إدارة التطبيق ← بلاغات المجتمع: كل محتوى عليه بلاغات (مجمّع) أو علّمه الفحص الآلي، والصور اللي علق فحصها،
+// والكلمات الممنوعة، وإعداد الفحص الآلي للنصوص. الإجراء يقفل كل البلاغات على نفس المحتوى، وينحفظ في سجل الإدارة.
 // (شرط App Store رقم 1.2: الرد على البلاغات بسرعة، خلال ٢٤ ساعة)
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
+import { AutoModPanel } from '@/components/safety/AutoModPanel';
 import { Avatar, Button, Card, Empty, Input, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { timeAgo } from '@/lib/dates';
 import { useLocalized } from '@/lib/i18n';
 import { isAdmin } from '@/lib/owner';
-import { addTerm, listTerms, removeTerm, safetyAct, safetyQueue, type SafetyAction, type SafetyItem } from '@/lib/safety';
+import { addTerm, isAutoFlag, listTerms, removeTerm, safetyAct, safetyQueue, type SafetyAction, type SafetyItem } from '@/lib/safety';
 import { errorKey, publicUrl } from '@/lib/supabase';
 import { colors, radius, space } from '@/theme';
 
-type Tab = 'open' | 'all' | 'terms';
+type Tab = 'open' | 'all' | 'terms' | 'auto';
 
 export default function OwnerSafety() {
   const { t } = useTranslation();
@@ -26,6 +27,7 @@ export default function OwnerSafety() {
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback((which: Tab) => {
+    if (which === 'auto') return; // اللوحة تحمّل نفسها
     if (which === 'terms') { listTerms().then(setTerms).catch((e) => { setTerms([]); Alert.alert(t(errorKey(e))); }); return; }
     setItems(null);
     safetyQueue(which).then(setItems).catch((e) => { setItems([]); Alert.alert(t(errorKey(e))); });
@@ -57,10 +59,11 @@ export default function OwnerSafety() {
   return (
     <Screen edges={['bottom']}>
       <T size="sm" muted style={{ lineHeight: 21 }}>{t('safety.queueHint')}</T>
-      <Segmented value={tab} onChange={setTab}
-        options={[{ value: 'open', label: t('safety.tabOpen') }, { value: 'all', label: t('safety.tabAll') }, { value: 'terms', label: t('safety.tabTerms') }]} />
+      <Segmented value={tab} onChange={setTab} wrap
+        options={[{ value: 'open', label: t('safety.tabOpen') }, { value: 'all', label: t('safety.tabAll') },
+                  { value: 'terms', label: t('safety.tabTerms') }, { value: 'auto', label: t('safety.tabAuto') }]} />
 
-      {tab === 'terms' ? (
+      {tab === 'auto' ? <AutoModPanel /> : tab === 'terms' ? (
         <View style={{ gap: space.md }}>
           <T size="sm" muted style={{ lineHeight: 21 }}>{t('safety.termsHint')}</T>
           <Row gap={space.sm}>
@@ -98,6 +101,8 @@ function ReportCard({ it, busy, onAct }: { it: SafetyItem; busy: string | null; 
   const { lng } = useLocalized();
   const s = it.snapshot ?? {};
   const unscreened = it.reasons.includes('unscreened');
+  // علّمه الفحص الآلي وما بلّغ عنه أحد: نقول «فحص آلي» بدل «بدون بلاغات»
+  const autoOnly = it.reports === 0 && isAutoFlag(it.reasons);
   const canHide = it.target_type === 'post' || it.target_type === 'comment' || it.target_type === 'checkin_comment';
   const open = it.status === 'open';
   const img = s.image_path ? publicUrl('posts', s.image_path) : null;
@@ -108,7 +113,7 @@ function ReportCard({ it, busy, onAct }: { it: SafetyItem; busy: string | null; 
     <Card style={{ gap: space.sm }}>
       <Row style={{ justifyContent: 'space-between' }}>
         <T size="xs" semibold color={open ? colors.danger : colors.muted} style={{ flex: 1, textTransform: 'uppercase' }}>
-          {t(`safety.what_${it.target_type}`)} · {unscreened ? t('safety.unscreened') : t('safety.reportsN', { count: it.reports })}
+          {t(`safety.what_${it.target_type}`)} · {unscreened ? t('safety.unscreened') : autoOnly ? t('safety.autoFlag') : t('safety.reportsN', { count: it.reports })}
           {it.hidden ? ` · ${t('safety.isHidden')}` : ''}{it.suspended_until ? ` · ${t('safety.isSuspended')}` : ''}
         </T>
         <T size="xs" muted>{timeAgo(it.last_at, lng)}</T>

@@ -222,6 +222,17 @@ npx supabase secrets set ANTHROPIC_OFFICE_MODEL=claude-opus-5-5       # اختي
   ```
   بدونه زر «شغّل الوكيل» بمكتب الويب يرجع `agent_not_configured` (والتطبيق يشتغل عادي).
 
+**الفحص الآلي للنصوص** (Qwen3Guard عبر Hugging Face، موقّف لين يشغّله المالك من لوحة إدارة التطبيق ← بلاغات المجتمع ← الفحص الآلي): يقرأ المنشورات والتعليقات بعد نشرها ويطلّع اللي ممكن يخالف الإرشادات للمراجعة. الشرح الكامل، وقرارات المالك، ونص الخصوصية المقترح، والرجوع: **[docs/auto-moderation.md](docs/auto-moderation.md)**.
+```bash
+npx supabase db push                                          # ترحيل 20261014000940_auto_moderation.sql (أو الصقه في SQL Editor ← Run)
+npx supabase functions deploy moderate --no-verify-jwt         # القاعدة تناديها بدون توكن، والدالة تتأكد من x-moderation-key
+npx supabase secrets set HF_TOKEN=hf_...                       # المالك بنفسه: توكن fine-grained بصلاحية «Inference Providers» بس
+```
+```sql
+select vault.create_secret('https://<ref>.supabase.co/functions/v1/moderate', 'moderation_url');  -- مرة وحدة
+```
+اختياري: `HF_MODERATION_MODEL` (الافتراضي `Qwen/Qwen3Guard-Gen-4B:featherless-ai`) و`HF_MODERATION_CHAT_MODEL` للرسائل (الافتراضي `Qwen/Qwen3Guard-Gen-0.6B:featherless-ai`). `HF_TOKEN` سر للدوال بس: لا تحطه في `.env` ولا في أي `EXPO_PUBLIC_*`.
+
 ### 3) تشغيل التطبيق
 ```bash
 cp .env.example .env        # وعبّئ رابط المشروع و anon key
