@@ -162,6 +162,13 @@ for (const [status, reason] of [[402, 'credits'], [401, 'auth'], [403, 'auth'], 
   ok(`${status}: no new claim after stopping`, calls('moderation_claim').length === 1);
 }
 
+// النموذج يتجهّز عند المزوّد (أول طلب): نوقف الدفعة ونرجّع الكل بعد دقيقة بدون ما تنحسب محاولة
+f = await failWith({ status: 400, text: JSON.stringify({ error: { message: 'The model `Qwen/Qwen3Guard-Gen-4B` is not ready for inference yet. Please try again shortly.', type: 'invalid_request_error', code: 'model_pending_deploy' } }) }, 8);
+ok('model warming up: every job goes back as skipped (no attempt used, nothing logged)', f.retries.length === 8 && f.retries.every((x) => x.p_reason === 'skipped'), JSON.stringify(f.retries.map((x) => x.p_reason)));
+ok('model warming up: no more calls after the first wave', sent.length <= PARALLEL && f.res.body.skipped === 8 && f.res.body.failed === 0, JSON.stringify(f.res.body));
+f = await failWith({ status: 400, text: JSON.stringify({ error: { message: 'bad', code: 'other' } }) });
+ok('another 400 is still http_4xx', f.retries[0]?.p_reason === 'http_4xx');
+
 // ---------- دفعات متتالية والتوازي ----------
 reset();
 reply = () => 'Safety: Safe\nCategories: None';

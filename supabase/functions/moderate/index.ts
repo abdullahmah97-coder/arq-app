@@ -60,8 +60,15 @@ async function handle(db: SupabaseClient, token: string, job: Job, t: Totals, st
     }
   } catch (e) {
     const reason = e instanceof GuardError ? e.reason : 'network';
-    if (FATAL.has(reason)) state.stop = true;
     console.error('moderate_check_failed', job.target_type, reason, e instanceof Error ? e.message : String(e));
+    // النموذج يتجهّز عند المزوّد: الباقي بيطيح بنفس الشي، فنوقف ونرجع بعد دقيقة بدون ما تنحسب محاولة
+    if (reason === 'warming') {
+      state.stop = true;
+      t.skipped++;
+      await db.rpc('moderation_retry', { ...ref, p_reason: 'skipped' });
+      return;
+    }
+    if (FATAL.has(reason)) state.stop = true;
     t.failed++;
     await db.rpc('moderation_retry', { ...ref, p_reason: reason, p_model: model });
     return;

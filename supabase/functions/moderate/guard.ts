@@ -11,8 +11,9 @@ export const MAX_CHARS = 1000;
 
 export type Label = 'safe' | 'unsafe' | 'controversial';
 export interface Verdict { label: Label; categories: string[] }
-/** أسباب الفشل: auth و credits و model مشكلة إعداد (توقف الدفعة كلها)، والباقي يعاد المحتوى نفسه لاحقاً */
-export type FailReason = 'auth' | 'credits' | 'model' | 'http_429' | 'http_5xx' | 'http_4xx' | 'timeout' | 'network' | 'bad_output';
+/** أسباب الفشل: auth و credits و model مشكلة إعداد (توقف الدفعة كلها)، والباقي يعاد المحتوى نفسه لاحقاً.
+ *  warming: المزوّد يحمّل النموذج (أول طلب بعد فترة، model_pending_deploy): توقف الدفعة ويرجع بعد دقيقة بدون ما تنحسب محاولة */
+export type FailReason = 'auth' | 'credits' | 'model' | 'warming' | 'http_429' | 'http_5xx' | 'http_4xx' | 'timeout' | 'network' | 'bad_output';
 export const FATAL: ReadonlySet<FailReason> = new Set(['auth', 'credits', 'model']);
 
 export class GuardError extends Error {
@@ -83,7 +84,8 @@ export async function checkText(token: string, model: string, text: string, time
     }
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
-      throw new GuardError(reasonFor(res.status), `${res.status} ${detail.slice(0, 200)}`);
+      const warming = res.status === 400 && /"code"\s*:\s*"model_pending_deploy"/.test(detail);
+      throw new GuardError(warming ? 'warming' : reasonFor(res.status), `${res.status} ${detail.slice(0, 200)}`);
     }
     let body: { choices?: { message?: { content?: unknown } }[] };
     try { body = await res.json(); } catch (e) {
