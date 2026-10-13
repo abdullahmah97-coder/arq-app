@@ -3851,7 +3851,7 @@
   "privacyPolicy": {
     "title": "Privacy Policy",
     "intro": "Your privacy is central to ARQ. This policy explains what data we collect and why, who we share it with, how we protect it and your rights over it, under the Personal Data Protection Law of the Kingdom of Saudi Arabia.",
-    "version": "Version 1.1 · Last updated 12 October 2026",
+    "version": "Version 1.2 · Last updated 13 October 2026",
     "sections": [
       {
         "icon": "person-circle-outline",
@@ -3876,7 +3876,7 @@
       {
         "icon": "sparkles-outline",
         "title": "Artificial intelligence",
-        "body": "We use Anthropic’s Claude to analyse meal photos and nutrition labels, read InBody reports, build training and meal plans, answer in the AI coach, and check post photos before your friends see them. We send only what each request needs, such as the photo or your goals, level and activity summary, never your email or login details, and Anthropic does not use it to train its models."
+        "body": "We use Anthropic’s Claude to analyse meal photos and nutrition labels, read InBody reports, build training and meal plans, answer in the AI coach, and check post photos before your friends see them. We send only what each request needs, such as the photo or your goals, level and activity summary, never your email or login details, and Anthropic does not use it to train its models. When automatic checks are on, we send the text of new posts and comments, without your name or account, to the Qwen3Guard model through Hugging Face (run by the provider featherless-ai) to detect content that breaks the community guidelines, and our team reviews anything it flags before acting."
       },
       {
         "icon": "eye-outline",
@@ -3891,7 +3891,7 @@
       {
         "icon": "server-outline",
         "title": "Service providers and transfers",
-        "body": "ARQ runs on trusted providers: Supabase for data hosting and sign-in, Anthropic for AI, Expo, Apple and Google for notifications and updates, Google Places, Foursquare and OpenStreetMap for finding gyms, and Open Food Facts for barcodes. Some data may be processed outside the Kingdom by these providers, only as far as needed and with appropriate safeguards. We don’t sell your data and don’t use outside ad networks."
+        "body": "ARQ runs on trusted providers: Supabase for data hosting and sign-in, Anthropic and Hugging Face (with its provider featherless-ai) for AI, Expo, Apple and Google for notifications and updates, Google Places, Foursquare and OpenStreetMap for finding gyms, and Open Food Facts for barcodes. Some data may be processed outside the Kingdom by these providers, only as far as needed and with appropriate safeguards. We don’t sell your data and don’t use outside ad networks."
       },
       {
         "icon": "megaphone-outline",

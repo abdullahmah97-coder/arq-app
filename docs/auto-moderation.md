@@ -66,9 +66,9 @@ select name from vault.secrets where name in ('moderation_key', 'moderation_url'
 ```
 بعد ما يضيف المالك `HF_TOKEN` ويشغّله من التطبيق: انشر تعليق تجريبي، وبعد دقيقة شيك `select result, categories, model, ms, error from moderation_log order by id desc limit 5;` ولوحة «الفحص الآلي» تعرض الأرقام وآخر خطأ.
 
-## ٤) نص الخصوصية المقترح (ينتظر موافقة المالك)
+## ٤) نص الخصوصية (وافق عليه المالك وانطبق: الإصدار ١٫٢، ١٣ أكتوبر ٢٠٢٦)
 
-يتعدّل في `docs/privacy.html` (صفحة المتاجر) و`src/app/policy/privacy.tsx` مع بعض، **قبل** التشغيل:
+النص في `src/locales/{ar,en}.json` (`privacyPolicy`)، وصفحة المتاجر `docs/privacy.html` تنبني منه بـ `node tools/build-policy-site.mjs`. جملة الرسائل الخاصة (آخر نقطة) ما انضافت: تنضاف لو انشغّل فحص الرسائل.
 
 - **الذكاء الاصطناعي** (إضافة جملة في آخر الفقرة):
   - ع: «وعند تفعيل الفحص الآلي، نرسل نص المنشورات والتعليقات الجديدة، دون اسمك أو حسابك، إلى نموذج Qwen3Guard عبر Hugging Face (يشغّله مزوّد featherless-ai) ليكشف المحتوى المخالف لإرشادات المجتمع، ويراجع فريقنا ما يعلّمه قبل أي إجراء.»
