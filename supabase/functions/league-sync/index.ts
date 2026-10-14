@@ -57,7 +57,8 @@ export async function sync(db: SupabaseClient, mode: 'full' | 'live', apiKey: st
   const season = seasonFor(now, s.season);
 
   const fail = async (error: string, left: number | null) => {
-    await db.rpc('league_ingest', { p_mode: mode, p_season: season, p_error: error, p_left: left });
+    const { error: e } = await db.rpc('league_ingest', { p_mode: mode, p_season: season, p_error: error, p_left: left });
+    if (e) console.error('league_error_record_failed', e.message);
     return { ok: false, mode, season, error };
   };
   if (!apiKey) return fail('API_FOOTBALL_KEY is not set', null);
@@ -93,8 +94,9 @@ export async function sync(db: SupabaseClient, mode: 'full' | 'live', apiKey: st
     p_mode: mode, p_season: season, p_teams: teams, p_matches: matches, p_standings: standings, p_left: left,
   });
   if (error) {
+    // ننكتب الخطأ عشان القاعدة تنتظر ١٠ دقايق (وإلا تطلب من المزوّد كل دقيقة) ويشوفه المشرف
     console.error('league_ingest_failed', error.message);
-    return { ok: false, mode, season, error: 'ingest_failed' };
+    return fail('ingest_failed', left);
   }
   return { mode, season, ...(data as object) };
 }

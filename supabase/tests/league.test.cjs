@@ -96,29 +96,49 @@ const { setup } = require('./_harness.cjs');
   // ---------- التذكير (m1 بعد ٣٠ دقيقة، والتذكير قبل ٦٠) ----------
   const sent = (await q(`select _league_remind() as n`))[0].n;
   check('reminders go to the one who asked and to both teams\' fans', sent === 3, String(sent));
-  const na = await notices(U.A, 'league-remind:1001');
+  const na = await notices(U.A, 'league-remind:1001:%');
   check('reminder text: teams and Riyadh time', na.length === 1 && na[0].title_ar.includes('الهلال') && na[0].title_ar.includes('النصر') && /الساعة \d{1,2}:\d{2} [صم]/.test(na[0].body_ar) && na[0].url === '/league/1001', JSON.stringify(na[0]));
-  check('fans get it too', (await notices(U.B, 'league-remind:1001')).length === 1 && (await notices(U.C, 'league-remind:1001')).length === 1);
+  check('fans get it too', (await notices(U.B, 'league-remind:1001:%')).length === 1 && (await notices(U.C, 'league-remind:1001:%')).length === 1);
   check('a second run sends nothing again', (await q(`select _league_remind() as n`))[0].n === 0);
-  check('the far match is not reminded yet', (await notices(U.C, 'league-remind:1003')).length === 0);
+  check('the far match is not reminded yet', (await notices(U.C, 'league-remind:1003:%')).length === 0);
   await q(`update league_matches set status = 'TBD' where id = 1003`);
   await q(`update league_matches set kickoff = now() + interval '20 minutes' where id = 1003`);
   check('a TBD time is never reminded', (await q(`select _league_remind() as n`))[0].n === 0);
+  check('fans are not written as reminder rows (dropping the team stops everything)', (await q(`select count(*)::int as n from league_reminders where user_id in ($1, $2)`, [U.B, U.C]))[0].n === 0);
+  check('the bell shows only what the user asked for', (await as(U.B, `select match_id from league_reminders`)).length === 0);
+  // تأجيل: موعد جديد ← تذكير جديد للي طلب وللمشجعين
+  await ingest('live', 2026, [], [{ ...m1, kickoff: iso(45) }]);
+  check('a new kick-off time resets the reminder', (await q(`select sent_at from league_reminders where user_id = $1 and match_id = 1001`, [U.A]))[0].sent_at === null);
+  check('…and everyone is reminded again for the new time', (await q(`select _league_remind() as n`))[0].n === 3);
+  check('two reminders for A, one per time', (await notices(U.A, 'league-remind:1001:%')).length === 2 && (await notices(U.B, 'league-remind:1001:%')).length === 2);
+  check('same time again → nothing', (await q(`select _league_remind() as n`))[0].n === 0);
 
   // ---------- النهاية ----------
   await ingest('live', 2026, [], [{ ...m2, status: 'FT', elapsed: 90, hg: 2, ag: 1 }]);
+  await q(`select _league_ft_notices()`);
   check('full time: no notice for nobody (nobody follows these teams)', (await notices(U.A, 'league-ft:1002')).length === 0);
   await ingest('live', 2026, [], [{ ...m1, kickoff: iso(-100), status: '2H', elapsed: 80, hg: 2, ag: 2 }]);
   await q(`update league_sync set last_full_at = now()`);
   const before = (await sync()).last_full_at;
   const rFt = await ingest('live', 2026, [], [{ ...m1, kickoff: iso(-110), status: 'FT', elapsed: 90, hg: 3, ag: 2 }]);
-  check('full time is detected', rFt.finished === 1);
+  check('full time is detected and queued (not sent inside the API call)', rFt.finished === 1 && (await notices(U.B, 'league-ft:1001')).length === 0
+    && (await q(`select ft_pending from league_matches where id = 1001`))[0].ft_pending === true);
+  const nFt = (await q(`select _league_ft_notices() as n`))[0].n;
+  check('the cron sends the queued full-time notices', nFt === 3 && (await q(`select ft_pending from league_matches where id = 1001`))[0].ft_pending === false, String(nFt));
   const ft = await notices(U.B, 'league-ft:1001');
   check('fans get the final score', ft.length === 1 && ft[0].body_ar === 'الهلال 3 - 2 النصر' && ft[0].url === '/league/1001', JSON.stringify(ft[0]));
   check('the one who asked for a reminder gets it too', (await notices(U.A, 'league-ft:1001')).length === 1 && (await notices(U.C, 'league-ft:1001')).length === 1);
-  check('a finished match forces a standings update', before && (await sync()).last_full_at === null);
+  const ago = (await q(`select extract(epoch from now() - last_full_at) / 60 as m from league_sync`))[0].m;
+  check('a finished match brings the standings update to ~70 minutes later (provider updates hourly)', before && ago > 108 && ago < 112, String(ago));
   await ingest('live', 2026, [], [{ ...m1, kickoff: iso(-110), status: 'FT', elapsed: 90, hg: 3, ag: 2 }]);
+  await q(`select _league_ft_notices()`);
   check('no second full-time notice', (await notices(U.B, 'league-ft:1001')).length === 1);
+  // مباراة قديمة تخلص بعد توقف أو أعطال: بدون إشعار
+  await ingest('full', 2026, [], [{ ...m3, id: 1005, kickoff: iso(-60 * 24 * 10), status: 'NS' }]);
+  await ingest('full', 2026, [], [{ ...m3, id: 1005, kickoff: iso(-60 * 24 * 10), status: 'FT', hg: 1, ag: 0 }]);
+  await q(`select _league_ft_notices()`);
+  check('a match from 10 days ago finishing late sends no notice', (await notices(U.C, 'league-ft:1005')).length === 0
+    && (await q(`select ft_pending from league_matches where id = 1005`))[0].ft_pending === false);
 
   // ---------- الجدولة ----------
   await q(`update league_matches set status = 'FT' where id in (1001, 1002)`);
@@ -135,6 +155,10 @@ const { setup } = require('./_harness.cjs');
   await q(`update league_matches set status = 'NS', kickoff = now() + interval '2 minutes' where id = 1003`);
   await q(`update league_sync set last_live_at = null`);
   check('about to kick off counts as live', (await q(`select run_league() as r`))[0].r === 'live:no_vault');
+  await q(`update league_sync set requested_at = now() - interval '2 minutes', last_ok_at = now() - interval '3 minutes', last_error_at = null`);
+  check('a request still pending for 2 minutes → waiting (runs never overlap)', (await q(`select run_league() as r`))[0].r === 'waiting');
+  await q(`update league_sync set requested_at = now() - interval '4 minutes'`);
+  check('no answer for 4 minutes → asks again', (await q(`select run_league() as r`))[0].r === 'live:no_vault');
   await q(`update league_sync set requested_at = now(), last_ok_at = now() - interval '1 minute'`);
   check('a request still pending → waiting', (await q(`select run_league() as r`))[0].r === 'waiting');
   await q(`update league_sync set requested_at = null`);
@@ -142,6 +166,18 @@ const { setup } = require('./_harness.cjs');
   check('right after an API error → backoff (no request)', (await q(`select run_league() as r`))[0].r === 'backoff');
   await q(`update league_sync set last_error_at = now() - interval '11 minutes'`);
   check('10 minutes later it tries again', (await q(`select run_league() as r`))[0].r === 'live:no_vault');
+  // حالة مباشرة قديمة (SUSP قبل ٣ أيام) ما تخلي التحديث المباشر شغّال
+  await q(`update league_matches set status = 'FT' where id = 1003`);
+  await q(`update league_matches set status = 'SUSP', kickoff = now() - interval '3 days' where id = 1002`);
+  await q(`update league_sync set last_full_at = now(), last_live_at = null, last_error = null, requested_at = null`);
+  check('a match stuck live for days does not keep live polling on', (await q(`select run_league() as r`))[0].r === 'idle');
+  await q(`update league_matches set status = '2H', kickoff = now() - interval '70 minutes' where id = 1002`);
+  check('a real live match does', (await q(`select run_league() as r`))[0].r === 'live:no_vault');
+  // run_league يرسل إشعارات النهاية المعلّقة
+  await q(`update league_matches set ft_pending = true where id = 1002`);
+  await q(`insert into league_fans (user_id, team_id) values ($1, 2938) on conflict (user_id) do update set team_id = 2938`, [U.D]);
+  await q(`select run_league()`);
+  check('run_league sends pending full-time notices', (await notices(U.D, 'league-ft:1002')).length === 1);
 
   // حذف الحساب
   await q(`delete from auth.users where id = $1`, [U.C]);

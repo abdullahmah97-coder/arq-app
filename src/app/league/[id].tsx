@@ -12,7 +12,7 @@ import { Button, Card, Empty, Loading, Row, Screen, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import {
   canBuyTickets, canRemind, countdown, formOf, headToHead, involves, kickoffClock, kickoffLabel, leagueCached, loadLeague, loadMatch,
-  matchState, myReminders, myTeam, roundNumber, setReminder, teamName, type LeagueData, type LeagueMatch,
+  myReminders, myTeam, roundNumber, setReminder, stateOf, teamName, type LeagueData, type LeagueMatch,
 } from '@/lib/league';
 import { enablePush } from '@/lib/push';
 import { brand, colors, radius, space } from '@/theme';
@@ -47,15 +47,15 @@ export default function MatchPage() {
     load(false);
     const timer = setInterval(() => {
       const x = mRef.current;
-      if (x && (matchState(x.status) === 'live' || (matchState(x.status) === 'upcoming' && Math.abs(Date.parse(x.kickoff) - Date.now()) < 10 * 60_000))) load(true);
+      if (x && (stateOf(x) === 'live' || (stateOf(x) === 'upcoming' && Math.abs(Date.parse(x.kickoff) - Date.now()) < 10 * 60_000))) load(true);
     }, 60_000);
     return () => clearInterval(timer);
   }, [load]));
 
+  if (m === null) return <Screen edges={['bottom']}><Empty icon="football-outline" text={t('league.notFound')} /></Screen>;
   if (m === undefined || !data) return <Loading />;
-  if (!m) return <Screen edges={['bottom']}><Empty icon="football-outline" text={t('league.notFound')} /></Screen>;
 
-  const st = matchState(m.status);
+  const st = stateOf(m);
   const home = data.teams.get(m.home_id);
   const away = data.teams.get(m.away_id);
   const hn = teamName(home, lng);

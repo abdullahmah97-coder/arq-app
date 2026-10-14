@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { T } from '@/components/ui';
 import {
-  kickoffClock, liveLabel, matchState, teamColors, teamInitial, teamName, type LeagueMatch, type LeagueTeam,
+  kickoffClock, liveLabel, stateOf, teamColors, teamInitial, teamName, type LeagueMatch, type LeagueTeam,
 } from '@/lib/leagueCore';
 import { brand, colors, fonts, radius, space } from '@/theme';
 
@@ -86,7 +86,7 @@ export function MatchRow({ m, teams, lng, mine, reminded, onRemind, onPress }: {
   reminded?: boolean; onRemind?: () => void; onPress: () => void;
 }) {
   const { t } = useTranslation();
-  const st = matchState(m.status);
+  const st = stateOf(m);
   const home = teams.get(m.home_id);
   const away = teams.get(m.away_id);
   const done = st === 'finished';

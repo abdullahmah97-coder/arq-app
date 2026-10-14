@@ -21,12 +21,20 @@ export const OFF_STATUSES = ['PST', 'CANC', 'ABD'];
 
 export type MatchState = 'upcoming' | 'live' | 'finished' | 'off';
 
-export function matchState(status: string): MatchState {
-  if (LIVE_STATUSES.includes(status)) return 'live';
+/** حالة مباشرة لمباراة بدأت قبل أكثر من ٤ ساعات = معلّقة (SUSP لليوم الثاني) أو بيانات قديمة: ما نعرضها «مباشر» */
+export const STALE_LIVE_MS = 4 * 3600_000;
+/** مباراة «قادمة» فات موعدها بأكثر من ٣ ساعات وما تحدثت = نطلّعها من القادمة */
+export const STALE_UPCOMING_MS = 3 * 3600_000;
+
+export function matchState(status: string, kickoff?: string, now = Date.now()): MatchState {
+  if (LIVE_STATUSES.includes(status)) return kickoff && Date.parse(kickoff) < now - STALE_LIVE_MS ? 'off' : 'live';
   if (DONE_STATUSES.includes(status)) return 'finished';
   if (OFF_STATUSES.includes(status)) return 'off';
   return 'upcoming'; // NS و TBD
 }
+
+/** حالة المباراة مع وقتها (الأفضل في كل مكان فيه مباراة كاملة) */
+export const stateOf = (m: Pick<LeagueMatch, 'status' | 'kickoff'>, now = Date.now()) => matchState(m.status, m.kickoff, now);
 
 /** وش نكتب مكان النتيجة وقت المباراة: الدقيقة («63'»)، أو مفتاح ترجمة (استراحة، ركلات ترجيح، متوقفة) */
 export function liveLabel(m: Pick<LeagueMatch, 'status' | 'elapsed'>): { minute: string } | { key: string } {
@@ -110,16 +118,16 @@ export function groupByDay<M extends Pick<LeagueMatch, 'kickoff'>>(rows: M[]): {
 
 const byKick = (a: LeagueMatch, b: LeagueMatch) => Date.parse(a.kickoff) - Date.parse(b.kickoff) || a.id - b.id;
 
-/** المباشرة أول، بعدها القادمة الأقرب فالأبعد */
-export function upcomingMatches(rows: LeagueMatch[]): LeagueMatch[] {
-  const live = rows.filter((m) => matchState(m.status) === 'live').sort(byKick);
-  const next = rows.filter((m) => matchState(m.status) === 'upcoming').sort(byKick);
+/** المباشرة أول، بعدها القادمة الأقرب فالأبعد (بدون اللي فات موعدها من زمان وما تحدثت) */
+export function upcomingMatches(rows: LeagueMatch[], now = Date.now()): LeagueMatch[] {
+  const live = rows.filter((m) => stateOf(m, now) === 'live').sort(byKick);
+  const next = rows.filter((m) => stateOf(m, now) === 'upcoming' && Date.parse(m.kickoff) > now - STALE_UPCOMING_MS).sort(byKick);
   return [...live, ...next];
 }
 
-/** النتائج: الأحدث أول (والملغاة والمؤجلة معها عشان ما تختفي) */
-export function finishedMatches(rows: LeagueMatch[]): LeagueMatch[] {
-  return rows.filter((m) => ['finished', 'off'].includes(matchState(m.status))).sort((a, b) => byKick(b, a));
+/** النتائج: الأحدث أول (والملغاة والمؤجلة والمعلّقة معها عشان ما تختفي) */
+export function finishedMatches(rows: LeagueMatch[], now = Date.now()): LeagueMatch[] {
+  return rows.filter((m) => ['finished', 'off'].includes(stateOf(m, now))).sort((a, b) => byKick(b, a));
 }
 
 export const involves = (m: Pick<LeagueMatch, 'home_id' | 'away_id'>, teamId: number | null | undefined) =>
@@ -127,10 +135,10 @@ export const involves = (m: Pick<LeagueMatch, 'home_id' | 'away_id'>, teamId: nu
 
 /** للرئيسية: مباراة مباشرة (فريقي أول)، وإلا القادمة لفريقي، وإلا أقرب قادمة */
 export function spotlight(rows: LeagueMatch[], myTeam?: number | null, now = Date.now()): LeagueMatch | null {
-  const live = rows.filter((m) => matchState(m.status) === 'live').sort(byKick);
+  const live = rows.filter((m) => stateOf(m, now) === 'live').sort(byKick);
   const liveMine = live.find((m) => involves(m, myTeam));
   if (liveMine) return liveMine;
-  const next = rows.filter((m) => matchState(m.status) === 'upcoming' && Date.parse(m.kickoff) > now - 3 * 3600_000).sort(byKick);
+  const next = rows.filter((m) => stateOf(m, now) === 'upcoming' && Date.parse(m.kickoff) > now - STALE_UPCOMING_MS).sort(byKick);
   const mine = myTeam != null ? next.find((m) => involves(m, myTeam)) : undefined;
   // مباراة فريقي خلال ٧ أيام تغلب، وإلا المباشرة، وإلا الأقرب
   if (mine && Date.parse(mine.kickoff) - now < 7 * 86_400_000) return mine;
@@ -139,7 +147,7 @@ export function spotlight(rows: LeagueMatch[], myTeam?: number | null, now = Dat
 
 /** نتيجة المباراة من جهة فريق: W فوز، D تعادل، L خسارة (null لو ما خلصت) */
 export function resultFor(m: LeagueMatch, teamId: number): 'W' | 'D' | 'L' | null {
-  if (matchState(m.status) !== 'finished' || m.home_goals == null || m.away_goals == null) return null;
+  if (stateOf(m) !== 'finished' || m.home_goals == null || m.away_goals == null) return null;
   const mine = m.home_id === teamId ? m.home_goals : m.away_goals;
   const theirs = m.home_id === teamId ? m.away_goals : m.home_goals;
   return mine > theirs ? 'W' : mine < theirs ? 'L' : 'D';
@@ -148,13 +156,13 @@ export function resultFor(m: LeagueMatch, teamId: number): 'W' | 'D' | 'L' | nul
 /** مواجهات الفريقين اللي خلصت (الأحدث أول)، بدون المباراة نفسها */
 export function headToHead(rows: LeagueMatch[], m: LeagueMatch, limit = 5): LeagueMatch[] {
   return finishedMatches(rows)
-    .filter((x) => x.id !== m.id && involves(x, m.home_id) && involves(x, m.away_id) && matchState(x.status) === 'finished')
+    .filter((x) => x.id !== m.id && involves(x, m.home_id) && involves(x, m.away_id) && stateOf(x) === 'finished')
     .slice(0, limit);
 }
 
 /** آخر نتائج فريق (الأحدث أول) */
 export function lastResults(rows: LeagueMatch[], teamId: number, limit = 5): LeagueMatch[] {
-  return finishedMatches(rows).filter((x) => involves(x, teamId) && matchState(x.status) === 'finished').slice(0, limit);
+  return finishedMatches(rows).filter((x) => involves(x, teamId) && stateOf(x) === 'finished').slice(0, limit);
 }
 
 /** شكل الفريق آخر ٥: من الترتيب لو موجود، وإلا من النتائج («WWDLW»، الأحدث آخر شي) */
@@ -182,8 +190,8 @@ export function countdown(iso: string, now = Date.now()): { d: number; h: number
 
 /** «احجز تذكرتك» يظهر للمباراة اللي ما بدأت للحين، ولو فيه رابط https */
 export const canBuyTickets = (m: Pick<LeagueMatch, 'status' | 'kickoff'>, url: string | null | undefined, now = Date.now()) =>
-  !!url && /^https:\/\/\S+$/.test(url) && matchState(m.status) === 'upcoming' && Date.parse(m.kickoff) > now;
+  !!url && /^https:\/\/\S+$/.test(url) && stateOf(m, now) === 'upcoming' && Date.parse(m.kickoff) > now;
 
 /** «ذكّرني» للمباراة اللي ما بدأت (والقاعدة ترفض غيرها) */
 export const canRemind = (m: Pick<LeagueMatch, 'status' | 'kickoff'>, now = Date.now()) =>
-  matchState(m.status) === 'upcoming' && Date.parse(m.kickoff) > now;
+  stateOf(m, now) === 'upcoming' && Date.parse(m.kickoff) > now;

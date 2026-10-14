@@ -149,5 +149,6 @@ reply = () => ({ errors: [], response: [] });
 db.ingestError = 'deadlock';
 r = await call({ mode: 'live' });
 ok('database failure → ingest_failed', r.body.ok === false && r.body.error === 'ingest_failed');
+ok('…and the failure is recorded (so the database backs off instead of asking every minute)', ingests().length === 2 && ingests()[1].p_error === 'ingest_failed' && ingests()[1].p_mode === 'live');
 
 if (failed) console.log(`${failed} failed`);

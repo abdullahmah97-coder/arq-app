@@ -9,7 +9,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { NT } from '@/components/pulse/widgets';
 import { LONG_PRESS_MS, useHomeLongPress } from '@/lib/homeLayout';
 import { useLocalized } from '@/lib/i18n';
-import { kickoffLabel, loadLeague, matchState, myTeam, spotlight, teamName, type LeagueData, type LeagueMatch } from '@/lib/league';
+import { kickoffLabel, loadLeague, myTeam, spotlight, stateOf, teamName, type LeagueData, type LeagueMatch } from '@/lib/league';
 import { brand } from '@/theme';
 import { LivePill, Score, TeamBadge } from './LeagueParts';
 
@@ -30,7 +30,7 @@ export function HomeLeagueTile() {
 
   if (!data || !data.settings.enabled || !data.matches.length) return null;
   const m: LeagueMatch | null = spotlight(data.matches, mine);
-  const st = m ? matchState(m.status) : null;
+  const st = m ? stateOf(m) : null;
   const home = m ? data.teams.get(m.home_id) : undefined;
   const away = m ? data.teams.get(m.away_id) : undefined;
   const open = () => (m ? router.push({ pathname: '/league/[id]', params: { id: String(m.id) } }) : router.push('/league'));

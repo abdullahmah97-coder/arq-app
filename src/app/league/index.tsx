@@ -10,8 +10,8 @@ import { DayHeader, FormDots, MatchRow, TeamBadge } from '@/components/league/Le
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import {
-  canRemind, finishedMatches, formOf, goalDiff, groupByDay, involves, loadLeague, matchDayTitle, matchState, myReminders, myTeam,
-  setReminder, signed, sortStandings, teamName, upcomingMatches, type LeagueData, type LeagueMatch,
+  canRemind, finishedMatches, formOf, goalDiff, groupByDay, involves, loadLeague, matchDayTitle, myReminders, myTeam,
+  setReminder, signed, sortStandings, stateOf, teamName, upcomingMatches, type LeagueData, type LeagueMatch,
 } from '@/lib/league';
 import { enablePush } from '@/lib/push';
 import { brand, colors, radius, space } from '@/theme';
@@ -47,8 +47,8 @@ export default function League() {
     const id = setInterval(() => {
       const d = dataRef.current;
       const now = Date.now();
-      const busy = d?.matches.some((m) => matchState(m.status) === 'live'
-        || (matchState(m.status) === 'upcoming' && Math.abs(Date.parse(m.kickoff) - now) < 10 * 60_000));
+      const busy = d?.matches.some((m) => stateOf(m, now) === 'live'
+        || (stateOf(m, now) === 'upcoming' && Math.abs(Date.parse(m.kickoff) - now) < 10 * 60_000));
       if (busy) load(true);
     }, 60_000);
     return () => clearInterval(id);
@@ -125,8 +125,8 @@ export default function League() {
             <StandingsTable data={data} mine={mine} lng={lng} />
           ) : shown.length ? (
             <View style={{ gap: space.sm }}>
-              {groupByDay(shown).map((g) => (
-                <View key={g.day} style={{ gap: space.sm }}>
+              {groupByDay(shown).map((g, i) => (
+                <View key={`${g.day}-${i}`} style={{ gap: space.sm }}>
                   <DayHeader title={matchDayTitle(g.day, lng)} />
                   {g.rows.map((m) => (
                     <MatchRow key={m.id} m={m} teams={data.teams} lng={lng} mine={mine} onPress={() => openMatch(m)}

@@ -2877,7 +2877,7 @@
     "st_PST": "Postponed",
     "st_CANC": "Cancelled",
     "st_ABD": "Abandoned",
-    "st_off": "Postponed",
+    "st_off": "Not completed",
     "startsIn": "Starts in {{d}} days {{h}} hours {{m}} minutes",
     "days": "days",
     "hours": "hrs",
@@ -2898,7 +2898,9 @@
     "form_L": "Loss",
     "formShort_W": "W",
     "formShort_D": "D",
-    "formShort_L": "L"
+    "formShort_L": "L",
+    "st_SUSP": "Suspended",
+    "st_INT": "Interrupted"
   },
   "leagueAdmin": {
     "intro": "Saudi League scores, fixtures and table from API-Football, refreshed automatically every 1–5 minutes during matches and every 3 hours otherwise.",

@@ -53,10 +53,19 @@ const rows = [
   m(6, '2026-10-12T18:00:00Z', 'PST', 2938, 2932),
   m(7, '2026-10-16T21:30:00Z', 'NS', 9999, 2938),
 ];
-ok(upcomingMatches(rows).map((x) => x.id).join() === '2,1,7,3', 'upcoming: live first, then nearest', upcomingMatches(rows).map((x) => x.id).join());
-ok(finishedMatches(rows).map((x) => x.id).join() === '6,4,5', 'results: newest first, postponed kept', finishedMatches(rows).map((x) => x.id).join());
-const g = groupByDay(upcomingMatches(rows));
+ok(upcomingMatches(rows, NOW).map((x) => x.id).join() === '2,1,7,3', 'upcoming: live first, then nearest', upcomingMatches(rows, NOW).map((x) => x.id).join());
+ok(finishedMatches(rows, NOW).map((x) => x.id).join() === '6,4,5', 'results: newest first, postponed kept', finishedMatches(rows, NOW).map((x) => x.id).join());
+const g = groupByDay(upcomingMatches(rows, NOW));
 ok(g.length === 2 && g[0].day === '2026-10-16' && g[0].rows.length === 2 && g[1].day === '2026-10-17' && g[1].rows.map((x) => x.id).join() === '7,3', 'grouped by Riyadh day (00:30 belongs to the next day)', JSON.stringify(g.map((x) => [x.day, x.rows.map((r) => r.id)])));
+
+// مباشرة قديمة (معلّقة لليوم الثاني) وقادمة فات وقتها
+const stale = [...rows, m(9, '2026-10-13T18:00:00Z', 'SUSP', 2932, 2938), m(10, '2026-10-16T09:00:00Z', 'NS', 2939, 9999)];
+ok(matchState('SUSP', '2026-10-13T18:00:00Z', NOW) === 'off' && matchState('2H', '2026-10-16T13:00:00Z', NOW) === 'live', 'live status older than 4h is not live');
+ok(!upcomingMatches(stale, NOW).some((x) => x.id === 9 || x.id === 10), 'stale live and long-passed upcoming leave the upcoming list');
+ok(finishedMatches(stale, NOW).some((x) => x.id === 9), 'a suspended match shows with the results');
+ok(spotlight(stale.filter((x) => x.id !== 2), null, NOW)?.id === 1, 'the home tile ignores a match stuck live');
+const dup = groupByDay(upcomingMatches(stale, NOW));
+ok(new Set(dup.map((x) => x.day)).size === dup.length, 'no day appears twice');
 
 // الأضواء للرئيسية
 ok(spotlight(rows, null, NOW)?.id === 2, 'spotlight: a live match');
