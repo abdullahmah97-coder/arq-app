@@ -289,6 +289,7 @@
     "deleteAccount": "Delete account",
     "deleteConfirm": "Your account and all your data (plan, photos, InBody reports, health data, posts) will be permanently deleted. This cannot be undone. Are you sure?",
     "deleteYes": "Delete permanently",
+    "deleting": "Deleting your account…",
     "changeCover": "Change background",
     "coverTitle": "Profile background",
     "coverAutoHint": "\"Auto\" follows the app theme. Other colours look the same for everyone.",

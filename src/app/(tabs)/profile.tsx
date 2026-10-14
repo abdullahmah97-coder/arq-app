@@ -5,14 +5,14 @@ import { ProfileView } from '@/components/social/ProfileView';
 import { useTranslation } from 'react-i18next';
 import { Alert, I18nManager, Pressable, View } from 'react-native';
 import { checkForAppUpdate, isBeta, versionLabel } from '@/lib/appInfo';
+import { DeleteAccountLink } from '@/components/DeleteAccountLink';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { MembershipEntry } from '@/components/gymops/MembershipEntry';
 import { ShortcutMenu } from '@/components/Shortcuts';
 import { LeaderboardVisibility } from '@/components/social/LeaderboardVisibility';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
-import { errorKey, supabase } from '@/lib/supabase';
-import { deleteMyAccount } from '@/lib/account';
+import { supabase } from '@/lib/supabase';
 import { unreadCount } from '@/lib/messages';
 import { ownerCounts } from '@/lib/owner';
 import { safetyCounts } from '@/lib/safety';
@@ -106,12 +106,7 @@ export default function ProfileTab() {
 
       <T size="xs" muted center>🔒 {t('profile.privacy')}</T>
       <Button title={t('auth.signOut')} variant="ghost" icon="log-out-outline" onPress={async () => { await unregisterPush(); await clearSleepSchedule(userId); await supabase.auth.signOut(); }} />
-      <Pressable onPress={() => Alert.alert(t('profile.deleteAccount'), t('profile.deleteConfirm'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('profile.deleteYes'), style: 'destructive', onPress: () => deleteMyAccount(userId).catch((e) => Alert.alert(t(errorKey(e)))) },
-      ])}>
-        <T size="sm" center color={colors.danger}>{t('profile.deleteAccount')}</T>
-      </Pressable>
+      <DeleteAccountLink userId={userId} />
       <Pressable onPress={async () => {
         const r = await checkForAppUpdate();
         if (r === 'none') Alert.alert(t('beta.upToDate'));

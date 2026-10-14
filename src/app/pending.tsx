@@ -3,14 +3,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, AppState, Pressable, View } from 'react-native';
+import { AppState, View } from 'react-native';
 import { Logo } from '@/brand/Brand';
+import { DeleteAccountLink } from '@/components/DeleteAccountLink';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
-import { deleteMyAccount } from '@/lib/account';
 import { useAuth } from '@/lib/auth';
 import { enablePush, pushStatus, unregisterPush, type PushStatus } from '@/lib/push';
-import { errorKey, supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
 
 const EVERY = 30_000;
@@ -40,11 +40,6 @@ export default function Pending() {
     await unregisterPush().catch(() => {});
     await supabase.auth.signOut();
   };
-  const remove = () => Alert.alert(t('profile.deleteAccount'), t('profile.deleteConfirm'), [
-    { text: t('common.cancel'), style: 'cancel' },
-    { text: t('profile.deleteYes'), style: 'destructive', onPress: () => { if (uid) deleteMyAccount(uid).catch((e) => Alert.alert(t(errorKey(e)))); } },
-  ]);
-
   const name = profile?.full_name?.trim() || (profile?.username ? `@${profile.username}` : session?.user.email ?? '');
 
   return (
@@ -83,9 +78,7 @@ export default function Pending() {
 
       <View style={{ gap: space.sm, marginTop: space.lg }}>
         <Button title={t('auth.signOut')} variant="ghost" icon="log-out-outline" onPress={signOut} />
-        <Pressable onPress={remove} accessibilityRole="button" hitSlop={8} style={{ paddingVertical: space.sm }}>
-          <T size="sm" center color={colors.danger}>{t('profile.deleteAccount')}</T>
-        </Pressable>
+        <DeleteAccountLink userId={uid} />
       </View>
     </Screen>
   );
