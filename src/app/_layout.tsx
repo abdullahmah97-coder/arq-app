@@ -107,6 +107,7 @@ function RootNavigator() {
         <Stack.Screen name="friends" options={{ title: t('friends.title') }} />
         <Stack.Screen name="user/[id]" options={{ title: '' }} />
         <Stack.Screen name="progress" options={{ title: t('profile.progress') }} />
+        <Stack.Screen name="bmi" options={{ title: t('bmi.title') }} />
         <Stack.Screen name="profile-edit" options={{ title: t('profile.edit') }} />
         <Stack.Screen name="inbody/index" options={{ title: t('inbody.title') }} />
         <Stack.Screen name="inbody/review" options={{ title: t('inbody.review') }} />

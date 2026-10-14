@@ -11,6 +11,7 @@ export const SHORTCUTS = {
   history: { icon: 'barbell-outline', label: 'workout.history', to: '/workout/history' },
   inbody: { icon: 'analytics-outline', label: 'profile.inbody', to: '/inbody' },
   progress: { icon: 'trending-down-outline', label: 'profile.progress', to: '/progress' },
+  bmi: { icon: 'calculator-outline', label: 'bmi.title', to: '/bmi' },
   stores: { icon: 'storefront-outline', label: 'store.title', to: '/store' },
   clubs: { icon: 'business-outline', label: 'clubs.title', to: '/clubs' },
   coaches: { icon: 'people-circle-outline', label: 'coaching.directory', to: '/coaches' },
