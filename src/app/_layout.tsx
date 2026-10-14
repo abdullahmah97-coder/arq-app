@@ -170,7 +170,11 @@ function RootNavigator() {
         <Stack.Screen name="recovery/appointments" options={{ title: t('partners.myAppointments') }} />
         <Stack.Screen name="events/index" options={{ title: t('events.title') }} />
         <Stack.Screen name="events/[id]" options={{ title: '' }} />
+        <Stack.Screen name="league/index" options={{ title: t('league.title') }} />
+        <Stack.Screen name="league/[id]" options={{ title: '' }} />
+        <Stack.Screen name="league/team" options={{ title: t('league.pickTeam'), presentation: 'modal' }} />
         <Stack.Screen name="owner-events" options={{ title: t('events.title') }} />
+        <Stack.Screen name="owner-league" options={{ title: t('league.title') }} />
         <Stack.Screen name="owner-event" options={{ title: t('events.new'), presentation: 'modal' }} />
         <Stack.Screen name="owner-calorie-alert" options={{ title: t('kcalAlert.title') }} />
         <Stack.Screen name="owner-ai-limits" options={{ title: t('aiLimits.title') }} />

@@ -24,6 +24,7 @@ import { listLaunchAds, type LaunchAdRow } from '@/lib/launchAds';
 import { adState } from '@/lib/launchAdsCore';
 import { listAllEvents, nextHighlight, upcomingEvents, type LocalEvent } from '@/lib/localEvents';
 import { loadCalorieAlertConfig, type CalorieAlertConfig } from '@/lib/nutrition';
+import { adminLeagueStatus, type LeagueAdminStatus } from '@/lib/league';
 import { loadAiLimits, type AiLimits } from '@/lib/aiLimits';
 import { adminUserStats, type AdminUserStats } from '@/lib/adminUsers';
 import { verifiedCount } from '@/lib/verify';
@@ -52,6 +53,7 @@ export default function Owner() {
   const [ads, setAds] = useState<LaunchAdRow[]>([]);
   const [events, setEvents] = useState<LocalEvent[]>([]);
   const [kcal, setKcal] = useState<CalorieAlertConfig | null>(null);
+  const [league, setLeague] = useState<LeagueAdminStatus | null>(null);
   const [aiLim, setAiLim] = useState<AiLimits | null>(null);
   const [users, setUsers] = useState<AdminUserStats | null>(null);
   const [verifiedN, setVerifiedN] = useState<number | null>(null);
@@ -68,6 +70,7 @@ export default function Owner() {
     if (!admin) return;
     // كل جزء يتحمّل لحاله: لو تعطّل واحد تبقى باقي اللوحة شغالة
     loadCalorieAlertConfig(true).then(setKcal).catch(() => {});
+    adminLeagueStatus().then(setLeague).catch(() => {});
     loadAiLimits().then(setAiLim).catch(() => {});
     adminUserStats().then(setUsers).catch(() => {});
     verifiedCount().then(setVerifiedN).catch(() => {});
@@ -137,6 +140,10 @@ export default function Owner() {
           ? t('events.adminSub', { count: shownEvents.length, name: lng === 'en' && homeEvent.title_en ? homeEvent.title_en : homeEvent.title })
           : t('events.adminSubCount', { count: shownEvents.length })}
         onPress={() => router.push('/owner-events')} />
+      <OwnerLink icon="football" title={t('league.title')}
+        sub={!league ? t('leagueAdmin.intro') : league.last_error ? t('leagueAdmin.error')
+          : league.settings.enabled ? t('leagueAdmin.ownerSubOn', { matches: league.matches }) : t('leagueAdmin.ownerSubOff')}
+        onPress={() => router.push('/owner-league')} />
       <OwnerLink icon="nutrition" title={t('kcalAlert.title')}
         sub={kcal && !kcal.enabled ? t('kcalAlert.ownerSubOff') : t('kcalAlert.ownerSubOn', { n: kcal?.threshold ?? 200 })}
         onPress={() => router.push('/owner-calorie-alert')} />

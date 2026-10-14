@@ -14,6 +14,7 @@ import { CheckInCard } from '@/components/CheckInCard';
 import { HomeClubOffers } from '@/components/clubs/HomeClubOffers';
 import { HomeBookingTile } from '@/components/bookings/HomeBookingTile';
 import { HomeEventsTile } from '@/components/events/HomeEventsTile';
+import { HomeLeagueTile } from '@/components/league/HomeLeagueTile';
 import { NotificationBell } from '@/components/NotificationBell';
 import { HomeNutrition } from '@/components/nutrition/HomeNutrition';
 import { HomeShortcuts } from '@/components/Shortcuts';
@@ -266,7 +267,7 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
     checkin: <CheckInCard onChange={loadRank} />,
     clubs: <HomeClubOffers />,
     store: <>
-          {/* مربعين جنب بعض: المتاجر، والبطولات والفعاليات المحلية، وتحتها حجز الملاعب والحصص */}
+          {/* مربعين جنب بعض: المتاجر، والبطولات والفعاليات المحلية، وتحتها الدوري السعودي وحجز الملاعب والحصص */}
           <View style={{ gap: 10 }}>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Pressable style={({ pressed }) => [styles.store, pressed && { opacity: 0.9 }]} onPress={() => router.push('/store')} onLongPress={openArrange} delayLongPress={LONG_PRESS_MS} accessibilityRole="button" accessibilityLabel={t('store.title')}>
@@ -282,6 +283,7 @@ function TraineeHome({ onPartnerMode }: { onPartnerMode?: () => void }) {
             </Pressable>
             <HomeEventsTile style={{ flex: 1 }} />
           </View>
+          <HomeLeagueTile />
           <HomeBookingTile />
           </View>
           </>,

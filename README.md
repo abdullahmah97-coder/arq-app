@@ -233,6 +233,17 @@ select vault.create_secret('https://<ref>.supabase.co/functions/v1/moderate', 'm
 ```
 اختياري: `HF_MODERATION_MODEL` (الافتراضي `Qwen/Qwen3Guard-Gen-4B:featherless-ai`) و`HF_MODERATION_CHAT_MODEL` للرسائل (الافتراضي `Qwen/Qwen3Guard-Gen-0.6B:featherless-ai`). `HF_TOKEN` سر للدوال بس: لا تحطه في `.env` ولا في أي `EXPO_PUBLIC_*`.
 
+**الدوري السعودي ⚽** (موقّف لين يشغّله المالك من لوحة إدارة التطبيق ← الدوري السعودي): النتائج المباشرة، المواعيد، الترتيب، «احجز تذكرتك» من المنصة الرسمية، و«ذكّرني» و«فريقي» بإشعارات قبل المباراة وبالنتيجة بعدها. البيانات من API-Football (الخطة المجانية ما تشمل الموسم الحالي). الشرح الكامل: **[docs/saudi-league.md](docs/saudi-league.md)**.
+```bash
+npx supabase db push                                          # ترحيل 20261015000960_saudi_league.sql
+npx supabase functions deploy league-sync --no-verify-jwt      # القاعدة تناديها بدون توكن، والدالة تتأكد من x-league-key
+npx supabase secrets set API_FOOTBALL_KEY=...                  # المالك بنفسه، من لوحة API-Football
+```
+```sql
+select vault.create_secret('https://<ref>.supabase.co/functions/v1/league-sync', 'league_url');  -- مرة وحدة
+```
+`API_FOOTBALL_KEY` سر للدوال بس: لا تحطه في `.env` ولا في أي `EXPO_PUBLIC_*`.
+
 ### 3) تشغيل التطبيق
 ```bash
 cp .env.example .env        # وعبّئ رابط المشروع و anon key

@@ -31,7 +31,7 @@ const mod = await import('../../../node_modules/.cache/fn/moderate.bundle.mjs');
 const { parseGuard, cleanText, modelFrom, BATCH, PARALLEL } = mod;
 
 let failed = 0;
-const ok = (c, label, extra = '') => { console.log(c ? 'ok  ' : 'FAIL', label, extra); if (!c) { failed++; process.exitCode = 1; } };
+const ok = (label, c, extra = '') => { console.log(c ? 'ok  ' : 'FAIL', label, c ? '' : extra); if (!c) { failed++; process.exitCode = 1; } };
 const call = async (headers = { 'x-moderation-key': db.key }, method = 'POST') => {
   const res = await handler(new Request('https://fn/moderate', { method, headers }));
   return { status: res.status, body: await res.json() };

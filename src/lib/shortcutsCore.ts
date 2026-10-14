@@ -13,6 +13,7 @@ export const SHORTCUTS = {
   progress: { icon: 'trending-down-outline', label: 'profile.progress', to: '/progress' },
   bmi: { icon: 'calculator-outline', label: 'bmi.title', to: '/bmi' },
   stores: { icon: 'storefront-outline', label: 'store.title', to: '/store' },
+  league: { icon: 'football-outline', label: 'league.title', to: '/league' },
   clubs: { icon: 'business-outline', label: 'clubs.title', to: '/clubs' },
   coaches: { icon: 'people-circle-outline', label: 'coaching.directory', to: '/coaches' },
   programs: { icon: 'albums-outline', label: 'programs.title', to: '/programs' },
