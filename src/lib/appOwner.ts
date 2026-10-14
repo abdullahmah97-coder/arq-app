@@ -39,6 +39,36 @@ export function useIsOwnerId(id?: string | null): boolean {
   return !!id && set.has(id);
 }
 
+// ---------- ألقاب فريق الإدارة (مثل XO): شارة جنب الاسم بدل الرتبة ----------
+// قليلة ونادرة التغيير: نجيبها كلها مرة وحدة (ونحفظها بالجهاز) بدل ما نضيفها لكل استعلام حسابات
+const TITLES_KEY = 'arq.staffTitles.v1';
+interface TitleStore { value: ReadonlyMap<string, string>; subs: Set<() => void>; started: boolean }
+const titles: TitleStore = { value: new Map(), subs: new Set(), started: false };
+const setTitles = (rows: [string, string][]) => {
+  titles.value = new Map(rows);
+  titles.subs.forEach((f) => { try { f(); } catch { /* مستمع واحد ما يوقف الباقي */ } });
+  AsyncStorage.setItem(TITLES_KEY, JSON.stringify(rows)).catch(() => {});
+};
+async function loadTitles() {
+  try {
+    const raw = await AsyncStorage.getItem(TITLES_KEY);
+    if (raw && !titles.value.size) setTitles(JSON.parse(raw) as [string, string][]);
+  } catch { /* بدون كاش */ }
+  // قبل تحديث القاعدة ما فيه staff_title: نتركها فاضية بصمت
+  const { data, error } = await supabase.from('profiles').select('id, staff_title').not('staff_title', 'is', null).limit(50);
+  if (!error) setTitles(((data ?? []) as { id: string; staff_title: string }[]).map((r) => [r.id, r.staff_title]));
+}
+const subscribeTitles = (f: () => void) => {
+  titles.subs.add(f);
+  if (!titles.started) { titles.started = true; void loadTitles(); }
+  return () => { titles.subs.delete(f); };
+};
+/** لقب الحساب في فريق الإدارة (مثل XO) أو null */
+export function useStaffTitle(id?: string | null): string | null {
+  const map = useSyncExternalStore(subscribeTitles, () => titles.value, () => titles.value);
+  return (id && map.get(id)) || null;
+}
+
 // ---------- الأجزاء المخفية عن الكل ----------
 const HIDDEN_KEY = 'arq.hiddenParts.v1';
 const hidden: Store = { value: new Set(), subs: new Set(), started: false };
