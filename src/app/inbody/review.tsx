@@ -10,6 +10,7 @@ import { hasEssentials, normalizeMetrics } from '@/lib/inbody/normalize';
 import type { InBodyMetrics, Segment } from '@/lib/inbody/types';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, font, fonts, radius, space } from '@/theme';
+import { toNumber } from '@/lib/digits';
 
 const SEGS: Segment[] = ['right_arm', 'left_arm', 'trunk', 'right_leg', 'left_leg'];
 
@@ -44,10 +45,10 @@ export default function ReviewReport() {
 
   const metrics = useMemo(() => normalizeMetrics({
     ...initial,
-    ...Object.fromEntries(Object.entries(vals).map(([k, v]) => [k, v.trim() === '' ? null : Number(v.replace(',', '.'))])),
+    ...Object.fromEntries(Object.entries(vals).map(([k, v]) => [k, v.trim() === '' ? null : toNumber(v)])),
     test_date: date,
     segmental_lean: Object.fromEntries(SEGS.map((s) => [s, {
-      kg: seg[s].kg ? Number(seg[s].kg) : null, pct: seg[s].pct ? Number(seg[s].pct) : null,
+      kg: seg[s].kg ? toNumber(seg[s].kg) : null, pct: seg[s].pct ? toNumber(seg[s].pct) : null,
     }])),
   }), [vals, date, seg, initial]);
 

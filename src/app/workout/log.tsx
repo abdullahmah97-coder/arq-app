@@ -21,6 +21,7 @@ import { getExercise } from '@/three/catalog';
 import { brand, fonts, night, pulse, space } from '@/theme';
 import { goBackOrHome } from '@/lib/nav';
 import { cancelRestAlert, scheduleRestAlert } from '@/lib/restAlert';
+import { parseDecimal } from '@/lib/digits';
 
 interface Draft { weight: string; reps: string }
 
@@ -87,7 +88,7 @@ export default function WorkoutLog() {
       return;
     }
     const d = draftOf(ex, i, target);
-    const entry = { exercise_id: ex, set_index: i, reps: Math.max(0, parseInt(d.reps, 10) || 0), weight_kg: Math.max(0, parseFloat(d.weight.replace(',', '.')) || 0), done_at: new Date().toISOString() };
+    const entry = { exercise_id: ex, set_index: i, reps: Math.max(0, Math.floor(parseDecimal(d.reps) ?? 0)), weight_kg: parseDecimal(d.weight) ?? 0, done_at: new Date().toISOString() };
     if (!entry.reps) return;
     update({ ...w, done: [...w.done, entry] });
     setRest({ until: Date.now() + restSec * 1000, total: restSec });

@@ -14,6 +14,7 @@ import { totals, type MealSlot } from '@/lib/nutrition';
 import { errorKey } from '@/lib/supabase';
 import { goBackOrHome } from '@/lib/nav';
 import { brand, colors, radius, space } from '@/theme';
+import { parseDecimal } from '@/lib/digits';
 
 const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
@@ -48,7 +49,7 @@ export default function SubscriberScreen() {
   const target = s.calories ?? null;
 
   const add = async (slot: MealSlot, p?: Product) => {
-    const n = (v: string) => { const x = parseFloat(v.replace(',', '.')); return Number.isFinite(x) ? x : 0; };
+    const n = (v: string) => parseDecimal(v) ?? 0;
     const m = p
       ? { name: p.name, product_id: p.id, kcal: p.kcal ?? 0, protein_g: +(p.protein_g ?? 0), carbs_g: +(p.carbs_g ?? 0), fat_g: +(p.fat_g ?? 0) }
       : { name: custom.name, product_id: null, kcal: Math.round(n(custom.kcal) || n(custom.p) * 4 + n(custom.c) * 4 + n(custom.f) * 9), protein_g: n(custom.p), carbs_g: n(custom.c), fat_g: n(custom.f) };

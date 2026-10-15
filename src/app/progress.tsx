@@ -10,6 +10,7 @@ import { useLocalized } from '@/lib/i18n';
 import { errorKey, signedBodyUrl, supabase, uploadImage } from '@/lib/supabase';
 import type { BodyLog } from '@/lib/types';
 import { colors, radius, space } from '@/theme';
+import { toNumber } from '@/lib/digits';
 
 type LogWithUrl = BodyLog & { url?: string };
 
@@ -34,7 +35,7 @@ export default function Progress() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const save = async () => {
-    const w = Number(weight);
+    const w = toNumber(weight);
     if (!(w >= 30 && w <= 300)) return Alert.alert(t('errors.invalidNumber'));
     setBusy(true);
     try {

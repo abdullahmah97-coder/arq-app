@@ -10,6 +10,7 @@ import { errorKey, publicUrl, supabase, uploadImage } from '@/lib/supabase';
 import type { Gender, Goal, Level } from '@/lib/types';
 import { space } from '@/theme';
 import { goBackOrHome } from '@/lib/nav';
+import { toNumber } from '@/lib/digits';
 
 export default function ProfileEdit() {
   const { t } = useTranslation();
@@ -29,7 +30,7 @@ export default function ProfileEdit() {
   const save = async () => {
     const u = username.trim().toLowerCase();
     if (!/^[a-z0-9_.]{3,24}$/.test(u)) return Alert.alert(t('errors.invalidUsername'));
-    const h = Number(height);
+    const h = toNumber(height);
     if (!(h >= 120 && h <= 230)) return Alert.alert(t('errors.invalidNumber'));
     setBusy(true);
     try {

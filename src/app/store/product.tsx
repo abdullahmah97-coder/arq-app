@@ -12,6 +12,7 @@ import { pickImage } from '@/lib/images';
 import { errorKey, publicUrl, supabase, uploadImage } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 import { goBackOrHome } from '@/lib/nav';
+import { toNumber } from '@/lib/digits';
 
 export default function ProductForm() {
   const { brand: brandId, id } = useLocalSearchParams<{ brand: string; id?: string }>();
@@ -49,7 +50,7 @@ export default function ProductForm() {
     try { setImage(await uploadImage('brands', userId, img.uri, img.mimeType)); } catch (e) { Alert.alert(t(errorKey(e))); }
   };
 
-  const toNum = (v: string) => (v.trim() ? Number(v.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(',', '.')) : null);
+  const toNum = (v: string) => (v.trim() ? toNumber(v) : null);
   const save = async () => {
     if (name.trim().length < 2) return Alert.alert(t('store.err_productName'));
     const n = toNum(price);

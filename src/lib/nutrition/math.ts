@@ -62,7 +62,8 @@ export function searchFoods(q: string, foods: Food[]): Food[] {
   return foods
     .map((f) => {
       const hay = normalizeSearch(`${f.name.ar} ${f.name.en}`);
-      if (!words.every((w) => hay.includes(w))) return null;
+      // «البرجر» تلقى «برجر لحم»: الكلمة كما هي، أو بدون «ال» في أولها
+      if (!words.every((w) => hay.includes(w) || (w.length > 3 && w.startsWith('ال') && hay.includes(w.slice(2))))) return null;
       const starts = normalizeSearch(f.name.ar).startsWith(n) || normalizeSearch(f.name.en).startsWith(n) ? 0 : 1;
       return { f, score: starts };
     })

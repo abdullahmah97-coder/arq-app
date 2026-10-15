@@ -7,6 +7,7 @@ import { Alert, I18nManager, KeyboardAvoidingView, Platform, Pressable, ScrollVi
 import { Button, Card, Input, Row, Screen, Segmented, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
+import { parseDecimal } from '@/lib/digits';
 import {
   FOOD_CATEGORIES, FOODS, getFood, kcalFromMacros, logFood, logFromDb, recentFoodIds, scaleFood, searchFoods,
   servingsFromGrams, slotForHour, type Food, type FoodCategory, type MealSlot,
@@ -15,7 +16,8 @@ import { errorKey } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 
 const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'snack', 'dinner'];
-const num0 = (s: string) => { const n = parseFloat(s.replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+// «٢٥٠» و«٧٥٫٥» من لوحة الأرقام العربية تنقرا زي «250» و«75.5» (قبل كانت تطلع صفر وينرفض الأكل المخصص)
+const num0 = (s: string) => parseDecimal(s) ?? 0;
 
 export default function AddFood() {
   const { t } = useTranslation();

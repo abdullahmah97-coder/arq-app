@@ -12,9 +12,10 @@ import { useLocalized } from '@/lib/i18n';
 import { errorKey, supabase } from '@/lib/supabase';
 import { brand, colors, radius, space } from '@/theme';
 import { goBackOrHome } from '@/lib/nav';
+import { toNumber } from '@/lib/digits';
 
 const MONTHS = [0, 1, 3, 6, 12];
-const toNum = (s: string) => { const v = Number(s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(',', '.')); return Number.isFinite(v) ? v : NaN; };
+const toNum = toNumber; // أرقام عربية وفاصلة «٫»
 const plusDays = (n: number) => todayIso(n);
 
 export default function OfferForm() {

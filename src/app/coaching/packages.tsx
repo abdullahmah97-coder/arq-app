@@ -8,9 +8,10 @@ import { useUser } from '@/lib/auth';
 import { deletePackage, loadPackages, savePackage, type CoachPackage } from '@/lib/coaching';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
+import { toNumber } from '@/lib/digits';
 
 const EMPTY = { id: undefined as string | undefined, title: '', sessions: '8', price: '', valid: '30', description: '', online: false, active: true };
-const num = (s: string) => Number(s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))));
+const num = (s: string) => (s.trim() ? toNumber(s) : 0);
 
 export default function Packages() {
   const { t } = useTranslation();

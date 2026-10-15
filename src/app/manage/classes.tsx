@@ -7,6 +7,7 @@ import { Button, Card, Empty, Input, Row, Screen, Segmented, T } from '@/compone
 import { deleteClass, loadClasses, loadSchedule, saveClass, type ClassSlot } from '@/lib/gymops';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
+import { toNumber } from '@/lib/digits';
 
 type Form = { id?: string; name: string; coach_name: string; weekday: number; start_time: string; duration_min: string; capacity: string; audience: 'men' | 'women' | 'mixed'; members_only: boolean; active: boolean };
 const EMPTY: Form = { name: '', coach_name: '', weekday: 0, start_time: '19:00', duration_min: '45', capacity: '20', audience: 'mixed', members_only: true, active: true };
@@ -31,7 +32,7 @@ export default function ClassesAdmin() {
     setBusy(true);
     try {
       await saveClass({ id: form.id, gym_id: String(gym), name: form.name.trim(), coach_name: form.coach_name.trim() || null, weekday: form.weekday,
-        start_time: form.start_time, duration_min: Number(form.duration_min) || 45, capacity: Number(form.capacity) || 20, audience: form.audience,
+        start_time: form.start_time, duration_min: toNumber(form.duration_min) || 45, capacity: toNumber(form.capacity) || 20, audience: form.audience,
         members_only: form.members_only, active: form.active });
       setForm(null); load();
     } catch (e) { Alert.alert(t(errorKey(e))); } finally { setBusy(false); }

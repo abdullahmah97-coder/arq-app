@@ -31,6 +31,8 @@ ok(normalizeSearch('الكَبْسة') === 'الكبسه' && normalizeSearch('أ
 ok(searchFoods('كبسه', FOODS)[0]?.id.startsWith('kabsa'), 'search finds kabsa with ه');
 ok(searchFoods('shawarma', FOODS).length >= 2 && searchFoods('شاورما دجاج', FOODS)[0]?.id === 'shawarma_chicken', 'search english + multi-word arabic');
 ok(searchFoods('تمر', FOODS).some((f) => f.id === 'dates'), 'search dates');
+ok(searchFoods('البرجر', FOODS).length > 0 && searchFoods('البرجر', FOODS).length === searchFoods('برجر', FOODS).length, 'search ignores a leading ال (البرجر = برجر)');
+ok(searchFoods('الكبسة', FOODS)[0]?.id.startsWith('kabsa'), 'search الكبسة finds kabsa');
 const cf = estimateCarbsFat(600, 40, { carbs_g: 250, fat_g: 70 });
 ok(Math.abs(kcalFromMacros(40, cf.carbs_g, cf.fat_g) - 600) <= 2, 'plan meal carbs/fat fill the calories');
 

@@ -15,6 +15,7 @@ import { errorKey, supabase, uploadImage } from '@/lib/supabase';
 import type { Gender, Goal, Level } from '@/lib/types';
 import { Logo } from '@/brand/Brand';
 import { colors, radius, space } from '@/theme';
+import { toNumber } from '@/lib/digits';
 
 const TOTAL = 6;
 
@@ -39,16 +40,16 @@ export default function Onboarding() {
 
   const input = (): PlanInput => ({
     gender,
-    age: new Date().getFullYear() - Number(birthYear),
-    height_cm: Number(height),
-    weight_kg: Number(weight),
+    age: new Date().getFullYear() - toNumber(birthYear),
+    height_cm: toNumber(height),
+    weight_kg: toNumber(weight),
     goal,
     level,
     days_per_week: days,
   });
 
   const next = () => {
-    if (step === 0 && !(Number(birthYear) > 1920 && Number(birthYear) <= new Date().getFullYear() - 13)) {
+    if (step === 0 && !(toNumber(birthYear) > 1920 && toNumber(birthYear) <= new Date().getFullYear() - 13)) {
       return Alert.alert(t('errors.invalidNumber'));
     }
     if (step === 1 && validateInput({ ...input(), age: 30 })) return Alert.alert(t('errors.invalidNumber'));
@@ -66,7 +67,7 @@ export default function Onboarding() {
     try {
       const i = input();
       const { error: hErr } = await supabase.from('health_profiles').upsert({
-        user_id: userId, gender, birth_year: Number(birthYear), height_cm: i.height_cm, weight_kg: i.weight_kg,
+        user_id: userId, gender, birth_year: toNumber(birthYear), height_cm: i.height_cm, weight_kg: i.weight_kg,
         goal, level, days_per_week: days, updated_at: new Date().toISOString(),
       });
       if (hErr) throw hErr;

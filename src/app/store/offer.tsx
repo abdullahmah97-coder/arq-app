@@ -8,6 +8,7 @@ import { deleteBrandOffer, loadBrandOffers, saveBrandOffer } from '@/lib/brands'
 import { goBackOrHome } from '@/lib/nav';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
+import { toNumber } from '@/lib/digits';
 
 const arDigits = (s: string) => s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
 
@@ -39,7 +40,7 @@ export default function StoreOfferForm() {
 
   const save = async () => {
     if (title.trim().length < 3) return Alert.alert(t('partners.err_offerTitle'));
-    const pct = percent.trim() ? Number(arDigits(percent.trim())) : null;
+    const pct = percent.trim() ? toNumber(percent) : null;
     if (pct != null && (!Number.isFinite(pct) || pct < 1 || pct > 90)) return Alert.alert(t('partners.err_percent'));
     if (code.trim() && !/^[A-Za-z0-9_-]{2,30}$/.test(code.trim())) return Alert.alert(t('partners.err_code'));
     const endsOn = arDigits(ends.trim());

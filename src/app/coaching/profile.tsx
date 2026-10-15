@@ -14,8 +14,9 @@ import { useLocalized } from '@/lib/i18n';
 import { goBackOrHome } from '@/lib/nav';
 import { errorKey } from '@/lib/supabase';
 import { brand, colors, space } from '@/theme';
+import { parseDecimal } from '@/lib/digits';
 
-const num = (s: string) => { const v = Number(s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))); return Number.isFinite(v) ? v : null; };
+const num = (s: string) => (s.trim() ? parseDecimal(s) : 0);
 
 export default function CoachProfileEdit() {
   const { t } = useTranslation();

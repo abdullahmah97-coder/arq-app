@@ -15,6 +15,7 @@ import { useLocalized } from '@/lib/i18n';
 import { goBackOrHome } from '@/lib/nav';
 import { errorKey } from '@/lib/supabase';
 import { colors, radius, space } from '@/theme';
+import { toNumber } from '@/lib/digits';
 
 type Tab = 'record' | 'report' | 'program' | 'sessions' | 'notes';
 
@@ -51,13 +52,13 @@ export default function ClientRecord() {
 
   const saveProgram = async () => {
     if (pf.title.trim().length < 2) return Alert.alert(t('coaching.err_program'));
-    try { await assignProgram(c.client_id, { title: pf.title, program_id: pf.program_id, days_per_week: pf.days, weeks: Number(pf.weeks) || 4, notes: pf.notes }); Alert.alert(t('coaching.programAssigned')); load(); }
+    try { await assignProgram(c.client_id, { title: pf.title, program_id: pf.program_id, days_per_week: pf.days, weeks: toNumber(pf.weeks) || 4, notes: pf.notes }); Alert.alert(t('coaching.programAssigned')); load(); }
     catch (e) { Alert.alert(t(errorKey(e))); }
   };
   const book = async () => {
     const d = parseRiyadh(sf.when);
     if (!d || d.getTime() < Date.now() - 86400000) return Alert.alert(t('coaching.err_when'));
-    try { await bookSession(c.client_id, d, Number(sf.minutes) || 60, sf.place); setSf({ when: '', minutes: '60', place: '' }); load(); }
+    try { await bookSession(c.client_id, d, toNumber(sf.minutes) || 60, sf.place); setSf({ when: '', minutes: '60', place: '' }); load(); }
     catch (e) { Alert.alert(t(errorKey(e))); }
   };
   const end = () => Alert.alert(t('coaching.endTitle'), t('coaching.endBody', { name }), [
