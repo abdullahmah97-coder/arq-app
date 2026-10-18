@@ -1,8 +1,9 @@
-// قطع الدوري السعودي: شارة الفريق (حرف بألوان النادي بدل الشعار)، نقطة «مباشر»، شكل الفريق، وسطر المباراة
+// قطع الدوري السعودي: شارة الفريق (حرف بألوان النادي بدل الشعار)، نقطة «مباشر»، شكل الفريق، وسطر المباراة،
+// وسطر مصدر البيانات (شروط SportScore تطلب «Powered by SportScore» ظاهر في كل شاشة تعرض بياناتهم)
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { T } from '@/components/ui';
 import {
   kickoffClock, liveLabel, stateOf, teamColors, teamInitial, teamName, type LeagueMatch, type LeagueTeam,
@@ -142,6 +143,17 @@ export function DayHeader({ title }: { title: string }) {
       <View style={{ width: 4, height: 16, borderRadius: 2, backgroundColor: brand.orange }} />
       <T semibold size="sm">{title}</T>
     </View>
+  );
+}
+
+/** مصدر البيانات: «Powered by SportScore» برابط لموقعهم (شرط الخطة المجانية، ما يتشال ولا يتغير نصه) */
+export const SOURCE_URL = 'https://sportscore.com';
+export function SourceCredit({ color = colors.muted, size = 12 }: { color?: string; size?: number }) {
+  return (
+    <Pressable onPress={() => Linking.openURL(SOURCE_URL).catch(() => {})} accessibilityRole="link" accessibilityLabel="Powered by SportScore"
+      hitSlop={8} style={{ alignSelf: 'center', paddingVertical: 2 }}>
+      <Text allowFontScaling={false} style={{ color, fontSize: size, fontFamily: fonts.body, textDecorationLine: 'underline' }}>Powered by SportScore</Text>
+    </Pressable>
   );
 }
 

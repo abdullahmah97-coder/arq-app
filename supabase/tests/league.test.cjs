@@ -18,7 +18,7 @@ const { setup } = require('./_harness.cjs');
 
   // ---------- الإعداد ----------
   const s0 = await setting();
-  check('setting starts off with API-Football league 307 and webook', s0.enabled === false && s0.league_id === 307 && s0.tickets_url.startsWith('https://webook.com'), JSON.stringify(s0));
+  check('setting starts off with league 307 and webook', s0.enabled === false && s0.league_id === 307 && s0.tickets_url.startsWith('https://webook.com'), JSON.stringify(s0));
   check('while off, the cron job does nothing', (await q(`select run_league() as r`))[0].r === 'off');
   await expectErr('an admin who is not the owner cannot change it', async () => {
     await q(`insert into app_admins (user_id) values ($1) on conflict do nothing`, [U.D]);
@@ -178,6 +178,21 @@ const { setup } = require('./_harness.cjs');
   await q(`insert into league_fans (user_id, team_id) values ($1, 2938) on conflict (user_id) do update set team_id = 2938`, [U.D]);
   await q(`select run_league()`);
   check('run_league sends pending full-time notices', (await notices(U.D, 'league-ft:1002')).length === 1);
+
+  // ---------- SportScore: مرجع المباراة، وما نمسح الجولة والملعب ----------
+  const ss = [{ id: 1987654321, name: 'Diraiyah' }, { id: 1987654322, name: 'NEOM Sports Club' }];
+  await ingest('full', 2026, ss, [{ id: 7700000000001, league: 307, season: 2026, kickoff: iso(60 * 24), status: 'NS', home: 1987654321, away: 1987654322,
+    round: 'Regular Season - 10', venue: 'Prince Faisal bin Fahd', ref: 'al-diraiyah-vs-neom-sports-club/2y8m4zh5od9xyz1' }]);
+  const nm = Object.fromEntries((await q(`select id, name_ar from league_teams where id in (1987654321, 1987654322)`)).map((r) => [r.id, r.name_ar]));
+  check('SportScore spellings get Arabic names (Diraiyah, NEOM)', nm[1987654321] === 'الدرعية' && nm[1987654322] === 'نيوم', JSON.stringify(nm));
+  check('the provider match reference is stored', (await q(`select source_ref from league_matches where id = 7700000000001`))[0].source_ref === 'al-diraiyah-vs-neom-sports-club/2y8m4zh5od9xyz1');
+  await ingest('live', 2026, ss, [{ id: 7700000000001, kickoff: iso(60 * 24), status: '1H', elapsed: 5, home: 1987654321, away: 1987654322, hg: 0, ag: 0 }]);
+  const kept = (await q(`select source_ref, round, venue, status from league_matches where id = 7700000000001`))[0];
+  check('an update without reference/round/venue keeps the saved ones', kept.source_ref === 'al-diraiyah-vs-neom-sports-club/2y8m4zh5od9xyz1' && kept.round === 'Regular Season - 10' && kept.venue === 'Prince Faisal bin Fahd' && kept.status === '1H', JSON.stringify(kept));
+  await ingest('full', 2026, ss, [{ id: 7700000000002, kickoff: iso(60 * 48), status: 'NS', home: 1987654322, away: 1987654321, ref: "x'); drop table league_teams; --/abcdefg" }]);
+  check('a junk reference is not stored', (await q(`select source_ref from league_matches where id = 7700000000002`))[0].source_ref === null);
+  check('big match ids (from the provider key) fit', (await as(U.A, `select id from league_matches where id = 7700000000001`)).length === 1);
+  await q(`delete from league_matches where id in (7700000000001, 7700000000002)`);
 
   // حذف الحساب
   await q(`delete from auth.users where id = $1`, [U.C]);

@@ -2854,7 +2854,7 @@
     "soon": "Coming soon: Saudi League scores, fixtures and tickets right here",
     "loadFailed": "We couldn't load the league. Check your connection and try again",
     "notFound": "We couldn't find this match",
-    "sourceNote": "Scores and fixtures come from API-Football and refresh every few minutes during matches, so they may lag the broadcast slightly. ARQ does not sell tickets.",
+    "sourceNote": "Scores and fixtures come from SportScore and refresh every 5 minutes during matches, so they may lag the broadcast slightly. ARQ does not sell tickets.",
     "team": "Team",
     "played": "P",
     "gd": "GD",
@@ -2903,7 +2903,7 @@
     "st_INT": "Interrupted"
   },
   "leagueAdmin": {
-    "intro": "Saudi League scores, fixtures and table from API-Football, refreshed automatically every 1–5 minutes during matches and every 3 hours otherwise.",
+    "intro": "Saudi League scores, fixtures and table from SportScore (free, no key), refreshed automatically every 5 minutes during matches and every 3 hours otherwise.",
     "ownerSubOn": "On · {{matches}} matches",
     "ownerSubOff": "Off (hidden in the app)",
     "notReady": "Server not set up yet (function URL in the vault)",
@@ -2919,7 +2919,7 @@
     "people": "Followers",
     "peopleValue": "{{fans}} fans · {{reminders}} reminders",
     "requestsLeft": "Requests left today",
-    "keyNote": "You add the API-Football key yourself as the Supabase secret API_FOOTBALL_KEY (never in the app, never shared). The free plan does not include the current season.",
+    "keyNote": "The source is free and needs no key. Its condition: \"Powered by SportScore\" must show on every screen with their data (it does, on the pages and the home tile). The provider does not report requests left.",
     "enabled": "Show the league in the app",
     "enabledHint": "Shows the home tile and page, and starts reminders",
     "remindBefore": "Reminder before kick-off",

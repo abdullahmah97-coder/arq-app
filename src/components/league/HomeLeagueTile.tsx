@@ -11,7 +11,7 @@ import { LONG_PRESS_MS, useHomeLongPress } from '@/lib/homeLayout';
 import { useLocalized } from '@/lib/i18n';
 import { kickoffLabel, loadLeague, myTeam, spotlight, stateOf, teamName, type LeagueData, type LeagueMatch } from '@/lib/league';
 import { brand } from '@/theme';
-import { LivePill, Score, TeamBadge } from './LeagueParts';
+import { LivePill, Score, SourceCredit, TeamBadge } from './LeagueParts';
 
 export function HomeLeagueTile() {
   const { t } = useTranslation();
@@ -76,6 +76,7 @@ export function HomeLeagueTile() {
           </NT>
         </View>
       ) : null}
+      {m ? <SourceCredit color={brand.sand} size={10} /> : null}
     </Pressable>
   );
 }

@@ -1,12 +1,12 @@
 // الدوري السعودي: المباريات القادمة (والمباشرة فوقها)، النتائج، جدول الترتيب، «فريقي» و«ذكّرني»
-// البيانات من API-Football عبر الخادم (league-sync)، وتتحدث كل دقيقة وأنت فاتح الصفحة وقت المباريات
+// البيانات من SportScore عبر الخادم (league-sync)، وتتحدث كل دقيقة وأنت فاتح الصفحة وقت المباريات
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
-import { DayHeader, FormDots, MatchRow, TeamBadge } from '@/components/league/LeagueParts';
+import { DayHeader, FormDots, MatchRow, TeamBadge, SourceCredit } from '@/components/league/LeagueParts';
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import {
@@ -145,6 +145,7 @@ export default function League() {
       )}
 
       <T size="xs" muted center style={{ lineHeight: 19 }}>{t('league.sourceNote')}</T>
+      <SourceCredit />
     </Screen>
   );
 }

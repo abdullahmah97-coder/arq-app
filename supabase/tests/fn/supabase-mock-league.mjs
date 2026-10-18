@@ -1,11 +1,36 @@
-// بديل supabase-js لاختبار دالة league-sync: مفتاح القاعدة، الإعداد، ونداءات league_ingest
+// بديل supabase-js لاختبار دالة league-sync: مفتاح القاعدة، الإعداد، مباريات تنتظر المتابعة، ونداءات league_ingest
 export const db = (globalThis.__leagueState ??= {
   key: 'league-secret',
   keyError: null,
   settings: { enabled: true, league_id: 307, remind_minutes: 60, live_every_min: 5, full_every_hours: 3, tickets_url: 'https://webook.com/ar/spl' },
   ingestError: null,
+  // صفوف league_matches اللي ترجع للدالة (id, kickoff, status, source_ref)، والفلترة بالوقت تصير هنا مثل القاعدة
+  matches: [],
+  matchesError: null,
   calls: [],
 });
+
+function matchesQuery() {
+  const f = { gte: null, lte: null, notNullRef: false, limit: 1000 };
+  const b = {
+    select: () => b,
+    gte: (c, v) => { if (c === 'kickoff') f.gte = v; return b; },
+    lte: (c, v) => { if (c === 'kickoff') f.lte = v; return b; },
+    not: (c, op, v) => { if (c === 'source_ref' && op === 'is' && v === null) f.notNullRef = true; return b; },
+    order: () => b,
+    limit: (n) => { f.limit = n; return b; },
+    then: (resolve, reject) => {
+      db.calls.push({ fn: 'league_matches', args: { ...f } });
+      if (db.matchesError) return Promise.resolve({ data: null, error: { message: db.matchesError } }).then(resolve, reject);
+      const rows = db.matches
+        .filter((m) => (!f.gte || m.kickoff >= f.gte) && (!f.lte || m.kickoff <= f.lte) && (!f.notNullRef || m.source_ref != null))
+        .sort((a, z) => a.kickoff.localeCompare(z.kickoff))
+        .slice(0, f.limit);
+      return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+    },
+  };
+  return b;
+}
 
 export function createClient(_url, key) {
   const service = key === 'service';
@@ -25,6 +50,7 @@ export function createClient(_url, key) {
       return { data: null, error: { message: 'unknown function ' + fn } };
     },
     from: (table) => {
+      if (table === 'league_matches') return matchesQuery();
       if (table !== 'app_settings') throw new Error('unexpected table ' + table);
       const f = {};
       const b = {

@@ -7,7 +7,7 @@ import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Share, StyleSheet, View } from 'react-native';
 import { SaduPattern } from '@/brand/Brand';
-import { FormDots, LivePill, MatchRow, Score, TeamBadge } from '@/components/league/LeagueParts';
+import { FormDots, LivePill, MatchRow, Score, TeamBadge, SourceCredit } from '@/components/league/LeagueParts';
 import { Button, Card, Empty, Loading, Row, Screen, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import {
@@ -179,6 +179,7 @@ export default function MatchPage() {
       ) : null}
 
       <T size="xs" muted center style={{ lineHeight: 19 }}>{t('league.sourceNote')}</T>
+      <SourceCredit />
     </Screen>
   );
 }
