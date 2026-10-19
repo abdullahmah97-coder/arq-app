@@ -190,6 +190,19 @@ export async function setMyTeam(userId: string, teamId: number | null): Promise<
   if (error) throw error;
 }
 
+/** فريقي + تذكير التوقع (قبل مبارياته بثلاث ساعات لو ما توقعت). بدون فريق = ما فيه تذكير توقع */
+export type FanPrefs = { team: number | null; predRemind: boolean };
+export async function myFanPrefs(): Promise<FanPrefs> {
+  const { data, error } = await supabase.from('league_fans').select('team_id, pred_remind').maybeSingle();
+  if (error) throw error;
+  return { team: (data?.team_id as number | undefined) ?? null, predRemind: data?.pred_remind !== false };
+}
+
+export async function setPredRemind(userId: string, on: boolean): Promise<void> {
+  const { error } = await supabase.from('league_fans').update({ pred_remind: on }).eq('user_id', userId);
+  if (error) throw error;
+}
+
 // ---------- لوحة إدارة التطبيق ----------
 export type LeagueAdminStatus = {
   settings: { enabled: boolean; league_id: number; remind_minutes: number; live_every_min: number; full_every_hours: number; tickets_url: string; season?: number };

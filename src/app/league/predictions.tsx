@@ -1,10 +1,11 @@
 // تحدي التوقعات: نقاطك وترتيبك بين أصدقائك (أو الكل)، المباريات الجاية تتوقعها، وتوقعاتك اللي خلصت بنقاطها.
 // النقاط: النتيجة بالضبط = ٣، الفائز أو التعادل صح = ١ (تنحسب بالخادم من نتيجة المباراة)
+// وتذكير التوقع: قبل مباريات فريقك بثلاث ساعات لو ما توقعت (يطفيه من هنا)
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Share, Text, View } from 'react-native';
+import { Alert, I18nManager, Pressable, Share, Switch, Text, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { PointsBadge } from '@/components/league/Predict';
 import { DayHeader, TeamBadge } from '@/components/league/LeagueParts';
@@ -12,9 +13,10 @@ import { Avatar, Button, Card, Empty, Loading, Row, Screen, Segmented, T } from 
 import { useAuth } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
 import {
-  finishedMatches, kickoffLabel, loadLeague, loadPredBoard, myPredictions, predPoints, stateOf, teamName, upcomingMatches,
-  type LeagueData, type LeagueMatch, type PredBoardRow,
+  finishedMatches, kickoffLabel, loadLeague, loadPredBoard, myFanPrefs, myPredictions, predPoints, setPredRemind, stateOf, teamName, upcomingMatches,
+  type FanPrefs, type LeagueData, type LeagueMatch, type PredBoardRow,
 } from '@/lib/league';
+import { enablePush } from '@/lib/push';
 import { publicUrl } from '@/lib/supabase';
 import { brand, colors, fonts, radius, space } from '@/theme';
 
@@ -40,16 +42,31 @@ export default function Predictions() {
   const [board, setBoard] = useState<PredBoardRow[] | null>(null);
   const [data, setData] = useState<LeagueData | null>(null);
   const [mine, setMine] = useState<Map<number, { home: number; away: number }>>(new Map());
+  const [fan, setFan] = useState<FanPrefs | null>(null);
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(async (sc: Scope) => {
     try {
-      const [b, d, p] = await Promise.all([loadPredBoard(sc), loadLeague(), uid ? myPredictions(uid) : Promise.resolve(new Map())]);
-      setBoard(b); setData(d); setMine(p); setFailed(false);
+      const [b, d, p, f] = await Promise.all([loadPredBoard(sc), loadLeague(), uid ? myPredictions(uid) : Promise.resolve(new Map()),
+        myFanPrefs().catch(() => null)]);
+      setBoard(b); setData(d); setMine(p); setFan(f); setFailed(false);
     } catch {
       setFailed(true);
     }
   }, [uid]);
+
+  const toggleRemind = async (on: boolean) => {
+    if (!uid || !fan || fan.team == null) return;
+    const prev = fan;
+    setFan({ ...fan, predRemind: on });
+    try {
+      await setPredRemind(uid, on);
+      if (on) enablePush(true).catch(() => {});
+    } catch {
+      setFan(prev);
+      Alert.alert(t('errors.generic'));
+    }
+  };
 
   useFocusEffect(useCallback(() => { load(scope); }, [load, scope]));
 
@@ -145,6 +162,8 @@ export default function Predictions() {
         </View>
       ) : null}
 
+      {fan ? <RemindRow fan={fan} team={fan.team != null && data.teams.has(fan.team) ? teamName(data.teams.get(fan.team), lng) : null} onToggle={toggleRemind} /> : null}
+
       {done.length ? (
         <View style={{ gap: space.sm }}>
           <DayHeader title={t('league.predHistory')} />
@@ -171,6 +190,39 @@ export default function Predictions() {
         </View>
       ) : null}
     </Screen>
+  );
+}
+
+/** تذكير التوقع: مفتاح لمشجع الفريق، أو دعوة يختار فريقه */
+function RemindRow({ fan, team, onToggle }: { fan: FanPrefs; team: string | null; onToggle: (on: boolean) => void }) {
+  const { t } = useTranslation();
+  const box = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: space.md, backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: space.md };
+  const icon = (
+    <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name="notifications-outline" size={20} color={colors.primary} />
+    </View>
+  );
+  if (fan.team == null) {
+    return (
+      <Pressable onPress={() => router.push('/league/team')} accessibilityRole="button" accessibilityLabel={t('league.predRemindPick')}
+        style={({ pressed }) => [box, pressed && { opacity: 0.85 }]}>
+        {icon}
+        <T size="sm" style={{ flex: 1, lineHeight: 21 }}>{t('league.predRemindPick')}</T>
+        <Ionicons name="chevron-forward" size={18} color={colors.muted} style={{ transform: [{ scaleX: I18nManager.isRTL ? -1 : 1 }] }} />
+      </Pressable>
+    );
+  }
+  const title = team ? t('league.predRemindTitle', { team }) : t('league.predRemindTitleMine');
+  return (
+    <View style={box}>
+      {icon}
+      <View style={{ flex: 1 }}>
+        <T semibold>{title}</T>
+        <T size="xs" muted style={{ lineHeight: 18 }}>{t('league.predRemindHint')}</T>
+      </View>
+      <Switch value={fan.predRemind} onValueChange={onToggle} trackColor={{ true: brand.orange }} accessibilityLabel={title} />
+    </View>
   );
 }
 
