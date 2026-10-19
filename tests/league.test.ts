@@ -5,7 +5,7 @@ import {
   matchDayTitle, matchState, resultFor, roundNumber, shortEnName, signed, sortStandings, spotlight, teamColors, teamInitial, teamLogo, teamName,
   upcomingMatches, type LeagueMatch, type LeagueStanding, type LeagueTeam,
   goalsWithSide, hasDetails, lineupRows, minuteText, nameFor, playerMarks, playerNamesIn, readDetails, readScorers, redCards, samePlayer, scorerLines,
-  shortPlayer, statBars,
+  shortPlayer, statBars, crowdShares, predErrorKey, predLocked, predPoints, readPredSummary,
   type LineupPlayer,
 } from '../src/lib/leagueCore';
 
@@ -161,6 +161,19 @@ ok(nameFor(ar, 'ar')('Joshua King') === 'جوشوا كينغ' && nameFor(ar, 'ar
 const slAr = scorerLines(det.events, nameFor(ar, 'ar'));
 ok(slAr.h[0].name === 'هاراسلين' && slAr.a.find((x) => x.mins.length === 2)?.name === 'كينغ' && slAr.h[1].name === 'Kanga', 'scorer lines use the short Arabic name', JSON.stringify(slAr));
 ok(shortPlayer('سالم الدوسري') === 'الدوسري' && shortPlayer('كريستيانو رونالدو') === 'رونالدو', 'short Arabic names');
+
+// التوقعات
+ok(predPoints(2, 1, 2, 1) === 3 && predPoints(3, 1, 2, 0) === 1 && predPoints(1, 1, 0, 0) === 1 && predPoints(0, 1, 2, 0) === 0 && predPoints(1, 0, null, null) === null, 'prediction points: exact 3, result 1, wrong 0, unfinished null');
+const cs = crowdShares({ total: 3, home_win: 1, draw: 1, away_win: 1 });
+ok(!!cs && cs.home + cs.draw + cs.away === 100 && Math.max(cs.home, cs.draw, cs.away) - Math.min(cs.home, cs.draw, cs.away) <= 1, 'crowd shares always add up to 100', JSON.stringify(cs));
+ok(JSON.stringify(crowdShares({ total: 4, home_win: 2, draw: 1, away_win: 1 })) === '{"home":50,"draw":25,"away":25}' && crowdShares({ total: 0, home_win: 0, draw: 0, away_win: 0 }) === null, 'crowd shares: exact split, none when empty');
+const sum = readPredSummary({ total: 4, home_win: 2, draw: 1, away_win: 1, locked: true, mine: { home: 2, away: 1, points: 3, shared: true },
+  friends: [{ user_id: 'u1', username: 'sara', full_name: 'Sara', avatar_url: null, home: 1, away: 1, points: 0 }, { user_id: 'u2', username: 'x' }, { nope: 1 }] });
+ok(!!sum && sum.mine?.points === 3 && sum.mine.shared && sum.friends.length === 2 && sum.friends[0].home === 1 && !('home' in sum.friends[1]) && sum.friends[1].points === null, 'prediction summary read defensively', JSON.stringify(sum));
+ok(readPredSummary(null) === null && readPredSummary({ total: 'x', mine: { home: 'a' } })?.mine === null, 'prediction summary: junk');
+ok(!predLocked({ kickoff: '2026-10-16T18:00:00Z', status: 'NS' }, NOW) && predLocked({ kickoff: '2026-10-16T14:00:00Z', status: 'NS' }, NOW)
+  && predLocked({ kickoff: '2026-10-16T18:00:00Z', status: 'PST' }, NOW) && predLocked({ kickoff: '2026-10-16T18:00:00Z', status: '1H' }, NOW), 'prediction locks at kick-off, or when the match is no longer scheduled');
+ok(predErrorKey('locked') === 'league.predLocked' && predErrorKey('bad_score') === 'league.predBadScore' && predErrorKey('boom') === 'errors.generic', 'prediction error messages');
 
 if (fail) process.exit(1);
 console.log('ALL LEAGUE TESTS PASSED');

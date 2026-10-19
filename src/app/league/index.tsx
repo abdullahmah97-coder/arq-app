@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, I18nManager, Pressable, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { DayHeader, FormDots, MatchRow, TeamBadge, SourceCredit } from '@/components/league/LeagueParts';
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
@@ -113,6 +113,18 @@ export default function League() {
         <Empty icon="football-outline" text={data.settings.enabled ? t('league.noData') : t('league.soon')} />
       ) : (
         <>
+          <Pressable onPress={() => router.push('/league/predictions')} accessibilityRole="button" accessibilityLabel={t('league.predTitle')}
+            style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: space.md, backgroundColor: colors.card, borderWidth: 1.5,
+              borderColor: brand.amber, borderRadius: radius.lg, padding: space.md }, pressed && { opacity: 0.85 }]}>
+            <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: brand.amber, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="trophy" size={20} color={brand.deepGreen} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <T semibold>{t('league.predTitle')}</T>
+              <T size="xs" muted style={{ lineHeight: 18 }}>{t('league.predBannerSub')}</T>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted} style={{ transform: [{ scaleX: I18nManager.isRTL ? -1 : 1 }] }} />
+          </Pressable>
           <Segmented<Tab> value={tab} onChange={(v) => { setTab(v); setLimit(PAGE); }}
             options={[{ value: 'next', label: t('league.tabNext') }, { value: 'results', label: t('league.tabResults') },
               { value: 'table', label: t('league.tabTable') }, { value: 'scorers', label: t('league.tabScorers') }]} />

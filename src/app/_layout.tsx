@@ -173,6 +173,7 @@ function RootNavigator() {
         <Stack.Screen name="league/index" options={{ title: t('league.title') }} />
         <Stack.Screen name="league/[id]" options={{ title: '' }} />
         <Stack.Screen name="league/team" options={{ title: t('league.pickTeam'), presentation: 'modal' }} />
+        <Stack.Screen name="league/predictions" options={{ title: t('league.predTitle') }} />
         <Stack.Screen name="owner-events" options={{ title: t('events.title') }} />
         <Stack.Screen name="owner-league" options={{ title: t('league.title') }} />
         <Stack.Screen name="owner-event" options={{ title: t('events.new'), presentation: 'modal' }} />

@@ -8,6 +8,7 @@ import type { TFunction } from 'i18next';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { PredictionPostCard } from '@/components/league/Predict';
 import { CoachCheck } from '@/components/social/RankBadge';
 import { Avatar, T } from '@/components/ui';
 import { timeAgo } from '@/lib/dates';
@@ -162,6 +163,7 @@ export const MomentRow = memo(function MomentRow({ it, mine, pickerOpen, last, o
             </Text>
             {headline ? <T style={{ lineHeight: 24 }} numberOfLines={2}>{headline}</T> : null}
             {it.item_type === 'post' && it.caption ? <T style={{ lineHeight: 24 }} numberOfLines={8}>{it.caption}</T> : null}
+            {it.item_type === 'post' && it.meta?.league_pred ? <View style={{ marginTop: 6 }}><PredictionPostCard postId={it.id} /></View> : null}
             {mine && it.item_type === 'post' && (it.meta?.hidden || it.meta?.screen) ? (
               <T size="xs" muted style={{ lineHeight: 18 }}>{it.meta.hidden ? '⚠️ ' : '⏳ '}{t(it.meta.hidden ? 'safety.flagHidden' : it.meta.screen === 'blocked' ? 'safety.flagBlocked' : 'safety.flagPending')}</T>
             ) : null}
