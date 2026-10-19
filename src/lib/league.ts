@@ -1,6 +1,9 @@
 // الدوري السعودي: قراءة المباريات والفرق والترتيب (يكتبها الخادم من SportScore)، و«ذكّرني» و«فريقي»
 import { supabase } from './supabase';
-import { readDetails, readScorers, type LeagueMatch, type LeagueSettings, type LeagueStanding, type LeagueTeam, type MatchDetails, type Scorer } from './leagueCore';
+import {
+  readDetails, readPredSummary, readScorers, type LeagueMatch, type LeagueSettings, type LeagueStanding, type LeagueTeam, type MatchDetails,
+  type PredBoardRow, type PredSummary, type Scorer,
+} from './leagueCore';
 
 export * from './leagueCore';
 
@@ -96,6 +99,61 @@ export async function loadScorers(season: number, force = false): Promise<Scorer
   const list = readScorers(data?.scorers);
   scorersCache = { season, at: Date.now(), list };
   return list;
+}
+
+// ---------- التوقعات ----------
+/** يحفظ أو يعدّل توقعي (قبل البداية بس؛ القاعدة ترفض بعدها بـ locked) */
+export async function predict(matchId: number, home: number, away: number): Promise<void> {
+  const { error } = await supabase.rpc('league_predict', { p_match: matchId, p_home: home, p_away: away });
+  if (error) throw error;
+}
+
+/** توقعات الجمهور، توقعي ونقاطي، وأصدقائي (نتايجهم تنكشف مع البداية) */
+export async function loadPredSummary(matchId: number): Promise<PredSummary | null> {
+  const { data, error } = await supabase.rpc('league_pred_summary', { p_match: matchId });
+  if (error) throw error;
+  return readPredSummary(data);
+}
+
+/** ترتيب التوقعات: أصدقائي، أو الكل (اللي اختاروا يظهرون + أصدقائي) */
+export async function loadPredBoard(scope: 'friends' | 'all'): Promise<PredBoardRow[]> {
+  const { data, error } = await supabase.rpc('league_pred_board', { p_scope: scope, p_season: null, p_limit: 100 });
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    user_id: String(r.user_id), username: (r.username as string) ?? null, full_name: (r.full_name as string) ?? null, avatar_url: (r.avatar_url as string) ?? null,
+    points: Number(r.points) || 0, exact: Number(r.exact) || 0, outcome: Number(r.outcome) || 0, played: Number(r.played) || 0, rank: Number(r.rank) || 0,
+  }));
+}
+
+/** توقعاتي كلها (رقم المباراة ← النتيجة) */
+export async function myPredictions(userId: string): Promise<Map<number, { home: number; away: number }>> {
+  const { data, error } = await supabase.from('league_predictions').select('match_id, home, away').eq('user_id', userId).limit(1000);
+  if (error) throw error;
+  return new Map(((data ?? []) as { match_id: number; home: number; away: number }[]).map((r) => [Number(r.match_id), { home: r.home, away: r.away }]));
+}
+
+/** ينشر توقعي في التايم لاين (لأصدقائي) ← رقم المنشور */
+export async function sharePrediction(matchId: number): Promise<string> {
+  const { data, error } = await supabase.rpc('league_share_prediction', { p_match: matchId });
+  if (error) throw error;
+  return String(data);
+}
+
+export type PostPrediction = {
+  match: number; kickoff: string; status: string; home_goals: number | null; away_goals: number | null;
+  home_id: number; away_id: number; home_name: string; home_ar: string | null; home_logo: string | null;
+  away_name: string; away_ar: string | null; away_logo: string | null; pred_home: number; pred_away: number; points: number | null;
+};
+const postPredCache = new Map<string, { at: number; v: PostPrediction | null }>();
+/** بطاقة منشور التوقع في التايم لاين (نحتفظ فيها دقيقة) */
+export async function loadPostPrediction(postId: string): Promise<PostPrediction | null> {
+  const hit = postPredCache.get(postId);
+  if (hit && Date.now() - hit.at < 60_000) return hit.v;
+  const { data, error } = await supabase.rpc('league_post_prediction', { p_post: postId });
+  if (error) throw error;
+  const v = data && typeof data === 'object' ? (data as PostPrediction) : null;
+  postPredCache.set(postId, { at: Date.now(), v });
+  return v;
 }
 
 // ---------- ذكّرني ----------

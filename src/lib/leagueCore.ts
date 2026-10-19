@@ -415,3 +415,72 @@ export const nameFor = (ar: ReadonlyMap<string, string> | null | undefined, lng:
 
 /** «٣٣'» — المزوّد يعطي الوقت بدقيقة وحدة (٩٣ = ٩٠+٣) */
 export const minuteText = (min: number) => (min > 90 ? `90+${min - 90}'` : `${min}'`);
+
+// ---------- توقعات المباريات (تحدي الأصدقاء) ----------
+// النقاط مثل القاعدة (league_pred_points): النتيجة بالضبط = ٣، الفائز أو التعادل صح = ١، غير كذا = ٠
+export const PRED_EXACT = 3;
+export const PRED_OUTCOME = 1;
+export const PRED_MAX_GOALS = 20;
+
+export function predPoints(ph: number | null | undefined, pa: number | null | undefined, hg: number | null | undefined, ag: number | null | undefined): number | null {
+  if (ph == null || pa == null || hg == null || ag == null) return null;
+  if (ph === hg && pa === ag) return PRED_EXACT;
+  return Math.sign(ph - pa) === Math.sign(hg - ag) ? PRED_OUTCOME : 0;
+}
+
+export type PredFriend = { user_id: string; username: string | null; full_name: string | null; avatar_url: string | null; home?: number; away?: number; points?: number | null };
+export type PredSummary = {
+  total: number; home_win: number; draw: number; away_win: number; locked: boolean;
+  mine: { home: number; away: number; points: number | null; shared: boolean } | null;
+  friends: PredFriend[];
+};
+export type PredBoardRow = {
+  user_id: string; username: string | null; full_name: string | null; avatar_url: string | null;
+  points: number; exact: number; outcome: number; played: number; rank: number;
+};
+
+const n0 = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0);
+const intOrNull = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) ? v : null);
+
+/** رد league_pred_summary (بحذر) */
+export function readPredSummary(v: unknown): PredSummary | null {
+  const s = v as Record<string, unknown> | null;
+  if (!s || typeof s !== 'object') return null;
+  const m = s.mine as Record<string, unknown> | null;
+  const friends = Array.isArray(s.friends) ? (s.friends as Record<string, unknown>[]) : [];
+  return {
+    total: n0(s.total), home_win: n0(s.home_win), draw: n0(s.draw), away_win: n0(s.away_win), locked: s.locked === true,
+    mine: m && intOrNull(m.home) != null && intOrNull(m.away) != null
+      ? { home: m.home as number, away: m.away as number, points: intOrNull(m.points), shared: m.shared === true } : null,
+    friends: friends.filter((f) => typeof f?.user_id === 'string').slice(0, 100).map((f) => ({
+      user_id: f.user_id as string, username: (f.username as string) ?? null, full_name: (f.full_name as string) ?? null, avatar_url: (f.avatar_url as string) ?? null,
+      ...(intOrNull(f.home) != null && intOrNull(f.away) != null ? { home: f.home as number, away: f.away as number } : {}),
+      points: intOrNull(f.points),
+    })),
+  };
+}
+
+/** نسب توقعات الجمهور (تكمل ١٠٠ بالضبط)، null لو ما فيه توقعات */
+export function crowdShares(s: Pick<PredSummary, 'total' | 'home_win' | 'draw' | 'away_win'> | null | undefined): { home: number; draw: number; away: number } | null {
+  if (!s || s.total <= 0) return null;
+  const raw = [s.home_win, s.draw, s.away_win].map((x) => (x / s.total) * 100);
+  const out = raw.map(Math.floor);
+  // نوزّع الباقي على الأكبر كسراً عشان المجموع ١٠٠
+  let left = 100 - out.reduce((a, b) => a + b, 0);
+  const order = raw.map((x, i) => [x - Math.floor(x), i] as const).sort((a, b) => b[0] - a[0]);
+  for (const [, i] of order) { if (left <= 0) break; out[i]++; left--; }
+  return { home: out[0], draw: out[1], away: out[2] };
+}
+
+/** خطأ من القاعدة ← مفتاح ترجمة */
+export function predErrorKey(message: string | undefined | null): string {
+  const m = message ?? '';
+  if (/locked/.test(m)) return 'league.predLocked';
+  if (/bad_score/.test(m)) return 'league.predBadScore';
+  if (/account_suspended/.test(m)) return 'safety.isSuspended';
+  return 'errors.generic';
+}
+
+/** التوقع مقفول؟ (بدأت أو فات موعدها أو تأجلت) */
+export const predLocked = (m: Pick<LeagueMatch, 'kickoff' | 'status'>, now = Date.now()) =>
+  Date.parse(m.kickoff) <= now || !['NS', 'TBD'].includes(m.status);

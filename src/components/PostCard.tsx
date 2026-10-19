@@ -15,6 +15,7 @@ import { brand, colors, radius, space } from '@/theme';
 import { CoachCheck } from './social/RankBadge';
 import { MomentAvatar, MomentBubble, momentText, NIGHT, ReactionPicker, ReactionPill, ReactorsStrip } from './timeline/Moments';
 import { Card, Row, T } from './ui';
+import { PredictionPostCard } from '@/components/league/Predict';
 
 export const PostCard = memo(function PostCard({ post, onReact, onReactors, onDelete, isMine, onMore }: {
   post: FeedPost;
@@ -75,6 +76,7 @@ export const PostCard = memo(function PostCard({ post, onReact, onReactors, onDe
         <>
           {img ? <Image source={{ uri: img }} style={{ width: '100%', aspectRatio: 1, backgroundColor: colors.cardAlt }} contentFit="cover" transition={150} /> : null}
           {post.caption ? <T style={{ paddingHorizontal: space.md, paddingTop: space.md, lineHeight: 24 }}>{post.caption}</T> : null}
+          {meta.league_pred ? <View style={{ paddingHorizontal: space.md, paddingTop: space.sm }}><PredictionPostCard postId={post.id} /></View> : null}
         </>
       )}
 

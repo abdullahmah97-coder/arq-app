@@ -1,6 +1,6 @@
 -- ARQ — إعداد قاعدة البيانات كاملة (مرة وحدة)
 -- الصق هذا الملف كله في Supabase > SQL Editor > New query ثم Run.
--- مولّد تلقائياً من supabase/migrations (73 ملف) — لا تعدّله يدوياً: npm run db:bundle
+-- مولّد تلقائياً من supabase/migrations (77 ملف) — لا تعدّله يدوياً: npm run db:bundle
 
 -- ===================== 20260926000000_init.sql =====================
 -- =====================================================================
@@ -15388,3 +15388,589 @@ begin
 end $$;
 revoke all on function public.admin_league_status() from public, anon;
 grant execute on function public.admin_league_status() to authenticated;
+
+
+-- ===================== 20261019000970_league_sportscore.sql =====================
+-- الدوري السعودي من SportScore بدل API-Football (مجاني بدون مفتاح). بدون DROP: عمود جديد + create or replace.
+--   - league_matches.source_ref: مرجع المباراة عند المزوّد «<الزوج>/<المعرّف>»، تستخدمه league-sync للتحديث المباشر
+--   - league_ingest: يحفظ المرجع، وما يمسح الجولة والملعب لو المزوّد ما رجّعها (SportScore ما يعطيها)
+--   - _league_team_ar: «Diraiyah» (تهجئة SportScore) ← الدرعية
+-- المعرّفات: SportScore ما عنده أرقام، فالدالة تصنع رقم ثابت للفريق من اسمه وللمباراة من معرّفها في الرابط.
+-- الجداول كانت فاضية (مفتاح API-Football ما انضاف)، فما فيه بيانات قديمة تتعارض.
+
+alter table public.league_matches add column if not exists source_ref text;
+
+create or replace function public._league_team_ar(p_name text)
+returns text language sql immutable set search_path = public as $$
+  with n as (select ' ' || regexp_replace(lower(coalesce(p_name, '')), '[^a-z]+', ' ', 'g') || ' ' as s)
+  select case
+    when s ~ ' hilal ' then 'الهلال'
+    when s ~ ' nassr | nasr ' then 'النصر'
+    when s ~ ' ittihad ' then 'الاتحاد'
+    when s ~ ' ahli ' then 'الأهلي'
+    when s ~ ' qadsiah | qadisiyah | qadisiya | qadsia | qadisiah ' then 'القادسية'
+    when s ~ ' ettifaq | ittifaq ' then 'الاتفاق'
+    when s ~ ' shabab ' then 'الشباب'
+    when s ~ ' taawoun | taawon | taawun | ta awoun | ta awon ' then 'التعاون'
+    when s ~ ' fateh ' then 'الفتح'
+    when s ~ ' khaleej ' then 'الخليج'
+    when s ~ ' fayha | feiha | fayhaa ' then 'الفيحاء'
+    when s ~ ' okhdood | akhdoud | ukhdood | akhdood ' then 'الأخدود'
+    when s ~ ' damac | damak | dhamk ' then 'ضمك'
+    when s ~ ' kholood | khulood ' then 'الخلود'
+    when s ~ ' hazem | hazm ' then 'الحزم'
+    when s ~ ' najma | najmah ' then 'النجمة'
+    when s ~ ' neom ' then 'نيوم'
+    when s ~ ' raed ' then 'الرائد'
+    when s ~ ' wehda | wahda | wehdah ' then 'الوحدة'
+    when s ~ ' orobah | uruba | orubah | oruba ' then 'العروبة'
+    when s ~ ' abha ' then 'أبها'
+    when s ~ ' tai ' then 'الطائي'
+    when s ~ ' batin ' then 'الباطن'
+    when s ~ ' faisaly | faisali ' then 'الفيصلي'
+    when s ~ ' jabalain ' then 'الجبلين'
+    when s ~ ' diriyah | diriya | dir iyah | diraiyah | diraiya ' then 'الدرعية'
+    when s ~ ' arabi ' then 'العربي'
+    when s ~ ' zulfi ' then 'الزلفي'
+    when s ~ ' bukiryah | bukayriyah | bukairiyah ' then 'البكيرية'
+    when s ~ ' adalah ' then 'العدالة'
+    when s ~ ' jandal ' then 'الجندل'
+    when s ~ ' ohod | uhud ' then 'أحد'
+    when s ~ ' ula ' then 'العلا'
+    when s ~ ' jeddah ' then 'جدة'
+    when s ~ ' ain ' then 'العين'
+    when s ~ ' riyadh ' then 'الرياض'
+  end from n;
+$$;
+
+-- p_teams: [{id, name, logo}], p_matches: [{id, league, season, round, kickoff, status, elapsed, home, away, hg, ag, venue, city, ref}]
+-- p_standings: [{team, rank, points, played, win, draw, lose, gf, ga, form}]
+-- مباراة تخلص الحين (من غير نهائية لنهائية، وبدأت قبل أقل من ٦ ساعات) ← ft_pending، وإشعار النتيجة يطلع من run_league
+-- موعد مباراة تغيّر ← التذكير ينرسل من جديد على الموعد الجديد
+create or replace function public.league_ingest(p_mode text, p_season integer, p_teams jsonb default '[]',
+  p_matches jsonb default '[]', p_standings jsonb default '[]', p_error text default null, p_left integer default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  x jsonb; v_old text; v_old_kick timestamptz; v_new text; v_kick timestamptz; v_done text[] := array['FT','AET','PEN','AWD','WO'];
+  n_teams int := 0; n_matches int := 0; n_finished int := 0; v_full_h int;
+begin
+  if p_mode is null or p_mode not in ('full', 'live') then raise exception 'bad_input'; end if;
+  if p_error is not null then
+    update league_sync set last_error = left(p_error, 300), last_error_at = now(),
+      requests_left = coalesce(p_left, requests_left), updated_at = now() where id;
+    return jsonb_build_object('ok', false);
+  end if;
+
+  for x in select * from jsonb_array_elements(coalesce(p_teams, '[]'::jsonb)) loop
+    if (x->>'id') is null or btrim(coalesce(x->>'name', '')) = '' then continue; end if;
+    insert into league_teams (id, name, name_ar, logo_url)
+    values ((x->>'id')::int, left(btrim(x->>'name'), 80), _league_team_ar(x->>'name'), left(nullif(x->>'logo', ''), 300))
+    on conflict (id) do update set name = excluded.name, logo_url = excluded.logo_url, updated_at = now(),
+      name_ar = coalesce(league_teams.name_ar, excluded.name_ar);
+    n_teams := n_teams + 1;
+  end loop;
+
+  for x in select * from jsonb_array_elements(coalesce(p_matches, '[]'::jsonb)) loop
+    if (x->>'id') is null or (x->>'kickoff') is null or (x->>'home') is null or (x->>'away') is null then continue; end if;
+    if not exists (select 1 from league_teams where id = (x->>'home')::int)
+       or not exists (select 1 from league_teams where id = (x->>'away')::int) then continue; end if;
+    v_old := null; v_old_kick := null;
+    select status, kickoff into v_old, v_old_kick from league_matches where id = (x->>'id')::bigint;
+    v_new := left(coalesce(nullif(x->>'status', ''), 'TBD'), 5);
+    v_kick := (x->>'kickoff')::timestamptz;
+    insert into league_matches (id, league_id, season, round, kickoff, status, elapsed, home_id, away_id, home_goals, away_goals, venue, city, source_ref)
+    values ((x->>'id')::bigint, coalesce((x->>'league')::int, (_league()->>'league_id')::int, 307), coalesce((x->>'season')::int, p_season), left(x->>'round', 60),
+            v_kick, v_new, (x->>'elapsed')::smallint, (x->>'home')::int, (x->>'away')::int,
+            (x->>'hg')::smallint, (x->>'ag')::smallint, left(x->>'venue', 80), left(x->>'city', 60),
+            case when coalesce(x->>'ref', '') ~ '^[a-z0-9-]{1,160}/[a-z0-9]{6,32}$' then x->>'ref' end)
+    on conflict (id) do update set round = coalesce(excluded.round, league_matches.round), kickoff = excluded.kickoff, status = excluded.status,
+      elapsed = excluded.elapsed, home_goals = excluded.home_goals, away_goals = excluded.away_goals,
+      venue = coalesce(excluded.venue, league_matches.venue), city = coalesce(excluded.city, league_matches.city),
+      source_ref = coalesce(excluded.source_ref, league_matches.source_ref), updated_at = now();
+    n_matches := n_matches + 1;
+
+    -- الموعد تغيّر (تأجيل أو تقديم): «ذكّرني» ينرسل من جديد
+    if v_old_kick is not null and v_old_kick <> v_kick then
+      update league_reminders set sent_at = null where match_id = (x->>'id')::bigint and sent_at is not null;
+    end if;
+
+    -- خلصت الحين (وبدأت قبل أقل من ٦ ساعات): إشعار النتيجة بالطابور
+    if v_old is not null and not (v_old = any(v_done)) and v_new = any(v_done) and v_kick > now() - interval '6 hours' then
+      n_finished := n_finished + 1;
+      update league_matches set ft_pending = true where id = (x->>'id')::bigint;
+    end if;
+  end loop;
+
+  for x in select * from jsonb_array_elements(coalesce(p_standings, '[]'::jsonb)) loop
+    if (x->>'team') is null or (x->>'rank') is null
+       or not exists (select 1 from league_teams where id = (x->>'team')::int) then continue; end if;
+    insert into league_standings (season, team_id, rank, points, played, win, draw, lose, goals_for, goals_against, form)
+    values (p_season, (x->>'team')::int, (x->>'rank')::smallint, coalesce((x->>'points')::smallint, 0),
+            (x->>'played')::smallint, (x->>'win')::smallint, (x->>'draw')::smallint, (x->>'lose')::smallint,
+            (x->>'gf')::smallint, (x->>'ga')::smallint, left(x->>'form', 10))
+    on conflict (season, team_id) do update set rank = excluded.rank, points = excluded.points, played = excluded.played,
+      win = excluded.win, draw = excluded.draw, lose = excluded.lose, goals_for = excluded.goals_for,
+      goals_against = excluded.goals_against, form = excluded.form, updated_at = now();
+  end loop;
+
+  v_full_h := coalesce((_league()->>'full_every_hours')::int, 3);
+  update league_sync set
+    season = coalesce(p_season, season),
+    -- مباراة خلصت ← تحديث الترتيب بعد ٧٠ دقيقة تقريباً (المزوّد يحدّث الترتيب كل ساعة)، ولا نأخر تحديث مستحق
+    last_full_at = case when p_mode = 'full' then now()
+                        when n_finished > 0 then least(coalesce(last_full_at, now()), now() - make_interval(hours => v_full_h) + interval '70 minutes')
+                        else last_full_at end,
+    last_live_at = case when p_mode = 'live' then now() else last_live_at end,
+    last_ok_at = now(), last_error = null, requests_left = coalesce(p_left, requests_left), updated_at = now()
+  where id;
+  return jsonb_build_object('ok', true, 'teams', n_teams, 'matches', n_matches, 'finished', n_finished);
+end $$;
+
+
+-- ===================== 20261019000980_league_match_details.sql =====================
+-- تفاصيل المباراة في صفحة المباراة: الأحداث (الأهداف والبطاقات والتبديلات)، الإحصائيات، التشكيلة، نتيجة الشوط الأول،
+-- وقائمة هدافي الدوري. كلها من SportScore عبر league-sync. بدون DROP: أعمدة جديدة + جدول جديد + دالة جديدة.
+--   - league_matches: ht_home/ht_away، events، stats، lineups، details_at (آخر مرة طلبنا التفاصيل)
+--   - league_leaders: صف لكل موسم فيه قائمة الهدافين (تنكتب كاملة كل تحديث، فما نحتاج نمسح صفوف)
+--   - league_ingest_details: يكتبها الخادم بس (service_role). ما نمسح قائمة محفوظة بقائمة فاضية:
+--     المزوّد يشيل الإحصائيات بعد نهاية المباراة بفترة، فالمحفوظ يبقى
+-- الأشكال (يكتبها الخادم بعد التنقية):
+--   events:  [{min, side: h|a, kind: goal|pen|og|yc|rc|y2|sub|pmiss|var, p?, in?, out?, hs?, as?}]
+--   stats:   [{k: possession|shots_on|…, h, a}]
+--   lineups: {ok, hf, af, hc, ac, h: [{n, no, pos, c?}], a: […], hs: […], as: […]}
+--   scorers: [{rank, name, team, goals, assists, matches, minutes}]
+
+alter table public.league_matches add column if not exists ht_home smallint check (ht_home is null or ht_home between 0 and 99);
+alter table public.league_matches add column if not exists ht_away smallint check (ht_away is null or ht_away between 0 and 99);
+alter table public.league_matches add column if not exists events jsonb check (events is null or jsonb_typeof(events) = 'array');
+alter table public.league_matches add column if not exists stats jsonb check (stats is null or jsonb_typeof(stats) = 'array');
+alter table public.league_matches add column if not exists lineups jsonb check (lineups is null or jsonb_typeof(lineups) = 'object');
+alter table public.league_matches add column if not exists details_at timestamptz;
+create index if not exists league_matches_details_todo on public.league_matches (season, kickoff) where details_at is null;
+
+create table if not exists public.league_leaders (
+  season     integer primary key,
+  scorers    jsonb not null default '[]'::jsonb check (jsonb_typeof(scorers) = 'array'),
+  updated_at timestamptz not null default now()
+);
+alter table public.league_leaders enable row level security;
+do $p$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'league_leaders' and policyname = 'league_leaders_read') then
+    create policy league_leaders_read on public.league_leaders for select to authenticated using (true);
+  end if;
+end $p$;
+revoke insert, update, delete, truncate, references, trigger on public.league_leaders from anon, authenticated;
+revoke select on public.league_leaders from anon;
+grant select on public.league_leaders to authenticated;
+
+-- p_details: [{id, ht?: [h, a], events?, stats?, lineups?}] — عنصر فيه id بس = طلبناها وما لقينا تفاصيل (لقاء ثاني للزوج)،
+-- فنسجّل details_at عشان ما نعيد طلبها كل مرة
+create or replace function public.league_ingest_details(p_season integer, p_details jsonb default '[]', p_scorers jsonb default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  x jsonb; v_id bigint; v_h text; v_a text; n int := 0; v_scorers boolean := false;
+begin
+  for x in select * from jsonb_array_elements(case when jsonb_typeof(p_details) = 'array' then p_details else '[]'::jsonb end) loop
+    if jsonb_typeof(x) <> 'object' or coalesce(x->>'id', '') !~ '^[0-9]{1,16}$' then continue; end if;
+    v_id := (x->>'id')::bigint;
+    v_h := case when jsonb_typeof(x->'ht') = 'array' then x->'ht'->>0 end;
+    v_a := case when jsonb_typeof(x->'ht') = 'array' then x->'ht'->>1 end;
+    update league_matches m set
+      ht_home = case when v_h ~ '^[0-9]{1,2}$' and v_a ~ '^[0-9]{1,2}$' then v_h::smallint else m.ht_home end,
+      ht_away = case when v_h ~ '^[0-9]{1,2}$' and v_a ~ '^[0-9]{1,2}$' then v_a::smallint else m.ht_away end,
+      events = case when jsonb_typeof(x->'events') = 'array' and jsonb_array_length(x->'events') between 1 and 150
+                     and octet_length((x->'events')::text) <= 40000 then x->'events' else m.events end,
+      stats = case when jsonb_typeof(x->'stats') = 'array' and jsonb_array_length(x->'stats') between 1 and 40
+                    and octet_length((x->'stats')::text) <= 8000 then x->'stats' else m.stats end,
+      lineups = case when jsonb_typeof(x->'lineups') = 'object' and octet_length((x->'lineups')::text) <= 40000
+                      then x->'lineups' else m.lineups end,
+      details_at = now(), updated_at = now()
+    where m.id = v_id;
+    if found then n := n + 1; end if;
+  end loop;
+
+  if p_season between 2000 and 2100 and jsonb_typeof(p_scorers) = 'array' and jsonb_array_length(p_scorers) between 1 and 60
+     and octet_length(p_scorers::text) <= 20000 then
+    insert into league_leaders (season, scorers) values (p_season, p_scorers)
+    on conflict (season) do update set scorers = excluded.scorers, updated_at = now();
+    v_scorers := true;
+  end if;
+  return jsonb_build_object('ok', true, 'details', n, 'scorers', v_scorers);
+end $$;
+
+revoke all on function public.league_ingest_details(integer, jsonb, jsonb) from public, anon, authenticated;
+grant execute on function public.league_ingest_details(integer, jsonb, jsonb) to service_role;
+
+
+-- ===================== 20261019000990_league_player_names.sql =====================
+-- أسماء لاعبي الدوري بالعربي. المزوّد يرسلها بالإنجليزي، فـ league-sync يكتبها بالعربي مرة وحدة (Wikidata ثم Claude)
+-- ويحفظها هنا، والتطبيق يعرضها بدل الإنجليزي. بدون DROP: جدول جديد + دوال جديدة + create or replace لـ league_ingest_details
+-- (نفس التوقيع) عشان تسجّل الأسماء اللي تمر عليها.
+--   - league_players: الاسم مثل ما يرسله المزوّد ← الاسم العربي ومصدره (wikidata / claude / manual)
+--   - المالك يقدر يصحح أي اسم، وتصحيحه ما ينكتب فوقه:
+--       update league_players set name_ar = 'الاسم', source = 'manual' where name = 'Name';
+
+create table if not exists public.league_players (
+  name       text primary key check (char_length(name) between 1 and 60),
+  name_ar    text check (name_ar is null or (char_length(name_ar) between 2 and 60 and name_ar ~ '[ء-ي]' and name_ar !~ '[A-Za-z0-9<>{}()]')),
+  source     text check (source is null or source in ('wikidata', 'claude', 'manual')),
+  wikidata   text check (wikidata is null or wikidata ~ '^Q[0-9]{1,12}$'),
+  tries      smallint not null default 0,
+  seen_at    timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists league_players_todo on public.league_players (seen_at desc) where name_ar is null;
+alter table public.league_players enable row level security;
+do $p$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'league_players' and policyname = 'league_players_read') then
+    create policy league_players_read on public.league_players for select to authenticated using (true);
+  end if;
+end $p$;
+revoke insert, update, delete, truncate, references, trigger on public.league_players from anon, authenticated;
+revoke select on public.league_players from anon;
+grant select on public.league_players to authenticated;
+
+-- الأسماء اللي مرت (من الأحداث والتشكيلة والهدافين) ← league_players (الجديد بدون اسم عربي، والقديم يتحدث وقت آخر ظهور)
+create or replace function public._league_players_seen(p_names text[])
+returns void language sql security definer set search_path = public as $$
+  insert into league_players (name)
+  select distinct left(btrim(regexp_replace(n, '\s+', ' ', 'g')), 60) from unnest(coalesce(p_names, '{}')) n
+  where n is not null and btrim(n) <> ''
+  on conflict (name) do update set seen_at = now();
+$$;
+revoke all on function public._league_players_seen(text[]) from public, anon, authenticated;
+
+-- نفس league_ingest_details من 20261019000980، ومعها تسجيل أسماء اللاعبين
+create or replace function public.league_ingest_details(p_season integer, p_details jsonb default '[]', p_scorers jsonb default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  x jsonb; v_id bigint; v_h text; v_a text; n int := 0; v_scorers boolean := false; v_names text[] := '{}';
+begin
+  for x in select * from jsonb_array_elements(case when jsonb_typeof(p_details) = 'array' then p_details else '[]'::jsonb end) loop
+    if jsonb_typeof(x) <> 'object' or coalesce(x->>'id', '') !~ '^[0-9]{1,16}$' then continue; end if;
+    v_id := (x->>'id')::bigint;
+    v_h := case when jsonb_typeof(x->'ht') = 'array' then x->'ht'->>0 end;
+    v_a := case when jsonb_typeof(x->'ht') = 'array' then x->'ht'->>1 end;
+    update league_matches m set
+      ht_home = case when v_h ~ '^[0-9]{1,2}$' and v_a ~ '^[0-9]{1,2}$' then v_h::smallint else m.ht_home end,
+      ht_away = case when v_h ~ '^[0-9]{1,2}$' and v_a ~ '^[0-9]{1,2}$' then v_a::smallint else m.ht_away end,
+      events = case when jsonb_typeof(x->'events') = 'array' and jsonb_array_length(x->'events') between 1 and 150
+                     and octet_length((x->'events')::text) <= 40000 then x->'events' else m.events end,
+      stats = case when jsonb_typeof(x->'stats') = 'array' and jsonb_array_length(x->'stats') between 1 and 40
+                    and octet_length((x->'stats')::text) <= 8000 then x->'stats' else m.stats end,
+      lineups = case when jsonb_typeof(x->'lineups') = 'object' and octet_length((x->'lineups')::text) <= 40000
+                      then x->'lineups' else m.lineups end,
+      details_at = now(), updated_at = now()
+    where m.id = v_id;
+    if found then
+      n := n + 1;
+      v_names := v_names || array(
+        select v #>> '{}' from (
+          select jsonb_path_query(x, '$.events[*].p ? (@.type() == "string")') v
+          union all select jsonb_path_query(x, '$.events[*].in ? (@.type() == "string")')
+          union all select jsonb_path_query(x, '$.events[*].out ? (@.type() == "string")')
+          union all select jsonb_path_query(x, '$.lineups.h[*].n ? (@.type() == "string")')
+          union all select jsonb_path_query(x, '$.lineups.a[*].n ? (@.type() == "string")')
+          union all select jsonb_path_query(x, '$.lineups.hs[*].n ? (@.type() == "string")')
+          union all select jsonb_path_query(x, '$.lineups.as[*].n ? (@.type() == "string")')
+        ) s limit 200);
+    end if;
+  end loop;
+
+  if p_season between 2000 and 2100 and jsonb_typeof(p_scorers) = 'array' and jsonb_array_length(p_scorers) between 1 and 60
+     and octet_length(p_scorers::text) <= 20000 then
+    insert into league_leaders (season, scorers) values (p_season, p_scorers)
+    on conflict (season) do update set scorers = excluded.scorers, updated_at = now();
+    v_scorers := true;
+    v_names := v_names || array(select v #>> '{}' from jsonb_path_query(p_scorers, '$[*].name ? (@.type() == "string")') v limit 60);
+  end if;
+
+  perform _league_players_seen(v_names);
+  return jsonb_build_object('ok', true, 'details', n, 'scorers', v_scorers);
+end $$;
+
+revoke all on function public.league_ingest_details(integer, jsonb, jsonb) from public, anon, authenticated;
+grant execute on function public.league_ingest_details(integer, jsonb, jsonb) to service_role;
+
+-- أسماء تنتظر اسم عربي (الأحدث ظهوراً أول). بعد ٣ محاولات فاشلة نوقف، ونعيد بعد يوم
+create or replace function public.league_names_todo(p_limit integer default 60)
+returns text[] language sql stable security definer set search_path = public as $$
+  select coalesce(array_agg(name), '{}') from (
+    select name from league_players
+    where name_ar is null and (tries < 3 or updated_at < now() - interval '1 day')
+    order by seen_at desc, name
+    limit least(greatest(coalesce(p_limit, 60), 1), 300)
+  ) s;
+$$;
+
+-- p_names: [{name, ar, source: wikidata|claude, qid?}] — اسم صالح بس، وتصحيح المالك (manual) ما ينكتب فوقه.
+-- p_tried: أسماء سألنا عنها وما طلع لها اسم ← محاولة زيادة
+create or replace function public.league_names_save(p_names jsonb default '[]', p_tried text[] default '{}')
+returns integer language plpgsql security definer set search_path = public as $$
+declare x jsonb; v_ar text; v_src text; n int := 0;
+begin
+  for x in select * from jsonb_array_elements(case when jsonb_typeof(p_names) = 'array' then p_names else '[]'::jsonb end) loop
+    if jsonb_typeof(x) <> 'object' then continue; end if;
+    v_ar := btrim(regexp_replace(coalesce(x->>'ar', ''), '\s+', ' ', 'g'));
+    v_src := x->>'source';
+    if coalesce(v_src, '') not in ('wikidata', 'claude') or char_length(v_ar) not between 2 and 60
+       or v_ar !~ '[ء-ي]' or v_ar ~ '[A-Za-z0-9<>{}()]' then continue; end if;
+    update league_players set name_ar = v_ar, source = v_src,
+      wikidata = case when v_src = 'wikidata' and coalesce(x->>'qid', '') ~ '^Q[0-9]{1,12}$' then x->>'qid' end,
+      updated_at = now()
+    where name = x->>'name' and coalesce(source, '') <> 'manual';
+    if found then n := n + 1; end if;
+  end loop;
+  update league_players set tries = least(tries + 1, 100), updated_at = now()
+  where name = any(coalesce(p_tried, '{}')) and name_ar is null;
+  return n;
+end $$;
+
+revoke all on function public.league_names_todo(integer) from public, anon, authenticated;
+revoke all on function public.league_names_save(jsonb, text[]) from public, anon, authenticated;
+grant execute on function public.league_names_todo(integer) to service_role;
+grant execute on function public.league_names_save(jsonb, text[]) to service_role;
+
+-- للتطبيق: الأسماء العربية لمجموعة أسماء (لين ٣٠٠) ← {"Name": "الاسم"}
+create or replace function public.league_player_names(p_names text[])
+returns jsonb language sql stable security invoker set search_path = public as $$
+  select coalesce(jsonb_object_agg(name, name_ar), '{}'::jsonb)
+  from league_players
+  where name = any((coalesce(p_names, '{}'))[1:300]) and name_ar is not null;
+$$;
+revoke all on function public.league_player_names(text[]) from public, anon;
+grant execute on function public.league_player_names(text[]) to authenticated;
+
+
+-- ===================== 20261019001000_league_predictions.sql =====================
+-- توقعات الدوري: تتوقع نتيجة المباراة قبل صافرة البداية، تاخذ نقاط بعد النهاية، تنافس أصدقاءك، وتقدر تنشر توقعك في التايم لاين.
+-- بدون DROP: جدول جديد + دوال جديدة + create or replace لـ _league_ft_notices (نفس التوقيع).
+--   - النقاط: النتيجة بالضبط = ٣، الفائز أو التعادل صح = ١، غير كذا = ٠ (league_pred_points). تنحسب وقت القراءة
+--     من نتيجة المباراة، فلو المزوّد صحح نتيجة تنعدل النقاط لحالها
+--   - التوقع يقفل مع موعد البداية (أو لو المباراة بدأت/تأجلت): الكتابة عن طريق league_predict بس، وتقدر تعدّله لين البداية
+--   - توقعات الأصدقاء تنكشف مع صافرة البداية (قبلها تشوف مين توقّع بس، عشان محد ينقل توقع غيره)
+--   - النشر في التايم لاين: منشور عادي (kind = 'post') لأصدقائك، فيه meta.league_pred = {m: رقم المباراة}، والبطاقة
+--     تجيب التوقع والنتيجة وقت العرض (league_post_prediction) عشان تتحدث بعد النهاية
+--   - إشعار النهاية لمن توقّع فيه نقاطه («توقعك صح بالضبط! +٣»)، وبنفس مفتاح إشعار النهاية فما يوصل مرتين
+
+create table if not exists public.league_predictions (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  match_id   bigint not null references public.league_matches(id) on delete cascade,
+  home       smallint not null check (home between 0 and 20),
+  away       smallint not null check (away between 0 and 20),
+  post_id    uuid references public.posts(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, match_id)
+);
+create index if not exists league_predictions_match on public.league_predictions (match_id);
+
+-- نقاط توقع واحد (null = المباراة ما خلصت)
+create or replace function public.league_pred_points(p_home integer, p_away integer, p_hg integer, p_ag integer)
+returns integer language sql immutable set search_path = public as $$
+  select case when p_home is null or p_away is null or p_hg is null or p_ag is null then null
+              when p_home = p_hg and p_away = p_ag then 3
+              when sign(p_home - p_away) = sign(p_hg - p_ag) then 1
+              else 0 end;
+$$;
+grant execute on function public.league_pred_points(integer, integer, integer, integer) to authenticated;
+
+-- المباراة خلصت (ونتيجتها نهائية)
+create or replace function public._league_done(p_status text)
+returns boolean language sql immutable as $$ select p_status in ('FT', 'AET', 'PEN', 'AWD', 'WO') $$;
+
+alter table public.league_predictions enable row level security;
+do $p$
+begin
+  -- توقعي دايم، وتوقعات أصدقائي بعد البداية (بدون المحظورين)
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'league_predictions' and policyname = 'league_predictions_read') then
+    create policy league_predictions_read on public.league_predictions for select to authenticated
+      using (user_id = auth.uid()
+             or (exists (select 1 from league_matches m where m.id = match_id and m.kickoff <= now())
+                 and are_friends(user_id, auth.uid()) and not is_blocked_pair(user_id, auth.uid())));
+  end if;
+end $p$;
+revoke insert, update, delete, truncate, references, trigger on public.league_predictions from anon, authenticated;
+revoke all on public.league_predictions from anon;
+grant select on public.league_predictions to authenticated;
+
+-- ---------- توقعي ----------
+-- يحفظ أو يعدّل التوقع قبل البداية. أخطاء: not_signed_in / bad_score / not_found / locked / account_suspended
+create or replace function public.league_predict(p_match bigint, p_home integer, p_away integer)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid(); v_m record;
+begin
+  if v_uid is null then raise exception 'not_signed_in'; end if;
+  if p_home is null or p_away is null or p_home not between 0 and 20 or p_away not between 0 and 20 then raise exception 'bad_score'; end if;
+  if is_suspended(v_uid) then raise exception 'account_suspended'; end if;
+  select id, kickoff, status into v_m from league_matches where id = p_match;
+  if v_m.id is null then raise exception 'not_found'; end if;
+  if v_m.kickoff <= now() or v_m.status not in ('NS', 'TBD') then raise exception 'locked'; end if;
+  insert into league_predictions (user_id, match_id, home, away) values (v_uid, p_match, p_home, p_away)
+  on conflict (user_id, match_id) do update set home = excluded.home, away = excluded.away, updated_at = now();
+  return jsonb_build_object('match', p_match, 'home', p_home, 'away', p_away);
+end $$;
+
+-- ---------- ملخص مباراة: توقعات الجمهور، توقعي ونقاطي، وأصدقائي ----------
+-- { total, home_win, draw, away_win, locked, mine: {home, away, points, shared} | null,
+--   friends: [{user_id, username, full_name, avatar_url, home?, away?, points?}] }  (النتيجة تنكشف بعد البداية)
+create or replace function public.league_pred_summary(p_match bigint)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_uid uuid := auth.uid(); v_m record; v_locked boolean; v_out jsonb;
+begin
+  select id, kickoff, status, home_goals, away_goals into v_m from league_matches where id = p_match;
+  if v_m.id is null then return null; end if;
+  v_locked := v_m.kickoff <= now() or v_m.status not in ('NS', 'TBD');
+  select jsonb_build_object(
+    'total', count(*),
+    'home_win', count(*) filter (where home > away),
+    'draw', count(*) filter (where home = away),
+    'away_win', count(*) filter (where home < away)
+  ) into v_out from league_predictions where match_id = p_match;
+  v_out := v_out || jsonb_build_object('locked', v_locked,
+    'mine', (select jsonb_build_object('home', p.home, 'away', p.away, 'shared', p.post_id is not null,
+                     'points', case when _league_done(v_m.status) then league_pred_points(p.home, p.away, v_m.home_goals, v_m.away_goals) end)
+             from league_predictions p where p.match_id = p_match and p.user_id = v_uid),
+    'friends', coalesce((
+      select jsonb_agg(x order by x->>'points' desc nulls last, x->>'username') from (
+        select jsonb_build_object('user_id', pr.id, 'username', pr.username, 'full_name', pr.full_name, 'avatar_url', pr.avatar_url)
+               || case when v_locked then jsonb_build_object('home', p.home, 'away', p.away,
+                         'points', case when _league_done(v_m.status) then league_pred_points(p.home, p.away, v_m.home_goals, v_m.away_goals) end)
+                       else '{}'::jsonb end as x
+        from league_predictions p join profiles pr on pr.id = p.user_id
+        where p.match_id = p_match and v_uid is not null and p.user_id <> v_uid
+          and are_friends(p.user_id, v_uid) and not is_blocked_pair(p.user_id, v_uid)
+        limit 100
+      ) s), '[]'::jsonb));
+  return v_out;
+end $$;
+
+-- ---------- الترتيب: أصدقائي أو الكل (الكل = اللي اختاروا يظهرون في المتصدرين + أصدقائي) ----------
+create or replace function public.league_pred_board(p_scope text default 'friends', p_season integer default null, p_limit integer default 50)
+returns table (user_id uuid, username text, full_name text, avatar_url text,
+               points bigint, exact bigint, outcome bigint, played bigint, rank bigint)
+language sql stable security definer set search_path = public as $$
+  with me as (select auth.uid() as id),
+  season as (select coalesce(p_season, (select max(season) from league_matches)) as s),
+  pool as (
+    select p.id, p.username, p.full_name, p.avatar_url, p.id = me.id as is_me
+    from profiles p cross join me
+    where me.id is not null
+      and (p.id = me.id or are_friends(p.id, me.id)
+           or (coalesce(p_scope, 'friends') = 'all' and p.show_on_leaderboard and not is_blocked_pair(p.id, me.id)))
+  ),
+  scores as (
+    select pool.id, pool.username, pool.full_name, pool.avatar_url, pool.is_me,
+           coalesce(sum(league_pred_points(pr.home, pr.away, m.home_goals, m.away_goals)), 0)::bigint as pts,
+           count(*) filter (where league_pred_points(pr.home, pr.away, m.home_goals, m.away_goals) = 3) as exact,
+           count(*) filter (where league_pred_points(pr.home, pr.away, m.home_goals, m.away_goals) = 1) as outcome,
+           count(m.id) as played,
+           count(pr.match_id) as predicted
+    from pool
+    left join league_predictions pr on pr.user_id = pool.id
+    left join league_matches m on m.id = pr.match_id and _league_done(m.status) and m.season = (select s from season)
+    group by pool.id, pool.username, pool.full_name, pool.avatar_url, pool.is_me
+  )
+  select id, username, full_name, avatar_url, pts, exact, outcome, played,
+         rank() over (order by pts desc, exact desc)
+  from scores
+  where is_me or predicted > 0
+  order by pts desc, exact desc, username
+  limit least(greatest(coalesce(p_limit, 50), 1), 200);
+$$;
+
+-- ---------- النشر في التايم لاين ----------
+-- منشور لأصدقائك فيه رابط المباراة، والبطاقة تعرض التوقع. مرة وحدة لكل توقع (لو انحذف المنشور تقدر تنشره من جديد)
+create or replace function public.league_share_prediction(p_match bigint)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := auth.uid(); v_p record; v_m record; v_post uuid;
+begin
+  if v_uid is null then raise exception 'not_signed_in'; end if;
+  if is_suspended(v_uid) then raise exception 'account_suspended'; end if;
+  select home, away, post_id into v_p from league_predictions where user_id = v_uid and match_id = p_match;
+  if not found then raise exception 'no_prediction'; end if;
+  if v_p.post_id is not null and exists (select 1 from posts where id = v_p.post_id) then return v_p.post_id; end if;
+  select coalesce(h.name_ar, h.name) as h_ar, coalesce(a.name_ar, a.name) as a_ar into v_m
+  from league_matches m join league_teams h on h.id = m.home_id join league_teams a on a.id = m.away_id where m.id = p_match;
+  insert into posts (user_id, caption, visibility, kind, meta)
+  values (v_uid, 'توقعي لمباراة ' || v_m.h_ar || ' × ' || v_m.a_ar || ' ⚽', 'friends', 'post',
+          jsonb_build_object('league_pred', jsonb_build_object('m', p_match)))
+  returning id into v_post;
+  update league_predictions set post_id = v_post where user_id = v_uid and match_id = p_match;
+  return v_post;
+end $$;
+
+-- بطاقة منشور التوقع: المباراة وتوقع صاحب المنشور ونقاطه، لمن يقدر يشوف المنشور (هو أو أصدقاؤه، بدون محظور ولا مخفي)
+create or replace function public.league_post_prediction(p_post uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'match', m.id, 'kickoff', m.kickoff, 'status', m.status, 'home_goals', m.home_goals, 'away_goals', m.away_goals,
+    'home_id', m.home_id, 'away_id', m.away_id,
+    'home_name', h.name, 'home_ar', h.name_ar, 'home_logo', h.logo_url,
+    'away_name', a.name, 'away_ar', a.name_ar, 'away_logo', a.logo_url,
+    'pred_home', pr.home, 'pred_away', pr.away,
+    'points', case when _league_done(m.status) then league_pred_points(pr.home, pr.away, m.home_goals, m.away_goals) end)
+  from posts po
+  join league_predictions pr on pr.post_id = po.id and pr.user_id = po.user_id
+  join league_matches m on m.id = pr.match_id
+  join league_teams h on h.id = m.home_id
+  join league_teams a on a.id = m.away_id
+  where po.id = p_post and auth.uid() is not null and po.hidden_at is null
+    and (po.user_id = auth.uid() or (are_friends(po.user_id, auth.uid()) and not is_blocked_pair(po.user_id, auth.uid())));
+$$;
+
+revoke all on function public.league_predict(bigint, integer, integer) from public, anon;
+revoke all on function public.league_pred_summary(bigint) from public, anon;
+revoke all on function public.league_pred_board(text, integer, integer) from public, anon;
+revoke all on function public.league_share_prediction(bigint) from public, anon;
+revoke all on function public.league_post_prediction(uuid) from public, anon;
+revoke all on function public._league_done(text) from public, anon;
+grant execute on function public.league_predict(bigint, integer, integer) to authenticated;
+grant execute on function public.league_pred_summary(bigint) to authenticated;
+grant execute on function public.league_pred_board(text, integer, integer) to authenticated;
+grant execute on function public.league_share_prediction(bigint) to authenticated;
+grant execute on function public.league_post_prediction(uuid) to authenticated;
+grant execute on function public._league_done(text) to authenticated;
+
+-- ---------- إشعار النهاية (نفس 20261015000960) ومعه نقاط التوقع ----------
+-- اللي توقّع يوصله إشعار فيه نقاطه أول، وبعدها مشجعي الفريقين ومن طلب «ذكّرني» (نفس المفتاح = ما يوصل مرتين)
+create or replace function public._league_ft_notices()
+returns integer language plpgsql security definer set search_path = public as $$
+declare v_m record; v_u uuid; v_p record; n int := 0; v_line_ar text; v_line_en text; v_pts int;
+begin
+  for v_m in
+    select m.id, m.home_id, m.away_id, m.home_goals, m.away_goals, m.status,
+           coalesce(h.name_ar, h.name) as h_ar, h.name as h_en, coalesce(a.name_ar, a.name) as a_ar, a.name as a_en
+    from league_matches m join league_teams h on h.id = m.home_id join league_teams a on a.id = m.away_id
+    where m.ft_pending
+    order by m.kickoff
+    limit 20
+  loop
+    update league_matches set ft_pending = false where id = v_m.id;
+    v_line_ar := v_m.h_ar || ' ' || coalesce(v_m.home_goals, 0) || ' - ' || coalesce(v_m.away_goals, 0) || ' ' || v_m.a_ar;
+    v_line_en := v_m.h_en || ' ' || coalesce(v_m.home_goals, 0) || '-' || coalesce(v_m.away_goals, 0) || ' ' || v_m.a_en;
+    for v_p in select user_id, home, away from league_predictions where match_id = v_m.id loop
+      v_pts := league_pred_points(v_p.home, v_p.away, v_m.home_goals, v_m.away_goals);
+      perform _notice(v_p.user_id, 'league-ft:' || v_m.id,
+        case v_pts when 3 then 'توقعك صح بالضبط! +٣ ⚽' when 1 then 'توقعت الفائز صح +١ ⚽' else 'انتهت المباراة ⚽' end,
+        v_line_ar || ' · توقعك ' || v_p.home || ' - ' || v_p.away,
+        case v_pts when 3 then 'Spot on! +3 ⚽' when 1 then 'You called the result +1 ⚽' else 'Full time ⚽' end,
+        v_line_en || ' · your pick ' || v_p.home || '-' || v_p.away,
+        '/league/' || v_m.id, null);
+      n := n + 1;
+    end loop;
+    for v_u in
+      select f.user_id from league_fans f where f.team_id in (v_m.home_id, v_m.away_id)
+      union
+      select r.user_id from league_reminders r where r.match_id = v_m.id
+    loop
+      perform _notice(v_u, 'league-ft:' || v_m.id, 'انتهت المباراة ⚽', v_line_ar,
+        'Full time ⚽', v_line_en, '/league/' || v_m.id, null);
+      n := n + 1;
+    end loop;
+  end loop;
+  return n;
+end $$;
+revoke all on function public._league_ft_notices() from public, anon, authenticated;

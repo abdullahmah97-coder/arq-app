@@ -9,12 +9,13 @@ import { Alert, Linking, Share, StyleSheet, View } from 'react-native';
 import { SaduPattern } from '@/brand/Brand';
 import { FormDots, LivePill, MatchRow, Score, TeamBadge, SourceCredit } from '@/components/league/LeagueParts';
 import { EventsTimeline, HalfTime, LineupView, ScorerColumns, StatsBars } from '@/components/league/MatchDetails';
+import { PredictCard, PreviewCompare } from '@/components/league/Predict';
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import {
   canBuyTickets, canRemind, countdown, formOf, headToHead, involves, kickoffClock, kickoffLabel, leagueCached, loadLeague, loadMatch,
-  loadMatchDetails, loadPlayerNames, myReminders, myTeam, nameFor, playerNamesIn, redCards, roundNumber, setReminder, stateOf, teamName,
-  type LeagueData, type LeagueMatch, type MatchDetails,
+  loadMatchDetails, loadPlayerNames, loadPredSummary, loadScorers, myReminders, myTeam, nameFor, playerNamesIn, redCards, roundNumber, setReminder,
+  stateOf, teamName, type LeagueData, type LeagueMatch, type MatchDetails, type PredSummary, type Scorer,
 } from '@/lib/league';
 import { enablePush } from '@/lib/push';
 import { brand, colors, radius, space } from '@/theme';
@@ -35,22 +36,26 @@ export default function MatchPage() {
   const [busy, setBusy] = useState(false);
   const [det, setDet] = useState<MatchDetails | null>(null);
   const [arNames, setArNames] = useState<ReadonlyMap<string, string> | null>(null);
+  const [pred, setPred] = useState<PredSummary | null>(null);
+  const [scorers, setScorers] = useState<Scorer[]>([]);
   const [tab, setTab] = useState<Tab | null>(null);
   const mRef = useRef(m);
   mRef.current = m;
 
   const load = useCallback(async (force: boolean) => {
     try {
-      const [d, team, r, x] = await Promise.all([loadLeague(force), myTeam().catch(() => null), myReminders().catch(() => new Set<number>()),
-        Number.isFinite(mid) ? loadMatchDetails(mid).catch(() => null) : Promise.resolve(null)]);
+      const [d, team, r, x, ps] = await Promise.all([loadLeague(force), myTeam().catch(() => null), myReminders().catch(() => new Set<number>()),
+        Number.isFinite(mid) ? loadMatchDetails(mid).catch(() => null) : Promise.resolve(null),
+        Number.isFinite(mid) ? loadPredSummary(mid).catch(() => null) : Promise.resolve(null)]);
+      setPred(ps);
+      const sc = d.season != null ? await loadScorers(d.season).catch(() => [] as Scorer[]) : [];
+      setScorers(sc);
       // من إشعار لمباراة موسم ثاني: نجيبها لحالها
       const found = d.matches.find((x) => x.id === mid) ?? (Number.isFinite(mid) ? await loadMatch(mid) : null);
       setData(d); setM(found); setMine(team); setReminded(r.has(mid));
-      if (x) {
-        setDet(x);
-        // أسماء اللاعبين بالعربي (الواجهة العربية بس)
-        if (lng !== 'en') loadPlayerNames(playerNamesIn(x)).then(setArNames).catch(() => {});
-      }
+      if (x) setDet(x);
+      // أسماء اللاعبين بالعربي (الواجهة العربية بس): لاعبين المباراة وهدافين الفريقين
+      if (lng !== 'en') loadPlayerNames([...playerNamesIn(x), ...sc.map((s) => s.name)]).then(setArNames).catch(() => {});
     } catch {
       if (mRef.current === undefined) setM(null);
     }
@@ -92,6 +97,9 @@ export default function MatchPage() {
   ];
   const order: Tab[] = ['events', 'lineups', 'stats', 'h2h'];
   const current: Tab | null = tab && tabs.includes(tab) ? tab : order.find((x) => tabs.includes(x)) ?? null;
+  // التوقع: قبل البداية دايم، وبعدها لو فيه توقعات (لي أو للجمهور)
+  const showPred = st !== 'off' && (st === 'upcoming' || !!pred?.mine || !!pred?.total);
+  const refreshPred = () => { loadPredSummary(mid).then(setPred).catch(() => {}); };
 
   const toggle = async () => {
     setBusy(true);
@@ -144,6 +152,9 @@ export default function MatchPage() {
         ) : null}
       </View>
 
+      {showPred ? <PredictCard m={m} home={home} away={away} lng={lng} summary={pred} onChanged={refreshPred} /> : null}
+      {st === 'upcoming' ? <PreviewCompare data={data} m={m} lng={lng} scorers={scorers} nm={nm} /> : null}
+
       <Card style={{ gap: space.sm }}>
         <Info icon="calendar-outline" label={t('league.when')} value={kickoffLabel(m.kickoff, lng)} />
         {m.venue || m.city ? <Info icon="location-outline" label={t('league.where')} value={[m.venue, m.city].filter(Boolean).join(' · ')} /> : null}
@@ -185,7 +196,7 @@ export default function MatchPage() {
       {current === 'lineups' && det?.lineups ? <LineupView lineups={det.lineups} events={events} home={home} away={away} lng={lng} nm={nm} /> : null}
       {current === 'events' || current === 'lineups' ? <T size="xs" muted center>{t('league.namesNote')}</T> : null}
 
-      {current === 'h2h' && data.standings.length ? (
+      {current === 'h2h' && data.standings.length && st !== 'upcoming' ? (
         <Card style={{ gap: space.md }}>
           <T semibold>{t('league.formTitle')}</T>
           {[m.home_id, m.away_id].map((tid) => {

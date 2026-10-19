@@ -131,6 +131,8 @@ export interface MomentMeta {
   at?: string; src?: 'alarm' | 'open' | 'manual'; slept?: number; sleep_id?: string; in?: string; out?: string | null;
   /** لصاحب المنشور بس: صورته قيد الفحص، أو انخفى (بلاغات أو مشرف أو فحص الصورة) */
   screen?: 'pending' | 'blocked'; hidden?: boolean;
+  /** منشور توقع مباراة (league_share_prediction): رقم المباراة، والبطاقة تجيب التوقع والنتيجة وقت العرض */
+  league_pred?: { m: number };
 }
 /** @deprecated الاسم القديم */
 export type WakeMeta = MomentMeta;
