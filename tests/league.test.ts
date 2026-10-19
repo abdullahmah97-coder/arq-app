@@ -2,7 +2,7 @@
 // التشغيل: npx esbuild@0.25 tests/league.test.ts --bundle --platform=node --log-level=error --outfile=node_modules/.cache/league.test.js && node node_modules/.cache/league.test.js
 import {
   canBuyTickets, canRemind, countdown, finishedMatches, formOf, goalDiff, groupByDay, headToHead, kickoffLabel, lastResults, liveLabel,
-  matchDayTitle, matchState, resultFor, roundNumber, shortEnName, signed, sortStandings, spotlight, teamColors, teamInitial, teamName,
+  matchDayTitle, matchState, resultFor, roundNumber, shortEnName, signed, sortStandings, spotlight, teamColors, teamInitial, teamLogo, teamName,
   upcomingMatches, type LeagueMatch, type LeagueStanding, type LeagueTeam,
 } from '../src/lib/leagueCore';
 
@@ -32,6 +32,9 @@ ok(teamName(NEW, 'ar') === 'Some New', 'no Arabic name → short English (Club d
 ok(shortEnName('Al-Ittihad FC') === 'Al-Ittihad' && shortEnName('Al Qadsiah') === 'Al Qadsiah', 'English suffixes dropped');
 ok(teamInitial(HIL, 'ar') === 'ه' && teamInitial(NAS, 'ar') === 'ن' && teamInitial({ id: 1, name: 'Damac', name_ar: 'ضمك' }, 'ar') === 'ض', 'Arabic initials skip ال');
 ok(teamInitial(HIL, 'en') === 'H' && teamInitial(NAS, 'en') === 'N' && teamInitial(NEW, 'en') === 'S', 'English initials skip Al-');
+ok(teamLogo({ id: 1, name: 'Al Hilal', name_ar: null, logo_url: 'https://img.thesports.com/football/team/07a5.png' }) === 'https://img.thesports.com/football/team/07a5.png', 'club crest: https link used');
+ok(teamLogo({ id: 1, name: 'X', name_ar: null, logo_url: 'http://x.com/a.png' }) === null && teamLogo({ id: 1, name: 'X', name_ar: null, logo_url: 'javascript:alert(1)' }) === null
+  && teamLogo({ id: 1, name: 'X', name_ar: null }) === null && teamLogo(null) === null, 'club crest: no https link → letter badge');
 ok(teamColors(HIL).bg === '#1B4FA0' && teamColors(NAS).bg === '#F6C516', 'known club colours');
 ok(teamColors(NEW).bg === teamColors({ ...NEW }).bg && /^#/.test(teamColors(NEW).bg) && teamColors(null).bg === '#9AA69E', 'other clubs get a stable colour');
 ok(roundNumber('Regular Season - 8') === 8 && roundNumber('Regular Season - 34') === 34 && roundNumber('Final') === null && roundNumber(null) === null, 'round number');

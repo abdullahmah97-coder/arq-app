@@ -38,7 +38,7 @@ export async function loadLeague(force = false): Promise<LeagueData> {
   let data: LeagueData = { settings, season, teams: new Map(), matches: [], standings: [] };
   if (season != null) {
     const [t, m, s] = await Promise.all([
-      supabase.from('league_teams').select('id, name, name_ar'),
+      supabase.from('league_teams').select('id, name, name_ar, logo_url'),
       supabase.from('league_matches').select(MATCH_COLS).eq('season', season).order('kickoff', { ascending: true }).limit(1000),
       supabase.from('league_standings').select('*').eq('season', season),
     ]);
