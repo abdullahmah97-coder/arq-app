@@ -5,7 +5,7 @@ import {
   matchDayTitle, matchState, resultFor, roundNumber, shortEnName, signed, sortStandings, spotlight, teamColors, teamInitial, teamLogo, teamName,
   upcomingMatches, type LeagueMatch, type LeagueStanding, type LeagueTeam,
   goalsWithSide, hasDetails, lineupRows, minuteText, nameFor, playerMarks, playerNamesIn, readDetails, readScorers, redCards, samePlayer, scorerLines,
-  shortPlayer, statBars, crowdShares, predErrorKey, predLocked, predPoints, readPredSummary,
+  shortPlayer, statBars, crowdShares, predErrorKey, predLocked, predPoints, readPredSummary, seasonTeams,
   type LineupPlayer,
 } from '../src/lib/leagueCore';
 
@@ -174,6 +174,13 @@ ok(readPredSummary(null) === null && readPredSummary({ total: 'x', mine: { home:
 ok(!predLocked({ kickoff: '2026-10-16T18:00:00Z', status: 'NS' }, NOW) && predLocked({ kickoff: '2026-10-16T14:00:00Z', status: 'NS' }, NOW)
   && predLocked({ kickoff: '2026-10-16T18:00:00Z', status: 'PST' }, NOW) && predLocked({ kickoff: '2026-10-16T18:00:00Z', status: '1H' }, NOW), 'prediction locks at kick-off, or when the match is no longer scheduled');
 ok(predErrorKey('locked') === 'league.predLocked' && predErrorKey('bad_score') === 'league.predBadScore' && predErrorKey('boom') === 'errors.generic', 'prediction error messages');
+
+// «مين تشجع؟»: فرق الموسم بترتيب الجدول، واللي ما له ترتيب بعدها، والفرق اللي مو في الموسم تنشال
+const ITT: LeagueTeam = { id: 2938, name: 'Al-Ittihad FC', name_ar: 'الاتحاد' };
+const OLD: LeagueTeam = { id: 7777, name: 'Relegated FC', name_ar: 'هابط' };
+const pickList = seasonTeams(new Map([[HIL.id, HIL], [NAS.id, NAS], [ITT.id, ITT], [NEW.id, NEW], [OLD.id, OLD]]),
+  [m(1, '2026-10-20T15:00:00Z', 'NS', 2932, 9999)], [{ team_id: 2939, rank: 1 }, { team_id: 2932, rank: 2 }, { team_id: 2938, rank: 3 }], 'ar');
+ok(pickList.map((x) => x.id).join() === '2939,2932,2938,9999', 'team picker: season teams by table rank, unranked after, others left out', pickList.map((x) => x.id).join());
 
 if (fail) process.exit(1);
 console.log('ALL LEAGUE TESTS PASSED');

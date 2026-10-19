@@ -180,6 +180,14 @@ export function formOf(teamId: number, standings: LeagueStanding[], rows: League
 
 export const sortStandings = (rows: LeagueStanding[]) => [...rows].sort((a, b) => a.rank - b.rank || b.points - a.points);
 
+/** فرق الموسم (من المباريات أو الترتيب) لاختيار «فريقي» بضغطة: بترتيب الجدول، واللي ما له ترتيب بالاسم آخر شي */
+export function seasonTeams(teams: Map<number, LeagueTeam>, matches: Pick<LeagueMatch, 'home_id' | 'away_id'>[], standings: Pick<LeagueStanding, 'team_id' | 'rank'>[], lng: string): LeagueTeam[] {
+  const rank = new Map(standings.map((s) => [s.team_id, s.rank]));
+  const ids = new Set<number>([...matches.flatMap((m) => [m.home_id, m.away_id]), ...standings.map((s) => s.team_id)]);
+  return [...teams.values()].filter((x) => ids.has(x.id))
+    .sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999) || teamName(a, lng).localeCompare(teamName(b, lng), lng === 'en' ? 'en' : 'ar'));
+}
+
 export const goalDiff = (s: Pick<LeagueStanding, 'goals_for' | 'goals_against'>) =>
   s.goals_for == null || s.goals_against == null ? null : s.goals_for - s.goals_against;
 
