@@ -1,4 +1,4 @@
-// الدوري السعودي: قراءة المباريات والفرق والترتيب (يكتبها الخادم من API-Football)، و«ذكّرني» و«فريقي»
+// الدوري السعودي: قراءة المباريات والفرق والترتيب (يكتبها الخادم من SportScore)، و«ذكّرني» و«فريقي»
 import { supabase } from './supabase';
 import type { LeagueMatch, LeagueSettings, LeagueStanding, LeagueTeam } from './leagueCore';
 

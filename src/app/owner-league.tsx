@@ -1,4 +1,4 @@
-// لوحة إدارة التطبيق ← الدوري السعودي: التشغيل (المالك بس)، وقت التذكير، رابط التذاكر، وحالة المزامنة مع API-Football
+// لوحة إدارة التطبيق ← الدوري السعودي: التشغيل (المالك بس)، وقت التذكير، رابط التذاكر، وحالة المزامنة مع SportScore
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';

@@ -14,7 +14,7 @@ export type LeagueStanding = {
 };
 export type LeagueSettings = { enabled: boolean; tickets_url: string | null; remind_minutes: number };
 
-// حالات API-Football
+// رموز الحالات (بأسلوب API-Football؛ دالة الخادم تحوّل حالات SportScore لها)
 export const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT', 'SUSP'];
 export const DONE_STATUSES = ['FT', 'AET', 'PEN', 'AWD', 'WO'];
 export const OFF_STATUSES = ['PST', 'CANC', 'ABD'];

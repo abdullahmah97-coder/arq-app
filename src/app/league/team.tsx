@@ -4,7 +4,7 @@ import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
-import { TeamBadge } from '@/components/league/LeagueParts';
+import { SourceCredit, TeamBadge } from '@/components/league/LeagueParts';
 import { Button, Card, Empty, Loading, Screen, T } from '@/components/ui';
 import { useUser } from '@/lib/auth';
 import { useLocalized } from '@/lib/i18n';
@@ -71,6 +71,7 @@ export default function PickTeam() {
         </View>
       ) : <Empty icon="football-outline" text={t('league.noData')} />}
       {mine != null ? <Button variant="secondary" icon="close-circle-outline" title={t('league.noTeam')} loading={busy === 'none'} onPress={() => pick(null)} /> : null}
+      {teams.length ? <SourceCredit /> : null}
     </Screen>
   );
 }
