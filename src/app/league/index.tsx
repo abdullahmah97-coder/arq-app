@@ -10,7 +10,7 @@ import { DayHeader, FormDots, MatchRow, TeamBadge, SourceCredit } from '@/compon
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import {
-  canRemind, finishedMatches, formOf, goalDiff, groupByDay, involves, loadLeague, loadScorers, matchDayTitle, myReminders, myTeam,
+  canRemind, finishedMatches, formOf, goalDiff, groupByDay, involves, loadLeague, loadPlayerNames, loadScorers, matchDayTitle, myReminders, myTeam, nameFor,
   setReminder, signed, sortStandings, stateOf, teamName, upcomingMatches, type LeagueData, type LeagueMatch, type Scorer,
 } from '@/lib/league';
 import { enablePush } from '@/lib/push';
@@ -157,12 +157,18 @@ function TopScorers({ data, mine, lng }: { data: LeagueData; mine: number | null
   const { t } = useTranslation();
   const [list, setList] = useState<Scorer[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [ar, setAr] = useState<ReadonlyMap<string, string> | null>(null);
   useEffect(() => {
     let live = true;
     if (data.season == null) { setList([]); return; }
-    loadScorers(data.season).then((l) => { if (live) setList(l); }).catch(() => { if (live) setFailed(true); });
+    loadScorers(data.season).then((l) => {
+      if (!live) return;
+      setList(l);
+      if (lng !== 'en') loadPlayerNames(l.map((x) => x.name)).then((m) => { if (live) setAr(m); }).catch(() => {});
+    }).catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
-  }, [data.season]);
+  }, [data.season, lng]);
+  const nm = nameFor(ar, lng);
   if (failed) return <Empty icon="cloud-offline-outline" text={t('league.loadFailed')} />;
   if (!list) return <Loading />;
   if (!list.length) return <Empty icon="football-outline" text={t('league.noScorers')} />;
@@ -180,7 +186,7 @@ function TopScorers({ data, mine, lng }: { data: LeagueData; mine: number | null
           const me = s.team != null && s.team === mine;
           return (
             <View key={`${s.rank}-${s.name}`} accessible
-              accessibilityLabel={`${s.rank}. ${s.name}، ${teamName(team, lng)}، ${s.goals} ${t('league.goals')}${s.assists != null ? `، ${s.assists} ${t('league.assists')}` : ''}`}
+              accessibilityLabel={`${s.rank}. ${nm(s.name)}، ${teamName(team, lng)}، ${s.goals} ${t('league.goals')}${s.assists != null ? `، ${s.assists} ${t('league.assists')}` : ''}`}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border,
                 backgroundColor: me ? 'rgba(254,169,79,0.18)' : undefined }}>
               <View style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: s.rank <= 3 ? brand.amber : 'transparent' }}>
@@ -188,7 +194,7 @@ function TopScorers({ data, mine, lng }: { data: LeagueData; mine: number | null
               </View>
               <TeamBadge team={team} lng={lng} size={28} />
               <View style={{ flex: 1, gap: 1 }}>
-                <T size="sm" semibold numberOfLines={1}>{s.name}</T>
+                <T size="sm" semibold numberOfLines={1}>{nm(s.name)}</T>
                 <T size="xs" muted numberOfLines={1}>{team ? teamName(team, lng) : '—'}{s.matches != null ? ` · ${t('league.matchesN', { n: s.matches })}` : ''}</T>
               </View>
               <T size="sm" muted style={{ width: 44, textAlign: 'center' }}>{s.assists ?? '—'}</T>

@@ -70,6 +70,23 @@ export async function loadMatchDetails(id: number): Promise<MatchDetails> {
   return readDetails(data);
 }
 
+// أسماء اللاعبين بالعربي (league_players، يكتبها الخادم من Wikidata أو Claude). نحتفظ باللي لقيناه، واللي ما لقيناه نعيد نسأل عنه بعد ٥ دقايق
+const arNames = new Map<string, string>();
+const missingAt = new Map<string, number>();
+export async function loadPlayerNames(names: string[]): Promise<ReadonlyMap<string, string>> {
+  const now = Date.now();
+  const want = [...new Set(names.filter((n) => typeof n === 'string' && n.trim()))]
+    .filter((n) => !arNames.has(n) && now - (missingAt.get(n) ?? 0) > 5 * 60_000).slice(0, 300);
+  if (want.length) {
+    const { data, error } = await supabase.rpc('league_player_names', { p_names: want });
+    if (!error && data && typeof data === 'object' && !Array.isArray(data)) {
+      for (const [k, v] of Object.entries(data as Record<string, unknown>)) if (typeof v === 'string' && v.trim()) arNames.set(k, v.trim());
+    }
+    for (const n of want) if (!arNames.has(n)) missingAt.set(n, now);
+  }
+  return new Map(arNames);
+}
+
 // الهدافين: تتحدث مع التحديث الكامل (كل ٣ ساعات)، فنحتفظ فيها ٥ دقايق
 let scorersCache: { season: number; at: number; list: Scorer[] } | null = null;
 export async function loadScorers(season: number, force = false): Promise<Scorer[]> {

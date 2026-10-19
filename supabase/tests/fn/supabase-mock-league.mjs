@@ -8,6 +8,8 @@ export const db = (globalThis.__leagueState ??= {
   matches: [],
   matchesError: null,
   detailsError: null,
+  // أسماء تنتظر اسم عربي (league_names_todo)
+  namesTodo: [],
   calls: [],
 });
 
@@ -57,6 +59,8 @@ export function createClient(_url, key) {
         if (db.detailsError) return { data: null, error: { message: db.detailsError } };
         return { data: { ok: true, details: args.p_details.length, scorers: !!args.p_scorers }, error: null };
       }
+      if (fn === 'league_names_todo') return { data: db.namesTodo.slice(0, args.p_limit), error: null };
+      if (fn === 'league_names_save') return { data: args.p_names.length, error: null };
       return { data: null, error: { message: 'unknown function ' + fn } };
     },
     from: (table) => {

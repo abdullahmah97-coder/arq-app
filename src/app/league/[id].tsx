@@ -13,7 +13,8 @@ import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/compo
 import { useLocalized } from '@/lib/i18n';
 import {
   canBuyTickets, canRemind, countdown, formOf, headToHead, involves, kickoffClock, kickoffLabel, leagueCached, loadLeague, loadMatch,
-  loadMatchDetails, myReminders, myTeam, redCards, roundNumber, setReminder, stateOf, teamName, type LeagueData, type LeagueMatch, type MatchDetails,
+  loadMatchDetails, loadPlayerNames, myReminders, myTeam, nameFor, playerNamesIn, redCards, roundNumber, setReminder, stateOf, teamName,
+  type LeagueData, type LeagueMatch, type MatchDetails,
 } from '@/lib/league';
 import { enablePush } from '@/lib/push';
 import { brand, colors, radius, space } from '@/theme';
@@ -33,6 +34,7 @@ export default function MatchPage() {
   const [reminded, setReminded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [det, setDet] = useState<MatchDetails | null>(null);
+  const [arNames, setArNames] = useState<ReadonlyMap<string, string> | null>(null);
   const [tab, setTab] = useState<Tab | null>(null);
   const mRef = useRef(m);
   mRef.current = m;
@@ -44,11 +46,15 @@ export default function MatchPage() {
       // من إشعار لمباراة موسم ثاني: نجيبها لحالها
       const found = d.matches.find((x) => x.id === mid) ?? (Number.isFinite(mid) ? await loadMatch(mid) : null);
       setData(d); setM(found); setMine(team); setReminded(r.has(mid));
-      if (x) setDet(x);
+      if (x) {
+        setDet(x);
+        // أسماء اللاعبين بالعربي (الواجهة العربية بس)
+        if (lng !== 'en') loadPlayerNames(playerNamesIn(x)).then(setArNames).catch(() => {});
+      }
     } catch {
       if (mRef.current === undefined) setM(null);
     }
-  }, [mid]);
+  }, [mid, lng]);
 
   useFocusEffect(useCallback(() => {
     load(false);
@@ -76,6 +82,7 @@ export default function MatchPage() {
   const played = st === 'live' || st === 'finished';
   const events = played ? det?.events ?? [] : [];
   const reds = redCards(events);
+  const nm = nameFor(arNames, lng);
   // التبويبات اللي فيها شي بس، والأول فيها يفتح (الأحداث، وإلا التشكيلة، وإلا الإحصائيات)
   const tabs: Tab[] = [
     ...(events.length ? ['events' as const] : []),
@@ -127,7 +134,7 @@ export default function MatchPage() {
           </View>
           <TeamCol name={an} sub={standing(m.away_id) ? t('league.rankShort', { rank: standing(m.away_id)!.rank }) : null} badge={<TeamBadge team={away} lng={lng} size={84} />} reds={reds.a} />
         </View>
-        {events.length ? <ScorerColumns events={events} /> : null}
+        {events.length ? <ScorerColumns events={events} nm={nm} /> : null}
         {cd ? (
           <View style={styles.countdown} accessible accessibilityLabel={t('league.startsIn', { d: cd.d, h: cd.h, m: cd.m })}>
             {cd.d ? <Unit n={cd.d} label={t('league.days')} /> : null}
@@ -172,10 +179,10 @@ export default function MatchPage() {
 
       {current === 'events' ? (
         <EventsTimeline events={events} finished={st === 'finished'} live={st === 'live'}
-          ft={m.home_goals != null && m.away_goals != null ? [m.home_goals, m.away_goals] : null} ht={det?.ht ?? null} />
+          ft={m.home_goals != null && m.away_goals != null ? [m.home_goals, m.away_goals] : null} ht={det?.ht ?? null} nm={nm} />
       ) : null}
       {current === 'stats' && det ? <StatsBars stats={det.stats} home={home} away={away} lng={lng} /> : null}
-      {current === 'lineups' && det?.lineups ? <LineupView lineups={det.lineups} events={events} home={home} away={away} lng={lng} /> : null}
+      {current === 'lineups' && det?.lineups ? <LineupView lineups={det.lineups} events={events} home={home} away={away} lng={lng} nm={nm} /> : null}
       {current === 'events' || current === 'lineups' ? <T size="xs" muted center>{t('league.namesNote')}</T> : null}
 
       {current === 'h2h' && data.standings.length ? (

@@ -4,7 +4,8 @@ import {
   canBuyTickets, canRemind, countdown, finishedMatches, formOf, goalDiff, groupByDay, headToHead, kickoffLabel, lastResults, liveLabel,
   matchDayTitle, matchState, resultFor, roundNumber, shortEnName, signed, sortStandings, spotlight, teamColors, teamInitial, teamLogo, teamName,
   upcomingMatches, type LeagueMatch, type LeagueStanding, type LeagueTeam,
-  goalsWithSide, hasDetails, lineupRows, minuteText, playerMarks, readDetails, readScorers, redCards, samePlayer, scorerLines, shortPlayer, statBars,
+  goalsWithSide, hasDetails, lineupRows, minuteText, nameFor, playerMarks, playerNamesIn, readDetails, readScorers, redCards, samePlayer, scorerLines,
+  shortPlayer, statBars,
   type LineupPlayer,
 } from '../src/lib/leagueCore';
 
@@ -151,6 +152,15 @@ ok(sb.map((x) => x.k).join() === 'possession,shots_on,corners' && sb[0].share ==
 ok(minuteText(33) === "33'" && minuteText(93) === "90+3'", 'minute text');
 const sc = readScorers([{ rank: 2, name: 'B', team: 5, goals: 6 }, { rank: 1, name: 'A', team: null, goals: 11, assists: 1 }, { rank: 'x', name: 'C', goals: 1 }, { rank: 3, name: '', goals: 1 }]);
 ok(sc.map((x) => x.name).join() === 'A,B' && sc[0].assists === 1 && sc[1].assists === null && readScorers(null).length === 0, 'scorers read defensively and sorted by rank');
+
+// أسماء اللاعبين بالعربي
+const pn = playerNamesIn(det);
+ok(pn.includes('Joshua King') && pn.includes('Thamer Al-Khaibri') && pn.includes('Adrian Šemper') && pn.filter((n) => n === 'Joshua King').length === 1 && playerNamesIn(null).length === 0, 'player names collected once from events and lineups', JSON.stringify(pn));
+const ar = new Map([['Joshua King', 'جوشوا كينغ'], ['Lukáš Haraslín', 'لوكاس هاراسلين']]);
+ok(nameFor(ar, 'ar')('Joshua King') === 'جوشوا كينغ' && nameFor(ar, 'ar')('Nobody') === 'Nobody' && nameFor(ar, 'en')('Joshua King') === 'Joshua King' && nameFor(null, 'ar')('X') === 'X', 'display name: Arabic when known (Arabic UI), else as sent');
+const slAr = scorerLines(det.events, nameFor(ar, 'ar'));
+ok(slAr.h[0].name === 'هاراسلين' && slAr.a.find((x) => x.mins.length === 2)?.name === 'كينغ' && slAr.h[1].name === 'Kanga', 'scorer lines use the short Arabic name', JSON.stringify(slAr));
+ok(shortPlayer('سالم الدوسري') === 'الدوسري' && shortPlayer('كريستيانو رونالدو') === 'رونالدو', 'short Arabic names');
 
 if (fail) process.exit(1);
 console.log('ALL LEAGUE TESTS PASSED');
