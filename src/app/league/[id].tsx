@@ -99,13 +99,13 @@ export default function MatchPage() {
           )}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-          <TeamCol name={hn} sub={standing(m.home_id) ? t('league.rankShort', { rank: standing(m.home_id)!.rank }) : null} badge={<TeamBadge team={home} lng={lng} size={62} />} />
+          <TeamCol name={hn} sub={standing(m.home_id) ? t('league.rankShort', { rank: standing(m.home_id)!.rank }) : null} badge={<TeamBadge team={home} lng={lng} size={84} />} />
           <View style={{ alignItems: 'center', minWidth: 92, gap: 4 }}>
             {st === 'live' || st === 'finished' ? <Score m={m} size={38} color={brand.cream} />
               : <T bold color={brand.cream} style={{ fontSize: 26, lineHeight: 34 }}>{kickoffClock(m.kickoff, lng)}</T>}
             {m.status === 'TBD' ? <T size="xs" color={brand.sand}>{t('league.tbd')}</T> : null}
           </View>
-          <TeamCol name={an} sub={standing(m.away_id) ? t('league.rankShort', { rank: standing(m.away_id)!.rank }) : null} badge={<TeamBadge team={away} lng={lng} size={62} />} />
+          <TeamCol name={an} sub={standing(m.away_id) ? t('league.rankShort', { rank: standing(m.away_id)!.rank }) : null} badge={<TeamBadge team={away} lng={lng} size={84} />} />
         </View>
         {cd ? (
           <View style={styles.countdown} accessible accessibilityLabel={t('league.startsIn', { d: cd.d, h: cd.h, m: cd.m })}>

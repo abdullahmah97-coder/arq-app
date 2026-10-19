@@ -1,18 +1,32 @@
-// قطع الدوري السعودي: شارة الفريق (حرف بألوان النادي بدل الشعار)، نقطة «مباشر»، شكل الفريق، وسطر المباراة،
+// قطع الدوري السعودي: شارة الفريق (شعار النادي، وحرف بألوانه لو الشعار ما حمّل)، نقطة «مباشر»، شكل الفريق، وسطر المباراة،
 // وسطر مصدر البيانات (شروط SportScore تطلب «Powered by SportScore» ظاهر في كل شاشة تعرض بياناتهم)
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
+import { Image } from 'expo-image';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Animated, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { T } from '@/components/ui';
 import {
-  kickoffClock, liveLabel, stateOf, teamColors, teamInitial, teamName, type LeagueMatch, type LeagueTeam,
+  kickoffClock, liveLabel, stateOf, teamColors, teamInitial, teamLogo, teamName, type LeagueMatch, type LeagueTeam,
 } from '@/lib/leagueCore';
 import { brand, colors, fonts, radius, space } from '@/theme';
 
 export const LIVE_RED = '#E5322D';
 
 export function TeamBadge({ team, size = 34, lng }: { team: LeagueTeam | undefined; size?: number; lng: string }) {
+  const logo = teamLogo(team);
+  const [broken, setBroken] = useState<string | null>(null);
+  if (logo && broken !== logo) {
+    // دائرة بيضا عشان الشعار يبان على الخلفيات الغامقة (لوحة المباراة ومربع الرئيسية)
+    const pad = Math.max(2, Math.round(size * 0.12));
+    return (
+      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+        borderWidth: size >= 48 ? 2 : 1, borderColor: 'rgba(255,255,255,0.9)', overflow: 'hidden' }} accessibilityElementsHidden importantForAccessibility="no">
+        <Image source={{ uri: logo }} style={{ width: size - pad * 2, height: size - pad * 2 }} contentFit="contain"
+          cachePolicy="memory-disk" transition={150} recyclingKey={logo} onError={() => setBroken(logo)} />
+      </View>
+    );
+  }
   const c = teamColors(team);
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center',

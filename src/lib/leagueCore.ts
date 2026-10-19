@@ -3,7 +3,7 @@
 import { clockLabel, dayLabel, riyadhDate, riyadhMinute } from './bookingsCore';
 import { riyadhDay } from './launchAdsCore';
 
-export type LeagueTeam = { id: number; name: string; name_ar: string | null };
+export type LeagueTeam = { id: number; name: string; name_ar: string | null; logo_url?: string | null };
 export type LeagueMatch = {
   id: number; season: number; round: string | null; kickoff: string; status: string; elapsed: number | null;
   home_id: number; away_id: number; home_goals: number | null; away_goals: number | null; venue: string | null; city: string | null;
@@ -53,6 +53,12 @@ export function teamName(t: LeagueTeam | undefined | null, lng: string): string 
   if (!t) return '—';
   if (lng !== 'en' && t.name_ar) return t.name_ar;
   return shortEnName(t.name);
+}
+
+/** شعار النادي من المزوّد (رابط https بس)، وإلا null ← نعرض الحرف بألوان النادي */
+export function teamLogo(t: LeagueTeam | undefined | null): string | null {
+  const u = t?.logo_url?.trim();
+  return u && /^https:\/\/[^\s]{4,300}$/.test(u) ? u : null;
 }
 
 /** حرف الشارة: أول حرف بعد «ال» أو «Al-» (الهلال ← ه، Al-Nassr ← N) */
