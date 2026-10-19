@@ -221,6 +221,43 @@ const { setup } = require('./_harness.cjs');
   check('signed-in users read details and scorers', (await as(U.A, `select events from league_matches where id = 7700000000001`))[0].events.length === 2
     && (await as(U.A, `select count(*)::int as n from league_leaders`))[0].n === 1);
   await expectErr('signed-out visitors cannot read scorers', () => as(null, `select * from league_leaders`), /permission denied/);
+
+  // ---------- أسماء اللاعبين بالعربي ----------
+  const seen = async () => (await q(`select name, name_ar, source, tries from league_players order by name`));
+  const names0 = (await seen()).map((r) => r.name);
+  check('names from events, lineups and scorers are recorded once, without Arabic yet',
+    ['Lukáš Haraslín', 'Joshua King', 'Thamer Al-Khaibri', 'Adrian Šemper', 'Ivan Toney', 'Mateo Retegui'].every((n) => names0.includes(n))
+    && names0.filter((n) => n === 'Joshua King').length === 1 && (await seen()).every((r) => r.name_ar === null), JSON.stringify(names0));
+  const namesTodo = async (n = 60) => (await q(`select league_names_todo($1) as t`, [n]))[0].t;
+  check('names waiting for Arabic are listed (limited)', (await namesTodo()).length === names0.length && (await namesTodo(2)).length === 2);
+  const saveNames = (names, tried = []) => q(`select league_names_save($1::jsonb, $2::text[]) as n`, [JSON.stringify(names), tried]).then((r) => r[0].n);
+  const nSaved = await saveNames([
+    { name: 'Lukáš Haraslín', ar: 'لوكاس هاراسلين', source: 'wikidata', qid: 'Q18933936' },
+    { name: 'Joshua King', ar: 'جوشوا كينغ', source: 'claude' },
+    { name: 'Ivan Toney', ar: 'Ivan توني', source: 'claude' },          // لاتيني ← مرفوض
+    { name: 'Adrian Šemper', ar: 'أدريان', source: 'someone' },          // مصدر غلط ← مرفوض
+    { name: 'Not Seen', ar: 'مجهول', source: 'claude' },                 // اسم ما مر ← ما ينضاف
+  ], ['Mateo Retegui']);
+  const byName = Object.fromEntries((await seen()).map((r) => [r.name, r]));
+  check('valid Arabic names saved with their source; Latin, bad sources and unknown names refused', nSaved === 2 && byName['Lukáš Haraslín'].name_ar === 'لوكاس هاراسلين'
+    && byName['Lukáš Haraslín'].source === 'wikidata' && byName['Joshua King'].source === 'claude' && byName['Ivan Toney'].name_ar === null
+    && byName['Adrian Šemper'].name_ar === null && !('Not Seen' in byName), JSON.stringify(byName['Ivan Toney']));
+  check('a name we asked about without an answer counts a try', byName['Mateo Retegui'].tries === 1 && byName['Ivan Toney'].tries === 0);
+  await q(`update league_players set tries = 3 where name = 'Mateo Retegui'`);
+  check('after 3 failed tries a name waits a day', !(await namesTodo(300)).includes('Mateo Retegui') && !(await namesTodo(300)).includes('Joshua King'));
+  await q(`update league_players set updated_at = now() - interval '2 days' where name = 'Mateo Retegui'`);
+  check('…then it is tried again', (await namesTodo(300)).includes('Mateo Retegui'));
+  await q(`update league_players set name_ar = 'جوشوا كنج', source = 'manual' where name = 'Joshua King'`);
+  await saveNames([{ name: 'Joshua King', ar: 'جوشوا كينغ', source: 'claude' }]);
+  check("the owner's correction is never overwritten", (await seen()).find((r) => r.name === 'Joshua King').name_ar === 'جوشوا كنج');
+  const map = (await as(U.A, `select league_player_names(array['Lukáš Haraslín', 'Joshua King', 'Ivan Toney', 'Nobody']) as m`))[0].m;
+  check('the app reads Arabic names for the names it shows', map['Lukáš Haraslín'] === 'لوكاس هاراسلين' && map['Joshua King'] === 'جوشوا كنج' && !('Ivan Toney' in map) && !('Nobody' in map), JSON.stringify(map));
+  await expectErr('a user cannot list or save names', () => as(U.A, `select league_names_todo(5)`), /permission denied/);
+  await expectErr('…or save them', () => as(U.A, `select league_names_save('[]'::jsonb, '{}')`), /permission denied/);
+  await as(U.A, `update league_players set name_ar = 'سس' where name = 'Joshua King'`).catch(() => {});
+  check('…or change the table', (await seen()).find((r) => r.name === 'Joshua King').name_ar === 'جوشوا كنج');
+  await expectErr('signed-out visitors cannot read names', () => as(null, `select league_player_names(array['Joshua King'])`), /permission denied/);
+  await expectErr('the table refuses Latin in the Arabic name', () => q(`update league_players set name_ar = 'Joshua' where name = 'Ivan Toney'`), /check constraint/);
   await q(`delete from league_matches where id in (7700000000001, 7700000000002)`);
 
   // حذف الحساب

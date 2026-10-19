@@ -14,6 +14,8 @@ import {
 import { brand, colors, fonts, radius, space } from '@/theme';
 
 const YELLOW = '#F5C518';
+/** اسم العرض الافتراضي: مثل ما وصل من المزوّد */
+const same = (n: string) => n;
 const RED = '#D7263D';
 const SUB_IN = '#1E9E5A';
 const HOME_BAR = brand.green;
@@ -59,9 +61,9 @@ export function HalfTime({ ht }: { ht: [number, number] }) {
 }
 
 /** هدافين المباراة: كل فريق تحت اسمه */
-export function ScorerColumns({ events }: { events: MatchEvent[] }) {
+export function ScorerColumns({ events, nm = same }: { events: MatchEvent[]; nm?: (n: string) => string }) {
   const { t } = useTranslation();
-  const lines = useMemo(() => scorerLines(events), [events]);
+  const lines = useMemo(() => scorerLines(events, nm), [events, nm]);
   if (!lines.h.length && !lines.a.length) return null;
   const col = (side: 'h' | 'a') => (
     <View style={{ flex: 1, gap: 3, alignItems: 'center' }}>
@@ -105,11 +107,11 @@ function timeline(events: MatchEvent[], finished: boolean, ft: [number, number] 
   return out;
 }
 
-function EventText({ e, align }: { e: MatchEvent; align: 'left' | 'right' }) {
+function EventText({ e, align, nm }: { e: MatchEvent; align: 'left' | 'right'; nm: (n: string) => string }) {
   const { t } = useTranslation();
   const row = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, justifyContent: (align === 'right' ? 'flex-end' : 'flex-start') as 'flex-end' | 'flex-start' };
   const name = (s: string | undefined, bold = false, muted = false) => (
-    <T size="sm" semibold={bold} muted={muted} numberOfLines={1} style={{ flexShrink: 1, textAlign: align }}>{s ?? '—'}</T>
+    <T size="sm" semibold={bold} muted={muted} numberOfLines={1} style={{ flexShrink: 1, textAlign: align }}>{s ? nm(s) : '—'}</T>
   );
   // الأيقونة جهة الوسط (جنب الدقيقة)
   const line = (icon: ReactNode, body: ReactNode, key?: string) => (
@@ -143,13 +145,14 @@ function EventText({ e, align }: { e: MatchEvent; align: 'left' | 'right' }) {
       </View>
     );
   }
-  return line(<Ionicons name="tv-outline" size={15} color={colors.muted} />, name(e.p ?? t('league.ev_var')));
+  return line(<Ionicons name="tv-outline" size={15} color={colors.muted} />,
+    <T size="sm" numberOfLines={1} style={{ flexShrink: 1, textAlign: align }}>{e.p ? nm(e.p) : t('league.ev_var')}</T>);
 }
 
 const kindLabel = (k: MatchEvent['kind']) => `league.ev_${k}`;
 
-export function EventsTimeline({ events, finished, live, ft, ht }: {
-  events: MatchEvent[]; finished: boolean; live: boolean; ft: [number, number] | null; ht: [number, number] | null;
+export function EventsTimeline({ events, finished, live, ft, ht, nm = same }: {
+  events: MatchEvent[]; finished: boolean; live: boolean; ft: [number, number] | null; ht: [number, number] | null; nm?: (n: string) => string;
 }) {
   const { t } = useTranslation();
   const items = useMemo(() => {
@@ -176,16 +179,16 @@ export function EventsTimeline({ events, finished, live, ft, ht }: {
           );
         }
         const e = it.e;
-        const label = `${minuteText(e.min)} ${t(kindLabel(e.kind))} ${e.kind === 'sub' ? `${e.in ?? ''} ${e.out ?? ''}` : e.p ?? ''}`;
+        const label = `${minuteText(e.min)} ${t(kindLabel(e.kind))} ${e.kind === 'sub' ? `${e.in ? nm(e.in) : ''} ${e.out ? nm(e.out) : ''}` : e.p ? nm(e.p) : ''}`;
         return (
           <View key={it.key} accessible accessibilityLabel={label} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 7 }}>
-            <View style={{ flex: 1, minWidth: 0 }}>{e.side === 'h' ? <EventText e={e} align="right" /> : null}</View>
+            <View style={{ flex: 1, minWidth: 0 }}>{e.side === 'h' ? <EventText e={e} align="right" nm={nm} /> : null}</View>
             <View style={{ minWidth: 46, alignItems: 'center', backgroundColor: e.kind === 'goal' || e.kind === 'pen' || e.kind === 'og' ? brand.deepGreen : 'transparent',
               borderRadius: radius.pill, paddingVertical: 2, paddingHorizontal: 6 }}>
               <Text allowFontScaling={false} style={{ fontFamily: fonts.semibold, fontSize: 12,
                 color: e.kind === 'goal' || e.kind === 'pen' || e.kind === 'og' ? brand.cream : colors.muted }}>{minuteText(e.min)}</Text>
             </View>
-            <View style={{ flex: 1, minWidth: 0 }}>{e.side === 'a' ? <EventText e={e} align="left" /> : null}</View>
+            <View style={{ flex: 1, minWidth: 0 }}>{e.side === 'a' ? <EventText e={e} align="left" nm={nm} /> : null}</View>
           </View>
         );
       })}
@@ -256,12 +259,12 @@ function Pitch({ width, height }: { width: number; height: number }) {
   );
 }
 
-function PlayerDot({ p, team, side, events, width }: { p: LineupPlayer; team?: LeagueTeam; side: 'h' | 'a'; events: MatchEvent[]; width: number }) {
+function PlayerDot({ p, team, side, events, width, nm }: { p: LineupPlayer; team?: LeagueTeam; side: 'h' | 'a'; events: MatchEvent[]; width: number; nm: (n: string) => string }) {
   const c = teamColors(team);
   const mk = playerMarks(p.n, side, events);
   const size = 34;
   return (
-    <View style={{ width, alignItems: 'center', gap: 3 }} accessible accessibilityLabel={`${p.no ?? ''} ${p.n}`}>
+    <View style={{ width, alignItems: 'center', gap: 3 }} accessible accessibilityLabel={`${p.no ?? ''} ${nm(p.n)}`}>
       <View style={{ width: size, height: size }}>
         <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.bg, borderWidth: 2, borderColor: 'rgba(255,255,255,0.9)',
           alignItems: 'center', justifyContent: 'center' }}>
@@ -288,13 +291,15 @@ function PlayerDot({ p, team, side, events, width }: { p: LineupPlayer; team?: L
       <Text allowFontScaling={false} numberOfLines={1}
         style={{ color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 11, maxWidth: width - 2, textAlign: 'center',
           textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } }}>
-        {shortPlayer(p.n)}{mk.outMin != null ? ` ${minuteText(mk.outMin)}` : ''}
+        {shortPlayer(nm(p.n))}{mk.outMin != null ? ` ${minuteText(mk.outMin)}` : ''}
       </Text>
     </View>
   );
 }
 
-export function LineupView({ lineups, events, home, away, lng }: { lineups: Lineups; events: MatchEvent[]; home?: LeagueTeam; away?: LeagueTeam; lng: string }) {
+export function LineupView({ lineups, events, home, away, lng, nm = same }: {
+  lineups: Lineups; events: MatchEvent[]; home?: LeagueTeam; away?: LeagueTeam; lng: string; nm?: (n: string) => string;
+}) {
   const { t } = useTranslation();
   const [side, setSide] = useState<'h' | 'a'>(lineups.h.length ? 'h' : 'a');
   const [w, setW] = useState(0);
@@ -346,7 +351,7 @@ export function LineupView({ lineups, events, home, away, lng }: { lineups: Line
               const cell = Math.min(84, w / Math.max(r.length, 1));
               return (
                 <View key={i} style={{ position: 'absolute', left: 0, right: 0, top: yOf(i) - 22, flexDirection: 'row', justifyContent: 'space-evenly' }}>
-                  {r.map((p) => <PlayerDot key={`${p.n}-${p.no}`} p={p} team={team} side={side} events={events} width={cell} />)}
+                  {r.map((p) => <PlayerDot key={`${p.n}-${p.no}`} p={p} team={team} side={side} events={events} width={cell} nm={nm} />)}
                 </View>
               );
             })}
@@ -371,7 +376,7 @@ export function LineupView({ lineups, events, home, away, lng }: { lineups: Line
             return (
               <View key={`${p.n}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 7, borderTopWidth: 1, borderTopColor: colors.border }}>
                 <T size="sm" bold muted style={{ width: 26, textAlign: 'center' }}>{p.no ?? '—'}</T>
-                <T size="sm" semibold={mk.inMin != null} numberOfLines={1} style={{ flex: 1 }}>{p.n}</T>
+                <T size="sm" semibold={mk.inMin != null} numberOfLines={1} style={{ flex: 1 }}>{nm(p.n)}</T>
                 {mk.goals ? <Ionicons name="football" size={14} color={colors.text} /> : null}
                 {mk.red || mk.yellow ? <CardIcon kind={mk.red ? 'rc' : 'yc'} size={12} /> : null}
                 {mk.inMin != null ? (

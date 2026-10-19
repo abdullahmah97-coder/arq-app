@@ -1,12 +1,14 @@
 // اختبار دالة league-sync بدون إنترنت: الدخول، الموسم، طلبات SportScore، القراءة، المتابعة المباشرة، والأخطاء
 // التشغيل (من جذر المشروع):
 //   npx esbuild@0.25 supabase/functions/league-sync/index.ts --bundle --format=esm --platform=node \
-//     --alias:npm:@supabase/supabase-js@2=./supabase/tests/fn/supabase-mock-league.mjs --outfile=node_modules/.cache/fn/league_sync.bundle.mjs
+//     --alias:npm:@supabase/supabase-js@2=./supabase/tests/fn/supabase-mock-league.mjs \
+//     --alias:npm:@anthropic-ai/sdk@0.131.0=./supabase/tests/fn/anthropic-mock.mjs --outfile=node_modules/.cache/fn/league_sync.bundle.mjs
 //   node supabase/tests/fn/league_sync.test.mjs
 import { db } from './supabase-mock-league.mjs';
+import { anth, resetAnthropic } from './anthropic-mock.mjs';
 
 let handler;
-const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'service' };
+const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'service', ANTHROPIC_API_KEY: 'test-key' };
 globalThis.Deno = { serve: (h) => { handler = h; }, env: { get: (k) => env[k] } };
 
 // SportScore: كل طلب يسجّل، والرد من دالة نغيّرها لكل اختبار
@@ -25,7 +27,7 @@ const mod = await import('../../../node_modules/.cache/fn/league_sync.bundle.mjs
 const {
   seasonFor, seasonWindow, hash53, teamId, matchRef, splitRef, statusCode, minuteOf, apiError, isLeague,
   parseTeamMatches, parseMatchDetail, parseStandings, mergeMatches, setPause,
-  eventKind, parseEvents, parseStats, parseLineups, parseTopScorers,
+  eventKind, parseEvents, parseStats, parseLineups, parseTopScorers, cleanAr, sparqlFor, parseSparql,
 } = mod;
 const waits = [];
 setPause(async (ms) => { waits.push(ms); });
@@ -36,7 +38,7 @@ const call = async (body = { mode: 'full' }, headers = { 'x-league-key': db.key 
   const res = await handler(new Request('https://fn/league-sync', { method, headers: { 'Content-Type': 'application/json', ...headers }, body: method === 'POST' && body !== undefined ? JSON.stringify(body) : undefined }));
   return { status: res.status, body: await res.json() };
 };
-const reset = () => { sent.length = 0; waits.length = 0; db.calls.length = 0; db.ingestError = null; db.keyError = null; db.matches = []; db.matchesError = null; db.detailsError = null; };
+const reset = () => { sent.length = 0; waits.length = 0; db.calls.length = 0; db.ingestError = null; db.keyError = null; db.matches = []; db.matchesError = null; db.detailsError = null; db.namesTodo = []; resetAnthropic(); };
 const ingests = () => db.calls.filter((c) => c.fn === 'league_ingest').map((c) => c.args);
 const detailCalls = () => db.calls.filter((c) => c.fn === 'league_ingest_details').map((c) => c.args);
 const iso = (mins) => new Date(Date.now() + mins * 60e3).toISOString();
@@ -362,5 +364,74 @@ db.ingestError = 'deadlock';
 r = await call({ mode: 'full' });
 ok('database failure → ingest_failed', r.body.ok === false && r.body.error === 'ingest_failed');
 ok('…and the failure is recorded (so the database backs off instead of asking every minute)', ingests().length === 2 && ingests()[1].p_error === 'ingest_failed');
+
+// ---------- أسماء اللاعبين بالعربي ----------
+ok('arabic name: clean, brackets and direction marks removed', cleanAr(' سالم  الدوسري ') === 'سالم الدوسري' && cleanAr('محمد (لاعب كرة قدم)') === 'محمد' && cleanAr('\u200fإيفان توني') === 'إيفان توني');
+ok('arabic name: Latin, digits, empty and too long refused', cleanAr('Ivan توني') === null && cleanAr('محمد 2') === null && cleanAr('') === null && cleanAr('ا'.repeat(61)) === null && cleanAr(5) === null);
+const sq = sparqlFor(['Ivan Toney', 'N"Golo \\ x']);
+ok('sparql: names quoted and escaped, footballers with an Arabic label, label or alias by path (no BIND)', sq.includes('"Ivan Toney"@en') && sq.includes('"N\\"Golo \\\\ x"@en') && sq.includes('wdt:P106 wd:Q937857')
+  && sq.includes('LANG(?ar) = "ar"') && sq.includes('rdfs:label|skos:altLabel ?name') && !sq.includes('BIND'), sq);
+const B = (name, q, ar, m, links) => ({ name: { value: name }, item: { value: `http://www.wikidata.org/entity/${q}` }, ar: { value: ar },
+  en: { value: m === 1 ? name : `${name} Jr.` }, links: { value: String(links) } });
+const sp = parseSparql({ results: { bindings: [
+  B('Cristiano Ronaldo', 'Q118125023', 'كريستيانو رونالدو الابن', 2, 10), B('Cristiano Ronaldo', 'Q11571', 'كريستيانو رونالدو', 1, 180),
+  B('Ali Al-Hassan', 'Q1', 'علي الحسن', 1, 3), B('Ali Al-Hassan', 'Q2', 'علي حسن', 1, 9),
+  B('Ivan Toney', 'Q16239819', 'Ivan Toney', 1, 40), B('Someone Else', 'Q3', 'شخص', 1, 1), B('Musa Barrow', 'bad', 'موسى بارو', 1, 5),
+] } }, ['Cristiano Ronaldo', 'Ali Al-Hassan', 'Ivan Toney', 'Musa Barrow']);
+ok('sparql: main label beats an alias, then the most-linked; Latin labels, bad ids and other names skipped',
+  sp.get('Cristiano Ronaldo')?.ar === 'كريستيانو رونالدو' && sp.get('Cristiano Ronaldo')?.qid === 'Q11571' && sp.get('Ali Al-Hassan')?.qid === 'Q2'
+  && !sp.has('Ivan Toney') && !sp.has('Musa Barrow') && !sp.has('Someone Else') && parseSparql(null, ['x']).size === 0, JSON.stringify([...sp]));
+
+const wdReply = (names) => ({ results: { bindings: names.filter((n) => n !== 'Marwane Saadane').map((n, i) => B(n, `Q${100 + i}`, { 'Ivan Toney': 'إيفان توني', 'Joshua King': 'جوشوا كينغ' }[n] ?? 'لاعب', 1, 5)) } });
+const namesSaved = () => db.calls.filter((c) => c.fn === 'league_names_save').map((c) => c.args);
+reset();
+db.namesTodo = ['Ivan Toney', 'Joshua King', 'Marwane Saadane', 'Abdulaziz Al-Suwailem'];
+db.matches = [];
+reply = (path, p, n) => {
+  if (path === '/sparql') return { __wd: true };
+  return {};
+};
+globalThis.fetch = (orig => async (url, init) => {
+  const u = new URL(url);
+  if (u.host === 'query.wikidata.org') {
+    sent.push({ host: u.host, path: u.pathname, params: Object.fromEntries(u.searchParams), headers: init.headers });
+    const q = u.searchParams.get('query');
+    const names = [...q.matchAll(/"((?:[^"\\]|\\.)*)"@en/g)].map((m) => m[1]);
+    return new Response(JSON.stringify(wdReply(names.filter((x) => x !== 'Abdulaziz Al-Suwailem'))), { status: 200 });
+  }
+  return orig(url, init);
+})(globalThis.fetch);
+anth.script = [{ json: { names: [{ name: 'Marwane Saadane', ar: 'مروان سعدان' }, { name: 'Abdulaziz Al-Suwailem', ar: 'Abdulaziz' }, { name: 'Made Up', ar: 'مختلق' }] } }];
+r = await call({ mode: 'live' });
+const wd = sent.filter((s) => s.host === 'query.wikidata.org');
+ok('names: Wikidata first (one batch, our User-Agent)', wd.length === 1 && /^arq-league\//.test(wd[0].headers['User-Agent']) && db.calls.find((c) => c.fn === 'league_names_todo').args.p_limit === 60);
+const asked = String(anth.requests[0]?.messages?.[0]?.content ?? '').split('Players:')[1] ?? '';
+ok('names: only the ones Wikidata did not know go to Claude', anth.requests.length === 1 && /Marwane Saadane/.test(asked)
+  && /Abdulaziz Al-Suwailem/.test(asked) && !/Ivan Toney/.test(asked) && !/Joshua King/.test(asked)
+  && anth.requests[0].output_config.format.type === 'json_schema', JSON.stringify(anth.requests[0]?.messages?.[0]?.content ?? '').slice(0, 200));
+const ns = namesSaved()[0];
+ok('names: saved with their source; a bad Claude answer and invented names dropped and counted as tried',
+  ns.p_names.map((x) => `${x.name}:${x.source}`).join() === 'Ivan Toney:wikidata,Joshua King:wikidata,Marwane Saadane:claude'
+  && ns.p_names[0].qid === 'Q100' && ns.p_tried.join() === 'Abdulaziz Al-Suwailem' && r.body.names === 3, JSON.stringify(ns));
+
+reset();
+db.namesTodo = ['Ivan Toney'];
+const keep = env.ANTHROPIC_API_KEY;
+delete env.ANTHROPIC_API_KEY;
+reply = (path, p) => (path === '/api/widget/standings/' ? standingsBody : teamReply(p.slug));
+r = await call({ mode: 'full' });
+ok('names: full run asks for up to 150; without a Claude key Wikidata names still save', db.calls.find((c) => c.fn === 'league_names_todo')?.args.p_limit === 150
+  && anth.requests.length === 0 && namesSaved()[0]?.p_names[0]?.name === 'Ivan Toney', JSON.stringify(namesSaved()));
+env.ANTHROPIC_API_KEY = keep;
+
+reset();
+db.namesTodo = ['Marwane Saadane'];
+anth.script = [{ throw: 'api' }];
+r = await call({ mode: 'live' });
+ok('names: Claude failing → counted as a try, the run still succeeds', r.status === 200 && namesSaved()[0].p_names.length === 0 && namesSaved()[0].p_tried.join() === 'Marwane Saadane');
+
+reset();
+r = await call({ mode: 'live' });
+ok('names: nothing waiting → no Wikidata, no Claude, no save', !sent.some((s) => s.host === 'query.wikidata.org') && anth.requests.length === 0 && namesSaved().length === 0 && r.body.names === 0);
 
 if (failed) console.log(`${failed} failed`);

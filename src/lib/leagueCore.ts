@@ -318,11 +318,11 @@ export function shortPlayer(name: string): string {
   return last;
 }
 
-/** هدافين المباراة لكل فريق: «Kanga 33'، 60'» (الهدف العكسي «(ع.ن)»، والجزائي «(ج)» يحددها اللي يعرض) */
-export function scorerLines(events: MatchEvent[]): Record<'h' | 'a', { name: string; mins: { min: number; kind: EventKind }[] }[]> {
+/** هدافين المباراة لكل فريق: «Kanga 33'، 60'» (الهدف العكسي والجزائي يحددها اللي يعرض). display = اسم العرض (العربي) */
+export function scorerLines(events: MatchEvent[], display: (n: string) => string = (n) => n): Record<'h' | 'a', { name: string; mins: { min: number; kind: EventKind }[] }[]> {
   const out: Record<'h' | 'a', { name: string; mins: { min: number; kind: EventKind }[] }[]> = { h: [], a: [] };
   for (const g of goalsWithSide(events)) {
-    const name = g.p ? shortPlayer(g.p) : '—';
+    const name = g.p ? shortPlayer(display(g.p)) : '—';
     const list = out[g.for];
     const hit = list.find((x) => x.name === name);
     if (hit) hit.mins.push({ min: g.min, kind: g.kind });
@@ -398,6 +398,20 @@ export function lineupRows(players: LineupPlayer[], formation: string | null): L
   const by = (pos: LineupPlayer['pos']) => sorted.filter((p) => (p.pos ?? 'M') === pos);
   return (['G', 'D', 'M', 'F'] as const).map(by).filter((r) => r.length);
 }
+
+/** كل أسماء اللاعبين في تفاصيل المباراة (نجيب أسماءهم بالعربي مرة وحدة) */
+export function playerNamesIn(d: MatchDetails | null | undefined): string[] {
+  if (!d) return [];
+  const out = new Set<string>();
+  for (const e of d.events) for (const n of [e.p, e.in, e.out]) if (n) out.add(n);
+  const l = d.lineups;
+  if (l) for (const p of [...l.h, ...l.a, ...l.hs, ...l.as]) out.add(p.n);
+  return [...out];
+}
+
+/** اسم اللاعب للعرض: بالعربي لو عندنا اسمه (والواجهة عربية)، وإلا مثل ما يرسله المزوّد */
+export const nameFor = (ar: ReadonlyMap<string, string> | null | undefined, lng: string) =>
+  (n: string): string => (lng !== 'en' && ar?.get(n)) || n;
 
 /** «٣٣'» — المزوّد يعطي الوقت بدقيقة وحدة (٩٣ = ٩٠+٣) */
 export const minuteText = (min: number) => (min > 90 ? `90+${min - 90}'` : `${min}'`);

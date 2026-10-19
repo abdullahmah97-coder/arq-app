@@ -7,6 +7,7 @@
 //         ونكمّل تفاصيل المباريات المنتهية اللي ما عندنا تفاصيلها (لين ٨ طلبات، الأحدث أول)
 // والنتيجة ترجع للقاعدة بـ league_ingest (هي اللي ترسل إشعار نهاية المباراة)، والتفاصيل (الأحداث والإحصائيات
 // والتشكيلة ونتيجة الشوط الأول) والهدافين بـ league_ingest_details.
+// وبعدها أسماء اللاعبين الجديدة بالعربي (names.ts: Wikidata ثم Claude) ← league_names_save. لين ٦٠ اسم وقت المباراة و١٥٠ بالتحديث الكامل.
 //
 // النشر (بدون تحقق البوابة من التوكن: القاعدة تناديها بدون توكن، والدالة تتأكد من x-league-key بنفسها):
 //   supabase functions deploy league-sync --no-verify-jwt
@@ -22,7 +23,9 @@ import {
   API_BASE, apiError, COMPETITION_SLUG, DEFAULT_LEAGUE, mergeMatches, mergeTeams, parseMatchDetail, parseStandings,
   parseTeamMatches, parseTopScorers, seasonFor, splitRef, USER_AGENT, type Detail, type Match, type Scorer, type Standing, type Team,
 } from './api.ts';
+import { fromClaude, fromWikidata, type ArName } from './names.ts';
 
+export { cleanAr, parseSparql, sparqlFor } from './names.ts';
 export {
   apiError, eventKind, hash53, isLeague, matchRef, mergeMatches, minuteOf, parseEvents, parseLineups, parseMatchDetail, parseStandings,
   parseStats, parseTeamMatches, parseTopScorers, seasonFor, seasonWindow, splitRef, statusCode, teamId,
@@ -39,6 +42,9 @@ export const RETRY_MS = 2_000;
 export const SETTLE_MAX = 12;
 /** أقصى عدد مباريات منتهية نكمّل تفاصيلها في التحديث الكامل */
 export const BACKFILL_MAX = 8;
+/** أقصى عدد أسماء لاعبين نكتبها بالعربي في كل تشغيل */
+export const NAMES_LIVE = 60;
+export const NAMES_FULL = 150;
 const DONE = ['FT', 'AET', 'PEN', 'AWD', 'WO'];
 const OFF = ['PST', 'CANC', 'ABD'];
 
@@ -126,6 +132,25 @@ async function details(rows: { id: number; source_ref: string }[], season: numbe
   return { teams, matches, details: found, failed };
 }
 
+/** أسماء لاعبين ما لها اسم عربي ← Wikidata ثم Claude ← نحفظها. خطأ هنا ما يوقف شي */
+export async function fillNames(db: SupabaseClient, limit: number): Promise<number> {
+  const { data, error } = await db.rpc('league_names_todo', { p_limit: limit });
+  if (error) { console.error('league_names_todo_failed', error.message); return 0; }
+  const todo = (Array.isArray(data) ? data : []).filter((n): n is string => typeof n === 'string' && n.trim().length > 0).slice(0, limit);
+  if (!todo.length) return 0;
+  const found: ArName[] = await fromWikidata(todo, USER_AGENT, pause);
+  const done = new Set(found.map((x) => x.name));
+  const rest = todo.filter((n) => !done.has(n));
+  const ai = rest.length ? await fromClaude(rest) : [];
+  if (ai) found.push(...ai);
+  const named = new Set(found.map((x) => x.name));
+  // اللي سألنا عنه وما طلع له اسم ينحسب محاولة (القاعدة توقف بعد ٣ وتعيد بعد يوم)
+  const tried = todo.filter((n) => !named.has(n));
+  const { data: saved, error: se } = await db.rpc('league_names_save', { p_names: found, p_tried: tried });
+  if (se) { console.error('league_names_save_failed', se.message); return 0; }
+  return Number(saved ?? 0);
+}
+
 export async function sync(db: SupabaseClient, mode: 'full' | 'live', now = new Date()) {
   const { data: row } = await db.from('app_settings').select('value').eq('key', 'league').maybeSingle();
   const s = (row?.value ?? {}) as { league_id?: number; season?: number };
@@ -210,7 +235,11 @@ export async function sync(db: SupabaseClient, mode: 'full' | 'live', now = new 
     if (de) console.error('league_details_failed', de.message);
     else saved = Number((dd as { details?: number } | null)?.details ?? 0);
   }
-  return { mode, season, ...(data as object), details: saved, scorers: scorers?.length ?? 0 };
+  let names = 0;
+  try { names = await fillNames(db, mode === 'live' ? NAMES_LIVE : NAMES_FULL); } catch (e) {
+    console.error('league_names_failed', e instanceof Error ? e.message : String(e));
+  }
+  return { mode, season, ...(data as object), details: saved, scorers: scorers?.length ?? 0, names };
 }
 
 Deno.serve(async (req) => {
