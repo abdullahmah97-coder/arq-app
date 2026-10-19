@@ -192,6 +192,35 @@ const { setup } = require('./_harness.cjs');
   await ingest('full', 2026, ss, [{ id: 7700000000002, kickoff: iso(60 * 48), status: 'NS', home: 1987654322, away: 1987654321, ref: "x'); drop table league_teams; --/abcdefg" }]);
   check('a junk reference is not stored', (await q(`select source_ref from league_matches where id = 7700000000002`))[0].source_ref === null);
   check('big match ids (from the provider key) fit', (await as(U.A, `select id from league_matches where id = 7700000000001`)).length === 1);
+
+  // ---------- تفاصيل المباراة والهدافين ----------
+  const details = (season, d, scorers = null) =>
+    q(`select league_ingest_details($1, $2::jsonb, $3::jsonb) as r`, [season, JSON.stringify(d), scorers == null ? null : JSON.stringify(scorers)]).then((r) => r[0].r);
+  const det = async () => (await q(`select ht_home, ht_away, events, stats, lineups, details_at from league_matches where id = 7700000000001`))[0];
+  const ev = [{ min: 33, side: 'h', kind: 'goal', p: 'Lukáš Haraslín', hs: 1, as: 0 }, { min: 45, side: 'a', kind: 'sub', in: 'Joshua King', out: 'Thamer Al-Khaibri' }];
+  const stats = [{ k: 'possession', h: 38, a: 62 }, { k: 'shots_on', h: 4, a: 4 }];
+  const lineups = { ok: true, hf: '3-4-3', af: '4-4-2', hc: null, ac: null, h: [{ n: 'Adrian Šemper', no: 1, pos: 'G' }], a: [], hs: [], as: [] };
+  const rd1 = await details(2026, [{ id: 7700000000001, ht: [1, 0], events: ev, stats, lineups }, { id: 123 }, { id: 'x' }, 'junk']);
+  let d1 = await det();
+  check('details saved: half-time score, events, stats, lineups and when', rd1.ok && rd1.details === 1 && d1.ht_home === 1 && d1.ht_away === 0 && d1.events.length === 2
+    && d1.events[0].p === 'Lukáš Haraslín' && d1.stats[0].k === 'possession' && d1.lineups.hf === '3-4-3' && d1.details_at != null, JSON.stringify(rd1));
+  await details(2026, [{ id: 7700000000001, events: [], stats: [] }]);
+  d1 = await det();
+  check('empty lists later (the provider drops stats after the match) keep what we saved', d1.events.length === 2 && d1.stats.length === 2 && d1.lineups.hf === '3-4-3' && d1.ht_home === 1);
+  await details(2026, [{ id: 7700000000001, ht: ['x', 0], stats: Array.from({ length: 41 }, (_, i) => ({ k: 's' + i, h: 1, a: 1 })), lineups: 'nope' }]);
+  d1 = await det();
+  check('junk half-time, too many stats and a non-object lineup are ignored', d1.ht_home === 1 && d1.stats.length === 2 && d1.lineups.hf === '3-4-3');
+  const rd2 = await details(2026, [], [{ rank: 1, name: 'Ivan Toney', team: 1987654321, goals: 11, assists: 1, matches: 8, minutes: 684 }]);
+  check('top scorers saved for the season', rd2.scorers === true && (await as(U.A, `select scorers from league_leaders where season = 2026`))[0].scorers[0].name === 'Ivan Toney');
+  await details(2026, [], [{ rank: 1, name: 'Mateo Retegui', team: null, goals: 6 }]);
+  await details(2026, [], []);
+  const lead = (await q(`select scorers from league_leaders where season = 2026`))[0].scorers;
+  check('a new list replaces the old one; an empty list does not wipe it', lead.length === 1 && lead[0].name === 'Mateo Retegui');
+  await expectErr('a user cannot write details', () => as(U.A, `select league_ingest_details(2026, '[]'::jsonb, null)`), /permission denied/);
+  await expectErr('a user cannot write scorers', () => as(U.A, `insert into league_leaders (season, scorers) values (2030, '[]')`), /permission denied|row-level security/);
+  check('signed-in users read details and scorers', (await as(U.A, `select events from league_matches where id = 7700000000001`))[0].events.length === 2
+    && (await as(U.A, `select count(*)::int as n from league_leaders`))[0].n === 1);
+  await expectErr('signed-out visitors cannot read scorers', () => as(null, `select * from league_leaders`), /permission denied/);
   await q(`delete from league_matches where id in (7700000000001, 7700000000002)`);
 
   // حذف الحساب

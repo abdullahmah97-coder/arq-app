@@ -1,5 +1,5 @@
-// صفحة المباراة: لوحة النتيجة (مباشرة بالدقيقة)، الموعد والملعب والعد التنازلي، «احجز تذكرتك» من المنصة الرسمية،
-// «ذكّرني»، ترتيب الفريقين وشكلهم، ومواجهاتهم هالموسم
+// صفحة المباراة: لوحة النتيجة (مباشرة بالدقيقة، والهدافين ونتيجة الشوط الأول)، الموعد والملعب والعد التنازلي،
+// «احجز تذكرتك» من المنصة الرسمية، «ذكّرني»، وتبويبات: الأحداث، الإحصائيات، التشكيلة على الملعب، والمواجهات (شكل الفريقين ولقاءاتهم)
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -8,16 +8,19 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Share, StyleSheet, View } from 'react-native';
 import { SaduPattern } from '@/brand/Brand';
 import { FormDots, LivePill, MatchRow, Score, TeamBadge, SourceCredit } from '@/components/league/LeagueParts';
-import { Button, Card, Empty, Loading, Row, Screen, T } from '@/components/ui';
+import { EventsTimeline, HalfTime, LineupView, ScorerColumns, StatsBars } from '@/components/league/MatchDetails';
+import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import {
   canBuyTickets, canRemind, countdown, formOf, headToHead, involves, kickoffClock, kickoffLabel, leagueCached, loadLeague, loadMatch,
-  myReminders, myTeam, roundNumber, setReminder, stateOf, teamName, type LeagueData, type LeagueMatch,
+  loadMatchDetails, myReminders, myTeam, redCards, roundNumber, setReminder, stateOf, teamName, type LeagueData, type LeagueMatch, type MatchDetails,
 } from '@/lib/league';
 import { enablePush } from '@/lib/push';
 import { brand, colors, radius, space } from '@/theme';
 
 const hostOf = (url: string) => /^https:\/\/(?:www\.)?([^/?#]+)/i.exec(url)?.[1] ?? url;
+
+type Tab = 'events' | 'stats' | 'lineups' | 'h2h';
 
 export default function MatchPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,15 +32,19 @@ export default function MatchPage() {
   const [mine, setMine] = useState<number | null>(null);
   const [reminded, setReminded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [det, setDet] = useState<MatchDetails | null>(null);
+  const [tab, setTab] = useState<Tab | null>(null);
   const mRef = useRef(m);
   mRef.current = m;
 
   const load = useCallback(async (force: boolean) => {
     try {
-      const [d, team, r] = await Promise.all([loadLeague(force), myTeam().catch(() => null), myReminders().catch(() => new Set<number>())]);
+      const [d, team, r, x] = await Promise.all([loadLeague(force), myTeam().catch(() => null), myReminders().catch(() => new Set<number>()),
+        Number.isFinite(mid) ? loadMatchDetails(mid).catch(() => null) : Promise.resolve(null)]);
       // من إشعار لمباراة موسم ثاني: نجيبها لحالها
       const found = d.matches.find((x) => x.id === mid) ?? (Number.isFinite(mid) ? await loadMatch(mid) : null);
       setData(d); setM(found); setMine(team); setReminded(r.has(mid));
+      if (x) setDet(x);
     } catch {
       if (mRef.current === undefined) setM(null);
     }
@@ -66,6 +73,18 @@ export default function MatchPage() {
   const tickets = canBuyTickets(m, data.settings.tickets_url) ? data.settings.tickets_url! : null;
   const h2h = headToHead(data.matches, m);
   const standing = (teamId: number) => data.standings.find((s) => s.team_id === teamId);
+  const played = st === 'live' || st === 'finished';
+  const events = played ? det?.events ?? [] : [];
+  const reds = redCards(events);
+  // التبويبات اللي فيها شي بس، والأول فيها يفتح (الأحداث، وإلا التشكيلة، وإلا الإحصائيات)
+  const tabs: Tab[] = [
+    ...(events.length ? ['events' as const] : []),
+    ...(played && det?.stats.length ? ['stats' as const] : []),
+    ...(det?.lineups ? ['lineups' as const] : []),
+    ...(data.standings.length || h2h.length ? ['h2h' as const] : []),
+  ];
+  const order: Tab[] = ['events', 'lineups', 'stats', 'h2h'];
+  const current: Tab | null = tab && tabs.includes(tab) ? tab : order.find((x) => tabs.includes(x)) ?? null;
 
   const toggle = async () => {
     setBusy(true);
@@ -99,14 +118,16 @@ export default function MatchPage() {
           )}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-          <TeamCol name={hn} sub={standing(m.home_id) ? t('league.rankShort', { rank: standing(m.home_id)!.rank }) : null} badge={<TeamBadge team={home} lng={lng} size={84} />} />
+          <TeamCol name={hn} sub={standing(m.home_id) ? t('league.rankShort', { rank: standing(m.home_id)!.rank }) : null} badge={<TeamBadge team={home} lng={lng} size={84} />} reds={reds.h} />
           <View style={{ alignItems: 'center', minWidth: 92, gap: 4 }}>
-            {st === 'live' || st === 'finished' ? <Score m={m} size={38} color={brand.cream} />
+            {played ? <Score m={m} size={38} color={brand.cream} />
               : <T bold color={brand.cream} style={{ fontSize: 26, lineHeight: 34 }}>{kickoffClock(m.kickoff, lng)}</T>}
+            {played && det?.ht && m.status !== '1H' ? <HalfTime ht={det.ht} /> : null}
             {m.status === 'TBD' ? <T size="xs" color={brand.sand}>{t('league.tbd')}</T> : null}
           </View>
-          <TeamCol name={an} sub={standing(m.away_id) ? t('league.rankShort', { rank: standing(m.away_id)!.rank }) : null} badge={<TeamBadge team={away} lng={lng} size={84} />} />
+          <TeamCol name={an} sub={standing(m.away_id) ? t('league.rankShort', { rank: standing(m.away_id)!.rank }) : null} badge={<TeamBadge team={away} lng={lng} size={84} />} reds={reds.a} />
         </View>
+        {events.length ? <ScorerColumns events={events} /> : null}
         {cd ? (
           <View style={styles.countdown} accessible accessibilityLabel={t('league.startsIn', { d: cd.d, h: cd.h, m: cd.m })}>
             {cd.d ? <Unit n={cd.d} label={t('league.days')} /> : null}
@@ -144,7 +165,20 @@ export default function MatchPage() {
       </Row>
       {reminded && canRemind(m) && !myMatch ? <T size="xs" muted center>{t('league.remindedHint', { n: data.settings.remind_minutes })}</T> : null}
 
-      {data.standings.length ? (
+      {tabs.length > 1 ? (
+        <Segmented<Tab> value={current ?? tabs[0]} onChange={setTab}
+          options={tabs.map((x) => ({ value: x, label: t(`league.tab_${x}`) }))} />
+      ) : null}
+
+      {current === 'events' ? (
+        <EventsTimeline events={events} finished={st === 'finished'} live={st === 'live'}
+          ft={m.home_goals != null && m.away_goals != null ? [m.home_goals, m.away_goals] : null} ht={det?.ht ?? null} />
+      ) : null}
+      {current === 'stats' && det ? <StatsBars stats={det.stats} home={home} away={away} lng={lng} /> : null}
+      {current === 'lineups' && det?.lineups ? <LineupView lineups={det.lineups} events={events} home={home} away={away} lng={lng} /> : null}
+      {current === 'events' || current === 'lineups' ? <T size="xs" muted center>{t('league.namesNote')}</T> : null}
+
+      {current === 'h2h' && data.standings.length ? (
         <Card style={{ gap: space.md }}>
           <T semibold>{t('league.formTitle')}</T>
           {[m.home_id, m.away_id].map((tid) => {
@@ -169,7 +203,7 @@ export default function MatchPage() {
         </Card>
       ) : null}
 
-      {h2h.length ? (
+      {current === 'h2h' && h2h.length ? (
         <View style={{ gap: space.sm }}>
           <T semibold>{t('league.h2h')}</T>
           {h2h.map((x) => (
@@ -184,12 +218,18 @@ export default function MatchPage() {
   );
 }
 
-function TeamCol({ name, sub, badge }: { name: string; sub: string | null; badge: ReactNode }) {
+function TeamCol({ name, sub, badge, reds = 0 }: { name: string; sub: string | null; badge: ReactNode; reds?: number }) {
+  const { t } = useTranslation();
   return (
     <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
       {badge}
       <T bold color={brand.cream} center numberOfLines={2} style={{ lineHeight: 22 }}>{name}</T>
       {sub ? <T size="xs" color={brand.sand}>{sub}</T> : null}
+      {reds ? (
+        <View style={{ flexDirection: 'row', gap: 3 }} accessible accessibilityLabel={t('league.redCards', { n: reds })}>
+          {Array.from({ length: Math.min(reds, 4) }, (_, i) => <View key={i} style={{ width: 9, height: 13, borderRadius: 2, backgroundColor: '#D7263D' }} />)}
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -8,7 +8,9 @@
 //   /team?slug=<النادي>&limit=30              ← آخر ٣٠ مباراة في جدول النادي (الأبعد أول). نجمعها لكل الأندية:
 //        نادي جدوله فيه أقل من ٣٠ مباراة باقية يجيب معها نتائجه الأخيرة، فالمجموع يغطي الموسم تقريباً
 //   /match?slug=<الزوج>                         ← آخر مواجهة بدأت بين الفريقين (مباشرة أو انتهت). نتأكد إنها مباراتنا
-//        من معرّفها في الرابط قبل ما نقبلها، لأن الرابط حق الزوج مو حق المباراة
+//        من معرّفها في الرابط قبل ما نقبلها، لأن الرابط حق الزوج مو حق المباراة. ومعها تفاصيلها: الأحداث (incidents)،
+//        الإحصائيات (stats، تختفي بعد النهاية بفترة)، التشكيلة (lineups)، ونتيجة الشوط الأول
+//   /topscorers?slug=saudi-professional-league ← هدافي الدوري (أول ٢٠) بأهدافهم وصناعتهم
 // ما فيه معرّفات رقمية: معرّف الفريق رقم ثابت من اسمه، ومعرّف المباراة رقم ثابت من معرّفها في الرابط.
 
 export const API_BASE = 'https://sportscore.com/api/widget';
@@ -24,6 +26,17 @@ export type Match = {
   elapsed: number | null; home: number; away: number; hg: number | null; ag: number | null; venue: string | null; city: string | null;
   ref: string | null;
 };
+export type EventKind = 'goal' | 'pen' | 'og' | 'yc' | 'rc' | 'y2' | 'sub' | 'pmiss' | 'var';
+export type MatchEvent = { min: number; side: 'h' | 'a'; kind: EventKind; p?: string; in?: string; out?: string; hs?: number; as?: number };
+export type StatRow = { k: string; h: number; a: number };
+export type LineupPlayer = { n: string; no: number | null; pos: 'G' | 'D' | 'M' | 'F' | null; c?: true };
+export type Lineups = {
+  ok: boolean; hf: string | null; af: string | null; hc: string | null; ac: string | null;
+  h: LineupPlayer[]; a: LineupPlayer[]; hs: LineupPlayer[]; as: LineupPlayer[];
+};
+/** تفاصيل مباراة لـ league_ingest_details. عنصر فيه id بس = طلبناها وطلع لقاء ثاني للزوج */
+export type Detail = { id: number; ht?: [number, number]; events?: MatchEvent[]; stats?: StatRow[]; lineups?: Lineups };
+export type Scorer = { rank: number; name: string; team: number | null; goals: number; assists: number | null; matches: number | null; minutes: number | null };
 export type Standing = {
   team: number; rank: number; points: number; played: number | null; win: number | null; draw: number | null;
   lose: number | null; gf: number | null; ga: number | null; form: string | null;
@@ -174,22 +187,176 @@ export function parseTeamMatches(body: Any, season: number, league = DEFAULT_LEA
   return { teams: [...teams.values()], matches };
 }
 
-/** /match ← المباراة، بس لو معرّفها نفس اللي ننتظره (الرابط حق الزوج ويرجع آخر مواجهة بدأت) */
-export function parseMatchDetail(body: Any, key: string, season: number, league = DEFAULT_LEAGUE): { teams: Team[]; match: Match } | null {
+/** /match ← المباراة وتفاصيلها، بس لو معرّفها نفس اللي ننتظره (الرابط حق الزوج ويرجع آخر مواجهة بدأت) */
+export function parseMatchDetail(body: Any, key: string, season: number, league = DEFAULT_LEAGUE): { teams: Team[]; match: Match; detail: Detail } | null {
   const x = body?.match;
   const r = matchRef(x?.url);
   if (!r || r.key !== key || !isLeague(x?.competition)) return null;
   const got = toMatch(x, season, league);
-  return got ? { teams: got.teams, match: got.match } : null;
+  if (!got) return null;
+  const detail: Detail = { id: got.match.id };
+  const st = got.match.status;
+  // نتيجة الشوط الأول بس بعد ما يخلص (وقت الشوط الأول المزوّد يرجع ٠-٠)
+  const hh = int(x?.home_ht_score, 0, 99);
+  const ha = int(x?.away_ht_score, 0, 99);
+  if (hh != null && ha != null && ['HT', '2H', 'ET', 'BT', 'P', 'FT', 'AET', 'PEN'].includes(st)) detail.ht = [hh, ha];
+  const events = parseEvents(x?.incidents);
+  if (events.length) detail.events = events;
+  const stats = parseStats(x?.stats);
+  if (stats.length) detail.stats = stats;
+  const lineups = parseLineups(x?.lineups);
+  if (lineups) detail.lineups = lineups;
+  return { teams: got.teams, match: got.match, detail };
+}
+
+/** نوع الحدث من رقمه (أرقام TheSports اللي يستخدمها المزوّد) أو اسمه. null = ما نعرضه (ركنية، تسلل، بداية…) */
+export function eventKind(x: Any): EventKind | null {
+  const id = int(x?.type_id, 0, 999);
+  const t = (str(x?.type, 60) ?? '').toLowerCase();
+  if (id === 17 || /own goal/.test(t)) return 'og';
+  if (id === 16 || id === 30 || (/miss/.test(t) && /pen/.test(t))) return 'pmiss';
+  if (id === 8 || (/pen/.test(t) && /goal|scored/.test(t))) return 'pen';
+  if (x?.is_goal === true || id === 1 || (/goal/.test(t) && !/kick/.test(t))) return /pen/.test(t) ? 'pen' : 'goal';
+  if (id === 15 || /second yellow|2nd yellow|yellow.?red/.test(t)) return 'y2';
+  if (id === 4 || /red card/.test(t)) return 'rc';
+  if (id === 3 || /yellow card/.test(t)) return 'yc';
+  if (id === 9 || x?.is_sub === true || /substitut/.test(t)) return 'sub';
+  if (id === 28 || /\bvar\b/.test(t)) return 'var';
+  return null;
+}
+
+const name = (v: unknown) => str(v, 60);
+
+/** incidents ← أحداث مرتبة بالدقيقة (حد أعلى ١٥٠) */
+export function parseEvents(list: unknown): MatchEvent[] {
+  if (!Array.isArray(list)) return [];
+  const out: MatchEvent[] = [];
+  for (const x of list.slice(0, 200)) {
+    const kind = eventKind(x);
+    const min = minuteOf(x?.time);
+    const side = x?.side === 'home' ? 'h' : x?.side === 'away' ? 'a' : null;
+    if (!kind || min == null || !side) continue;
+    const e: MatchEvent = { min, side, kind };
+    if (kind === 'sub') {
+      const pin = name(x?.player_in);
+      const pout = name(x?.player_out);
+      if (!pin && !pout) continue;
+      if (pin) e.in = pin;
+      if (pout) e.out = pout;
+    } else {
+      const p = name(x?.player);
+      if (p) e.p = p;
+    }
+    if (kind === 'goal' || kind === 'pen' || kind === 'og') {
+      const hs = int(x?.home_score, 0, 99);
+      const as = int(x?.away_score, 0, 99);
+      if (hs != null && as != null) { e.hs = hs; e.as = as; }
+    }
+    out.push(e);
+    if (out.length >= 150) break;
+  }
+  // ترتيب ثابت بالدقيقة (والأحداث بنفس الدقيقة بترتيب المزوّد)
+  return out.map((e, i) => [e, i] as const).sort((p, q) => p[0].min - q[0].min || p[1] - q[1]).map((p) => p[0]);
+}
+
+/** أسماء الإحصائيات عند المزوّد ← مفاتيحنا (التطبيق يترجمها). اللي ما نعرفه ما نحفظه */
+const STAT_KEYS: [RegExp, string][] = [
+  [/^(ball )?possession$/, 'possession'],
+  [/^(total )?shots$/, 'shots'],
+  [/^shots on (target|goal)$/, 'shots_on'],
+  [/^shots off (target|goal)$/, 'shots_off'],
+  [/^blocked shots$/, 'blocked'],
+  [/^corner( kick)?s$/, 'corners'],
+  [/^attacks$/, 'attacks'],
+  [/^dangerous attacks$/, 'dangerous'],
+  [/^fouls$/, 'fouls'],
+  [/^yellow cards$/, 'yellow'],
+  [/^red cards$/, 'red'],
+  [/^offsides?$/, 'offsides'],
+  [/^(goalkeeper )?saves$/, 'saves'],
+  [/^(total )?passes$/, 'passes'],
+  [/^free kicks$/, 'free_kicks'],
+  [/^goal kicks$/, 'goal_kicks'],
+  [/^throw[- ]ins$/, 'throw_ins'],
+];
+
+export function parseStats(list: unknown): StatRow[] {
+  if (!Array.isArray(list)) return [];
+  const out: StatRow[] = [];
+  const seen = new Set<string>();
+  for (const x of list.slice(0, 60)) {
+    const label = (str(x?.label, 60) ?? str(x?.name, 60) ?? '').toLowerCase();
+    const k = STAT_KEYS.find(([re]) => re.test(label))?.[1];
+    const h = int(x?.home, 0, 100000);
+    const a = int(x?.away, 0, 100000);
+    if (!k || seen.has(k) || h == null || a == null) continue;
+    if (k === 'possession' && (h > 100 || a > 100)) continue;
+    seen.add(k);
+    out.push({ k, h, a });
+  }
+  return out;
+}
+
+function players(list: unknown, max: number): LineupPlayer[] {
+  if (!Array.isArray(list)) return [];
+  const out: LineupPlayer[] = [];
+  for (const x of list.slice(0, 40)) {
+    const n = name(x?.name);
+    if (!n) continue;
+    const pos = (str(x?.position, 20) ?? '').charAt(0).toUpperCase();
+    const p: LineupPlayer = { n, no: int(x?.number, 0, 99), pos: pos === 'G' || pos === 'D' || pos === 'M' || pos === 'F' ? pos : null };
+    if (x?.captain === true) p.c = true;
+    out.push(p);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+const formation = (v: unknown) => {
+  const s = str(v, 20);
+  return s && /^[1-6](-[1-6]){1,4}$/.test(s) ? s : null;
+};
+
+/** lineups ← التشكيلة (null لو ما فيه لاعبين) */
+export function parseLineups(x: Any): Lineups | null {
+  if (!x || typeof x !== 'object') return null;
+  const h = players(x.home_xi, 11);
+  const a = players(x.away_xi, 11);
+  if (!h.length && !a.length) return null;
+  return {
+    ok: x.confirmed === true, hf: formation(x.home_formation), af: formation(x.away_formation),
+    hc: name(x.home_coach), ac: name(x.away_coach),
+    h, a, hs: players(x.home_subs, 20), as: players(x.away_subs, 20),
+  };
+}
+
+/** /topscorers ← الهدافين. الفريق من رابط النادي في الترتيب (أضمن من الاسم)، وإلا من الاسم لو نعرفه */
+export function parseTopScorers(body: Any, slugTeam: Record<string, number> = {}, known: Set<number> = new Set()): Scorer[] {
+  const list: Any[] = Array.isArray(body?.scorers) ? body.scorers : [];
+  const out: Scorer[] = [];
+  for (const x of list.slice(0, 60)) {
+    const n = name(x?.player);
+    const goals = int(x?.goals, 0, 200);
+    const rank = int(x?.rank, 1, 200);
+    if (!n || goals == null || rank == null) continue;
+    const slug = str(x?.team_slug, 80) ?? '';
+    const tname = str(x?.team, 80);
+    const byName = tname ? teamId(tname) : null;
+    const team = Object.hasOwn(slugTeam, slug) ? slugTeam[slug] : byName != null && known.has(byName) ? byName : null;
+    out.push({ rank, name: n, team, goals, assists: int(x?.assists, 0, 200), matches: int(x?.matches, 0, 99), minutes: int(x?.minutes, 0, 10000) });
+    if (out.length >= 30) break;
+  }
+  return out;
 }
 
 /** /standings ← جدول الترتيب، والفرق اللي فيه، وروابط الأندية (نطلب جدول كل نادي منها) */
-export function parseStandings(body: Any): { teams: Team[]; standings: Standing[]; slugs: string[] } {
+export function parseStandings(body: Any): { teams: Team[]; standings: Standing[]; slugs: string[]; slugTeam: Record<string, number> } {
   const groups: Any[] = Array.isArray(body?.tables) ? body.tables : [];
   const rows: Any[] = groups.flatMap((g) => (Array.isArray(g?.rows) ? g.rows : []));
   const teams = new Map<number, Team>();
   const standings = new Map<number, Standing>();
   const slugs: string[] = [];
+  const slugTeam: Record<string, number> = {};
   for (const r of rows) {
     const name = str(r?.team, 80);
     const rank = int(r?.pos, 1, 40);
@@ -198,14 +365,14 @@ export function parseStandings(body: Any): { teams: Team[]; standings: Standing[
     if (standings.has(id)) continue;
     teams.set(id, { id, name, logo: logo(r?.team_logo) });
     const slug = str(r?.team_slug, 80);
-    if (slug && /^[a-z0-9]+(?:-[a-z0-9]+){0,10}$/.test(slug)) slugs.push(slug);
+    if (slug && /^[a-z0-9]+(?:-[a-z0-9]+){0,10}$/.test(slug)) { slugs.push(slug); slugTeam[slug] = id; }
     standings.set(id, {
       team: id, rank, points: int(r?.pts, -50, 200) ?? 0,
       played: int(r?.p, 0, 99), win: int(r?.w, 0, 99), draw: int(r?.d, 0, 99), lose: int(r?.l, 0, 99),
       gf: int(r?.gf, 0, 999), ga: int(r?.ga, 0, 999), form: null,
     });
   }
-  return { teams: [...teams.values()], standings: [...standings.values()], slugs };
+  return { teams: [...teams.values()], standings: [...standings.values()], slugs, slugTeam };
 }
 
 const DONE = ['FT', 'AET', 'PEN', 'AWD', 'WO'];

@@ -201,3 +201,203 @@ export const canBuyTickets = (m: Pick<LeagueMatch, 'status' | 'kickoff'>, url: s
 /** «ذكّرني» للمباراة اللي ما بدأت (والقاعدة ترفض غيرها) */
 export const canRemind = (m: Pick<LeagueMatch, 'status' | 'kickoff'>, now = Date.now()) =>
   stateOf(m, now) === 'upcoming' && Date.parse(m.kickoff) > now;
+
+// ---------- تفاصيل المباراة (الأحداث، الإحصائيات، التشكيلة) والهدافين ----------
+// يكتبها الخادم (league-sync ← league_ingest_details) بشكل مختصر، وهنا نقراها بحذر (أي شي غريب ينشال)
+
+export type EventKind = 'goal' | 'pen' | 'og' | 'yc' | 'rc' | 'y2' | 'sub' | 'pmiss' | 'var';
+export type MatchEvent = { min: number; side: 'h' | 'a'; kind: EventKind; p?: string; in?: string; out?: string; hs?: number; as?: number };
+export type StatRow = { k: string; h: number; a: number };
+export type LineupPlayer = { n: string; no: number | null; pos: 'G' | 'D' | 'M' | 'F' | null; c?: boolean };
+export type Lineups = {
+  ok: boolean; hf: string | null; af: string | null; hc: string | null; ac: string | null;
+  h: LineupPlayer[]; a: LineupPlayer[]; hs: LineupPlayer[]; as: LineupPlayer[];
+};
+export type MatchDetails = { ht: [number, number] | null; events: MatchEvent[]; stats: StatRow[]; lineups: Lineups | null };
+export type Scorer = { rank: number; name: string; team: number | null; goals: number; assists: number | null; matches: number | null; minutes: number | null };
+
+const KINDS: EventKind[] = ['goal', 'pen', 'og', 'yc', 'rc', 'y2', 'sub', 'pmiss', 'var'];
+const isInt = (v: unknown, min: number, max: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max;
+const txt = (v: unknown, max = 60): string | undefined => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+
+function readEvent(x: unknown): MatchEvent | null {
+  const e = x as Record<string, unknown> | null;
+  if (!e || typeof e !== 'object') return null;
+  if (!isInt(e.min, 0, 200) || (e.side !== 'h' && e.side !== 'a') || !KINDS.includes(e.kind as EventKind)) return null;
+  const out: MatchEvent = { min: e.min, side: e.side, kind: e.kind as EventKind };
+  const p = txt(e.p); const pin = txt(e.in); const pout = txt(e.out);
+  if (p) out.p = p;
+  if (pin) out.in = pin;
+  if (pout) out.out = pout;
+  if (isInt(e.hs, 0, 99) && isInt(e.as, 0, 99)) { out.hs = e.hs; out.as = e.as; }
+  return out;
+}
+
+function readPlayers(v: unknown, max: number): LineupPlayer[] {
+  if (!Array.isArray(v)) return [];
+  const out: LineupPlayer[] = [];
+  for (const x of v.slice(0, max)) {
+    const n = txt((x as { n?: unknown })?.n);
+    if (!n) continue;
+    const no = (x as { no?: unknown }).no;
+    const pos = (x as { pos?: unknown }).pos;
+    out.push({ n, no: isInt(no, 0, 99) ? no : null, pos: pos === 'G' || pos === 'D' || pos === 'M' || pos === 'F' ? pos : null, c: (x as { c?: unknown }).c === true });
+  }
+  return out;
+}
+
+const formationOk = (v: unknown) => (typeof v === 'string' && /^[1-6](-[1-6]){1,4}$/.test(v) ? v : null);
+
+/** صف المباراة من القاعدة ← التفاصيل (فاضية لو ما فيه شي) */
+export function readDetails(row: { ht_home?: unknown; ht_away?: unknown; events?: unknown; stats?: unknown; lineups?: unknown } | null | undefined): MatchDetails {
+  const ht: [number, number] | null = row && isInt(row.ht_home, 0, 99) && isInt(row.ht_away, 0, 99) ? [row.ht_home, row.ht_away] : null;
+  const events = Array.isArray(row?.events) ? (row!.events as unknown[]).slice(0, 150).map(readEvent).filter((e): e is MatchEvent => !!e) : [];
+  events.sort((a, b) => a.min - b.min);
+  const stats = Array.isArray(row?.stats)
+    ? (row!.stats as { k?: unknown; h?: unknown; a?: unknown }[]).slice(0, 40)
+      .filter((s) => typeof s?.k === 'string' && /^[a-z_]{2,20}$/.test(s.k) && isInt(s.h, 0, 100000) && isInt(s.a, 0, 100000))
+      .map((s) => ({ k: s.k as string, h: s.h as number, a: s.a as number }))
+    : [];
+  const l = row?.lineups as Record<string, unknown> | null | undefined;
+  let lineups: Lineups | null = null;
+  if (l && typeof l === 'object' && !Array.isArray(l)) {
+    const h = readPlayers(l.h, 11); const a = readPlayers(l.a, 11);
+    if (h.length || a.length) {
+      lineups = { ok: l.ok === true, hf: formationOk(l.hf), af: formationOk(l.af), hc: txt(l.hc) ?? null, ac: txt(l.ac) ?? null,
+        h, a, hs: readPlayers(l.hs, 20), as: readPlayers(l.as, 20) };
+    }
+  }
+  return { ht, events, stats, lineups };
+}
+
+export const hasDetails = (d: MatchDetails | null | undefined) => !!d && (d.events.length > 0 || d.stats.length > 0 || !!d.lineups);
+
+/** قائمة الهدافين من القاعدة (بحذر) */
+export function readScorers(v: unknown): Scorer[] {
+  if (!Array.isArray(v)) return [];
+  const out: Scorer[] = [];
+  for (const x of v.slice(0, 40)) {
+    const s = x as Record<string, unknown>;
+    const name = txt(s?.name);
+    if (!name || !isInt(s.rank, 1, 200) || !isInt(s.goals, 0, 200)) continue;
+    out.push({ rank: s.rank, name, team: isInt(s.team, 1, 2147483647) ? s.team : null, goals: s.goals,
+      assists: isInt(s.assists, 0, 200) ? s.assists : null, matches: isInt(s.matches, 0, 99) ? s.matches : null, minutes: isInt(s.minutes, 0, 10000) ? s.minutes : null });
+  }
+  return out.sort((a, b) => a.rank - b.rank || b.goals - a.goals);
+}
+
+const GOALS: EventKind[] = ['goal', 'pen', 'og'];
+export const isGoal = (e: MatchEvent) => GOALS.includes(e.kind);
+
+/** الأهداف بجهة الفريق المستفيد: من فرق النتيجة قبل وبعد (أضمن للهدف العكسي)، وإلا جهة الحدث */
+export function goalsWithSide(events: MatchEvent[]): (MatchEvent & { for: 'h' | 'a' })[] {
+  let ph = 0; let pa = 0;
+  const out: (MatchEvent & { for: 'h' | 'a' })[] = [];
+  for (const e of events) {
+    if (!isGoal(e)) continue;
+    let side: 'h' | 'a' = e.kind === 'og' ? (e.side === 'h' ? 'a' : 'h') : e.side;
+    if (e.hs != null && e.as != null) {
+      if (e.hs > ph && e.as === pa) side = 'h';
+      else if (e.as > pa && e.hs === ph) side = 'a';
+      ph = e.hs; pa = e.as;
+    }
+    out.push({ ...e, for: side });
+  }
+  return out;
+}
+
+/** «Ali Saeed Ali Al Shaafi» ← «Al Shaafi»، «Cristiano Ronaldo» ← «Ronaldo»، «Fawaz Al-Sagour» ← «Al-Sagour» */
+export function shortPlayer(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  // «A. Alamine Ali»: الحرف الأول اختصار، واللي بعده اسم العائلة
+  if (parts.length >= 3 && /^[A-Za-z]\.$/.test(parts[0])) return parts[1];
+  if (parts.length < 2) return name.trim();
+  const last = parts[parts.length - 1];
+  const prev = parts[parts.length - 2];
+  if (/^(al|el|ad|as|ash|at|az|abu|bin|ben|de|da|di|van|von|le|la|dos|del)$/i.test(prev)) return `${prev} ${last}`;
+  return last;
+}
+
+/** هدافين المباراة لكل فريق: «Kanga 33'، 60'» (الهدف العكسي «(ع.ن)»، والجزائي «(ج)» يحددها اللي يعرض) */
+export function scorerLines(events: MatchEvent[]): Record<'h' | 'a', { name: string; mins: { min: number; kind: EventKind }[] }[]> {
+  const out: Record<'h' | 'a', { name: string; mins: { min: number; kind: EventKind }[] }[]> = { h: [], a: [] };
+  for (const g of goalsWithSide(events)) {
+    const name = g.p ? shortPlayer(g.p) : '—';
+    const list = out[g.for];
+    const hit = list.find((x) => x.name === name);
+    if (hit) hit.mins.push({ min: g.min, kind: g.kind });
+    else list.push({ name, mins: [{ min: g.min, kind: g.kind }] });
+  }
+  return out;
+}
+
+/** بطاقات حمراء لكل فريق (تبان تحت النتيجة) */
+export function redCards(events: MatchEvent[]): Record<'h' | 'a', number> {
+  const r = { h: 0, a: 0 };
+  for (const e of events) if (e.kind === 'rc' || e.kind === 'y2') r[e.side]++;
+  return r;
+}
+
+/** ترتيب عرض الإحصائيات، وحصة كل فريق (٠..١) للشريط */
+export const STAT_ORDER = ['possession', 'shots', 'shots_on', 'shots_off', 'blocked', 'corners', 'attacks', 'dangerous', 'fouls', 'yellow', 'red', 'offsides', 'saves', 'passes', 'free_kicks', 'goal_kicks', 'throw_ins'];
+export function statBars(stats: StatRow[]): (StatRow & { share: number })[] {
+  return [...stats]
+    .sort((a, b) => (STAT_ORDER.indexOf(a.k) + 1 || 99) - (STAT_ORDER.indexOf(b.k) + 1 || 99))
+    .map((s) => ({ ...s, share: s.h + s.a > 0 ? s.h / (s.h + s.a) : 0.5 }));
+}
+
+const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+/** نفس اللاعب؟ المزوّد يكتب الاسم بأكثر من شكل («Ali Alamine» و«A. Alamine Ali»): الاسم كامل، أو كلمة مميزة (٤ حروف وأكثر)
+ *  مشتركة غير الاسم الأول */
+export function samePlayer(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  const x = norm(a); const y = norm(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const tx = x.split(' ').slice(1).filter((t) => t.length >= 4);
+  const ty = new Set(y.split(' ').slice(1).filter((t) => t.length >= 4));
+  return tx.some((t) => ty.has(t));
+}
+
+/** وش صار للاعب في المباراة (للتشكيلة): أهدافه، بطاقاته، ومتى طلع أو دخل */
+export function playerMarks(name: string, side: 'h' | 'a', events: MatchEvent[]) {
+  const m = { goals: 0, og: 0, yellow: false, red: false, outMin: null as number | null, inMin: null as number | null };
+  for (const e of events) {
+    // الهدف العكسي: المزوّد ممكن يحطه بجهة المستفيد، فنطابقه بالاسم بس
+    if (e.kind === 'og') { if (samePlayer(e.p, name)) m.og++; continue; }
+    if (e.side !== side) continue;
+    if ((e.kind === 'goal' || e.kind === 'pen') && samePlayer(e.p, name)) m.goals++;
+    else if (e.kind === 'yc' && samePlayer(e.p, name)) m.yellow = true;
+    else if ((e.kind === 'rc' || e.kind === 'y2') && samePlayer(e.p, name)) m.red = true;
+    else if (e.kind === 'sub') {
+      if (m.outMin == null && samePlayer(e.out, name)) m.outMin = e.min;
+      if (m.inMin == null && samePlayer(e.in, name)) m.inMin = e.min;
+    }
+  }
+  return m;
+}
+
+const POS_ORDER = { G: 0, D: 1, M: 2, F: 3 } as const;
+
+/** خطوط التشكيلة من الحارس للهجوم. الخطة («4-2-3-1») تحدد عدد كل خط، واللاعبين بترتيب المراكز (حارس، دفاع، وسط، هجوم).
+ *  لو الخطة ناقصة أو ما تطابق العدد: خط لكل مركز */
+export function lineupRows(players: LineupPlayer[], formation: string | null): LineupPlayer[][] {
+  if (!players.length) return [];
+  const sorted = players.map((p, i) => [p, i] as const)
+    .sort((a, b) => (a[0].pos ? POS_ORDER[a[0].pos] : 2) - (b[0].pos ? POS_ORDER[b[0].pos] : 2) || a[1] - b[1]).map((x) => x[0]);
+  const gkFirst = sorted[0]?.pos === 'G' || !sorted.some((p) => p.pos === 'G');
+  const counts = formation ? formation.split('-').map(Number) : [];
+  const outfield = gkFirst ? sorted.slice(1) : sorted;
+  if (gkFirst && counts.length && counts.reduce((s, n) => s + n, 0) === outfield.length) {
+    const rows: LineupPlayer[][] = [[sorted[0]]];
+    let i = 0;
+    for (const n of counts) { rows.push(outfield.slice(i, i + n)); i += n; }
+    return rows;
+  }
+  const by = (pos: LineupPlayer['pos']) => sorted.filter((p) => (p.pos ?? 'M') === pos);
+  return (['G', 'D', 'M', 'F'] as const).map(by).filter((r) => r.length);
+}
+
+/** «٣٣'» — المزوّد يعطي الوقت بدقيقة وحدة (٩٣ = ٩٠+٣) */
+export const minuteText = (min: number) => (min > 90 ? `90+${min - 90}'` : `${min}'`);

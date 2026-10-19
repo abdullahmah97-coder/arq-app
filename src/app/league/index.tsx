@@ -1,8 +1,8 @@
-// الدوري السعودي: المباريات القادمة (والمباشرة فوقها)، النتائج، جدول الترتيب، «فريقي» و«ذكّرني»
+// الدوري السعودي: المباريات القادمة (والمباشرة فوقها)، النتائج، جدول الترتيب، الهدافين، «فريقي» و«ذكّرني»
 // البيانات من SportScore عبر الخادم (league-sync)، وتتحدث كل دقيقة وأنت فاتح الصفحة وقت المباريات
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
@@ -10,13 +10,13 @@ import { DayHeader, FormDots, MatchRow, TeamBadge, SourceCredit } from '@/compon
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import {
-  canRemind, finishedMatches, formOf, goalDiff, groupByDay, involves, loadLeague, matchDayTitle, myReminders, myTeam,
-  setReminder, signed, sortStandings, stateOf, teamName, upcomingMatches, type LeagueData, type LeagueMatch,
+  canRemind, finishedMatches, formOf, goalDiff, groupByDay, involves, loadLeague, loadScorers, matchDayTitle, myReminders, myTeam,
+  setReminder, signed, sortStandings, stateOf, teamName, upcomingMatches, type LeagueData, type LeagueMatch, type Scorer,
 } from '@/lib/league';
 import { enablePush } from '@/lib/push';
 import { brand, colors, radius, space } from '@/theme';
 
-type Tab = 'next' | 'results' | 'table';
+type Tab = 'next' | 'results' | 'table' | 'scorers';
 const PAGE = 24;
 
 export default function League() {
@@ -114,15 +114,18 @@ export default function League() {
       ) : (
         <>
           <Segmented<Tab> value={tab} onChange={(v) => { setTab(v); setLimit(PAGE); }}
-            options={[{ value: 'next', label: t('league.tabNext') }, { value: 'results', label: t('league.tabResults') }, { value: 'table', label: t('league.tabTable') }]} />
+            options={[{ value: 'next', label: t('league.tabNext') }, { value: 'results', label: t('league.tabResults') },
+              { value: 'table', label: t('league.tabTable') }, { value: 'scorers', label: t('league.tabScorers') }]} />
 
-          {tab !== 'table' && mine != null ? (
+          {(tab === 'next' || tab === 'results') && mine != null ? (
             <Segmented<'all' | 'mine'> wrap value={onlyMine ? 'mine' : 'all'} onChange={(v) => { setOnlyMine(v === 'mine'); setLimit(PAGE); }}
               options={[{ value: 'all', label: t('league.allMatches') }, { value: 'mine', label: t('league.onlyMine', { team: teamName(myT, lng) }) }]} />
           ) : null}
 
           {tab === 'table' ? (
             <StandingsTable data={data} mine={mine} lng={lng} />
+          ) : tab === 'scorers' ? (
+            <TopScorers data={data} mine={mine} lng={lng} />
           ) : shown.length ? (
             <View style={{ gap: space.sm }}>
               {groupByDay(shown).map((g, i) => (
@@ -147,6 +150,55 @@ export default function League() {
       <T size="xs" muted center style={{ lineHeight: 19 }}>{t('league.sourceNote')}</T>
       <SourceCredit />
     </Screen>
+  );
+}
+
+function TopScorers({ data, mine, lng }: { data: LeagueData; mine: number | null; lng: string }) {
+  const { t } = useTranslation();
+  const [list, setList] = useState<Scorer[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    if (data.season == null) { setList([]); return; }
+    loadScorers(data.season).then((l) => { if (live) setList(l); }).catch(() => { if (live) setFailed(true); });
+    return () => { live = false; };
+  }, [data.season]);
+  if (failed) return <Empty icon="cloud-offline-outline" text={t('league.loadFailed')} />;
+  if (!list) return <Loading />;
+  if (!list.length) return <Empty icon="football-outline" text={t('league.noScorers')} />;
+  return (
+    <View style={{ gap: space.sm }}>
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: colors.cardAlt }}>
+          <T size="xs" muted style={{ width: 24, textAlign: 'center' }}>#</T>
+          <T size="xs" muted style={{ flex: 1 }}>{t('league.player')}</T>
+          <T size="xs" muted style={{ width: 44, textAlign: 'center' }}>{t('league.assists')}</T>
+          <T size="xs" semibold style={{ width: 44, textAlign: 'center' }}>{t('league.goals')}</T>
+        </View>
+        {list.map((s, i) => {
+          const team = s.team != null ? data.teams.get(s.team) : undefined;
+          const me = s.team != null && s.team === mine;
+          return (
+            <View key={`${s.rank}-${s.name}`} accessible
+              accessibilityLabel={`${s.rank}. ${s.name}، ${teamName(team, lng)}، ${s.goals} ${t('league.goals')}${s.assists != null ? `، ${s.assists} ${t('league.assists')}` : ''}`}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border,
+                backgroundColor: me ? 'rgba(254,169,79,0.18)' : undefined }}>
+              <View style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: s.rank <= 3 ? brand.amber : 'transparent' }}>
+                <T size="sm" bold color={s.rank <= 3 ? brand.deepGreen : colors.text}>{s.rank}</T>
+              </View>
+              <TeamBadge team={team} lng={lng} size={28} />
+              <View style={{ flex: 1, gap: 1 }}>
+                <T size="sm" semibold numberOfLines={1}>{s.name}</T>
+                <T size="xs" muted numberOfLines={1}>{team ? teamName(team, lng) : '—'}{s.matches != null ? ` · ${t('league.matchesN', { n: s.matches })}` : ''}</T>
+              </View>
+              <T size="sm" muted style={{ width: 44, textAlign: 'center' }}>{s.assists ?? '—'}</T>
+              <T size="lg" bold style={{ width: 44, textAlign: 'center' }}>{s.goals}</T>
+            </View>
+          );
+        })}
+      </Card>
+      <T size="xs" muted center>{t('league.namesNote')}</T>
+    </View>
   );
 }
 

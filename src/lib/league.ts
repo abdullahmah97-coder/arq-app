@@ -1,6 +1,6 @@
 // الدوري السعودي: قراءة المباريات والفرق والترتيب (يكتبها الخادم من SportScore)، و«ذكّرني» و«فريقي»
 import { supabase } from './supabase';
-import type { LeagueMatch, LeagueSettings, LeagueStanding, LeagueTeam } from './leagueCore';
+import { readDetails, readScorers, type LeagueMatch, type LeagueSettings, type LeagueStanding, type LeagueTeam, type MatchDetails, type Scorer } from './leagueCore';
 
 export * from './leagueCore';
 
@@ -61,6 +61,24 @@ export const leagueCached = () => cache?.data ?? null;
 export async function loadMatch(id: number): Promise<LeagueMatch | null> {
   const { data } = await supabase.from('league_matches').select(MATCH_COLS).eq('id', id).maybeSingle();
   return (data as LeagueMatch | null) ?? null;
+}
+
+/** تفاصيل المباراة (الأحداث، الإحصائيات، التشكيلة، نتيجة الشوط الأول): تنطلب لحالها لأنها أثقل من سطر المباراة */
+export async function loadMatchDetails(id: number): Promise<MatchDetails> {
+  const { data, error } = await supabase.from('league_matches').select('ht_home, ht_away, events, stats, lineups').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return readDetails(data);
+}
+
+// الهدافين: تتحدث مع التحديث الكامل (كل ٣ ساعات)، فنحتفظ فيها ٥ دقايق
+let scorersCache: { season: number; at: number; list: Scorer[] } | null = null;
+export async function loadScorers(season: number, force = false): Promise<Scorer[]> {
+  if (!force && scorersCache && scorersCache.season === season && Date.now() - scorersCache.at < 5 * 60_000) return scorersCache.list;
+  const { data, error } = await supabase.from('league_leaders').select('scorers').eq('season', season).maybeSingle();
+  if (error) throw error;
+  const list = readScorers(data?.scorers);
+  scorersCache = { season, at: Date.now(), list };
+  return list;
 }
 
 // ---------- ذكّرني ----------
