@@ -7,24 +7,30 @@ export const db = (globalThis.__leagueState ??= {
   // صفوف league_matches اللي ترجع للدالة (id, kickoff, status, source_ref)، والفلترة بالوقت تصير هنا مثل القاعدة
   matches: [],
   matchesError: null,
+  detailsError: null,
   calls: [],
 });
 
 function matchesQuery() {
-  const f = { gte: null, lte: null, notNullRef: false, limit: 1000 };
+  const f = { gte: null, lte: null, notNullRef: false, limit: 1000, eq: {}, in: {}, isNull: [], asc: true };
   const b = {
     select: () => b,
     gte: (c, v) => { if (c === 'kickoff') f.gte = v; return b; },
     lte: (c, v) => { if (c === 'kickoff') f.lte = v; return b; },
+    eq: (c, v) => { f.eq[c] = v; return b; },
+    in: (c, v) => { f.in[c] = v; return b; },
+    is: (c, v) => { if (v === null) f.isNull.push(c); return b; },
     not: (c, op, v) => { if (c === 'source_ref' && op === 'is' && v === null) f.notNullRef = true; return b; },
-    order: () => b,
+    order: (_c, o) => { f.asc = o?.ascending !== false; return b; },
     limit: (n) => { f.limit = n; return b; },
     then: (resolve, reject) => {
       db.calls.push({ fn: 'league_matches', args: { ...f } });
       if (db.matchesError) return Promise.resolve({ data: null, error: { message: db.matchesError } }).then(resolve, reject);
       const rows = db.matches
-        .filter((m) => (!f.gte || m.kickoff >= f.gte) && (!f.lte || m.kickoff <= f.lte) && (!f.notNullRef || m.source_ref != null))
-        .sort((a, z) => a.kickoff.localeCompare(z.kickoff))
+        .filter((m) => (!f.gte || m.kickoff >= f.gte) && (!f.lte || m.kickoff <= f.lte) && (!f.notNullRef || m.source_ref != null)
+          && Object.entries(f.eq).every(([c, v]) => m[c] === v) && Object.entries(f.in).every(([c, v]) => v.includes(m[c]))
+          && f.isNull.every((c) => m[c] == null))
+        .sort((a, z) => (f.asc ? 1 : -1) * a.kickoff.localeCompare(z.kickoff))
         .slice(0, f.limit);
       return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
     },
@@ -46,6 +52,10 @@ export function createClient(_url, key) {
         if (db.ingestError) return { data: null, error: { message: db.ingestError } };
         if (args.p_error) return { data: { ok: false }, error: null };
         return { data: { ok: true, teams: args.p_teams.length, matches: args.p_matches.length, finished: 0 }, error: null };
+      }
+      if (fn === 'league_ingest_details') {
+        if (db.detailsError) return { data: null, error: { message: db.detailsError } };
+        return { data: { ok: true, details: args.p_details.length, scorers: !!args.p_scorers }, error: null };
       }
       return { data: null, error: { message: 'unknown function ' + fn } };
     },

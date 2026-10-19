@@ -4,6 +4,8 @@ import {
   canBuyTickets, canRemind, countdown, finishedMatches, formOf, goalDiff, groupByDay, headToHead, kickoffLabel, lastResults, liveLabel,
   matchDayTitle, matchState, resultFor, roundNumber, shortEnName, signed, sortStandings, spotlight, teamColors, teamInitial, teamLogo, teamName,
   upcomingMatches, type LeagueMatch, type LeagueStanding, type LeagueTeam,
+  goalsWithSide, hasDetails, lineupRows, minuteText, playerMarks, readDetails, readScorers, redCards, samePlayer, scorerLines, shortPlayer, statBars,
+  type LineupPlayer,
 } from '../src/lib/leagueCore';
 
 let fail = 0;
@@ -97,6 +99,58 @@ ok(countdown('2026-10-16T14:00:00Z', NOW) === null, 'started → no countdown');
 ok(canBuyTickets(rows[0], 'https://webook.com/ar/spl', NOW) && !canBuyTickets(rows[1], 'https://webook.com/ar/spl', NOW), 'tickets only before kick-off');
 ok(!canBuyTickets(rows[0], 'http://x.com', NOW) && !canBuyTickets(rows[0], null, NOW), 'tickets need an https link');
 ok(canRemind(rows[0], NOW) && !canRemind(rows[1], NOW) && !canRemind(rows[3], NOW), 'reminders only before kick-off');
+
+// تفاصيل المباراة (بشكل ما يكتبه الخادم)
+const row = {
+  ht_home: 1, ht_away: 0,
+  events: [
+    { min: 60, side: 'h', kind: 'goal', p: 'Wilfried Kanga', hs: 2, as: 0 },
+    { min: 33, side: 'h', kind: 'goal', p: 'Lukáš Haraslín', hs: 1, as: 0 },
+    { min: 38, side: 'h', kind: 'yc', p: 'Ali Alamine' },
+    { min: 45, side: 'a', kind: 'sub', in: 'Joshua King', out: 'Thamer Al-Khaibri' },
+    { min: 78, side: 'a', kind: 'og', p: 'Mihai Lixandru', hs: 2, as: 1 },
+    { min: 84, side: 'a', kind: 'pen', p: 'Joshua King', hs: 2, as: 2 },
+    { min: 93, side: 'a', kind: 'goal', p: 'Joshua King', hs: 2, as: 3 },
+    { min: 95, side: 'h', kind: 'y2', p: 'Ali Alamine' },
+    { min: 'x', side: 'h', kind: 'goal' }, { min: 10, side: 'z', kind: 'goal' }, { min: 10, side: 'h', kind: 'dance' }, null,
+  ],
+  stats: [{ k: 'shots_on', h: 4, a: 4 }, { k: 'possession', h: 38, a: 62 }, { k: 'BAD KEY', h: 1, a: 1 }, { k: 'fouls', h: -1, a: 2 }, { k: 'corners', h: 0, a: 0 }],
+  lineups: { ok: true, hf: '3-4-3', af: '4-2-3-1; x', hc: null, ac: 'Coach', h: [{ n: 'Adrian Šemper', no: 1, pos: 'G' }, { n: '', no: 2 }], a: [{ n: 'X', no: 300, pos: 'Q' }], hs: 'nope', as: [] },
+};
+const det = readDetails(row);
+ok(JSON.stringify(det.ht) === '[1,0]' && det.events.length === 8 && det.events.map((e) => e.min).join() === '33,38,45,60,78,84,93,95', 'details: junk events dropped, sorted by minute', det.events.map((e) => e.min).join());
+ok(det.stats.map((x) => x.k).join() === 'shots_on,possession,corners', 'details: bad stat rows dropped');
+ok(det.lineups?.hf === '3-4-3' && det.lineups.af === null && det.lineups.h.length === 1 && det.lineups.a[0].no === null && det.lineups.a[0].pos === null && det.lineups.hs.length === 0, 'details: lineups read defensively');
+ok(!hasDetails(readDetails(null)) && readDetails({ lineups: [] }).lineups === null && hasDetails(det), 'details: empty row → nothing');
+const gs = goalsWithSide(det.events);
+ok(gs.map((g) => g.for).join('') === 'hhaaa', 'goals: each goal (own goal too) counts for the side whose score went up', gs.map((g) => g.for).join(''));
+ok(goalsWithSide([{ min: 5, side: 'a', kind: 'og', p: 'X', hs: 1, as: 0 }])[0].for === 'h', 'goals: the score decides over the listed side');
+ok(goalsWithSide([{ min: 5, side: 'h', kind: 'og', p: 'X' }])[0].for === 'a', 'goals: own goal without a score → the other side');
+const sl = scorerLines(det.events);
+ok(sl.h.map((x) => `${x.name}:${x.mins.map((m) => m.min).join('+')}`).join() === 'Haraslín:33,Kanga:60'
+  && sl.a.map((x) => `${x.name}:${x.mins.map((m) => m.kind).join('+')}`).join() === 'Lixandru:og,King:pen+goal', 'scorer lines grouped per player and side', JSON.stringify(sl));
+ok(JSON.stringify(redCards(det.events)) === '{"h":1,"a":0}', 'red cards (second yellow counts)');
+ok(shortPlayer('Ali Saeed Ali Al Shaafi') === 'Al Shaafi' && shortPlayer('Cristiano Ronaldo') === 'Ronaldo' && shortPlayer('Fawaz Al-Sagour') === 'Al-Sagour' && shortPlayer('Kanga') === 'Kanga' && shortPlayer('A. Alamine Ali') === 'Alamine', 'short player names');
+ok(samePlayer('Ali Alamine', 'A. Alamine Ali') && samePlayer('Lukáš Haraslín', 'Lukas Haraslin') && !samePlayer('Mohammed Abbas Al Ibrahim', 'Mohammed Al-Khabrani')
+  && !samePlayer('Ali Al-Hassan', 'Ali Al Masoud') && !samePlayer(undefined, 'x'), 'same player across spellings, not across shared first names');
+const mk = playerMarks('A. Alamine Ali', 'h', det.events);
+ok(mk.yellow && mk.red && mk.goals === 0, 'player marks: cards matched across spellings');
+const mk2 = playerMarks('Joshua King', 'a', det.events);
+ok(mk2.goals === 2 && mk2.inMin === 45 && mk2.outMin === null && playerMarks('Thamer Al-Khaibri', 'a', det.events).outMin === 45, 'player marks: goals and substitution minutes');
+ok(playerMarks('Joshua King', 'h', det.events).goals === 0, 'player marks: only that side');
+const P = (n: string, pos: LineupPlayer['pos'], no = 1): LineupPlayer => ({ n, no, pos });
+const xi343 = [P('G1', 'G'), P('M1', 'M'), P('D1', 'D'), P('F1', 'F'), P('F2', 'F'), P('F3', 'F'), P('M2', 'M'), P('D2', 'D'), P('M3', 'M'), P('M4', 'M'), P('D3', 'D')];
+ok(lineupRows(xi343, '3-4-3').map((r) => r.map((p) => p.n).join('')).join('|') === 'G1|D1D2D3|M1M2M3M4|F1F2F3', 'lineup rows follow the formation');
+const xi4231 = [P('G', 'G'), P('D1', 'D'), P('D2', 'D'), P('D3', 'D'), P('D4', 'D'), P('M1', 'M'), P('M2', 'M'), P('M3', 'M'), P('M4', 'M'), P('M5', 'M'), P('F1', 'F')];
+ok(lineupRows(xi4231, '4-2-3-1').map((r) => r.length).join('-') === '1-4-2-3-1', 'lineup rows: 4-2-3-1 splits the midfield');
+ok(lineupRows(xi4231, '4-4-3').map((r) => r.length).join('-') === '1-4-5-1' && lineupRows(xi4231, null).map((r) => r.length).join('-') === '1-4-5-1', 'lineup rows: wrong or missing formation → one line per position');
+ok(playerMarks('Mihai Lixandru', 'h', det.events).og === 1, 'player marks: an own goal is found whichever side it is listed under');
+ok(lineupRows([], '4-4-2').length === 0, 'lineup rows: nobody → nothing');
+const sb = statBars(det.stats);
+ok(sb.map((x) => x.k).join() === 'possession,shots_on,corners' && sb[0].share === 0.38 && sb[2].share === 0.5, 'stats ordered with each side share');
+ok(minuteText(33) === "33'" && minuteText(93) === "90+3'", 'minute text');
+const sc = readScorers([{ rank: 2, name: 'B', team: 5, goals: 6 }, { rank: 1, name: 'A', team: null, goals: 11, assists: 1 }, { rank: 'x', name: 'C', goals: 1 }, { rank: 3, name: '', goals: 1 }]);
+ok(sc.map((x) => x.name).join() === 'A,B' && sc[0].assists === 1 && sc[1].assists === null && readScorers(null).length === 0, 'scorers read defensively and sorted by rank');
 
 if (fail) process.exit(1);
 console.log('ALL LEAGUE TESTS PASSED');

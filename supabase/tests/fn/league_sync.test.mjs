@@ -25,6 +25,7 @@ const mod = await import('../../../node_modules/.cache/fn/league_sync.bundle.mjs
 const {
   seasonFor, seasonWindow, hash53, teamId, matchRef, splitRef, statusCode, minuteOf, apiError, isLeague,
   parseTeamMatches, parseMatchDetail, parseStandings, mergeMatches, setPause,
+  eventKind, parseEvents, parseStats, parseLineups, parseTopScorers,
 } = mod;
 const waits = [];
 setPause(async (ms) => { waits.push(ms); });
@@ -35,8 +36,9 @@ const call = async (body = { mode: 'full' }, headers = { 'x-league-key': db.key 
   const res = await handler(new Request('https://fn/league-sync', { method, headers: { 'Content-Type': 'application/json', ...headers }, body: method === 'POST' && body !== undefined ? JSON.stringify(body) : undefined }));
   return { status: res.status, body: await res.json() };
 };
-const reset = () => { sent.length = 0; waits.length = 0; db.calls.length = 0; db.ingestError = null; db.keyError = null; db.matches = []; db.matchesError = null; };
+const reset = () => { sent.length = 0; waits.length = 0; db.calls.length = 0; db.ingestError = null; db.keyError = null; db.matches = []; db.matchesError = null; db.detailsError = null; };
 const ingests = () => db.calls.filter((c) => c.fn === 'league_ingest').map((c) => c.args);
+const detailCalls = () => db.calls.filter((c) => c.fn === 'league_ingest_details').map((c) => c.args);
 const iso = (mins) => new Date(Date.now() + mins * 60e3).toISOString();
 
 // ردود بنفس شكل SportScore الحقيقي
@@ -105,6 +107,77 @@ ok('detail: our match → live score and minute', d1 && d1.match.status === '2H'
 ok('detail: a different meeting of the same pair is refused', parseMatchDetail(liveBody, 'zzzzzzz9', seasonFor(new Date())) === null);
 ok('detail: junk → null', parseMatchDetail({ error: 'Match not found' }, 'kkkkkkk7', 2026) === null && parseMatchDetail(null, 'kkkkkkk7', 2026) === null);
 
+// تفاصيل حقيقية (الفتح ٢-٣ الخليج، ١٨ أكتوبر ٢٠٢٦) بشكل رد SportScore
+const P = (name, number, position, captain = false) => ({ name, number, rating: '0.0', captain, position });
+const realDetail = { sport: 'football', match: {
+  ...mx('Al Fateh', 'Al Khaleej', 'y39mp1h6l80vmoj', '2026-10-18T18:00:00+00:00', { status: 'finished', status_text: 'Finished', home_score: '2', away_score: '3' }),
+  url: '/football/match/al-fateh-sc-vs-al-khaleej-club/y39mp1h6l80vmoj/', home_ht_score: 1, away_ht_score: 0,
+  stats: [
+    { away: 62, home: 38, label: 'Ball Possession', suffix: '%', away_pct: 62, home_pct: 38 },
+    { away: 4, home: 4, label: 'Shots on Target', suffix: '', away_pct: 50, home_pct: 50 },
+    { away: 7, home: 6, label: 'Shots off Target', suffix: '', away_pct: 54, home_pct: 46 },
+    { away: 107, home: 81, label: 'Attacks', suffix: '', away_pct: 57, home_pct: 43 },
+    { away: 58, home: 40, label: 'Dangerous Attacks', suffix: '', away_pct: 59, home_pct: 41 },
+    { away: 1, home: 2, label: 'Something New', suffix: '' },
+  ],
+  lineups: {
+    confirmed: true, home_formation: '3-4-3', away_formation: '4-4-2', home_coach: null, away_coach: 'Some Coach',
+    home_xi: [P('Adrian Šemper', 1, 'G'), P('Ali Al-Hassan', 6, 'M'), P('Mihai Lixandru', 8, 'D'), P('Wilfried Kanga', 9, 'F'), P('Lukáš Haraslín', 10, 'F'),
+      P('Mourad Batna', 11, 'F'), P('Abdulelah Al Khaibari', 16, 'M'), P('Marwane Saadane', 17, 'D', true), P('Hossam Essadak', 20, 'M'), P('A. Alamine Ali', 27, 'M'), P('Abdulaziz Al-Suwailem', 78, 'D')],
+    away_xi: [P('Boubakar Kouyate', 4, 'D'), P('Omar Mascarell', 8, 'M'), P('Mateo Benegas', 9, 'F'), P('Ahmad Asiri', 13, 'D'), P('Ali Saeed Ali Al Shaafi', 14, 'D'),
+      P('Mansour Hamzi', 15, 'M'), P('Nawaf Al-Sadi', 18, 'M'), P('Fawaz Al-Sagour', 27, 'D'), P('Hussain Al Issa', 28, 'M'), P('Thamer Al-Khaibri', 90, 'F'), P('Marwan Al-Haidari', 96, 'G')],
+    home_subs: [P('Fahad Al Zubaidi', 7, 'F'), P('Robin Kelder', 19, 'D')], away_subs: [P('Joshua King', 7, 'F'), P('Musa Barrow', 99, 'F'), { name: '', number: 3 }],
+  },
+  incidents: [
+    { side: 'home', time: 33, type: 'Goal', player: 'Lukáš Haraslín', is_goal: true, type_id: 1, away_score: 0, home_score: 1 },
+    { side: 'home', time: 37, type: 'Yellow card', player: 'Ali Al-Hassan', is_card: true, type_id: 3 },
+    { side: 'away', time: 45, type: 'Substitution', is_sub: true, player: '', type_id: 9, player_in: 'Joshua King', player_out: 'Thamer Al-Khaibri' },
+    { side: 'home', time: 60, type: 'Goal', player: 'Wilfried Kanga', is_goal: true, type_id: 1, away_score: 0, home_score: 2 },
+    { side: 'away', time: 78, type: 'Goal', player: 'Musa Barrow', is_goal: true, type_id: 1, away_score: 1, home_score: 2 },
+    { side: 'home', time: 2, type: 'Corner', type_id: 2 },
+    { side: 'away', time: 84, type: 'Goal', player: 'Joshua King', is_goal: true, type_id: 1, away_score: 2, home_score: 2 },
+    { side: 'away', time: 93, type: 'Goal', player: 'Omar Mascarell', is_goal: true, type_id: 1, away_score: 3, home_score: 2 },
+    { side: 'nobody', time: 50, type: 'Goal', type_id: 1 },
+  ],
+} };
+const rd = parseMatchDetail(realDetail, 'y39mp1h6l80vmoj', 2026);
+ok('detail: the id the details belong to is the match id', rd && rd.detail.id === rd.match.id && rd.match.status === 'FT' && rd.match.hg === 2 && rd.match.ag === 3);
+ok('detail: half-time score once the first half is over', JSON.stringify(rd.detail.ht) === '[1,0]');
+ok('detail: events sorted by minute, corners and junk dropped', rd.detail.events.length === 7 && rd.detail.events.map((e) => e.min).join() === '33,37,45,60,78,84,93', JSON.stringify(rd.detail.events.map((e) => e.min)));
+const ev0 = rd.detail.events[0];
+ok('detail: goal carries scorer, side and the score after it', ev0.kind === 'goal' && ev0.side === 'h' && ev0.p === 'Lukáš Haraslín' && ev0.hs === 1 && ev0.as === 0);
+const sub = rd.detail.events.find((e) => e.kind === 'sub');
+ok('detail: substitution keeps in and out, no empty player', sub.side === 'a' && sub.in === 'Joshua King' && sub.out === 'Thamer Al-Khaibri' && !('p' in sub));
+ok('detail: yellow card', rd.detail.events[1].kind === 'yc' && rd.detail.events[1].p === 'Ali Al-Hassan' && !('hs' in rd.detail.events[1]));
+ok('detail: stats mapped to our keys, unknown labels dropped', rd.detail.stats.map((x) => x.k).join() === 'possession,shots_on,shots_off,attacks,dangerous'
+  && rd.detail.stats[0].h === 38 && rd.detail.stats[0].a === 62, JSON.stringify(rd.detail.stats));
+const lu = rd.detail.lineups;
+ok('detail: lineups with formations, eleven each, captain, coach', lu.ok === true && lu.hf === '3-4-3' && lu.af === '4-4-2' && lu.h.length === 11 && lu.a.length === 11
+  && lu.h.find((x) => x.c)?.n === 'Marwane Saadane' && lu.hc === null && lu.ac === 'Some Coach' && lu.h[0].pos === 'G' && lu.h[0].no === 1);
+ok('detail: subs without a name skipped', lu.hs.length === 2 && lu.as.length === 2);
+const firstHalf = parseMatchDetail({ match: { ...liveBody.match, status_text: '1st half', home_ht_score: 0, away_ht_score: 0, incidents: [], stats: [], lineups: {} } }, 'kkkkkkk7', seasonFor(new Date()));
+ok('detail: no half-time score during the first half, empty lists left out', firstHalf && !('ht' in firstHalf.detail) && !('events' in firstHalf.detail) && !('stats' in firstHalf.detail) && !('lineups' in firstHalf.detail), JSON.stringify(firstHalf?.detail));
+
+const k = (x) => eventKind(x);
+ok('event kinds: own goal, penalty, missed penalty, second yellow, red, VAR', k({ type: 'Own goal', is_goal: true, type_id: 17 }) === 'og' && k({ type_id: 8, type: 'Penalty' }) === 'pen'
+  && k({ type: 'Penalty missed', type_id: 16 }) === 'pmiss' && k({ type: 'Yellow-red card' }) === 'y2' && k({ type: 'Red card', type_id: 4 }) === 'rc' && k({ type: 'VAR', type_id: 28 }) === 'var');
+ok('event kinds: corners, goal kicks, offsides, unknown → not shown', k({ type: 'Corner', type_id: 2 }) === null && k({ type: 'Goal kick', type_id: 7 }) === null && k({ type: 'Offside', type_id: 5 }) === null && k({}) === null);
+ok('events: junk → nothing, sub with nobody skipped', parseEvents(null).length === 0 && parseEvents([{ side: 'home', time: 10, type_id: 9, player_in: '', player_out: '' }]).length === 0
+  && parseEvents([{ side: 'home', time: 'x', type_id: 1 }]).length === 0);
+ok('stats: duplicates and impossible possession dropped', parseStats([{ label: 'Ball Possession', home: 150, away: 20 }, { label: 'Corner Kicks', home: 3, away: 5 }, { label: 'Corners', home: 9, away: 9 }]).map((x) => `${x.k}:${x.h}`).join() === 'corners:3');
+ok('lineups: nothing / bad formation', parseLineups(null) === null && parseLineups({ home_xi: [], away_xi: [] }) === null && parseLineups({ home_xi: [P('A B', 1, 'G')], home_formation: '4-4-2; drop' }).hf === null);
+
+const sc = parseTopScorers({ scorers: [
+  { rank: 1, player: 'Ivan Toney', team: 'Al Ahli SC', team_slug: 'al-ahli-sc', goals: 11, assists: 1, matches: 8, minutes: 684 },
+  { rank: 2, player: 'Mateo Retegui', team: 'Al Qadsiah', team_slug: 'unknown-slug', goals: 6, assists: 2, matches: 9, minutes: 707 },
+  { rank: 3, player: 'Someone', team: 'Nobody FC', team_slug: '__proto__', goals: 5 },
+  { rank: 4, player: '', team: 'Al Hilal', goals: 4 },
+  { rank: 'x', player: 'Bad', goals: 1 },
+] }, { 'al-ahli-sc': 77 }, new Set([teamId('Al Qadsiah')]));
+ok('scorers: team from the club link, else from a known name, else none', sc.length === 3 && sc[0].team === 77 && sc[0].goals === 11 && sc[0].assists === 1
+  && sc[1].team === teamId('Al Qadsiah') && sc[2].team === null && sc[2].assists === null, JSON.stringify(sc));
+ok('scorers: junk body → nothing', parseTopScorers(null).length === 0 && parseTopScorers({ scorers: 'x' }).length === 0);
+
 const ps = parseStandings({ tables: [{ rows: [row(1, 'Al Qadsiah', 'al-qadsiah', 22), row(2, 'Al Hilal', 'al-hilal', 21), row(3, 'Al Hilal', 'al-hilal', 1), { pos: 99, team: 'X' }, row(4, 'Bad Slug', 'Bad Slug!', 3)] }] });
 ok('standings: rows, numbers, duplicates and bad ranks skipped, no form', ps.standings.length === 3 && ps.standings[0].points === 22 && ps.standings[0].gf === 19 && ps.standings[0].form === null && ps.standings[1].team === teamId('Al Hilal'), JSON.stringify(ps.standings));
 ok('standings: club slugs for the team requests (bad slug dropped)', ps.slugs.join() === 'al-qadsiah,al-hilal');
@@ -132,8 +205,9 @@ const teamReply = (slug) => ({ sport: 'football', team: { name: slug, slug }, co
 reset();
 reply = (path, p) => path === '/api/widget/standings/' ? standingsBody : teamReply(p.slug);
 let r = await call({ mode: 'full' });
-ok('full: standings then each club, in order, no API key anywhere', sent.length === 4 && sent[0].path === '/api/widget/standings/' && sent[0].params.slug === 'saudi-professional-league'
-  && sent.slice(1).map((s) => s.params.slug).join() === 'al-qadsiah,al-hilal,al-nassr' && sent.slice(1).every((s) => s.path === '/api/widget/team/' && s.params.limit === '30'), JSON.stringify(sent.map((s) => s.path + '?' + s.params.slug)));
+ok('full: standings, each club in order, then top scorers; no API key anywhere', sent.length === 5 && sent[0].path === '/api/widget/standings/' && sent[0].params.slug === 'saudi-professional-league'
+  && sent.slice(1, 4).map((s) => s.params.slug).join() === 'al-qadsiah,al-hilal,al-nassr' && sent.slice(1, 4).every((s) => s.path === '/api/widget/team/' && s.params.limit === '30')
+  && sent[4].path === '/api/widget/topscorers/' && sent[4].params.slug === 'saudi-professional-league', JSON.stringify(sent.map((s) => s.path + '?' + s.params.slug)));
 ok('full: sportscore.com, our User-Agent, paced', sent.every((s) => s.host === 'sportscore.com' && /^arq-league\//.test(s.headers['User-Agent'])) && waits.filter((w) => w === 350).length >= 3);
 const g = ingests()[0];
 const nq = g.p_matches.find((m) => m.ref === 'al-nassr-vs-al-qadsiah/nq000002');
@@ -149,7 +223,7 @@ reply = (path, p) => {
   return path === '/api/widget/standings/' ? standingsBody : teamReply(p.slug);
 };
 await call({ mode: 'full' });
-ok('full: a 503 is retried once after a pause', sent.length === 5 && waits.includes(2000) && ingests()[0].p_matches.length === 2 && !ingests()[0].p_error);
+ok('full: a 503 is retried once after a pause', sent.length === 6 && waits.includes(2000) && ingests()[0].p_matches.length === 2 && !ingests()[0].p_error);
 
 // نادي واحد طاح ← نكمل بالباقي
 reset();
@@ -182,6 +256,42 @@ reply = (path, p) => {
 await call({ mode: 'full' });
 const settled = ingests()[0].p_matches.find((m) => m.ref === 'al-hilal-vs-al-hazem/settle01');
 ok('full: overdue match settled from its detail (only that one)', sent.filter((s) => s.path === '/api/widget/match/').length === 1 && sent.at(-1).params.slug === 'al-hilal-vs-al-hazem' && settled?.status === 'FT' && settled.hg === 4, JSON.stringify(sent.map((s) => s.path)));
+ok('full: …and its details saved after the results', detailCalls().length === 1 && detailCalls()[0].p_details.length === 1 && detailCalls()[0].p_details[0].id === hash53('match:settle01')
+  && db.calls.findIndex((c) => c.fn === 'league_ingest') < db.calls.findIndex((c) => c.fn === 'league_ingest_details'));
+
+// الهدافين + تكملة تفاصيل المباريات المنتهية
+const S = seasonFor(new Date());
+const scorersBody = { sport: 'football', competition: SPL, stat_type: 'goals', scorers: [
+  { rank: 1, player: 'Mateo Retegui', team: 'Al Qadsiah', team_slug: 'al-qadsiah', goals: 6, assists: 2, matches: 9, minutes: 707 },
+  { rank: 2, player: 'Ollie Watkins', team: 'Al Hilal FC', team_slug: 'al-hilal', goals: 4, assists: 4, matches: 5, minutes: 394 },
+] };
+reset();
+db.matches = [
+  ...Array.from({ length: 10 }, (_, i) => ({ id: 100 + i, season: S, kickoff: iso(-60 * 24 * (i + 1)), status: 'FT', source_ref: `al-hilal-vs-al-hazem/back${String(i).padStart(4, '0')}`, details_at: null })),
+  { id: 200, season: S, kickoff: iso(-60 * 24 * 2), status: 'FT', source_ref: 'a-vs-b/havedetail', details_at: iso(-60) },
+  { id: 201, season: S, kickoff: iso(60 * 24), status: 'NS', source_ref: 'a-vs-b/notplayed', details_at: null },
+  { id: 202, season: S - 1, kickoff: iso(-60 * 24 * 300), status: 'FT', source_ref: 'a-vs-b/lastseason', details_at: null },
+];
+reply = (path, p) => {
+  if (path === '/api/widget/topscorers/') return scorersBody;
+  if (path === '/api/widget/match/') return realDetail; // لقاء ثاني للزوج: ما يطابق أي مفتاح
+  return path === '/api/widget/standings/' ? standingsBody : teamReply(p.slug);
+};
+r = await call({ mode: 'full' });
+const backReqs = sent.filter((s) => s.path === '/api/widget/match/');
+ok('full: finished matches without details, newest first, at most 8; never ones with details, unplayed or last season', backReqs.length === 8
+  && db.calls.some((c) => c.fn === 'league_matches' && c.args.eq.season === S && c.args.isNull.includes('details_at') && c.args.asc === false), String(backReqs.length));
+const dc = detailCalls()[0];
+ok('full: a different meeting of the pair is marked as asked (id only)', dc.p_details.length === 8 && dc.p_details.every((d) => Object.keys(d).join() === 'id') && dc.p_details[0].id === 100, JSON.stringify(dc.p_details));
+ok('full: top scorers sent with the club from the standings link', dc.p_scorers.length === 2 && dc.p_scorers[0].team === teamId('Al Qadsiah') && dc.p_scorers[1].team === teamId('Al Hilal') && dc.p_season === S, JSON.stringify(dc.p_scorers));
+ok('full: response counts details and scorers', r.body.details === 8 && r.body.scorers === 2, JSON.stringify(r.body));
+
+// الهدافين طاحوا والتفاصيل طاحت ← النتائج محفوظة والتشغيل ناجح
+reset();
+db.detailsError = 'boom';
+reply = (path, p) => (path === '/api/widget/topscorers/' ? { __status: 500 } : path === '/api/widget/standings/' ? standingsBody : teamReply(p.slug));
+r = await call({ mode: 'full' });
+ok('full: top scorers failing → results still saved, no details call needed', r.body.ok === true && ingests().length === 1 && !ingests()[0].p_error && detailCalls().length === 0, JSON.stringify(r.body));
 
 // ---------- live ----------
 reset();
@@ -199,6 +309,16 @@ ok('live: only unfinished matches around now, one detail request each', sent.len
 const lv = ingests()[0];
 ok('live: our match saved with score and minute; an older meeting ignored', lv.p_mode === 'live' && lv.p_matches.length === 1 && lv.p_matches[0].hg === 2 && lv.p_matches[0].elapsed === 63 && lv.p_matches[0].status === '2H' && lv.p_standings.length === 0, JSON.stringify(lv));
 ok('live: match id stays the one we stored (same key ← same id)', lv.p_matches[0].id === hash53('match:kkkkkkk7'));
+const ld = detailCalls()[0];
+ok('live: details for our match, an older meeting marked by id only', ld && ld.p_details.length === 2 && ld.p_details[0].id === hash53('match:kkkkkkk7')
+  && ld.p_details[1].id === 11 && Object.keys(ld.p_details[1]).join() === 'id' && ld.p_scorers === null, JSON.stringify(ld));
+
+reset();
+db.matches = [{ id: 10, kickoff: iso(-50), status: '1H', source_ref: 'al-hilal-vs-al-hazem/kkkkkkk7' }];
+db.detailsError = 'boom';
+reply = () => liveBody;
+r = await call({ mode: 'live' });
+ok('live: a details failure does not fail the run (the score is saved)', r.status === 200 && ingests().length === 1 && !ingests()[0].p_error && r.body.details === 0, JSON.stringify(r.body));
 
 reset();
 r = await call({ mode: 'live' });
