@@ -30,6 +30,7 @@ Links: models are at `https://huggingface.co/OWNER/NAME`, datasets at `https://h
 | google/siglip2-base-patch16-224 (onnx-community/siglip2-base-patch16-224-ONNX) | apache-2.0 base; the ONNX repo has no tag but is a conversion of the Apache base | |
 | CAMeL-Lab/bert-base-arabic-camelbert-da-sentiment, CAMeL-Lab/bert-base-arabic-camelbert-mix-did-madar-corpus26 | apache-2.0 | Sentiment, and a Najdi-vs-MSA check in CI. |
 | silma-ai/silma-tts | apache-2.0; card: "research and commercial use" | Self-host. |
+| permutans/wikidata-labels, permutans/wikidata-aliases, permutans/wikidata-claims (datasets) | cc0-1.0; README "Source and license": "Wikidata is released under CC0, and so are these tables" (release 20260928) | Checked 2026-10-19 for the league match page: Arabic names of players, clubs and stadiums, loaded in an offline batch. Only public data is involved. |
 
 ## مسموح بشروط
 
@@ -47,6 +48,14 @@ Links: models are at `https://huggingface.co/OWNER/NAME`, datasets at `https://h
 | ResembleAI/chatterbox | MIT | Disclose the Perth watermark. Clone voices only with consent. |
 | mistralai/Voxtral-Mini-4B-Realtime-Arabic | Apache 2.0, stated only in the README License section; no metadata tag | Cite the README text. Self-host. Released very recently. |
 | HeshamHaroon/saudi-dialect-conversations (dataset) | apache-2.0 tag; card says it was generated with GPT-4o | Use only as a style reference or for few-shot examples. Do not train on it without legal review. |
+| arbml/NETransliteration (dataset) | The Hub mirror has no card and no license. The upstream steveash/NETransliteration-COLING2018 `data/LICENSE` is CC0 1.0 (Wikidata-mined EN→AR person names). | Checked 2026-10-19. Take the data from upstream GitHub, not the mirror. The pairs are noisy; use them for evaluation or few-shot examples. |
+| arbml/google_transliteration (dataset) | Hub mirror with no license. Upstream google/transliteration is Apache-2.0 ("Arabic-English transliteration dataset mined from Wikipedia"). | Checked 2026-10-19. Take it from upstream and keep the Apache notice. It has about 16k single-token pairs. |
+| Helsinki-NLP/opus-mt-tc-big-en-ar | cc-by-4.0; live on hf-inference | Checked 2026-10-19. Attribution required. It is an MT model, not a transliterator, and was not tested on names. It is likely to translate surnames that are also English words, so it is not recommended for names. |
+| Damir81/football-charts-results-goal-timing (dataset) | cc-by-4.0 (README "Licence" + Zenodo 10.5281/zenodo.22295583, "Compiled by football-charts.com from public match reports") | Checked 2026-10-19. Credit "football-charts.com". Includes `saudi1` (Saudi Professional League 2023-24 to 2025-26) and `saudi2`. The live football-charts API is a different product: commercial plan €39/month, "no redistribution of raw data". Created Sep 2026. |
+| Homie0609/MatchTime (dataset) | cc-by-sa-4.0 (SoccerNet-Caption derived) | Checked 2026-10-19. Internal evaluation only (share-alike). English only. |
+| CAMeL-Lab/bert-base-arabic-camelbert-msa-ner | apache-2.0 on the card; no LICENSE file; fine-tuned on ANERcorp, which CAMeL's site lists as CC BY-SA 4.0 | Checked 2026-10-19. Self-host. Running it on user posts means user data, so no provider. Share-alike training data is a residual risk. |
+| HebArabNlpProject/arabic-iahlt-NER (dataset) | cc-by-4.0; human-annotated; the source texts are not named | Checked 2026-10-19. Internal evaluation only, with attribution. |
+| luxury-lakehouse/soccer-analytics-app (Space) | Card `license: apache-2.0`; no LICENSE or NOTICE file; its data mixes StatsBomb, Wyscout (CC-BY-NC) and others | Checked 2026-10-19. Copy UI patterns (verdict tile, xG race, decisive moments) only. Never reuse its data. |
 
 ## ممنوع
 
@@ -66,6 +75,11 @@ Links: models are at `https://huggingface.co/OWNER/NAME`, datasets at `https://h
 | AyoubChLin/Qwen3.5-9B-saudi-dialect | No license, and trained on GPT-4o-generated data. |
 | Ammar-alhaj-ali/arabic-MARBERT-dialect-identification-city | No license tag. |
 | sitatech/freepik_nsfw_detector_onnx | Community conversion with no license field. |
+| moha/ANETAC, moha/Arabic-English-Transliteration-Dataset (datasets) | cc-by-nc-4.0 and cc-by-nc-sa-4.0 (checked 2026-10-19). |
+| alvations/autotrain-ara-transliterate-1259548205 | No license anywhere; its training-data repo no longer exists (checked 2026-10-19). |
+| hatmimoha/arabic-ner (and onnx-community/arabic-ner-ONNX) | The card has only `language: ar` and no license, despite 2.2M downloads (checked 2026-10-19). |
+| CohereLabs/c4ai-command-r7b-arabic-02-2025 | cc-by-nc-4.0; gated; live on cohere (checked 2026-10-19). |
+| build-small-hackathon/Shamsher_football_predictor, hikopa/football-match-prediction (Spaces) | No license. hikopa also ships a 222 MB pickled model, which must never be unpickled (checked 2026-10-19). |
 
 ## غير واضح (treat as ممنوع until resolved)
 
@@ -89,3 +103,12 @@ Links: models are at `https://huggingface.co/OWNER/NAME`, datasets at `https://h
 | EduardoPacheco/FoodSeg103 (dataset) | apache-2.0 tag, but the images come from Recipe1M. | Image rights from Recipe1M. |
 | Xenova/opus-mt-ar-en | No license tag; it is an ONNX port of the older opus-mt-ar-en. | Use Helsinki-NLP/opus-mt-tc-big-ar-en instead. |
 | MediaPipe Pose Landmarker (Google `.task`) | Apache-2.0 according to Google's model card, but only as quoted on a Hub mirror. | Confirm on Google's own model card before shipping. |
+| arbml/names_transliteration (dataset) | No card, no license, unknown source (118k AR→EN surname pairs). Checked 2026-10-19. | The source and its license. |
+| freococo/arabic_names_with_myanmar_and_english_transliteration (dataset) | cc0 tag, but the source is a Kaggle dataset with an unknown license and the transliterations were generated by Gemini. Hadith narrators only. Checked 2026-10-19. | Not relevant to football anyway. |
+| eatpizzanot/soccer-dataset (dataset) | cc-by-4.0 tag, but the card names API-Football and football-data.co.uk as sources. API-Football's terms say "We do not provide a 'license' for the use and publication of the data". Includes the Saudi Pro League (league 37). Checked 2026-10-19. | Written permission from the upstream sources. At most, internal evaluation. |
+| xgabora/club-football-match-data (dataset) | The Hub card has no license front-matter; GitHub shows "MIT". Data comes from Football-Data.co.uk and ClubElo and includes bookmaker odds. Checked 2026-10-19. | Upstream terms. Keep betting odds out of the Saudi product. |
+| adibmed/football-dataset (dataset) | mit tag, but the sources include Transfermarkt, SofaScore and bookmaker odds. National teams only. Checked 2026-10-19. | Upstream terms. |
+| yallashoot/football-commentary-dataset (dataset) | cc-by-4.0 tag, but the repo holds only a 15-row sample although the card claims 50k rows "collected from live match feeds". Checked 2026-10-19. | The full data and its provenance. |
+| falahmanalodi/Football-Commentary (dataset) | mit tag on a card with no description; the rows look like scraped Premier League live commentary. Checked 2026-10-19. | The source. |
+| SinaLab/ArabicNER-Wojood | mit tag, but the card states neither the Wojood corpus terms nor a license for the base aubmindlab/bert-base-arabertv2 (no tag). Non-standard checkpoint layout. Checked 2026-10-19. | Wojood corpus and AraBERT licenses. |
+| humain-ai/ALLaM-7B-Instruct-preview (re-check) | Still no LICENSE file in the repo on 2026-10-19. | Same as the row above. |
