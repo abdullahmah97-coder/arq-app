@@ -1,0 +1,18 @@
+# تحديث فوري لنسخة المتجر (قناة production): كل ما يُرفع لفرع production-ota على GitHub
+# بدون بناء جديد ولا مراجعة متجر، ويوصل بس للنسخ اللي بصمتها (fingerprint) نفس بصمة الكود المرفوع.
+# أي تعديل على package.json أو إعدادات التطبيق أو الأيقونات يحتاج بناء جديد من فرع release بدل هذا.
+# APP_VARIANT لازم يطابق بروفايل production في eas.json، وإلا تختلف بصمة النسخة وما يوصل التحديث للجوال
+name: Production OTA update
+
+on:
+  push:
+    branches: ['production-ota']
+
+jobs:
+  publish_update:
+    type: update
+    environment: production
+    env:
+      APP_VARIANT: production
+    params:
+      channel: production
