@@ -1,5 +1,5 @@
 // مربع «الدوري السعودي» في الرئيسية تحت المتاجر والبطولات: مباراة مباشرة بنتيجتها ودقيقتها، أو مباراة فريقك الجاية،
-// أو أقرب مباراة. يختفي لين يشغّل المالك الدوري وتوصل أول بيانات.
+// أو أقرب مباراة. يختفي لين يشغّل المالك الدوري وتوصل أول بيانات. واللي ما اختار فريقه يشوف سطر «اختر فريقك» (يقدر يخفيه)
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
@@ -12,24 +12,26 @@ import { useLocalized } from '@/lib/i18n';
 import { kickoffLabel, loadLeague, myTeam, spotlight, stateOf, teamName, type LeagueData, type LeagueMatch } from '@/lib/league';
 import { brand } from '@/theme';
 import { LivePill, Score, SourceCredit, TeamBadge } from './LeagueParts';
+import { TeamInviteRow } from './TeamInvite';
 
 export function HomeLeagueTile() {
   const { t } = useTranslation();
   const { lng } = useLocalized();
   const longPress = useHomeLongPress();
   const [data, setData] = useState<LeagueData | null>(null);
-  const [mine, setMine] = useState<number | null>(null);
+  // undefined = ما ندري للحين (ما نعرض دعوة «اختر فريقك»)، null = بدون فريق
+  const [mine, setMine] = useState<number | null | undefined>(undefined);
 
   useFocusEffect(useCallback(() => {
     let dead = false;
-    Promise.all([loadLeague(), myTeam().catch(() => null)])
-      .then(([d, team]) => { if (!dead) { setData(d); setMine(team); } })
+    Promise.all([loadLeague(), myTeam().catch(() => undefined)])
+      .then(([d, team]) => { if (!dead) { setData(d); if (team !== undefined) setMine(team); } })
       .catch(() => {});
     return () => { dead = true; };
   }, []));
 
   if (!data || !data.settings.enabled || !data.matches.length) return null;
-  const m: LeagueMatch | null = spotlight(data.matches, mine);
+  const m: LeagueMatch | null = spotlight(data.matches, mine ?? null);
   const st = m ? stateOf(m) : null;
   const home = m ? data.teams.get(m.home_id) : undefined;
   const away = m ? data.teams.get(m.away_id) : undefined;
@@ -76,6 +78,7 @@ export function HomeLeagueTile() {
           </NT>
         </View>
       ) : null}
+      <TeamInviteRow mine={mine} />
       {m ? <SourceCredit color={brand.sand} size={10} /> : null}
     </Pressable>
   );

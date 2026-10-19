@@ -174,8 +174,10 @@ export async function setReminder(matchId: number, on: boolean): Promise<void> {
 }
 
 // ---------- فريقي ----------
+/** فريقي (null = بدون فريق). يرمي خطأ لو ما قدر يقرأ، عشان ما نعامل «ما ندري» كأنه «بدون فريق» */
 export async function myTeam(): Promise<number | null> {
-  const { data } = await supabase.from('league_fans').select('team_id').maybeSingle();
+  const { data, error } = await supabase.from('league_fans').select('team_id').maybeSingle();
+  if (error) throw error;
   return (data?.team_id as number | undefined) ?? null;
 }
 

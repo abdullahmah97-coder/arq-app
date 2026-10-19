@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, I18nManager, Pressable, View } from 'react-native';
 import { BrandGradient, SaduPattern } from '@/brand/Brand';
 import { DayHeader, FormDots, MatchRow, TeamBadge, SourceCredit } from '@/components/league/LeagueParts';
+import { TeamInviteCard } from '@/components/league/TeamInvite';
 import { Button, Card, Empty, Loading, Row, Screen, Segmented, T } from '@/components/ui';
 import { useLocalized } from '@/lib/i18n';
 import {
@@ -26,6 +27,7 @@ export default function League() {
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<Tab>('next');
   const [mine, setMine] = useState<number | null>(null);
+  const [teamKnown, setTeamKnown] = useState(false);
   const [onlyMine, setOnlyMine] = useState(false);
   const [rem, setRem] = useState<Set<number>>(new Set());
   const [limit, setLimit] = useState(PAGE);
@@ -33,9 +35,11 @@ export default function League() {
 
   const load = useCallback(async (force: boolean) => {
     try {
-      const [d, team, r] = await Promise.all([loadLeague(force), myTeam().catch(() => null), myReminders().catch(() => new Set<number>())]);
+      const [d, team, r] = await Promise.all([loadLeague(force), myTeam().catch(() => undefined), myReminders().catch(() => new Set<number>())]);
       dataRef.current = d;
-      setData(d); setMine(team); setRem(r); setFailed(false);
+      setData(d); setRem(r); setFailed(false);
+      // فشل قراءة الفريق ما يمسح فريقك (ولا يطلّع دعوة «مين تشجع؟» بالغلط)
+      if (team !== undefined) { setMine(team); setTeamKnown(true); }
     } catch {
       if (!dataRef.current) setFailed(true);
     }
@@ -113,6 +117,7 @@ export default function League() {
         <Empty icon="football-outline" text={data.settings.enabled ? t('league.noData') : t('league.soon')} />
       ) : (
         <>
+          <TeamInviteCard data={data} mine={teamKnown ? mine : undefined} lng={lng} onPicked={setMine} />
           <Pressable onPress={() => router.push('/league/predictions')} accessibilityRole="button" accessibilityLabel={t('league.predTitle')}
             style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: space.md, backgroundColor: colors.card, borderWidth: 1.5,
               borderColor: brand.amber, borderRadius: radius.lg, padding: space.md }, pressed && { opacity: 0.85 }]}>
